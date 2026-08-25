@@ -21,6 +21,24 @@ the property of its rights holders:
 
 These classes are a project policy, not legal advice.
 
+## Third-party dependencies
+
+Original code is MIT, so permissively licensed dependencies (MIT, BSD,
+Apache-2.0, ISC, Zlib) may be used freely with attribution. Copyleft
+dependencies (GPL, LGPL, AGPL) must not be linked into workspace crates;
+if one is genuinely required later, isolate it behind an optional feature
+or separate tool and record the decision before it is added. Specifically:
+
+- **SNESRecomp is PolyForm Noncommercial.** It may be studied and run locally
+  for analysis, but its code must never be copied into this repository or its
+  build.
+- Emulator cores and SPC700/DSP implementations carry their own licenses;
+  check compatibility before vendoring or linking, and record provenance in
+  the crate that uses them.
+
+When adding any dependency, note its license next to the dependency or in the
+crate README so the next reviewer does not have to rediscover it.
+
 ## Before starting
 
 1. Read [`README.md`](README.md) and
