@@ -51,10 +51,12 @@ Tooling will verify input before reading it. Initial known-good references are:
 | Tenchi Souzou (Japan) | Headerless, 4 MiB | `3CC7FDF4` | `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548` |
 | Terranigma (Europe, English) | Strip a 512-byte copier header when present | `974523FF` | `93ba50d853e98e1ca227a2ca72389c0e3ac18d6b50c946b3f618c16c2d3edd38` |
 
-The Japanese release is the initial code and behavior reference. The European
-release is the initial official English-localization reference. Supporting both
-through one maintainable address/data model is planned, but the first
-behavioral test lane should target only one executable revision.
+**The Japanese release is the sole behavior reference** for reference traces,
+symbol maps, and differential tests through M6. The European release is used
+only as the official English-localization source until cross-version behavior
+support is defined in M8. See
+[ADR 0001](docs/adr/0001-version-support-model.md) for the full
+version-support model.
 
 ## Planned repository layout
 

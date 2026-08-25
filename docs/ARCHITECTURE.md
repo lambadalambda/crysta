@@ -37,7 +37,9 @@ User-provided ROM
 
 ### ROM normalization
 
-All offsets are defined against a headerless image. Input handling must detect
+The Japanese normalized image is the behavior reference; see
+[ADR 0001](adr/0001-version-support-model.md). All offsets are defined
+against a headerless image. Input handling must detect
 and remove a 512-byte copier header without changing the source file, then
 verify the normalized image against a known hash.
 
