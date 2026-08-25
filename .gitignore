@@ -1,0 +1,31 @@
+# Local cartridge dumps and common ROM extensions
+*.[sS][fF][cC]
+*.[sS][mM][cC]
+*.[fF][iI][gG]
+*.[sS][wW][cC]
+baserom
+baserom.*
+
+# Canonical private workspace for all ROM-backed inputs and outputs
+/local/
+/private/
+
+# Generated or extracted copyrighted content
+/assets/generated/
+/generated/
+/disasm/build/
+/oracle/local/
+*.assets
+*.assetpack
+
+# Rust and local tooling
+/target/
+.env
+.env.*
+!.env.example
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
