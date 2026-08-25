@@ -21,10 +21,10 @@ audio device; framebuffers and samples go to caller-provided buffers.
 
 | Candidate | Verdict |
 | --- | --- |
-| **LakeSnes core** | MIT; ~11 K-LOC headless C core; frame-stepped by design; `snes_runFrame` + explicit `snes_setPixels` flush; save/load state built in; same PPU/DSP lineage snesrev uses for per-frame comparison |
+| **LakeSnes core** | MIT; ~11 K-LOC headless C core; frame-stepped by design; `snes_runFrame` + explicit `snes_setPixels` flush; save/load state built in; compact enough to audit |
 | Mesen / Mesen2 | Excellent debugging, but heavy UI-oriented application; embedding headless requires its Lua/IPC surface or significant surgery; license (GPL-3) conflicts with dependency rules |
-| bsnes/ares | Most accurate, but accuracy-tier performance is slower and the library API is larger than needed; GPL-3 also conflicts |
-| snes9x | Non-commercial license clause; rejected |
+| bsnes / ares | Most accurate; both are permissively licensed (ISC) today, so licensing is *not* the blocker — but the library API and accuracy-tier cost are far larger than this boundary needs. Revisit if LakeSnes accuracy becomes limiting |
+| snes9x | Snes9x license is non-commercial; conflicts with MIT distribution; rejected |
 | Custom harness | Maximum control, months of work before the first useful trace; rejected for now, revisit if LakeSnes accuracy becomes the limiting factor |
 
 ## Consequences
@@ -38,8 +38,10 @@ audio device; framebuffers and samples go to caller-provided buffers.
 - LakeSnes is compatibility-grade, not cycle-exact. If oracle/reference
   traces later disagree with hardware findings, the boundary (Session API)
   stays; the core can be swapped.
-- Upstream is dormant since 2023; we carry the vendored copy and patch it in
-  place with upstreamable diffs where practical.
+- Upstream is archived (dormant since 2023; an active fork exists with CX4
+  work). We carry the vendored copy and patch it in place with upstreamable
+  diffs where practical. `vendor/lakesnes/shims.c` is **project-authored**,
+  not upstream.
 
 ## Rejected-but-recorded
 

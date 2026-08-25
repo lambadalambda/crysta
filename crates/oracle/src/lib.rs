@@ -184,14 +184,19 @@ impl Session {
         }
     }
 
-    /// Advances exactly one frame and flushes the framebuffer.
+    /// Advances exactly one frame, then flushes the framebuffer and audio
+    /// samples into the session buffers, mirroring upstream's per-frame
+    /// `playAudio()` + `renderScreen()` sequence.
     ///
-    /// `snes_setPixels` performs the copy from the core's internal line
-    /// buffer into the caller's buffer (the interactive frontend calls it
-    /// once per rendered frame), so we re-invoke it here.
+    /// # Panics
+    ///
+    /// Panics if the sample-buffer size does not fit an `i32`; it is a
+    /// compile-time constant that always fits.
     pub fn run_frame(&mut self) {
         unsafe {
             ffi::snes_runFrame(self.snes);
+            let samples_per_frame = i32::try_from(SAMPLES_PER_FRAME).expect("fits i32");
+            ffi::snes_setSamples(self.snes, self.samples.as_mut_ptr(), samples_per_frame);
             ffi::snes_setPixels(self.snes, self.pixels.as_mut_ptr());
         }
     }
@@ -208,7 +213,8 @@ impl Session {
         unsafe { ffi::snes_setButtonState(self.snes, 1, button.as_c(), pressed) };
     }
 
-    /// The last flushed framebuffer, XRGB byte order, `FRAME_WIDTH x FRAME_HEIGHT`.
+    /// The last flushed framebuffer (XRGB8888, one `u32` per pixel,
+    /// `FRAME_WIDTH x FRAME_HEIGHT`).
     #[must_use]
     pub fn pixels(&self) -> &[u8] {
         &self.pixels
