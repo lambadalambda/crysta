@@ -1,5 +1,26 @@
 # Contributing
 
+## License
+
+Original project code is under the [MIT License](LICENSE). By contributing,
+you license your contributions under the same terms.
+
+MIT covers only original work in this repository. ROM-derived content remains
+the property of its rights holders:
+
+- **Commit-safe:** input logs, schemas, hashes, symbol metadata, synthetic
+  fixtures, documentation, and fully labeled reconstructed assembly/data
+  representing original reverse-engineering annotation in the style of
+  community matching-decompilation projects.
+- **Local only (`local/`, ignored):** cartridge dumps, emulator save states,
+  raw memory/video/audio exports, extracted content, reconstructed binaries,
+  and generated asset packs.
+- **Review required:** minimized derived fixtures or reconstructed source
+  whose copyright/provenance status is not already covered by the classes
+  above.
+
+These classes are a project policy, not legal advice.
+
 ## Before starting
 
 1. Read [`README.md`](README.md) and
@@ -39,15 +60,6 @@ ignored output under `local/`. Raw snapshots, memory/video/audio captures, and
 other ROM-backed oracle artifacts belong there too. Public tests and CI must
 not require copyrighted input. Optional ROM-backed integration tests should
 skip clearly when the expected local ROM is not configured.
-
-Artifact classes are:
-
-- **Commit-safe:** input logs, schemas, hashes, symbol metadata, synthetic
-  fixtures, and documentation written without copied game content.
-- **Local only:** ROMs, emulator states, raw memory/video/audio exports,
-  extracted content, reconstructed binaries, and generated asset packs.
-- **Review required:** minimized derived fixtures or reconstructed source whose
-  copyright/provenance status is not already covered by project policy.
 
 Before every commit, run:
 

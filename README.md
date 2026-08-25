@@ -77,6 +77,15 @@ tools/                  Developer-facing inspection and conversion tools
 
 Directories are added only when their first implementation issue begins.
 
+## License
+
+Original project code is licensed under the [MIT License](LICENSE).
+
+MIT does not cover ROM-derived content. That content remains the property of
+its rights holders and stays out of version control. The publication policy in
+[Contributing](CONTRIBUTING.md) defines what reconstructed source and derived
+artifacts may be committed.
+
 ## Development model
 
 Work is tracked in [`meta/issues.md`](meta/issues.md). Each issue has a focused
@@ -84,6 +93,3 @@ detail file with acceptance criteria. Follow red-green-refactor where practical;
 reverse-engineering discoveries and documentation should instead be validated
 with structural checks, round trips, known hashes, traces, or reproducible
 experiments.
-
-No project license has been selected yet. Until that issue is resolved, no
-permission to copy, modify, or redistribute repository content is implied.
