@@ -1,7 +1,5 @@
 # Open Issues
 
-- [ ] [Bootstrap the Rust workspace and quality gates](issues/bootstrap-rust-workspace.md)
-- [ ] [Implement safe ROM normalization and validation](issues/safe-rom-validation.md)
 - [ ] [Define the ROM revision and version-support model](issues/define-version-support-model.md)
 - [ ] [Establish ROM-free continuous integration](issues/rom-free-ci.md)
 - [ ] [Select and integrate the reference emulator](issues/select-reference-emulator.md)
