@@ -21,6 +21,8 @@ issue files; the open issue index remains the authoritative work queue.
 
 ### Issues
 
+None remaining; M0 is complete. Verification record:
+[ROM-backed run](../docs/rom-verification.md).
 
 <a id="m1-reference-oracle"></a>
 ## M1 — Reference oracle
