@@ -2,9 +2,9 @@
 //! dumps.
 //!
 //! This crate never reads or writes files. Callers own the bytes; everything
-//! here operates on in-memory images. The canonical local tooling entry point
-//! that loads files lives in `tools/` and always writes ROM-derived output
-//! under the ignored `local/` directory.
+//! here operates on in-memory images. File-loading entry points belong to
+//! tooling crates and must write ROM-derived output under the ignored
+//! `local/` directory (see CONTRIBUTING.md).
 
 /// A known, supported cartridge revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +16,22 @@ pub enum Revision {
 }
 
 impl Revision {
+    /// Every supported revision.
+    pub const ALL: [Self; 2] = [Self::Japan, Self::EuropeEnglish];
+
+    /// The built-in known-ROM table used by [`Rom::load`].
+    #[must_use]
+    pub fn builtin_known() -> Vec<KnownRom> {
+        Self::ALL
+            .into_iter()
+            .map(|r| KnownRom {
+                revision: r,
+                sha256: r.sha256(),
+                crc32: r.crc32(),
+            })
+            .collect()
+    }
+
     /// The normalized-image SHA-256 digest of this revision.
     #[must_use]
     pub fn sha256(self) -> [u8; 32] {
@@ -38,8 +54,8 @@ impl Revision {
         }
     }
 
-    /// The internal title recorded in the SNES header at file offset
-    /// `0xFFC0` of the normalized image.
+    /// The internal title recorded at file offset `0xFFC0` of the normalized
+    /// image, from the SNES cartridge header.
     #[must_use]
     pub fn internal_title(self) -> &'static str {
         match self {
@@ -59,10 +75,50 @@ fn hex_to_bytes(s: &str) -> [u8; 32] {
     out
 }
 
+/// A recognized ROM: a revision plus the digests of its normalized image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct KnownRom {
+    /// The revision this entry recognizes.
+    pub revision: Revision,
+    /// Expected SHA-256 of the normalized image.
+    pub sha256: [u8; 32],
+    /// Expected CRC32 of the normalized image.
+    pub crc32: u32,
+}
+
+/// Digests computed over a normalized image.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Digests {
+    /// SHA-256 of the normalized image.
+    pub sha256: [u8; 32],
+    /// CRC32 of the normalized image.
+    pub crc32: u32,
+}
+
+/// Computes SHA-256 and CRC32 over a byte slice.
+#[must_use]
+pub fn digests(bytes: &[u8]) -> Digests {
+    use sha2::{Digest, Sha256};
+    Digests {
+        sha256: Sha256::digest(bytes).into(),
+        crc32: crc32fast::hash(bytes),
+    }
+}
+
+/// How a cartridge image is laid out on disk.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeaderLayout {
+    /// A plain headerless image of exactly [`Rom::IMAGE_SIZE`] bytes.
+    Headerless,
+    /// A [`Rom::HEADER_SIZE`]-byte copier header followed by the image.
+    CopierHeader,
+}
+
 /// Errors produced while loading a cartridge image.
 #[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum LoadError {
-    /// The image is too small to contain an SNES header at all.
+    /// The image is smaller than a valid normalized image.
     TooSmall {
         /// Actual image length in bytes.
         len: usize,
@@ -72,13 +128,15 @@ pub enum LoadError {
         /// Actual image length in bytes.
         len: usize,
     },
-    /// The image has a recognized size but its normalized form matches no
-    /// supported revision.
+    /// The image has a recognized layout but its normalized form matches no
+    /// known revision.
     UnknownRevision {
         /// Computed SHA-256 of the normalized image.
         sha256: [u8; 32],
-        /// Which normalization was attempted.
-        attempted: &'static str,
+        /// Computed CRC32 of the normalized image.
+        crc32: u32,
+        /// Which normalization was applied.
+        attempted: HeaderLayout,
     },
 }
 
@@ -86,19 +144,31 @@ impl std::fmt::Display for LoadError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::TooSmall { len } => {
-                write!(f, "image is too small to contain an SNES ROM ({len} bytes)")
+                write!(f, "image is too small to be a valid ROM ({len} bytes)")
             }
             Self::UnknownSize { len } => write!(
                 f,
-                "image size {len} matches no known SNES layout \
-                 (expected 4 MiB headerless or 4 MiB + 512-byte copier header)"
+                "image size {len} matches no known layout \
+                 (expected {} bytes headerless or {} bytes with a copier header)",
+                Rom::IMAGE_SIZE,
+                Rom::IMAGE_SIZE + Rom::HEADER_SIZE
             ),
-            Self::UnknownRevision { sha256, attempted } => write!(
-                f,
-                "normalized image ({attempted}) matches no supported revision; \
-                 sha256={}",
-                bytes_to_hex(sha256)
-            ),
+            Self::UnknownRevision {
+                sha256,
+                crc32,
+                attempted,
+            } => {
+                let layout = match attempted {
+                    HeaderLayout::Headerless => "headerless",
+                    HeaderLayout::CopierHeader => "copier header stripped",
+                };
+                write!(
+                    f,
+                    "normalized image ({layout}) matches no supported revision; \
+                     sha256={} crc32={crc32:08x}",
+                    bytes_to_hex(sha256)
+                )
+            }
         }
     }
 }
@@ -129,59 +199,71 @@ impl Rom {
     /// Expected normalized image size: 32 Mbit (4 MiB).
     pub const IMAGE_SIZE: usize = 4 * 1024 * 1024;
 
-    /// Detects whether `image` begins with a 512-byte copier header by
-    /// checking whether the SNES header checksum-complement field at
-    /// `0xFFDC` of the candidate headerless image holds the one's complement
-    /// of the checksum at `0xFFDE`.
+    /// Determines the layout of an image from its size.
     ///
-    /// This is a structural test, not a filename convention.
-    #[must_use]
-    fn has_copier_header(image: &[u8]) -> bool {
-        const CHECKSUM_FIELD: usize = 0xFFDC;
-        if image.len() < Self::HEADER_SIZE + CHECKSUM_FIELD + 4 {
-            return false;
-        }
-        let body = &image[Self::HEADER_SIZE..];
-        let complement = u16::from_le_bytes([body[CHECKSUM_FIELD], body[CHECKSUM_FIELD + 1]]);
-        let checksum = u16::from_le_bytes([body[CHECKSUM_FIELD + 2], body[CHECKSUM_FIELD + 3]]);
-        complement == !checksum
-    }
-
-    /// Normalizes `image` in memory: returns the headerless slice and a
-    /// description of the normalization performed. The input is never
-    /// modified.
-    #[must_use]
-    fn normalize(image: &[u8]) -> (&[u8], &'static str) {
-        if Self::has_copier_header(image) {
-            (&image[Self::HEADER_SIZE..], "copier header stripped")
+    /// Size is the primary structural discriminator: the two supported
+    /// layouts differ by exactly 512 bytes and are unambiguous. The SHA-256
+    /// gate in [`Rom::load`] is the authority on whether the resulting
+    /// normalized image is a supported revision.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LoadError`] if the length matches no known layout.
+    pub fn detect_layout(len: usize) -> Result<HeaderLayout, LoadError> {
+        if len == Self::IMAGE_SIZE {
+            Ok(HeaderLayout::Headerless)
+        } else if len == Self::IMAGE_SIZE + Self::HEADER_SIZE {
+            Ok(HeaderLayout::CopierHeader)
+        } else if len < Self::IMAGE_SIZE {
+            Err(LoadError::TooSmall { len })
         } else {
-            (image, "headerless")
+            Err(LoadError::UnknownSize { len })
         }
     }
 
-    /// Loads and validates a cartridge image, normalizing any copier header
-    /// in memory. Rejects unknown, truncated, and unrecognized images.
+    /// Returns the normalized (headerless) slice and the layout it was
+    /// classified as. The input is never modified.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LoadError`] if the image size matches no known layout.
+    fn normalize(image: &[u8]) -> Result<(&[u8], HeaderLayout), LoadError> {
+        match Self::detect_layout(image.len())? {
+            HeaderLayout::Headerless => Ok((image, HeaderLayout::Headerless)),
+            HeaderLayout::CopierHeader => {
+                Ok((&image[Self::HEADER_SIZE..], HeaderLayout::CopierHeader))
+            }
+        }
+    }
+
+    /// Loads and validates a cartridge image against the built-in table of
+    /// known revisions, normalizing any copier header in memory.
     ///
     /// # Errors
     ///
     /// Returns a [`LoadError`] describing why the image was rejected.
     pub fn load(image: &[u8]) -> Result<Self, LoadError> {
-        use sha2::{Digest, Sha256};
-        const CHECKSUM_FIELD: usize = 0xFFDC;
-        if image.len() < Self::HEADER_SIZE + CHECKSUM_FIELD + 4 {
-            return Err(LoadError::TooSmall { len: image.len() });
-        }
-        let (body, attempted) = Self::normalize(image);
-        if body.len() != Self::IMAGE_SIZE {
-            return Err(LoadError::UnknownSize { len: image.len() });
-        }
-        let digest: [u8; 32] = Sha256::digest(body).into();
-        let revision = [Revision::Japan, Revision::EuropeEnglish]
-            .into_iter()
-            .find(|r| r.sha256() == digest)
+        Self::load_with_known(image, &Revision::builtin_known())
+    }
+
+    /// Loads and validates a cartridge image against a caller-supplied table
+    /// of known ROMs. Useful for tests and for future revisions that are not
+    /// part of the built-in table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`LoadError`] describing why the image was rejected.
+    pub fn load_with_known(image: &[u8], known: &[KnownRom]) -> Result<Self, LoadError> {
+        let (body, layout) = Self::normalize(image)?;
+        let d = digests(body);
+        let revision = known
+            .iter()
+            .find(|k| k.sha256 == d.sha256 && k.crc32 == d.crc32)
+            .map(|k| k.revision)
             .ok_or(LoadError::UnknownRevision {
-                sha256: digest,
-                attempted,
+                sha256: d.sha256,
+                crc32: d.crc32,
+                attempted: layout,
             })?;
         Ok(Self {
             revision,
@@ -206,58 +288,100 @@ impl Rom {
 mod tests {
     use super::*;
 
-    /// Builds a synthetic image of `size` bytes with a plausible SNES
-    /// internal header at `0xFFC0`, whose checksum fields are either
-    /// consistent (used to fake "structural" header detection) or zero.
-    fn synthetic_image(size: usize, valid_checksum: bool) -> Vec<u8> {
+    /// A deterministic synthetic image of `size` bytes with a plausible SNES
+    /// internal header at `0xFFC0`.
+    fn synthetic_image(size: usize) -> Vec<u8> {
         let mut v = vec![0u8; size];
-        // internal title
-        v[0xFFC0..0xFFC0 + 4].copy_from_slice(b"SYNT");
-        if valid_checksum {
-            let checksum: u16 = 0x1234;
-            v[0xFFDC..0xFFDE].copy_from_slice(&(!checksum).to_le_bytes());
-            v[0xFFDE..0xFFE0].copy_from_slice(&checksum.to_le_bytes());
+        for (i, b) in b"SYNTHETIC-TEST-ROM!".iter().enumerate() {
+            v[i] = *b;
+            v[size - 1 - i] = !*b;
         }
+        v[0xFFC0..0xFFC0 + 4].copy_from_slice(b"SYNT");
         v
     }
 
-    #[test]
-    fn rejects_too_small() {
-        let err = Rom::load(&[0u8; 64]).unwrap_err();
-        assert_eq!(err, LoadError::TooSmall { len: 64 });
+    /// Builds a known-ROM table entry matching `image`'s actual digests, so
+    /// the full success path can be exercised without any real dump.
+    fn known_for(image: &[u8]) -> Vec<KnownRom> {
+        vec![KnownRom {
+            revision: Revision::Japan,
+            sha256: digests(image).sha256,
+            crc32: digests(image).crc32,
+        }]
     }
 
     #[test]
-    fn rejects_unknown_size() {
-        // big enough to structurally inspect, wrong total size
-        let img = synthetic_image(Rom::IMAGE_SIZE + 1024, false);
-        let err = Rom::load(&img).unwrap_err();
-        assert!(matches!(err, LoadError::UnknownSize { .. }));
+    fn layout_detection_by_size() {
+        assert_eq!(
+            Rom::detect_layout(Rom::IMAGE_SIZE),
+            Ok(HeaderLayout::Headerless)
+        );
+        assert_eq!(
+            Rom::detect_layout(Rom::IMAGE_SIZE + Rom::HEADER_SIZE),
+            Ok(HeaderLayout::CopierHeader)
+        );
+        assert_eq!(Rom::detect_layout(64), Err(LoadError::TooSmall { len: 64 }));
+        assert_eq!(
+            Rom::detect_layout(Rom::IMAGE_SIZE + 1),
+            Err(LoadError::UnknownSize {
+                len: Rom::IMAGE_SIZE + 1
+            })
+        );
+        assert_eq!(
+            Rom::detect_layout(Rom::IMAGE_SIZE + 1024),
+            Err(LoadError::UnknownSize {
+                len: Rom::IMAGE_SIZE + 1024
+            })
+        );
     }
 
     #[test]
-    fn header_detection_uses_structure_not_filename() {
-        // A headerless image has its checksum fields at 0xFFDC/0xFFDE.
-        let img = synthetic_image(Rom::IMAGE_SIZE, true);
-        assert!(!Rom::has_copier_header(&img));
-
-        // Prepend a copier header: the same fields now sit 512 bytes later,
-        // and the bytes at 0xFFDC of the *whole* image are zeros, while the
-        // structural test must find the valid pair at +512.
-        let mut with_header = vec![0u8; 512];
-        with_header.extend_from_slice(&img);
-        assert!(Rom::has_copier_header(&with_header));
+    fn success_path_with_injected_digests_headerless() {
+        let image = synthetic_image(Rom::IMAGE_SIZE);
+        let rom = Rom::load_with_known(&image, &known_for(&image))
+            .expect("synthetic image must load against its own digests");
+        assert_eq!(rom.revision(), Revision::Japan);
+        assert_eq!(rom.image().len(), Rom::IMAGE_SIZE);
+        assert_eq!(rom.image(), image.as_slice());
     }
 
     #[test]
-    fn error_messages_are_actionable() {
-        let msg = LoadError::UnknownRevision {
-            sha256: [0xAB; 32],
-            attempted: "copier header stripped",
+    fn success_path_with_injected_digests_copier_header() {
+        let body = synthetic_image(Rom::IMAGE_SIZE);
+        let mut with_header = vec![0xA5u8; Rom::HEADER_SIZE];
+        with_header.extend_from_slice(&body);
+        // Digests are computed over the normalized body, not the header.
+        let rom = Rom::load_with_known(&with_header, &known_for(&body))
+            .expect("headered synthetic image must load against body digests");
+        assert_eq!(rom.image(), body.as_slice());
+    }
+
+    #[test]
+    fn unknown_bytes_are_rejected_with_actionable_error() {
+        let image = synthetic_image(Rom::IMAGE_SIZE);
+        let err = Rom::load_with_known(&image, &known_for(&synthetic_image(Rom::IMAGE_SIZE + 1)))
+            .unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("sha256="), "message: {msg}");
+        assert!(msg.contains("crc32="), "message: {msg}");
+        assert!(msg.contains("headerless"), "message: {msg}");
+    }
+
+    #[test]
+    fn headered_bytes_that_match_no_table_report_the_strip() {
+        let body = synthetic_image(Rom::IMAGE_SIZE);
+        let mut with_header = vec![0u8; Rom::HEADER_SIZE];
+        with_header.extend_from_slice(&body);
+        let err = Rom::load_with_known(&with_header, &[]).unwrap_err();
+        let msg = err.to_string();
+        assert!(msg.contains("copier header stripped"), "message: {msg}");
+    }
+
+    #[test]
+    fn builtin_table_covers_all_revisions_consistently() {
+        for k in Revision::builtin_known() {
+            assert_eq!(k.sha256, k.revision.sha256());
+            assert_eq!(k.crc32, k.revision.crc32());
         }
-        .to_string();
-        assert!(msg.contains("sha256="));
-        assert!(msg.contains("abab"));
-        assert!(msg.contains("copier"));
     }
 }

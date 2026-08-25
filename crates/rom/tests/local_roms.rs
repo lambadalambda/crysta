@@ -54,9 +54,14 @@ fn corrupted_image_is_rejected_with_hash() {
     corrupted[0x100] ^= 0xFF;
     let err = Rom::load(&corrupted).unwrap_err();
     match err {
-        LoadError::UnknownRevision { sha256, attempted } => {
+        LoadError::UnknownRevision {
+            sha256,
+            crc32,
+            attempted,
+        } => {
             assert_ne!(sha256, Revision::Japan.sha256());
-            assert_eq!(attempted, "headerless");
+            assert_ne!(crc32, Revision::Japan.crc32());
+            assert_eq!(attempted, rom::HeaderLayout::Headerless);
         }
         other => panic!("expected UnknownRevision, got {other:?}"),
     }

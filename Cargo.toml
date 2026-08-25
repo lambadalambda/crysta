@@ -6,7 +6,7 @@ members = ["crates/rom"]
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://example.invalid/terranigma"
+repository = "https://github.com/lainsoykaf/terranigma"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

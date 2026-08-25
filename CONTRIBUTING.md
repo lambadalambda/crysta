@@ -100,6 +100,23 @@ An issue is complete only after its acceptance criteria have been verified.
 Move its index entry from `meta/issues.md` to `meta/issues_archive.md`, changing
 `[ ]` to `[x]`; leave the detail file in place.
 
+## Toolchain and quality gates
+
+The repository pins the current stable toolchain in
+[`rust-toolchain.toml`](rust-toolchain.toml); any Rust version capable of
+building the workspace may be used locally, but CI uses the pinned channel.
+Run the full gate suite before committing:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+Clippy is configured at `warn` level in the workspace manifest for
+incremental development, but commits must pass `-D warnings` as shown above;
+CI enforces the same.
+
 ## Commits
 
 Use small topical commits and Conventional Commit messages, for example:

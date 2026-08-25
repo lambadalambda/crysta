@@ -186,8 +186,7 @@ The milestone backlog intentionally leaves these choices open until measured:
 - assembler/disassembly toolchain;
 - reference emulator integration;
 - whether static recompilation is used as a temporary bridge;
-- rendering and audio backend libraries;
-- project license and contributor policy.
+- rendering and audio backend libraries.
 
 Record consequential choices as short architecture decision records rather
 than silently encoding them in implementation details.

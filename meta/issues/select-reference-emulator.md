@@ -26,4 +26,8 @@ Evaluate emulator/debugger options and integrate the smallest maintainable refer
 ## Notes
 
 - Milestone: [M1 — Reference oracle](../milestones.md#m1-reference-oracle)
+- Snapshots, memory dumps, screenshots, and audio captures produced here are
+  local-only artifacts under the classes defined in
+  [CONTRIBUTING](../../CONTRIBUTING.md); public fixtures carry inputs, hashes,
+  and schemas only.
 - Mesen, bsnes-derived cores, and a dedicated headless harness are candidates; selection must be evidence-based.

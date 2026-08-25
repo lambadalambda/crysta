@@ -26,4 +26,7 @@ Select an assembler and create a reconstruction that can replace opaque ROM rang
 ## Notes
 
 - Milestone: [M2 — Matching disassembly foundation](../milestones.md#m2-matching-disassembly-foundation)
+- Reconstructed assembly and data committed under this issue follow the
+  commit-safe / local-only / review-required classes defined in
+  [CONTRIBUTING](../../CONTRIBUTING.md).
 - Matching is an archival/reference property; the portable Rust build must not depend on assembling a ROM.
