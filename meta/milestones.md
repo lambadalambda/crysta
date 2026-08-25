@@ -21,7 +21,6 @@ issue files; the open issue index remains the authoritative work queue.
 
 ### Issues
 
-- [Record first ROM-backed verification run](issues/record-first-rom-backed-run.md)
 
 <a id="m1-reference-oracle"></a>
 ## M1 — Reference oracle

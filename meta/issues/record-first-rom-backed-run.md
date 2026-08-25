@@ -25,3 +25,4 @@ Run the full local verification against the actual cartridge dumps and record th
 
 - Milestone: [M0 — Safe foundation](../milestones.md#m0-safe-foundation)
 - The optional local tests currently pass on the author's machine, but results were not recorded in-repo; this makes that verification durable and reviewable.
+- Results recorded in [docs/rom-verification.md](../../docs/rom-verification.md).
