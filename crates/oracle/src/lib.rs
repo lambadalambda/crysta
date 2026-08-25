@@ -10,6 +10,8 @@ use std::fmt;
 use rom::Rom;
 use sha2::{Digest, Sha256};
 
+pub mod replay;
+
 mod ffi {
     #![allow(non_snake_case, non_camel_case_types, dead_code)]
 
@@ -258,6 +260,40 @@ impl Drop for Session {
         unsafe { ffi::snes_free(self.snes) };
     }
 }
+
+/// Saves the core state to an opaque byte vector for replay resumption.
+///
+/// # Panics
+///
+/// Panics if the state exceeds an internal bound (allocation guard).
+#[must_use]
+pub fn save_state(session: &Session) -> Vec<u8> {
+    unsafe {
+        // LakeSnes returns the used size; a NULL probe is not offered, so
+        // allocate the documented maximum and truncate.
+        let mut buf = vec![0u8; STATE_SIZE_MAX];
+        let n = ffi::snes_saveState(session.snes, buf.as_mut_ptr());
+        assert!(n >= 0, "state save failed");
+        let n = usize::try_from(n).expect("positive size");
+        assert!(n <= STATE_SIZE_MAX, "state exceeded allocation");
+        buf.truncate(n);
+        buf
+    }
+}
+
+/// Loads a core state previously saved by [`save_state`].
+///
+/// # Panics
+///
+/// Panics if the core rejects the payload.
+pub fn load_state(session: &mut Session, data: &[u8]) {
+    let len = i32::try_from(data.len()).expect("state size fits i32");
+    let ok = unsafe { ffi::snes_loadState(session.snes, data.as_ptr(), len) };
+    assert!(ok, "core rejected state payload");
+}
+
+/// Internal bound matching the core's documented maximum state size.
+const STATE_SIZE_MAX: usize = 4 * 1024 * 1024;
 
 #[cfg(test)]
 mod tests {

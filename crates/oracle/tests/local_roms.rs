@@ -3,6 +3,7 @@
 //! Proves the reference boundary boots the real game headless, advances the
 //! game's own state machine, and reaches a stable frame boundary from reset.
 
+use oracle::replay::{run_fixture, save_snapshot, ButtonDef, Fixture, FrameInput, StartPoint};
 use oracle::{Button, Session};
 use rom::Revision;
 
@@ -106,4 +107,88 @@ fn start_input_advances_game_state() {
     // Audio path must be flushed too (nonzero samples after boot music).
     let audible = pressed_at_300.samples().iter().filter(|s| **s != 0).count();
     eprintln!("pixels non-black: {nonblack}, samples non-zero: {audible}");
+}
+
+#[test]
+fn replay_fixture_is_deterministic_and_snapshot_resumes() {
+    let Some(image) = local_rom("Tenchi Souzou (Japan).sfc") else {
+        eprintln!("skipping: local Japanese dump not present");
+        return;
+    };
+    let rom = rom::Rom::load(&image).expect("validated dump");
+    let rom_sha = rom.revision().sha256();
+
+    let fixture = Fixture {
+        version: oracle::replay::FIXTURE_VERSION,
+        rom_sha256: rom_sha,
+        harness: "smoke".into(),
+        start: StartPoint::Reset { skip_frames: 300 },
+        frames: vec![
+            FrameInput {
+                press: vec![ButtonDef::Start],
+                release: vec![],
+            },
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput::default(),
+            FrameInput {
+                press: vec![],
+                release: vec![ButtonDef::Start],
+            },
+        ],
+    };
+    fixture.validate(rom_sha).expect("fixture matches ROM");
+
+    // Two independent runs must agree exactly.
+    let mut a = oracle::Session::new(&rom).expect("session a");
+    let mut b = oracle::Session::new(&rom).expect("session b");
+    let sa = run_fixture(&mut a, &fixture);
+    let sb = run_fixture(&mut b, &fixture);
+    assert_eq!(sa, sb, "same fixture must produce identical state");
+
+    // Snapshot after the skip, then resume and compare against a run that
+    // continued normally: states must match.
+    let mut base = oracle::Session::new(&rom).expect("session base");
+    base.run_frames(300);
+    let snap = save_snapshot(&base);
+
+    let mut resumed = oracle::Session::new(&rom).expect("session resumed");
+    oracle::load_state(&mut resumed, &snap);
+    for f in &fixture.frames {
+        for btn in &f.press {
+            resumed.set_button((*btn).into(), true);
+        }
+        for btn in &f.release {
+            resumed.set_button((*btn).into(), false);
+        }
+        resumed.run_frame();
+    }
+    // base continues identically from its own state
+    for f in &fixture.frames {
+        for btn in &f.press {
+            base.set_button((*btn).into(), true);
+        }
+        for btn in &f.release {
+            base.set_button((*btn).into(), false);
+        }
+        base.run_frame();
+    }
+    assert_eq!(
+        resumed.frame_state(),
+        base.frame_state(),
+        "snapshot resume must equal continuous run"
+    );
+
+    // Corrupt fixture rejection.
+    let mut bad = fixture.clone();
+    bad.rom_sha256 = [0x00; 32];
+    assert!(bad.validate(rom_sha).is_err());
+    bad.rom_sha256 = rom_sha;
+    bad.version = 99;
+    assert!(bad.validate(rom_sha).is_err());
 }
