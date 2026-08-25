@@ -62,6 +62,11 @@ def main() -> int:
             violations.append(f"baserom-like file tracked: {rel}")
         if parts[:1] in (("local",), ("private",)):
             violations.append(f"ignored local content tracked: {rel}")
+        if "local" in parts or "private" in parts:
+            if parts[:1] in (("local",), ("private",)):
+                violations.append(f"ignored local content tracked: {rel}")
+            elif "generated" not in parts:
+                violations.append(f"ignored nested local/private path tracked: {rel}")
         if "generated" in parts:
             violations.append(f"generated-asset location tracked: {rel}")
 
@@ -72,7 +77,7 @@ def main() -> int:
         if (
             len(data) > MAX_BLOB_BYTES
             and not rel.startswith(ALLOWED_BINARY_PREFIXES)
-            and suffix not in {".lock", ".md"}
+            and rel != "Cargo.lock"
         ):
             violations.append(
                 f"binary blob {len(data)} bytes exceeds {MAX_BLOB_BYTES}: {rel}"

@@ -56,6 +56,7 @@ def main() -> int:
         text = p.read_text()
         if text.count("## Dependencies") != 1:
             violations.append(f"{p.name}: dependency section count")
+            continue
         section = text.split("## Dependencies", 1)[1].split("## Requirements", 1)[0]
         graph[p.name] = re.findall(r"\[[^]]+\]\(([^)#]+\.md)\)", section)
 
@@ -76,21 +77,27 @@ def main() -> int:
     for node in graph:
         visit(node)
 
-    # Markdown link resolution across the repo.
-    for p in ROOT.rglob("*.md"):
-        if ".git" in p.parts:
-            continue
-        for match in re.finditer(r"\[[^]]+\]\(([^)]+)\)", p.read_text()):
+    # Markdown link resolution across the repo, skipping ignored directories.
+    ignored_dirs = {"local", "private", "target", ".git"}
+    md_files = [
+        p
+        for p in ROOT.rglob("*.md")
+        if not ignored_dirs & set(p.parts)
+    ]
+    for p in md_files:
+        text = p.read_text()
+        for match in re.finditer(r"\[[^]]+\]\(([^)]+)\)", text):
             raw = match.group(1)
             if raw.startswith(("http://", "https://", "mailto:", "#")):
                 continue
             target, _, fragment = raw.partition("#")
             if not target:
                 continue
-            if not (p.parent / target).resolve().exists():
+            resolved = (p.parent / target).resolve()
+            if not resolved.exists():
                 violations.append(f"{p}: broken link {raw}")
             elif fragment:
-                t = (p.parent / target).resolve().read_text()
+                t = resolved.read_text()
                 if f'id="{fragment}"' not in t:
                     violations.append(f"{p}: missing anchor {raw}")
 
