@@ -31,3 +31,4 @@ Evaluate emulator/debugger options and integrate the smallest maintainable refer
   [CONTRIBUTING](../../CONTRIBUTING.md); public fixtures carry inputs, hashes,
   and schemas only.
 - Mesen, bsnes-derived cores, and a dedicated headless harness are candidates; selection must be evidence-based.
+- Decision recorded in [ADR 0002](../../docs/adr/0002-reference-emulator.md); results verified on the local Japanese dump (stable boundary at frame 50, input divergence confirmed).

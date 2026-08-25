@@ -38,7 +38,6 @@ None remaining; M0 is complete. Verification record:
 
 ### Issues
 
-- [Select and integrate the reference emulator](issues/select-reference-emulator.md)
 - [Record deterministic input replays and snapshots](issues/deterministic-replays-snapshots.md)
 - [Export and compare reference frame state](issues/reference-state-export.md)
 - [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)

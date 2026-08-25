@@ -1,0 +1,19 @@
+[package]
+name = "oracle"
+description = "Reference execution boundary: vendored LakeSnes core plus deterministic frame stepping"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+rom = { path = "../rom" }
+sha2 = "0.10"
+
+[build-dependencies]
+cc = "1.1"
+
+[lints]
+rust.unsafe_code = "allow"
+clippy.all = { level = "warn", priority = -1 }
+clippy.pedantic = "warn"

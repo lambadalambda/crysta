@@ -8,3 +8,4 @@
 - [x] [Define the ROM revision and version-support model](issues/define-version-support-model.md)
 - [x] [Establish ROM-free continuous integration](issues/rom-free-ci.md)
 - [x] [Record first ROM-backed verification run](issues/record-first-rom-backed-run.md)
+- [x] [Select and integrate the reference emulator](issues/select-reference-emulator.md)
