@@ -39,7 +39,6 @@ None remaining; M0 is complete. Verification record:
 ### Issues
 
 - [Harden the oracle session boundary](issues/harden-oracle-session.md)
-- [Export and compare reference frame state](issues/reference-state-export.md)
 - [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
 
 <a id="m2-matching-disassembly-foundation"></a>

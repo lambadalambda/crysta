@@ -10,6 +10,7 @@ use std::fmt;
 use rom::Rom;
 use sha2::{Digest, Sha256};
 
+pub mod export;
 pub mod replay;
 
 mod ffi {

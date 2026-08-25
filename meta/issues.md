@@ -1,7 +1,6 @@
 # Open Issues
 
 - [ ] [Harden the oracle session boundary](issues/harden-oracle-session.md)
-- [ ] [Export and compare reference frame state](issues/reference-state-export.md)
 - [ ] [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
 - [ ] [Establish a byte-matching disassembly build](issues/matching-disassembly-build.md)
 - [ ] [Disassemble boot, interrupts, and the main loop](issues/disassemble-boot-main-loop.md)
