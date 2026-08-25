@@ -21,11 +21,6 @@ issue files; the open issue index remains the authoritative work queue.
 
 ### Issues
 
-- [Select the project license and contribution policy](issues/select-project-license.md)
-- [Define the oracle artifact and publication policy](issues/define-oracle-artifact-policy.md)
-- [Bootstrap the Rust workspace and quality gates](issues/bootstrap-rust-workspace.md)
-- [Implement safe ROM normalization and validation](issues/safe-rom-validation.md)
-- [Define the ROM revision and version-support model](issues/define-version-support-model.md)
 - [Establish ROM-free continuous integration](issues/rom-free-ci.md)
 
 <a id="m1-reference-oracle"></a>

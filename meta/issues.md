@@ -1,6 +1,5 @@
 # Open Issues
 
-- [ ] [Establish ROM-free continuous integration](issues/rom-free-ci.md)
 - [ ] [Select and integrate the reference emulator](issues/select-reference-emulator.md)
 - [ ] [Record deterministic input replays and snapshots](issues/deterministic-replays-snapshots.md)
 - [ ] [Export and compare reference frame state](issues/reference-state-export.md)

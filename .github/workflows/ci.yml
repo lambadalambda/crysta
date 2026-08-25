@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rust:
+    name: Rust (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Format
+        run: cargo fmt --all -- --check
+      - name: Clippy (warnings denied)
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests (ROM-free; local tests skip without dumps)
+        run: cargo test --workspace
+      - name: Docs
+        run: cargo doc --workspace --no-deps
+
+  safety:
+    name: Repository safety and tracker checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Repository safety (ROM-free)
+        run: python3 tools/check_repo_safety.py
+      - name: Tracker structure
+        run: python3 tools/check_tracker.py
+
+  safety-selftest:
+    name: Safety check detects a planted ROM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Plant a fake ROM-named file
+        run: |
+          printf 'fake' > planted.sfc
+          git add -f planted.sfc
+      - name: Safety check must fail
+        run: |
+          if python3 tools/check_repo_safety.py; then
+            echo "ERROR: safety check did not fail on planted ROM" >&2
+            exit 1
+          else
+            echo "safety check correctly rejected planted ROM"
+          fi

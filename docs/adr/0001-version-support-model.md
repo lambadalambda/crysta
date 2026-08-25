@@ -1,7 +1,7 @@
 # ROM Revision and Version-Support Model
 
 Status: decided 2026-08-25. This is an architecture decision record for
-[the version-support issue](../meta/issues/define-version-support-model.md).
+[the version-support issue](../../meta/issues/define-version-support-model.md).
 
 ## Decision
 

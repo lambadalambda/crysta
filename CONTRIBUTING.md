@@ -111,11 +111,21 @@ Run the full gate suite before committing:
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+python3 tools/check_repo_safety.py
+python3 tools/check_tracker.py
 ```
 
 Clippy is configured at `warn` level in the workspace manifest for
 incremental development, but commits must pass `-D warnings` as shown above;
 CI enforces the same.
+
+### Local ROM-backed tests
+
+Tests that need real dumps read them from the git-ignored `local/`
+directory (e.g. `local/Tenchi Souzou (Japan).sfc`) and **skip with a clear
+message when absent** — `cargo test --workspace` stays fully green on a
+clean checkout and in CI. To run them locally, copy your dumps into
+`local/` first.
 
 ## Commits
 
