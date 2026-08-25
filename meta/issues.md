@@ -1,6 +1,5 @@
 # Open Issues
 
-- [ ] [Bootstrap the repository plan](issues/bootstrap-repository-plan.md)
 - [ ] [Select the project license and contribution policy](issues/select-project-license.md)
 - [ ] [Define the oracle artifact and publication policy](issues/define-oracle-artifact-policy.md)
 - [ ] [Bootstrap the Rust workspace and quality gates](issues/bootstrap-rust-workspace.md)
