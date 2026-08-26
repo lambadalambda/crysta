@@ -73,6 +73,17 @@ An earlier "leading hypothesis" (vblank/`$4210` handshake) was disproven:
 the `$4210` NMI-wait helper at `$86:8009` works (the CPU sees the flag and
 proceeds ~10×/frame); `$4210` timing is fine.
 
+## Core-swap check (2026-08-26): fork does not help
+
+Tested as a drop-in: `dinkc64/LakeSnes` (the active fork, latest commit
+`048a0d72`, incl. its single-cycle SPC rework) via
+[ADR 0002 update](adr/0002-reference-emulator.md). Boot replays
+**identically** — same map history `1 → 34 → 4 → 15 → 41 → 15`, same
+state `$170`, same pending-41 wedge, same player position (304,112). Both
+LakeSnes generations share the CPU↔SPC interleaving gap (upstream README:
+"communication between the CPU and SPC is also not cycle-accurate"); the
+vendored core remains at upstream commit `9db90b8`.
+
 ## Reusable RAM symbols (probe-derived)
 
 - `0x0450` program state, `0x047E` current map, `0x0480` map × 2,

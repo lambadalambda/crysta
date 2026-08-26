@@ -47,3 +47,20 @@ audio device; framebuffers and samples go to caller-provided buffers.
 
 Swapping in a more accurate core later is intentionally cheap: the `Session`
 surface (`new/run_frame/set_button/frame_state`) hides the core entirely.
+
+## Update 2026-08-26: fork swap evaluated, not adopted
+
+The M1 boot sequence stalls in an SPC driver-upload handshake (see
+[oracle-boot-probes.md](../oracle-boot-probes.md)). Because upstream
+LakeSnes was archived, the active fork (`dinkc64/LakeSnes`, with a
+single-cycle SPC rework) was tested as a drop-in: vendored at its latest
+commit (`048a0d72`), `cx4.c`/`cx4.h` added to the build, and a compat no-op
+`shims.c` `snes_setPixelFormat` (the fork hardcodes the same XRGB8888
+layout). The fork compiled unmodified against our shims, but the boot
+replays **identically** — same map history, same state `$170` / pending map
+41 wedge, same frame counts. Conclusion: both LakeSnes generations share
+the CPU↔SPC interleaving gap (upstream README itself warns "communication
+between the CPU and SPC is also not cycle-accurate"), so a core swap within
+the LakeSnes family does not unblock the post-name-entry scenarios. The
+vendored core stays at the ADR-pinned commit `9db90b8`. Revisiting accuracy
+would mean a different core family (bsnes/ares), per the decision above.
