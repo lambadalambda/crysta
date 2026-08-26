@@ -39,6 +39,7 @@ None remaining; M0 is complete. Verification record:
 ### Issues
 
 - [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
+- [Switch reference core to bsnes](issues/switch-reference-core.md)
 
 <a id="m2-matching-disassembly-foundation"></a>
 ## M2 — Matching disassembly foundation
