@@ -54,6 +54,8 @@ mod ffi {
         pub fn snes_ram(snes: *const Snes) -> *const u8;
         pub fn snes_frames(snes: *const Snes) -> u32;
         pub fn snes_cycles(snes: *const Snes) -> u64;
+        pub fn snes_vram(snes: *const Snes) -> *const u16;
+        pub fn snes_cgram(snes: *const Snes) -> *const u16;
     }
 }
 
@@ -229,6 +231,26 @@ impl Session {
         &self.samples
     }
 
+    /// The full 64 KiB VRAM image (16-bit words).
+    #[must_use]
+    pub fn vram(&self) -> Vec<u16> {
+        let mut out = vec![0u16; 0x8000];
+        unsafe {
+            std::ptr::copy_nonoverlapping(ffi::snes_vram(self.snes), out.as_mut_ptr(), 0x8000);
+        }
+        out
+    }
+
+    /// The 256-entry CGRAM palette (15-bit colors, one `u16` each).
+    #[must_use]
+    pub fn cgram(&self) -> Vec<u16> {
+        let mut out = vec![0u16; 0x100];
+        unsafe {
+            std::ptr::copy_nonoverlapping(ffi::snes_cgram(self.snes), out.as_mut_ptr(), 0x100);
+        }
+        out
+    }
+
     /// Reads a byte from WRAM (`$7E:0000`–`$7F:FFFF`).
     ///
     /// # Panics
@@ -334,5 +356,21 @@ mod tests {
         let rom = synthetic_rom();
         let s = Session::new(&rom).expect("core accepts image");
         let _ = s.wram(0x1FFFF);
+    }
+
+    #[test]
+    fn graphics_memory_is_full_size_and_deterministic() {
+        let rom = synthetic_rom();
+        let run = |frames: usize| -> (Vec<u16>, Vec<u16>) {
+            let mut s = Session::new(&rom).expect("core accepts image");
+            s.run_frames(frames);
+            (s.vram(), s.cgram())
+        };
+        let (vram_a, cgram_a) = run(10);
+        let (vram_b, cgram_b) = run(10);
+        assert_eq!(vram_a.len(), 0x8000);
+        assert_eq!(cgram_a.len(), 0x100);
+        assert_eq!(vram_a, vram_b);
+        assert_eq!(cgram_a, cgram_b);
     }
 }
