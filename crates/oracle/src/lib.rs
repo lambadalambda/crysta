@@ -56,6 +56,8 @@ mod ffi {
         pub fn snes_cycles(snes: *const Snes) -> u64;
         pub fn snes_vram(snes: *const Snes) -> *const u16;
         pub fn snes_cgram(snes: *const Snes) -> *const u16;
+        pub fn snes_cpu_pc(snes: *const Snes) -> u16;
+        pub fn snes_cpu_bank(snes: *const Snes) -> u8;
     }
 }
 
@@ -260,6 +262,18 @@ impl Session {
         out
     }
 
+    /// The program counter the core's CPU is currently at.
+    #[must_use]
+    pub fn cpu_pc(&self) -> u16 {
+        unsafe { ffi::snes_cpu_pc(self.snes) }
+    }
+
+    /// The program bank the core's CPU is currently executing in.
+    #[must_use]
+    pub fn cpu_bank(&self) -> u8 {
+        unsafe { ffi::snes_cpu_bank(self.snes) }
+    }
+
     /// Reads a byte from WRAM (`$7E:0000`–`$7F:FFFF`).
     ///
     /// # Panics
@@ -389,5 +403,16 @@ mod tests {
         assert_eq!(cgram_a.len(), 0x100);
         assert_eq!(vram_a, vram_b);
         assert_eq!(cgram_a, cgram_b);
+    }
+
+    #[test]
+    fn cpu_pc_is_exposed_and_deterministic() {
+        let rom = synthetic_rom();
+        let run = || -> (u16, u8) {
+            let mut s = Session::new(&rom).expect("core accepts image");
+            s.run_frames(10);
+            (s.cpu_pc(), s.cpu_bank())
+        };
+        assert_eq!(run(), run());
     }
 }
