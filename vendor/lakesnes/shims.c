@@ -15,3 +15,6 @@ const uint16_t* snes_cgram(const Snes* snes) { return snes->ppu->cgram; }
 /* CPU register access for the headless oracle. */
 uint16_t snes_cpu_pc(const Snes* snes) { return snes->cpu->pc; }
 uint8_t snes_cpu_bank(const Snes* snes) { return snes->cpu->k; }
+
+/* SPC RAM access for the headless oracle. */
+const uint8_t* snes_apu_ram(const Snes* snes) { return snes->apu->ram; }

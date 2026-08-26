@@ -58,6 +58,7 @@ mod ffi {
         pub fn snes_cgram(snes: *const Snes) -> *const u16;
         pub fn snes_cpu_pc(snes: *const Snes) -> u16;
         pub fn snes_cpu_bank(snes: *const Snes) -> u8;
+        pub fn snes_apu_ram(snes: *const Snes) -> *const u8;
     }
 }
 
@@ -274,6 +275,16 @@ impl Session {
         unsafe { ffi::snes_cpu_bank(self.snes) }
     }
 
+    /// The full 64 KiB SPC RAM image (the audio driver's workspace).
+    #[must_use]
+    pub fn apu_ram(&self) -> Vec<u8> {
+        let mut out = vec![0u8; 0x10000];
+        unsafe {
+            std::ptr::copy_nonoverlapping(ffi::snes_apu_ram(self.snes), out.as_mut_ptr(), 0x10000);
+        }
+        out
+    }
+
     /// Reads a byte from WRAM (`$7E:0000`–`$7F:FFFF`).
     ///
     /// # Panics
@@ -414,5 +425,19 @@ mod tests {
             (s.cpu_pc(), s.cpu_bank())
         };
         assert_eq!(run(), run());
+    }
+
+    #[test]
+    fn spc_ram_is_full_size_and_deterministic() {
+        let rom = synthetic_rom();
+        let run = || -> Vec<u8> {
+            let mut s = Session::new(&rom).expect("core accepts image");
+            s.run_frames(10);
+            s.apu_ram()
+        };
+        let a = run();
+        let b = run();
+        assert_eq!(a.len(), 0x10000);
+        assert_eq!(a, b);
     }
 }
