@@ -2,6 +2,7 @@
 //!
 //! Proves the reference boundary boots the real game headless, advances the
 //! game's own state machine, and reaches a stable frame boundary from reset.
+#![allow(clippy::too_many_lines)] // scenario corpus is deliberately linear
 
 use oracle::export;
 use oracle::replay::{run_fixture, save_snapshot, ButtonDef, Fixture, FrameInput, StartPoint};
@@ -324,6 +325,163 @@ fn scenario_boot_to_name_entry_reports_named_checkpoints() {
         .iter()
         .find(|p| p.name == "name-entry-settled")
         .expect("settled checkpoint captured");
+    assert_eq!(
+        (
+            final_point.frame,
+            final_point.map,
+            final_point.state,
+            final_point.wram.as_str(),
+            final_point.vram.as_str()
+        ),
+        (
+            reference.frame,
+            reference.map,
+            reference.state,
+            reference.wram.as_str(),
+            reference.vram.as_str()
+        ),
+        "committed fixture must reproduce the reference run's final checkpoint"
+    );
+}
+
+/// Scenario: name-entry cursor movement. Start dismisses the title into the
+/// name-entry screen; three Down presses move the kana-grid cursor exactly
+/// three cells. The wedge (SPC upload) is not entered: no confirm input is
+/// sent.
+#[test]
+fn scenario_name_entry_cursor_moves_deterministically() {
+    let Some(image) = local_rom("Tenchi Souzou (Japan).sfc") else {
+        eprintln!("skipping: local Japanese dump not present");
+        return;
+    };
+    let rom = rom::Rom::load(&image).expect("validated dump");
+
+    // idle: Start@400 only; pressed: Start@400 plus Down 700..711,
+    // 730..741, 760..771.
+    let mut idle = Session::new(&rom).expect("session idle");
+    let mut a = Session::new(&rom).expect("session a");
+    let mut b = Session::new(&rom).expect("session b");
+    let mut points_a = Vec::new();
+    let mut points_b = Vec::new();
+    let mut cursor_after_first_block = None;
+    let mut cursor_after_second_block = None;
+    for frame in 0..900u32 {
+        if frame == 400 {
+            idle.set_button(Button::Start, true);
+            a.set_button(Button::Start, true);
+            b.set_button(Button::Start, true);
+        }
+        if frame == 410 {
+            idle.set_button(Button::Start, false);
+            a.set_button(Button::Start, false);
+            b.set_button(Button::Start, false);
+        }
+        let down = (700..712).contains(&frame)
+            || (730..742).contains(&frame)
+            || (760..772).contains(&frame);
+        a.set_button(Button::Down, down);
+        b.set_button(Button::Down, down);
+        idle.run_frame();
+        a.run_frame();
+        b.run_frame();
+        match frame {
+            460 => {
+                points_a.push(checkpoint(&a, "name-entry"));
+                points_b.push(checkpoint(&b, "name-entry"));
+            }
+            720 => {
+                points_a.push(checkpoint(&a, "cursor-one"));
+                points_b.push(checkpoint(&b, "cursor-one"));
+                cursor_after_first_block = Some(a.wram(0x04C8));
+            }
+            750 => {
+                points_a.push(checkpoint(&a, "cursor-two"));
+                points_b.push(checkpoint(&b, "cursor-two"));
+                cursor_after_second_block = Some(a.wram(0x04C8));
+            }
+            899 => {
+                points_a.push(checkpoint(&a, "cursor-three"));
+                points_b.push(checkpoint(&b, "cursor-three"));
+            }
+            _ => {}
+        }
+    }
+
+    for (ca, cb) in points_a.iter().zip(&points_b) {
+        assert_eq!(
+            ca, cb,
+            "checkpoint '{}' must be identical across sessions",
+            ca.name
+        );
+    }
+    let by_name = |n: &str| {
+        points_a
+            .iter()
+            .find(|p| p.name == n)
+            .expect("checkpoint must exist")
+    };
+    assert_eq!(by_name("name-entry").map, 4, "expected name-entry map");
+    assert_eq!(
+        by_name("name-entry").state,
+        0xC6,
+        "expected name-entry state"
+    );
+    // Intermediate cursor rows pin per-block movement so a drift that
+    // preserves the final row still fails. Frames 720/750 are quiet gaps
+    // between the press blocks.
+    assert_eq!(
+        cursor_after_first_block,
+        Some(1),
+        "first Down block must move the cursor to row 1"
+    );
+    assert_eq!(
+        cursor_after_second_block,
+        Some(2),
+        "second Down block must move the cursor to row 2"
+    );
+    assert_eq!(
+        a.wram(0x04C8),
+        3,
+        "three Down presses must move the kana cursor three cells"
+    );
+
+    // The whole input difference against the idle run must be exactly the
+    // cursor cell: the cursor-row byte and the two cell-value bytes.
+    let idle_img = idle.wram_image();
+    let img = a.wram_image();
+    let mut diffs: Vec<usize> = (0..0x20000).filter(|&o| img[o] != idle_img[o]).collect();
+    diffs.sort_unstable();
+    assert_eq!(
+        diffs,
+        vec![0x04C8, 0x0A11, 0x10C2],
+        "Down presses must touch only the kana-cursor cells"
+    );
+    assert_eq!(img[0x04C8].wrapping_sub(idle_img[0x04C8]), 3);
+    assert_eq!(img[0x0A11].wrapping_sub(idle_img[0x0A11]), 0x30);
+    assert_eq!(img[0x10C2].wrapping_sub(idle_img[0x10C2]), 0x30);
+
+    for p in &points_a {
+        eprintln!(
+            "checkpoint {}: map={:#04x} state={:#04x} wram_sha256={} vram_sha256={}",
+            p.name, p.map, p.state, p.wram, p.vram
+        );
+    }
+
+    // The committed fixture encodes exactly this input stream; replaying it
+    // must land on the same final checkpoint.
+    let fixture_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/name-entry-cursor.json");
+    let fixture: Fixture =
+        serde_json::from_slice(&std::fs::read(fixture_path).expect("fixture exists"))
+            .expect("fixture parses");
+    let rom_sha = rom.revision().sha256();
+    fixture
+        .validate(rom_sha)
+        .expect("fixture matches local ROM");
+    let mut run = Session::new(&rom).expect("session");
+    run_fixture(&mut run, &fixture);
+    let final_point = checkpoint(&run, "fixture-final");
+    let reference = by_name("cursor-three");
     assert_eq!(
         (
             final_point.frame,
