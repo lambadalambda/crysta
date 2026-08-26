@@ -39,15 +39,39 @@ The name buffer already holds the default name before any input
 - Input dropped by the harness (mirrors prove the game reads it).
 - Slow text speed / long cutscene (idle runs are far longer than any scene).
 - SRAM/battery wait, decompress/DMA resource wait (nothing ever arrives).
+- CPU deadlock or crash (CPU cycles its main loop, see below).
 
-## Leading hypothesis
+## Root cause: SPC driver-upload handshake wedge (confirmed 2026-08-26)
 
-The room-change routine waits on a frame-bound handshake that instant
-frame-stepping breaks — e.g. a `$4210` vblank-end poll whose NMI semantics
-differ, or an SPC handshake over `$2140–2143` where the CPU never sees the
-reply because LakeSnes catches the APU up only at frame end. Next step:
-sample the CPU PC (shim accessor `snes_cpu_pc`/`snes_cpu_bank`) at the stuck
-state and check whether it spins in a tight polling loop.
+The stall is a two-sided CPU↔SPC protocol deadlock during the first audio
+load after name entry, not game logic and not a crash:
+
+- The CPU is pinned in the packet-send loop at `$86:AB4C`:
+  `CMP $2140 / BNE spin / INC A / STA $2140` — it waits for the SPC to echo
+  the byte it just wrote to `$2140`.
+- The SPC boots fine (IPL at `$FFC0`: echoes `$AA/$BB/$CC`, uploads the
+  driver via the word-oriented handshake on `$2140/$2141`).
+- The word stream observed mid-transfer: ack-count lows
+  `00,01,02,…` with data highs `13 08 CA 0B 72 07 …` — a raw driver chunk.
+- The IPL restarts its handshake phase (back to writing `$AA/$BB` and
+  waiting for `$F4 == $CC`) whenever a consumed word's data byte is
+  nonzero. The game only writes the `$CC` chunk marker once per chunk, so
+  once the IPL lands in its `$CC` wait while the CPU waits for the next
+  echo, neither side ever yields: permanent deadlock.
+- Both sides keep executing valid code forever (CPU sampled at
+  `$86:8009/$86:800D` alternating; SPC cycling the IPL at `$FFD2` reading
+  `$F4 = 0`). Forcing per-access SPC catchup in the core does not change
+  the outcome, so this is a phase-sync accuracy gap in LakeSnes's APU
+  interleaving, not a simple catchup-quantization bug.
+- Identical on JP and EU (EU is force-blanked in the same wait).
+
+The earlier probe-55 "not audio-driven" conclusion is **reversed**: the SPC
+handshake is exactly what blocks progress. Title and name-entry scenarios
+remain reproducible; anything that needs the post-name audio load does not.
+
+An earlier "leading hypothesis" (vblank/`$4210` handshake) was disproven:
+the `$4210` NMI-wait helper at `$86:8009` works (the CPU sees the flag and
+proceeds ~10×/frame); `$4210` timing is fine.
 
 ## Reusable RAM symbols (probe-derived)
 
@@ -55,3 +79,8 @@ state and check whether it spins in a tight polling loop.
   `0x0482` pending map, `0x0488` room-change timer, `0x0456` button mirror
   (A = 0x80), `0x0920` secondary input mirror, `0x0DC8` menu cursor,
   `0x06A4` text speed.
+
+## Oracle capabilities added during the investigation
+
+- `Session::cpu_pc` / `cpu_bank` (bank `$86`, PC sampling).
+- `Session::apu_ram` (full 64 KiB SPC RAM snapshot, for driver forensics).
