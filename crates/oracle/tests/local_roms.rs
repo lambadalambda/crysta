@@ -500,3 +500,116 @@ fn scenario_name_entry_cursor_moves_deterministically() {
         "committed fixture must reproduce the reference run's final checkpoint"
     );
 }
+
+/// Scenario (Europe dump): boot to title (map 34, state 0xA5), Start at
+/// frame 1800 opens the name-entry screen (map 4, state 0xC8). Europe's
+/// flow differs from Japan's (no early-day Start; the first Start while the
+/// attract screen is showing opens name entry).
+#[test]
+fn scenario_eu_boot_to_name_entry_reports_named_checkpoints() {
+    let Some(image) = local_rom("Terranigma (E) [!].smc") else {
+        eprintln!("skipping: local European dump not present");
+        return;
+    };
+    let rom = rom::Rom::load(&image).expect("validated dump");
+
+    let mut a = Session::new(&rom).expect("session a");
+    let mut b = Session::new(&rom).expect("session b");
+    let mut points_a = Vec::new();
+    let mut points_b = Vec::new();
+    for frame in 0..1960u32 {
+        if (1800..1810).contains(&frame) {
+            a.set_button(Button::Start, true);
+            b.set_button(Button::Start, true);
+        } else {
+            a.set_button(Button::Start, false);
+            b.set_button(Button::Start, false);
+        }
+        a.run_frame();
+        b.run_frame();
+        match frame {
+            503 => {
+                points_a.push(checkpoint(&a, "title"));
+                points_b.push(checkpoint(&b, "title"));
+            }
+            1857 => {
+                points_a.push(checkpoint(&a, "name-entry"));
+                points_b.push(checkpoint(&b, "name-entry"));
+            }
+            1959 => {
+                points_a.push(checkpoint(&a, "name-entry-settled"));
+                points_b.push(checkpoint(&b, "name-entry-settled"));
+            }
+            _ => {}
+        }
+    }
+
+    for (ca, cb) in points_a.iter().zip(&points_b) {
+        assert_eq!(
+            ca, cb,
+            "checkpoint '{}' must be identical across sessions",
+            ca.name
+        );
+    }
+    let by_name = |n: &str| {
+        points_a
+            .iter()
+            .find(|p| p.name == n)
+            .expect("checkpoint must exist")
+    };
+    assert_eq!(by_name("title").map, 0x22, "expected title/attract map");
+    assert_eq!(by_name("title").state, 0xA5, "expected title state");
+    assert_eq!(by_name("name-entry").map, 4, "expected name-entry map");
+    assert_eq!(
+        by_name("name-entry").state,
+        0xC8,
+        "expected Europe name-entry state"
+    );
+    assert_eq!(
+        by_name("name-entry-settled").map,
+        4,
+        "name entry must persist"
+    );
+    assert_eq!(
+        by_name("name-entry-settled").state,
+        0xB0,
+        "Europe name-entry state must persist"
+    );
+    for p in &points_a {
+        eprintln!(
+            "checkpoint {}: map={:#04x} state={:#04x} wram_sha256={} vram_sha256={}",
+            p.name, p.map, p.state, p.wram, p.vram
+        );
+    }
+
+    let fixture_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/eu-boot-to-name-entry.json");
+    let fixture: Fixture =
+        serde_json::from_slice(&std::fs::read(fixture_path).expect("fixture exists"))
+            .expect("fixture parses");
+    let rom_sha = rom.revision().sha256();
+    fixture
+        .validate(rom_sha)
+        .expect("fixture matches local ROM");
+    let mut run = Session::new(&rom).expect("session");
+    run_fixture(&mut run, &fixture);
+    let final_point = checkpoint(&run, "fixture-final");
+    let reference = by_name("name-entry-settled");
+    assert_eq!(
+        (
+            final_point.frame,
+            final_point.map,
+            final_point.state,
+            final_point.wram.as_str(),
+            final_point.vram.as_str()
+        ),
+        (
+            reference.frame,
+            reference.map,
+            reference.state,
+            reference.wram.as_str(),
+            reference.vram.as_str()
+        ),
+        "committed fixture must reproduce the reference run's final checkpoint"
+    );
+}
