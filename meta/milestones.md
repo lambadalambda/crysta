@@ -38,7 +38,6 @@ None remaining; M0 is complete. Verification record:
 
 ### Issues
 
-- [Harden the oracle session boundary](issues/harden-oracle-session.md)
 - [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
 
 <a id="m2-matching-disassembly-foundation"></a>

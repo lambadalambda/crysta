@@ -11,3 +11,4 @@
 - [x] [Select and integrate the reference emulator](issues/select-reference-emulator.md)
 - [x] [Record deterministic input replays and snapshots](issues/deterministic-replays-snapshots.md)
 - [x] [Export and compare reference frame state](issues/reference-state-export.md)
+- [x] [Harden the oracle session boundary](issues/harden-oracle-session.md)
