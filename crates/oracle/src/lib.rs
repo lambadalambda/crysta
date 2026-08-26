@@ -114,6 +114,14 @@ impl Button {
     }
 }
 
+/// `Rom` validates to exactly [`rom::Rom::IMAGE_SIZE`] bytes, and the core's
+/// ROM length is an `i32`; a validated image therefore always fits, and no
+/// fallible path in [`Session::new`] can leak the core allocation.
+const _: () = assert!(
+    rom::Rom::IMAGE_SIZE <= i32::MAX as usize,
+    "validated ROM image fits the core's i32 length"
+);
+
 /// A headless reference session over a validated ROM.
 pub struct Session {
     snes: *mut ffi::Snes,
@@ -121,8 +129,9 @@ pub struct Session {
     samples: Vec<i16>,
 }
 
-// The core keeps no threads and we never share the pointer; the session owns
-// it exclusively for its lifetime.
+// The core holds no mutable global state (a CI check pins this on the
+// vendored tree) and the session owns the pointer exclusively for its
+// lifetime, so moving a session across threads is sound.
 unsafe impl Send for Session {}
 
 /// Errors from reference-session use.
@@ -154,7 +163,7 @@ pub struct FrameState {
 }
 
 impl Session {
-    /// Creates a session and hard-resets the core.
+    /// Creates a session; the core hard-resets as part of ROM load.
     ///
     /// # Errors
     ///
@@ -164,12 +173,13 @@ impl Session {
     /// # Panics
     ///
     /// Panics if the sample-buffer size does not fit an `i32`; it is a
-    /// compile-time constant that always fits.
+    /// compile-time constant that always fits. The ROM length conversion
+    /// is guaranteed by the const assertion on [`rom::Rom::IMAGE_SIZE`].
     pub fn new(rom: &Rom) -> Result<Self, SessionError> {
         unsafe {
             let snes = ffi::snes_init();
             let image = rom.image();
-            let len = i32::try_from(image.len()).map_err(|_| SessionError::CoreRejectedRom)?;
+            let len = i32::try_from(image.len()).expect("validated ROM image fits i32");
             let ok = ffi::snes_loadRom(snes, image.as_ptr(), len);
             if !ok {
                 ffi::snes_free(snes);
@@ -184,7 +194,6 @@ impl Session {
             ffi::snes_setPixels(snes, session.pixels.as_mut_ptr());
             let samples_per_frame = i32::try_from(SAMPLES_PER_FRAME).expect("fits i32");
             ffi::snes_setSamples(snes, session.samples.as_mut_ptr(), samples_per_frame);
-            ffi::snes_reset(snes, true);
             Ok(session)
         }
     }
@@ -356,6 +365,14 @@ mod tests {
         let rom = synthetic_rom();
         let s = Session::new(&rom).expect("core accepts image");
         let _ = s.wram(0x1FFFF);
+    }
+
+    #[test]
+    #[should_panic(expected = "WRAM offset out of range")]
+    fn wram_panics_past_the_image() {
+        let rom = synthetic_rom();
+        let s = Session::new(&rom).expect("core accepts image");
+        let _ = s.wram(0x20000);
     }
 
     #[test]
