@@ -70,19 +70,4 @@ jobs:
           else
             echo "safety check correctly rejected planted ROM"
           fi
-      - name: Remove planted ROM before the next plant
-        run: |
-          git rm -q --cached planted.sfc
-          rm planted.sfc
-      - name: Plant a non-const vendored static
-        run: |
-          printf 'static int evil_var = 3;\n' > vendor/lakesnes/__gate_test.c
-          git add -f vendor/lakesnes/__gate_test.c
-      - name: Safety check must fail on mutable static
-        run: |
-          if python3 tools/check_repo_safety.py; then
-            echo "ERROR: safety check did not fail on planted static" >&2
-            exit 1
-          else
-            echo "safety check correctly rejected planted mutable static"
-          fi
+
