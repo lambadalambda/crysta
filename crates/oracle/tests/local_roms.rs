@@ -3,9 +3,11 @@
 //! Proves the reference boundary boots the real game headless, advances the
 //! game's own state machine, and reaches a stable frame boundary from reset.
 
+use oracle::export;
 use oracle::replay::{run_fixture, save_snapshot, ButtonDef, Fixture, FrameInput, StartPoint};
 use oracle::{Button, Session};
 use rom::Revision;
+use std::path::Path;
 
 fn local_rom(name: &str) -> Option<Vec<u8>> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -191,4 +193,152 @@ fn replay_fixture_is_deterministic_and_snapshot_resumes() {
     bad.rom_sha256 = rom_sha;
     bad.version = 99;
     assert!(bad.validate(rom_sha).is_err());
+}
+
+/// A named scenario checkpoint: frame, `$7E047E` map byte, `$7E0450`
+/// program state, and WRAM/VRAM digests.
+#[derive(Debug, PartialEq, Eq)]
+struct Checkpoint {
+    name: &'static str,
+    frame: u32,
+    map: u8,
+    state: u8,
+    wram: String,
+    vram: String,
+}
+
+fn checkpoint(session: &Session, name: &'static str) -> Checkpoint {
+    Checkpoint {
+        name,
+        frame: session.frame_state().frames,
+        map: session.wram(0x047E),
+        state: session.wram(0x0450),
+        wram: export::digest_hex(&session.wram_image()),
+        vram: export::digest_hex(&vram_le_bytes(session)),
+    }
+}
+
+// `vram()` returns words; digest the little-endian bytes for stability of
+// the checkpoint encoding.
+fn vram_le_bytes(session: &Session) -> Vec<u8> {
+    session
+        .vram()
+        .iter()
+        .flat_map(|w| w.to_le_bytes())
+        .collect()
+}
+
+#[test]
+fn scenario_boot_to_name_entry_reports_named_checkpoints() {
+    let Some(image) = local_rom("Tenchi Souzou (Japan).sfc") else {
+        eprintln!("skipping: local Japanese dump not present");
+        return;
+    };
+    let rom = rom::Rom::load(&image).expect("validated dump");
+
+    // The boot-to-name-entry reference input: idle to the title screen,
+    // Start at 400 to dismiss it into name entry, then quiet.
+    let mut a = Session::new(&rom).expect("session a");
+    let mut b = Session::new(&rom).expect("session b");
+    let mut points_a = Vec::new();
+    let mut points_b = Vec::new();
+    for frame in 0..700u32 {
+        if frame == 400 {
+            a.set_button(Button::Start, true);
+            b.set_button(Button::Start, true);
+        }
+        if frame == 410 {
+            a.set_button(Button::Start, false);
+            b.set_button(Button::Start, false);
+        }
+        a.run_frame();
+        b.run_frame();
+        match frame {
+            399 => {
+                points_a.push(checkpoint(&a, "title"));
+                points_b.push(checkpoint(&b, "title"));
+            }
+            449 => {
+                points_a.push(checkpoint(&a, "name-entry"));
+                points_b.push(checkpoint(&b, "name-entry"));
+            }
+            459 => {
+                points_a.push(checkpoint(&a, "name-entry-settled"));
+                points_b.push(checkpoint(&b, "name-entry-settled"));
+            }
+            699 => {
+                points_a.push(checkpoint(&a, "quiet-after-name-entry"));
+                points_b.push(checkpoint(&b, "quiet-after-name-entry"));
+            }
+            _ => {}
+        }
+    }
+
+    for (ca, cb) in points_a.iter().zip(&points_b) {
+        assert_eq!(
+            ca, cb,
+            "checkpoint '{}' must be identical across sessions",
+            ca.name
+        );
+    }
+    // The scenario must actually have moved: title map (34) then name entry
+    // (4), per the probe-derived timeline.
+    let title = points_a.iter().find(|p| p.name == "title").unwrap();
+    let name_entry = points_a.iter().find(|p| p.name == "name-entry").unwrap();
+    let settled = points_a
+        .iter()
+        .find(|p| p.name == "name-entry-settled")
+        .unwrap();
+    assert_eq!(title.map, 34, "expected attract/title map");
+    assert_eq!(name_entry.map, 4, "expected name-entry map");
+    assert_eq!(settled.map, 4, "name entry must persist past input");
+    assert_eq!(
+        name_entry.state, 0xC6,
+        "expected the name-entry program state"
+    );
+    assert_eq!(settled.state, 0xC6, "name entry state must persist");
+    for p in &points_a {
+        eprintln!(
+            "checkpoint {}: map={:#04x} state={:#04x} wram_sha256={} vram_sha256={}",
+            p.name, p.map, p.state, p.wram, p.vram
+        );
+    }
+
+    // The committed fixture encodes precisely this input stream; replaying
+    // it must land on the same final checkpoint.
+    let fixture_path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/boot-to-name-entry.json");
+    let fixture: Fixture =
+        serde_json::from_slice(&std::fs::read(fixture_path).expect("fixture exists"))
+            .expect("fixture parses");
+    let rom_sha = rom.revision().sha256();
+    fixture
+        .validate(rom_sha)
+        .expect("fixture matches local ROM");
+    let mut run = Session::new(&rom).expect("session");
+    run_fixture(&mut run, &fixture);
+    // skip 400 + 60 frames ends at boundary 460, matching `settled` (frame
+    // 459 executed, counter reports 460).
+    let final_point = checkpoint(&run, "fixture-final");
+    let reference = points_a
+        .iter()
+        .find(|p| p.name == "name-entry-settled")
+        .expect("settled checkpoint captured");
+    assert_eq!(
+        (
+            final_point.frame,
+            final_point.map,
+            final_point.state,
+            final_point.wram.as_str(),
+            final_point.vram.as_str()
+        ),
+        (
+            reference.frame,
+            reference.map,
+            reference.state,
+            reference.wram.as_str(),
+            reference.vram.as_str()
+        ),
+        "committed fixture must reproduce the reference run's final checkpoint"
+    );
 }

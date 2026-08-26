@@ -285,6 +285,16 @@ impl Session {
         out
     }
 
+    /// A full 128 KiB WRAM image snapshot.
+    #[must_use]
+    pub fn wram_image(&self) -> Vec<u8> {
+        let mut out = vec![0u8; 0x20000];
+        unsafe {
+            std::ptr::copy_nonoverlapping(ffi::snes_ram(self.snes), out.as_mut_ptr(), 0x20000);
+        }
+        out
+    }
+
     /// Reads a byte from WRAM (`$7E:0000`–`$7F:FFFF`).
     ///
     /// # Panics
@@ -299,11 +309,7 @@ impl Session {
     /// Semantic state for comparison at the current frame boundary.
     #[must_use]
     pub fn frame_state(&self) -> FrameState {
-        let mut wram = vec![0u8; 0x20000];
-        unsafe {
-            std::ptr::copy_nonoverlapping(ffi::snes_ram(self.snes), wram.as_mut_ptr(), 0x20000);
-        }
-        let digest = Sha256::digest(&wram);
+        let digest = Sha256::digest(self.wram_image());
         FrameState {
             frames: unsafe { ffi::snes_frames(self.snes) },
             cycles: unsafe { ffi::snes_cycles(self.snes) },
