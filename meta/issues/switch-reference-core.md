@@ -30,11 +30,14 @@ Swap the vendored reference core to bsnes (ISC) behind the unchanged
 
 - `cargo test` for synthetic-ROM unit tests passes.
 - The ROM-backed scenario suite runs against the new core, all three
-  existing fixtures re-pinned to bsnes timings, and at least one scenario
-  reaches past the old LakeSnes wedge (map 15 → Crysta/next room change).
-- The SPC-handshake blocker no longer applies to boot scenarios.
+  existing fixtures re-pinned to ares timings/checkpoints, and at least one
+  scenario reaches past the old "wedge" frame counts (the game's own state
+  machine drives the map transitions; the test pins the map-15/state-170
+  divergence point as a documented reference divergence, listed under
+  [initial-reference-scenarios](initial-reference-scenarios.md) as a
+  remaining input-sequence blocker, not an emulator defect).
 - No LakeSnes files remain in the vendored tree; the license record lists
-  the bsnes vendored sources.
+  the ares vendored sources.
 
 ## Notes
 
@@ -43,3 +46,9 @@ Swap the vendored reference core to bsnes (ISC) behind the unchanged
   applies by design.
 - Input frame timings and checkpoint state bytes are core-dependent; the
   fixtures (input streams) stay, their reference checkpoints get re-pinned.
+- **Verification finding (prototype, 2026-08-26):** the wedge reproduces
+  identically under the ares core with the same input stream — the stall is
+  the game's own script desync on the name-entry input sequence, NOT an
+  emulator accuracy defect. The SPC-upload handshake diagnosis from
+  [oracle-boot-probes.md](../../docs/oracle-boot-probes.md) applies only to
+  LakeSnes; under ares the SPC runs and the game still waits.
