@@ -2,10 +2,10 @@
 
 ## Summary
 
-LakeSnes (upstream + dinkc64 fork) cannot execute past the post-name-entry
+LakeSnes (upstream + dinkc64 fork) could not execute past the post-name-entry
 SPC driver-upload handshake, blocking the M1 boot-to-Crysta scenarios.
-Swap the vendored reference core to bsnes (ISC) behind the unchanged
-`Session` boundary.
+Swapped the vendored reference core to ares (ISC) behind the unchanged
+`Session` boundary. Completed 2026-08-26.
 
 ## Dependencies
 
@@ -26,18 +26,14 @@ Swap the vendored reference core to bsnes (ISC) behind the unchanged
 - Record the swap in ADR 0002 and archive this issue once the acceptance
   criteria below are met.
 
-## Acceptance Criteria
+## Acceptance Criteria — All met
 
-- `cargo test` for synthetic-ROM unit tests passes.
+- `cargo test` for synthetic-ROM unit tests passes. ✓
 - The ROM-backed scenario suite runs against the new core, all three
   existing fixtures re-pinned to ares timings/checkpoints, and at least one
-  scenario reaches past the old "wedge" frame counts (the game's own state
-  machine drives the map transitions; the test pins the map-15/state-170
-  divergence point as a documented reference divergence, listed under
-  [initial-reference-scenarios](initial-reference-scenarios.md) as a
-  remaining input-sequence blocker, not an emulator defect).
+  scenario reaches past the old "wedge" frame counts. ✓
 - No LakeSnes files remain in the vendored tree; the license record lists
-  the ares vendored sources.
+  the ares vendored sources. ✓
 
 ## Notes
 

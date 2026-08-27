@@ -12,3 +12,5 @@
 - [x] [Record deterministic input replays and snapshots](issues/deterministic-replays-snapshots.md)
 - [x] [Export and compare reference frame state](issues/reference-state-export.md)
 - [x] [Harden the oracle session boundary](issues/harden-oracle-session.md)
+- [x] [Switch reference core to bsnes](issues/switch-reference-core.md)
+- [x] [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)

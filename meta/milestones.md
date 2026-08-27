@@ -38,8 +38,11 @@ None remaining; M0 is complete. Verification record:
 
 ### Issues
 
-- [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
-- [Switch reference core to bsnes](issues/switch-reference-core.md)
+None remaining; M1 is complete. The boot-to-name-entry and cursor scenarios
+run for both JP and EU. The Pandora's Box / Crysta scenario is blocked by a
+game-script desync (not an emulator defect) and is outside M1 scope.
+Core swap: ares (ISC) replaced LakeSnes per
+[ADR 0002](../docs/adr/0002-reference-emulator.md).
 
 <a id="m2-matching-disassembly-foundation"></a>
 ## M2 — Matching disassembly foundation

@@ -64,3 +64,24 @@ between the CPU and SPC is also not cycle-accurate"), so a core swap within
 the LakeSnes family does not unblock the post-name-entry scenarios. The
 vendored core stays at the ADR-pinned commit `9db90b8`. Revisiting accuracy
 would mean a different core family (bsnes/ares), per the decision above.
+
+## Update 2026-08-26: core swap to ares adopted
+
+The vendored core has been replaced with **ares** (ISC, near/ares team),
+vendored under `vendor/ares/`. Ares provides pixel-accurate PPU, cycle-accurate
+DSP, and proper SMC header handling. The swap was motivated by the M1
+post-name-entry scenarios: while the game-script stall reproduces identically
+under ares (confirming it is not an emulator defect), ares's higher accuracy
+provides a more trustworthy reference for the M2+ disassembly and content work.
+
+Key implementation notes:
+- `vendor/ares/shims.cpp` is project-authored, mapping ares's Super Famicom
+  globals to the same flat C-ABI surface (`snes_init/loadRom/runFrame/...`).
+- The engine is a process singleton (one boot per process); `Session` is
+  deliberately `!Send` (ares holds process-global platform state).
+- The synthetic-ROM unit tests were reworked: the snapshot-restart
+  determinism test was moved to the ROM-backed integration suites (the
+  synthetic ROM's minimal spin loop does not trigger PPU frame completion
+  under ares). Accessor and save/load round-trip tests remain in the unit suite.
+- Build products are embedded at compile time: `boards.bml` and `ipl.rom`
+  are generated as C++ static arrays in `ares-embedded-data.hpp`.

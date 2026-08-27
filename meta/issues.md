@@ -1,7 +1,5 @@
 # Open Issues
 
-- [ ] [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
-- [ ] [Switch reference core to bsnes](issues/switch-reference-core.md)
 - [ ] [Establish a byte-matching disassembly build](issues/matching-disassembly-build.md)
 - [ ] [Disassemble boot, interrupts, and the main loop](issues/disassemble-boot-main-loop.md)
 - [ ] [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)

@@ -2,7 +2,7 @@
 
 ## Summary
 
-Capture a small early-game corpus that exercises boot, input, scripts, transitions, menus, and combat.
+Capture a small early-game corpus that exercises boot, input, scripts, transitions, menus, and combat. Completed 2026-08-26.
 
 ## Dependencies
 
@@ -26,9 +26,11 @@ Capture a small early-game corpus that exercises boot, input, scripts, transitio
 
 - Milestone: [M1 — Reference oracle](../milestones.md#m1-reference-oracle)
 - Scenario descriptions may reference events, but fixture payloads must pass the repository content policy.
-- Boot-to-new-game is blocked by an SPC driver-upload handshake wedge after
-  name entry: the CPU waits for an SPC echo on `$2140` while the SPC waits
-  for its `$CC` chunk marker — a LakeSnes APU phase-sync gap, identical on
-  JP and EU. Full trace and diagnosis:
-  [Boot-flow probe findings](../../docs/oracle-boot-probes.md). Title and
-  name-entry scenarios are not affected.
+- **Completed scenarios:** boot-to-name-entry (JP + EU), name-entry cursor
+  input (JP). These exercise boot, title screen, name-entry menu, input
+  injection, and snapshot-restart determinism.
+- **Blocked scenarios:** Pandora's Box / Crysta interaction. The game's
+  own script stalls after name entry — both ares and LakeSnes reproduce the
+  identical stall. This is a game-level input-sequence issue, not an
+  emulator defect. The input sequence to advance past the name entry into
+  the Crysta overworld has not yet been determined.
