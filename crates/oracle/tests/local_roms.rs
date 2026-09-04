@@ -196,6 +196,10 @@ fn reset_trace_reaches_first_main_loop_iteration() {
         text.contains("reset trace: 965059 instructions, 64 frames, 8a6db5e98dac5f7b6e085a7509f4259dafa283ab3df4b929fda76d21d7b09df9"),
         "child must report the qualified reset trace: {text}"
     );
+    assert!(
+        text.contains("opening dispatch: $80:805A via $7E:049E=$805D reached $80:805D"),
+        "child must report the observed opening dispatch: {text}"
+    );
 }
 
 fn run_reset_trace_child() -> ! {
@@ -209,7 +213,8 @@ fn run_reset_trace_child() -> ! {
         .expect("valid trace bounds");
     assert_eq!(trace.stop, CpuTraceStop::TargetReached);
     assert_eq!(trace.entries.len(), 965_059);
-    assert_eq!(session.frame_state().frames, 64);
+    let reset_frames = session.frame_state().frames;
+    assert_eq!(reset_frames, 64);
     assert_eq!(
         trace
             .entries
@@ -225,6 +230,22 @@ fn run_reset_trace_child() -> ! {
     assert!(!trace.entries[3].emulation);
     assert_eq!(trace.entries.last().unwrap().address, 0x80_8043);
 
+    let dispatch_trace = session
+        .trace_until_pc(0x80_805A, 1_000_000, 4)
+        .expect("trace opening main-loop dispatch");
+    assert_eq!(dispatch_trace.stop, CpuTraceStop::TargetReached);
+    assert_eq!(dispatch_trace.entries.last().unwrap().address, 0x80_805A);
+    assert_eq!(
+        u16::from_le_bytes([session.wram(0x049E), session.wram(0x049F)]),
+        0x805D,
+        "opening top-level dispatch target at JMP"
+    );
+    let target_trace = session
+        .trace_until_pc(0x80_805D, 2, 1)
+        .expect("trace opening top-level dispatch target");
+    assert_eq!(target_trace.stop, CpuTraceStop::TargetReached);
+    assert_eq!(target_trace.entries.last().unwrap().address, 0x80_805D);
+
     let digest = trace.digest_hex();
     assert_eq!(
         digest,
@@ -233,8 +254,9 @@ fn run_reset_trace_child() -> ! {
     eprintln!(
         "reset trace: {} instructions, {} frames, {digest}",
         trace.entries.len(),
-        session.frame_state().frames
+        reset_frames
     );
+    eprintln!("opening dispatch: $80:805A via $7E:049E=$805D reached $80:805D");
     std::process::exit(0);
 }
 
