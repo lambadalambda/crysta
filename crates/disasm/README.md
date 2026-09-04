@@ -42,10 +42,12 @@ The command:
 2. rejects every revision except the Japanese behavior reference;
 3. creates a fresh run directory under `local/disasm/` and writes the normalized
    input there as `rom-clean.bin`;
-4. assembles `asm/*.s` in lexical order and links with `linker.cfg`;
-5. writes objects, listings, a map, and `rom-built.bin` in that same ignored run
+4. validates the canonical Japanese memory map and generates
+   `memory-symbols.inc` in that ignored run directory;
+5. assembles `asm/*.s` in lexical order and links with `linker.cfg`;
+6. writes objects, listings, a map, and `rom-built.bin` in that same ignored run
    directory;
-6. compares every output byte and prints the known Japanese SHA-256 on success.
+7. compares every output byte and prints the known Japanese SHA-256 on success.
 
 Each invocation uses a new directory, so failed or concurrent runs cannot
 replace a prior result or alias the source dump. The source dump is read and
@@ -63,6 +65,15 @@ As routines become understood, those slices shrink and assembled instructions
 or structured data occupy exactly the released bytes. Link-time address and
 size assertions guard important boundaries; the final byte comparison remains
 authoritative.
+
+`memory-symbols.inc` is generated deterministically from the revision/hash-bound
+[canonical memory map](../../docs/memory-map.md); no generated copy is committed.
+The map stores canonical 24-bit addresses. A low-WRAM short operand is valid
+only when the complete symbol fits the `$7E:0000-$7E:1FFF` mirror; direct-page
+operands assume `D=$0000`. Hardware operands such as `$2121` are numerically
+the canonical bank-zero address, while using that 16-bit spelling still relies
+on the DBR mirror documented at the assembly entry point. Symbols outside the
+supported short forms retain long operands.
 
 Assembly conventions:
 

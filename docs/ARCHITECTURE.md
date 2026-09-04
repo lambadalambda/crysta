@@ -65,6 +65,23 @@ The disassembly should capture:
 - named WRAM, SRAM, VRAM, CGRAM, and OAM structures;
 - cross-version correspondences where evidence supports them.
 
+### Canonical memory map
+
+The [canonical memory map](memory-map.md) is a schema-versioned, ROM-revision-
+and hash-bound source of typed direct-page, WRAM, SRAM, and hardware metadata.
+Canonical 24-bit addresses remain distinct from assembly operands that rely on
+`D=$0000` or a documented DBR mirror. Public maps are evidence leads rather than
+ground truth, and unresolved conflicts remain explicit.
+
+The `memory-map` crate validates the committed Japanese map and serves both
+Rust/oracle lookup and deterministic ca65 include generation. Validation treats
+`D=$0000` direct page and low WRAM as the same physical bytes, hardens evidence
+provenance and short operands, constrains prospective SRAM symbols to bank-local
+HiROM windows, and exposes boundary disputes as typed conflict queries.
+Reconstruction writes its include only to an ignored per-run directory and
+remains subject to the byte-identical ROM comparison. The schema supports SRAM,
+but no canonical SRAM fields are claimed until sufficient evidence exists.
+
 ### Oracle
 
 A reference emulator or compatible execution harness should support deterministic
@@ -72,6 +89,14 @@ frame stepping, recorded controller input, snapshots, and state export. The
 portable implementation will be compared against selected semantic state each
 frame. Full-memory comparisons are useful during discovery but may later need
 documented exclusions for irrelevant transient bytes.
+
+Stable symbol trace v1 records scenario labels separately from actual core
+frames and hashes a canonical, domain-separated binary encoding of ROM/map,
+scenario, symbol-definition, timing, and value data. For qualified local-save
+scenarios, `Session::new_with_sram` validates exactly 8 KiB before claiming the
+process-global session and supplies it before power-on; `Session::new` continues
+to use zero-filled SRAM. ROMs, external saves, and raw traces remain local, and
+sampled contents do not establish every meaning or extent in an imported map.
 
 ## Portable lane
 

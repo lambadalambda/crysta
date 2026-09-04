@@ -1,6 +1,5 @@
 # Open Issues
 
-- [ ] [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
 - [ ] [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
 - [ ] [Implement and verify the compression codec](issues/compression-codec.md)
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)

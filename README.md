@@ -18,15 +18,16 @@ registers.
 
 The safe repository foundation (M0) and deterministic reference oracle (M1)
 are complete. Work is now focused on the matching-disassembly foundation (M2):
-a byte-identical reconstruction and the first boot, interrupt, frame-gate, and
-main-loop annotations are in place; shared symbol maps and broader region
-classification remain.
+a byte-identical reconstruction, the first boot/interrupt/main-loop annotations,
+a canonical revision-bound memory map, and a qualified local-SRAM symbol trace
+are in place; broader ROM region classification remains.
 
 No playable portable implementation exists yet.
 
 See:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Canonical memory map](docs/memory-map.md)
 - [Boot, interrupts, and main loop](docs/boot-main-loop.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
@@ -72,6 +73,7 @@ crates/                 Rust workspace
   rom/                  ROM validation, normalization, and addressing
   oracle/               Reference execution and differential testing
   disasm/               Matching 65C816 reconstruction tooling
+  memory-map/           Typed revision-bound memory symbols
   assets/               Compression and data-format codecs (planned)
   core/                 Deterministic portable game simulation (planned)
   renderer/             Deterministic command consumer/classic renderer (planned)

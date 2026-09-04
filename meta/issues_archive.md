@@ -19,3 +19,4 @@
 - [x] [Make ROM-backed scenario tests skip on clean checkouts](issues/fix-rom-backed-test-skips.md)
 - [x] [Disassemble boot, interrupts, and the main loop](issues/disassemble-boot-main-loop.md)
 - [x] [Load local SRAM in oracle sessions](issues/load-local-sram-oracle.md)
+- [x] [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
