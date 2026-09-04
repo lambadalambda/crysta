@@ -56,9 +56,11 @@ Core swap: ares (ISC) replaced LakeSnes per
 - Canonical RAM/hardware symbols are shared by tools.
 - Major code, data, and indirect-dispatch regions are classified.
 
-### Remaining issues
+### Issues
 
-- [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
+None remaining; M2 is complete. The Japanese reconstruction matches all
+4,194,304 bytes, and the final map verification is recorded in
+[ROM code, data, and dispatch map](../docs/rom-map.md).
 
 <a id="m3-content-and-script-pipeline"></a>
 ## M3 — Content and script pipeline

@@ -1,6 +1,5 @@
 # Open Issues
 
-- [ ] [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
 - [ ] [Implement and verify the compression codec](issues/compression-codec.md)
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
