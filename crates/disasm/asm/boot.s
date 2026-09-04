@@ -6,18 +6,12 @@
 
 .setcpu "65816"
 .include "memory-symbols.inc"
+.include "rom-map.inc"
 .import __ROM_LOAD__, __ROM_SIZE__
 .segment "ROM"
 
 ROM_BASE = $C00000
 ROM_SIZE = $400000
-
-NmiHandlerRuntime = $85F98F
-IrqHandlerRuntime = $85FB00
-BrkHandlerRuntime = $85FB01
-CopHandlerRuntime = $808378
-NativeResetRuntime = $808017
-WaitForFrameAndPollInput = $868000
 
 RomBegin:
 .assert RomBegin = ROM_BASE, lderror, "ROM start moved"
@@ -36,13 +30,13 @@ Reset:
 
 ; Native vector trampolines execute in bank $00 and establish handler PBRs.
 NmiTrampoline:
-    jml NmiHandlerRuntime
+    jml NativeNmiHandlerRuntime
 IrqTrampoline:
-    jml IrqHandlerRuntime
+    jml NativeIrqHandlerRuntime
 CopTrampoline:
-    jml CopHandlerRuntime
+    jml NativeCopHandlerRuntime
 BrkTrampoline:
-    jml BrkHandlerRuntime
+    jml NativeBrkHandlerRuntime
 
 ; Entry: E=0, M=1, X=1, PBR=$80, DBR=$00, D=$0000.
 NativeReset:
@@ -74,7 +68,7 @@ NativeReset:
 ; before dispatching through the mutable 16-bit state-handler pointer at $049E.
 MainLoop:
 .assert MainLoop = $C08043, lderror, "main loop moved"
-    jsl WaitForFrameAndPollInput
+    jsl WaitForFrameAndPollInputRuntime
     jsr $820C
     jsl $8D9328
     jsl $80E8AF

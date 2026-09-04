@@ -1,7 +1,10 @@
 //! Explicit local driver for the byte-matching reconstruction workflow.
 
-use disasm::{canonical_symbol_include, compare_images};
-use rom::{Revision, Rom};
+use disasm::{
+    canonical_rom_map_include, canonical_symbol_include, compare_images, DataKind, RegionClass,
+    RomMap,
+};
+use rom::{CanonicalRomAddress, NormalizedOffset, Revision, Rom, RuntimeRomAddress};
 use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -24,24 +27,101 @@ fn run(args: &[OsString]) -> Result<(), Box<dyn std::error::Error>> {
     let Some(command) = args.first().and_then(|arg| arg.to_str()) else {
         return Err(usage_error());
     };
-    if command != "reconstruct" || args.len() != 2 {
-        return Err(usage_error());
+    match (command, args) {
+        ("reconstruct", [_, rom_path]) => {
+            let workspace = workspace_root();
+            reconstruct(&workspace, Path::new(rom_path))
+        }
+        ("inspect-rom", [_, location]) => {
+            let location = location.to_str().ok_or_else(|| {
+                io::Error::new(io::ErrorKind::InvalidInput, "address must be UTF-8")
+            })?;
+            println!("{}", inspect_rom_location(location)?);
+            Ok(())
+        }
+        _ => Err(usage_error()),
     }
+}
 
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+fn workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .expect("disasm crate must be inside the workspace")
-        .to_owned();
-    reconstruct(&workspace, Path::new(&args[1]))
+        .to_owned()
 }
 
 fn usage_error() -> Box<dyn std::error::Error> {
     io::Error::new(
         io::ErrorKind::InvalidInput,
-        "usage: cargo run -p disasm -- reconstruct <path-to-japanese-rom>",
+        "usage:\n  cargo run -p disasm -- reconstruct <path-to-japanese-rom>\n  cargo run -p disasm -- inspect-rom <offset:XXXXXX|canonical:XXXXXX|runtime:XX:XXXX>",
     )
     .into()
+}
+
+fn inspect_rom_location(query: &str) -> Result<String, Box<dyn std::error::Error>> {
+    let (kind, value) = query.split_once(':').ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "address must include offset:, canonical:, or runtime:",
+        )
+    })?;
+    let parsed = parse_hex(value)?;
+    let normalized = match kind {
+        "offset" => NormalizedOffset::new(parsed)?,
+        "canonical" => CanonicalRomAddress::new(parsed)?.normalized(),
+        "runtime" => RuntimeRomAddress::new(parsed)?.normalized(),
+        _ => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "address must use offset:, canonical:, or runtime:",
+            )
+            .into());
+        }
+    };
+    let map = RomMap::built_in_japan()?;
+    let region = map.region_at(normalized).map_or_else(
+        || "region=unclassified".to_owned(),
+        |region| {
+            let class = match region.class {
+                RegionClass::Code => "class=code".to_owned(),
+                RegionClass::Data(kind) => {
+                    format!("class=data kind={}", data_kind_name(kind))
+                }
+            };
+            format!("region={} {class}", region.id)
+        },
+    );
+    let entry = map.entry_at(normalized).map_or_else(
+        || "entry=none".to_owned(),
+        |entry| format!("entry={}", entry.id),
+    );
+    let canonical = normalized.canonical().value();
+    Ok(format!(
+        "normalized={normalized} canonical=${:02X}:{:04X} {region} {entry}",
+        canonical >> 16,
+        canonical & 0xFFFF
+    ))
+}
+
+fn data_kind_name(kind: DataKind) -> &'static str {
+    match kind {
+        DataKind::Raw => "raw",
+        DataKind::VectorTable => "vector_table",
+        DataKind::FunctionPointerTable => "function_pointer_table",
+        DataKind::CallbackRecords => "callback_records",
+        DataKind::ScriptEntryTable => "script_entry_table",
+    }
+}
+
+fn parse_hex(value: &str) -> Result<u32, Box<dyn std::error::Error>> {
+    let compact = value
+        .strip_prefix('$')
+        .or_else(|| value.strip_prefix("0x"))
+        .unwrap_or(value)
+        .replace(':', "");
+    u32::from_str_radix(&compact, 16)
+        .map_err(|error| io::Error::new(io::ErrorKind::InvalidInput, error).into())
 }
 
 fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::error::Error>> {
@@ -55,6 +135,10 @@ fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::err
         .into());
     }
 
+    let rom_map = RomMap::built_in_japan()?;
+    rom_map.validate_rom(&reference)?;
+    let cop_targets = rom_map.resolve_dispatch("cop_services", &reference)?;
+
     let ca65 = find_tool(workspace, "ca65")?;
     let ld65 = find_tool(workspace, "ld65")?;
     print_tool_version(&ca65)?;
@@ -67,6 +151,7 @@ fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::err
         output_dir.join("memory-symbols.inc"),
         canonical_symbol_include()?,
     )?;
+    fs::write(output_dir.join("rom-map.inc"), canonical_rom_map_include()?)?;
 
     let asm_dir = workspace.join("crates/disasm/asm");
     let sources = assembly_sources(&asm_dir)?;
@@ -120,6 +205,12 @@ fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::err
         "matched Japanese reference: {} bytes, sha256={}",
         built.len(),
         hex(&digest)
+    );
+    println!(
+        "validated ROM map: {} regions, {} entries, {} COP targets",
+        rom_map.regions().len(),
+        rom_map.entry_points().len(),
+        cop_targets.len()
     );
     println!("local output: {}", output_dir.display());
     Ok(())
@@ -229,7 +320,7 @@ fn hex(bytes: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{assembly_sources, create_run_directory, hex};
+    use super::{assembly_sources, create_run_directory, hex, inspect_rom_location};
     use std::fs;
 
     #[test]
@@ -266,6 +357,30 @@ mod tests {
             .collect();
         assert_eq!(names, ["a.s", "z.s"]);
         fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    fn inspection_normalizes_explicit_address_spaces() {
+        let offset = inspect_rom_location("offset:008000").unwrap();
+        let canonical = inspect_rom_location("canonical:C08000").unwrap();
+        let runtime = inspect_rom_location("runtime:80:8000").unwrap();
+        assert_eq!(offset, canonical);
+        assert_eq!(offset, runtime);
+        assert!(offset.contains("normalized=$008000"));
+        assert!(offset.contains("canonical=$C0:8000"));
+        assert!(offset.contains("region=boot_main class=code"));
+        assert!(offset.contains("entry=reset"));
+
+        let table = inspect_rom_location("offset:0083B2").unwrap();
+        assert!(table.contains("region=cop_dispatch_table class=data"));
+        assert!(table.contains("kind=function_pointer_table"));
+    }
+
+    #[test]
+    fn inspection_rejects_ambiguous_or_unmapped_addresses() {
+        assert!(inspect_rom_location("808000").is_err());
+        assert!(inspect_rom_location("runtime:00:7fff").is_err());
+        assert!(inspect_rom_location("offset:400000").is_err());
     }
 
     #[test]
