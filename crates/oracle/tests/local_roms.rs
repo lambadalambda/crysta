@@ -50,6 +50,122 @@ fn vram_le_bytes(session: &Session) -> Vec<u8> {
 }
 
 #[test]
+fn local_sram_trace_verifies_gameplay_symbols() {
+    if local_rom("Tenchi Souzou (Japan).sfc").is_none()
+        || local_rom("saves/Terranigma.srm").is_none()
+    {
+        eprintln!("skipping: local Japanese dump or qualified SRAM not present");
+        return;
+    }
+    if std::env::var("ORACLE_SRAM_TRACE_CHILD").is_ok() {
+        run_local_sram_trace_child();
+    }
+
+    let exe = std::env::current_exe().expect("current exe");
+    let out = std::process::Command::new(&exe)
+        .args([
+            "--exact",
+            "local_sram_trace_verifies_gameplay_symbols",
+            "--nocapture",
+        ])
+        .env("ORACLE_SRAM_TRACE_CHILD", "1")
+        .output()
+        .expect("spawn SRAM trace child");
+    assert!(
+        out.status.success(),
+        "child SRAM trace must exit cleanly\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        text.contains("local SRAM symbol trace: 3 checkpoints, 6d2c6756ff22e9c41a8287f649252599a493422b54d684e886b64e9b12741595"),
+        "child must report the qualified SRAM symbol trace: {text}"
+    );
+}
+
+fn run_local_sram_trace_child() -> ! {
+    let image = local_rom("Tenchi Souzou (Japan).sfc").expect("parent verified local dump");
+    let save = local_rom("saves/Terranigma.srm").expect("parent verified local SRAM");
+    assert_eq!(
+        export::digest_hex(&save),
+        "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+        "local SRAM must be the qualified beginning-game save"
+    );
+    let rom = rom::Rom::load(&image).expect("validated dump");
+    assert_eq!(rom.revision(), Revision::Japan);
+    let mut session = Session::new_with_sram(&rom, &save).expect("session with local SRAM");
+    let map = memory_map::MemoryMap::built_in_japan().expect("canonical memory map");
+    let mut trace = export::SymbolTrace::new(
+        &map,
+        rom.revision().sha256(),
+        "qualified-sram-slot-1-movement",
+        &[
+            "current_map",
+            "player_x",
+            "player_y",
+            "event_flags",
+            "inventory_items",
+            "inventory_weapons",
+            "inventory_armor",
+        ],
+    )
+    .expect("symbol trace metadata");
+
+    for scenario_frame in 0..=1_900_u32 {
+        session.set_button(Button::Start, (400..408).contains(&scenario_frame));
+        session.set_button(Button::A, (1_100..1_112).contains(&scenario_frame));
+        session.set_button(Button::Right, (1_800..1_840).contains(&scenario_frame));
+        session.run_frame();
+        if matches!(scenario_frame, 1_600 | 1_799 | 1_840) {
+            trace
+                .append_checkpoint(
+                    session.frame_state().frames,
+                    scenario_frame,
+                    &session.wram_image(),
+                )
+                .expect("sample canonical symbols");
+        }
+    }
+
+    let value = |checkpoint: usize, id: &str| {
+        let symbol_index = trace
+            .symbols
+            .iter()
+            .position(|symbol| symbol.id == id)
+            .expect("selected symbol");
+        trace.checkpoints[checkpoint].values[symbol_index].as_slice()
+    };
+    assert_eq!(value(0, "current_map"), [0x28, 0x01]);
+    assert_eq!(value(0, "player_x"), [0x08, 0x03]);
+    assert_eq!(value(0, "player_y"), [0x70, 0x00]);
+    assert_eq!(
+        &value(0, "inventory_items")[..8],
+        [0x10, 5, 0x1A, 1, 0x13, 2, 0x11, 1]
+    );
+    assert_eq!(&value(0, "inventory_weapons")[..4], [0x80, 1, 0x81, 1]);
+    assert_eq!(&value(0, "inventory_armor")[..4], [0xA1, 1, 0xA0, 1]);
+    assert_eq!(&value(0, "event_flags")[4..8], [0xEF, 0x7F, 0xA1, 0x70]);
+    assert_eq!(value(1, "player_x"), [0x08, 0x03]);
+    assert_eq!(value(1, "player_y"), [0x70, 0x00]);
+    assert_eq!(value(2, "player_x"), [0x42, 0x03]);
+    assert_eq!(value(2, "player_y"), [0x80, 0x00]);
+    assert_eq!(value(0, "inventory_items"), value(2, "inventory_items"));
+    assert_eq!(value(0, "event_flags"), value(2, "event_flags"));
+
+    let digest = trace.digest_hex().expect("canonical symbol trace digest");
+    assert_eq!(
+        digest,
+        "6d2c6756ff22e9c41a8287f649252599a493422b54d684e886b64e9b12741595"
+    );
+    eprintln!(
+        "local SRAM symbol trace: {} checkpoints, {digest}",
+        trace.checkpoints.len()
+    );
+    std::process::exit(0);
+}
+
+#[test]
 fn reset_trace_reaches_first_main_loop_iteration() {
     if local_rom("Tenchi Souzou (Japan).sfc").is_none() {
         eprintln!("skipping: local Japanese dump not present");

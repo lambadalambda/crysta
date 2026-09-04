@@ -121,6 +121,7 @@ name = "oracle"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "memory-map",
  "rom",
  "serde",
  "serde_json",
