@@ -1,0 +1,1190 @@
+{
+  "schema_version": 1,
+  "revision": "japan",
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "sources": [
+    {
+      "id": "datacrystal-53316",
+      "title": "Terranigma/RAM map, revision 53316",
+      "url": "https://datacrystal.tcrf.net/w/index.php?title=Terranigma/RAM_map&oldid=53316",
+      "retrieved_on": "2026-09-04"
+    },
+    {
+      "id": "gamefaqs-78151",
+      "title": "Terranigma SRAM/WRAM/ROM Data Guide",
+      "url": "https://gamefaqs.gamespot.com/snes/588784-terranigma/faqs/78151",
+      "retrieved_on": "2026-09-04"
+    },
+    {
+      "id": "fantasyanime-save-1",
+      "title": "Terranigma Game Save #1: Beginning of the game",
+      "url": "https://fantasyanime.com/legacy/terran_saves.htm",
+      "retrieved_on": "2026-09-04"
+    },
+    {
+      "id": "project-boot-assembly",
+      "title": "Project boot and interrupt matching assembly",
+      "project_path": "crates/disasm/asm/boot.s"
+    },
+    {
+      "id": "project-boot-probes",
+      "title": "Project boot-flow probe findings",
+      "project_path": "docs/oracle-boot-probes.md"
+    },
+    {
+      "id": "project-oracle-tests",
+      "title": "Project Japanese ROM-backed oracle tests",
+      "project_path": "crates/oracle/tests/local_roms.rs"
+    },
+    {
+      "id": "project-rom-library",
+      "title": "Project ROM revision definitions",
+      "project_path": "crates/rom/src/lib.rs"
+    }
+  ],
+  "symbols": [
+    {
+      "id": "cop_return_address",
+      "asm_name": "COP_RETURN_ADDRESS",
+      "space": "direct_page",
+      "address": "$000036",
+      "width": 2,
+      "kind": "pointer",
+      "access": "read_write",
+      "lifetime": "interrupt",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeCopHandler through CopReturnAfterTwoBytes",
+          "provenance": "static_analysis",
+          "note": "COP return address scratch is read and advanced."
+        }
+      ],
+      "assembly_operand": "$0036"
+    },
+    {
+      "id": "cop_return_bank",
+      "asm_name": "COP_RETURN_BANK",
+      "space": "direct_page",
+      "address": "$000038",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "interrupt",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeCopHandler",
+          "provenance": "static_analysis",
+          "note": "Stacked bank/frame scratch copied by the COP dispatcher."
+        }
+      ],
+      "assembly_operand": "$0038"
+    },
+    {
+      "id": "frame_counter",
+      "asm_name": "FRAME_COUNTER",
+      "space": "direct_page",
+      "address": "$000042",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "First 16-bit counter advanced by each NMI."
+        }
+      ],
+      "assembly_operand": "$0042"
+    },
+    {
+      "id": "frame_counter_aux",
+      "asm_name": "FRAME_COUNTER_AUX",
+      "space": "direct_page",
+      "address": "$000044",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "Second 16-bit counter advanced by each NMI."
+        }
+      ],
+      "assembly_operand": "$0044"
+    },
+    {
+      "id": "nmi_transfer_state",
+      "asm_name": "NMI_TRANSFER_STATE",
+      "space": "direct_page",
+      "address": "$000084",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI clears this 16-bit transfer state."
+        }
+      ],
+      "assembly_operand": "$0084"
+    },
+    {
+      "id": "hdma_enable_shadow",
+      "asm_name": "HDMA_ENABLE_SHADOW",
+      "space": "direct_page",
+      "address": "$000086",
+      "width": 1,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "session",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI restores HDMA enable from this byte."
+        }
+      ],
+      "assembly_operand": "$0086"
+    },
+    {
+      "id": "program_state",
+      "asm_name": "PROGRAM_STATE",
+      "space": "wram",
+      "address": "$7E0450",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "session",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x0450",
+          "provenance": "imported_claim",
+          "note": "Public map calls this a possible program state."
+        },
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Reusable RAM symbols, 0x0450",
+          "provenance": "project_trace",
+          "note": "Boot traces record stable state transitions."
+        }
+      ],
+      "assembly_operand": "$0450"
+    },
+    {
+      "id": "controller_1_raw",
+      "asm_name": "CONTROLLER_1_RAW",
+      "space": "wram",
+      "address": "$7E0456",
+      "width": 2,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI copies JOY1 into this low-WRAM field."
+        },
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Stall signature, 0x0456",
+          "provenance": "project_trace",
+          "note": "Trace observes A-button changes."
+        }
+      ],
+      "assembly_operand": "$0456"
+    },
+    {
+      "id": "controller_2_raw",
+      "asm_name": "CONTROLLER_2_RAW",
+      "space": "wram",
+      "address": "$7E0458",
+      "width": 2,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI copies JOY2 into this low-WRAM field."
+        }
+      ],
+      "assembly_operand": "$0458"
+    },
+    {
+      "id": "room_change_trigger",
+      "asm_name": "ROOM_CHANGE_TRIGGER",
+      "space": "wram",
+      "address": "$7E047C",
+      "width": 1,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x047c",
+          "provenance": "imported_claim",
+          "note": "Public lead labels a room-change trigger."
+        },
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "Reset writes one before opening-state initialization."
+        }
+      ],
+      "assembly_operand": "$047C"
+    },
+    {
+      "id": "current_map",
+      "asm_name": "CURRENT_MAP",
+      "space": "wram",
+      "address": "$7E047E",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "7E047E-7E047F",
+          "provenance": "imported_claim",
+          "note": "Public map identifies the current location number."
+        },
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Reusable RAM symbols, 0x047E",
+          "provenance": "project_trace",
+          "note": "Project traces record map history at this field."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "scenario_suite_runs_on_one_boot and local_sram_trace_verifies_gameplay_symbols",
+          "provenance": "project_test",
+          "note": "ROM-backed scenarios observe location transitions and a loaded-save location."
+        }
+      ],
+      "assembly_operand": "$047E"
+    },
+    {
+      "id": "current_map_times_two",
+      "asm_name": "CURRENT_MAP_TIMES_TWO",
+      "space": "wram",
+      "address": "$7E0480",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Stall signature, 0x0480",
+          "provenance": "project_trace",
+          "note": "Observed byte as current map multiplied by two."
+        }
+      ],
+      "assembly_operand": "$0480"
+    },
+    {
+      "id": "pending_map",
+      "asm_name": "PENDING_MAP",
+      "space": "wram",
+      "address": "$7E0482",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Reusable RAM symbols, 0x0482",
+          "provenance": "project_trace",
+          "note": "Trace distinguishes this byte as pending from current map."
+        }
+      ],
+      "assembly_operand": "$0482"
+    },
+    {
+      "id": "map_load_state",
+      "asm_name": "MAP_LOAD_STATE",
+      "space": "wram",
+      "address": "$7E0484",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "Reset clears this map initialization field."
+        }
+      ],
+      "assembly_operand": "$0484"
+    },
+    {
+      "id": "room_change_timer",
+      "asm_name": "ROOM_CHANGE_TIMER",
+      "space": "wram",
+      "address": "$7E0488",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x0488",
+          "provenance": "imported_claim",
+          "note": "Public notes call this the room-change timer."
+        },
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Reusable RAM symbols, 0x0488",
+          "provenance": "project_trace",
+          "note": "Project trace observes the timer during transition."
+        }
+      ],
+      "assembly_operand": "$0488"
+    },
+    {
+      "id": "state_handler_pointer",
+      "asm_name": "STATE_HANDLER_POINTER",
+      "space": "wram",
+      "address": "$7E049E",
+      "width": 2,
+      "kind": "pointer",
+      "access": "read_write",
+      "lifetime": "session",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "TopLevelStateDispatch",
+          "provenance": "static_analysis",
+          "note": "Top-level state dispatch jumps indirectly through this pointer."
+        }
+      ],
+      "assembly_operand": "$049E"
+    },
+    {
+      "id": "apu_queued_value",
+      "asm_name": "APU_QUEUED_VALUE",
+      "space": "wram",
+      "address": "$7E04B6",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI consumes and clears the queued APU value."
+        }
+      ],
+      "assembly_operand": "$04B6"
+    },
+    {
+      "id": "apu_update_mode",
+      "asm_name": "APU_UPDATE_MODE",
+      "space": "wram",
+      "address": "$7E04B8",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "NMI selects its APU update path from this field."
+        }
+      ],
+      "assembly_operand": "$04B8"
+    },
+    {
+      "id": "name_entry_cursor_row",
+      "asm_name": "NAME_ENTRY_CURSOR_ROW",
+      "space": "wram",
+      "address": "$7E04C8",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "run_scenario_child: name-entry cursor movement block",
+          "provenance": "project_test",
+          "note": "Three input blocks advance this byte through rows 1, 2, and 3."
+        }
+      ],
+      "assembly_operand": "$04C8"
+    },
+    {
+      "id": "text_speed",
+      "asm_name": "TEXT_SPEED",
+      "space": "wram",
+      "address": "$7E06A4",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x06a4",
+          "provenance": "imported_claim",
+          "note": "Public notes identify text speed."
+        },
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Stall signature, 0x06A4",
+          "provenance": "project_trace",
+          "note": "Project probes varied and observed this setting."
+        }
+      ],
+      "assembly_operand": "$06A4"
+    },
+    {
+      "id": "event_flags",
+      "asm_name": "EVENT_FLAGS",
+      "space": "wram",
+      "address": "$7E06C0",
+      "width": 64,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x06c0-0x06ff",
+          "provenance": "imported_claim",
+          "note": "Public notes enumerate temporary, scene, and progression bits in this contiguous block."
+        },
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "event flag data",
+          "provenance": "imported_claim",
+          "note": "Guide used as a corroborating public lead; exact meanings remain unverified."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "The qualified loaded-game trace records stable nonzero bytes at the documented block; individual bit meanings remain imported claims."
+        },
+        {
+          "source_id": "fantasyanime-save-1",
+          "locator": "Game Save #1, slot 1: Level 1, Chapter 1, Crystal Blue",
+          "provenance": "imported_claim",
+          "note": "Describes the local SRAM scenario used by the project trace; SHA-256 is qualified in the test and documentation."
+        }
+      ],
+      "assembly_operand": "$06C0"
+    },
+    {
+      "id": "map_x_scroll",
+      "asm_name": "MAP_X_SCROLL",
+      "space": "wram",
+      "address": "$7E081E",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [
+        {
+          "name": "crystal blue camera y",
+          "status": "conflicting",
+          "related_symbol_id": "crystal_blue_camera_y_claim",
+          "note": "The same public revision assigns this incompatible label later in its notes."
+        }
+      ],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "7E081E-7E081F",
+          "provenance": "imported_claim",
+          "note": "Top-level public map labels this map X scroll."
+        }
+      ],
+      "assembly_operand": "$081E"
+    },
+    {
+      "id": "crystal_blue_camera_y_claim",
+      "asm_name": "CRYSTAL_BLUE_CAMERA_Y_CLAIM",
+      "space": "wram",
+      "address": "$7E081E",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [
+        {
+          "name": "map X scroll",
+          "status": "conflicting",
+          "related_symbol_id": "map_x_scroll",
+          "note": "Retained separately rather than silently merging the contradictory claim."
+        }
+      ],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x081e",
+          "provenance": "imported_claim",
+          "note": "Later public notes label the same bytes crystal-blue camera Y."
+        }
+      ],
+      "assembly_operand": "$081E"
+    },
+    {
+      "id": "controller_1_normalized",
+      "asm_name": "CONTROLLER_1_NORMALIZED",
+      "space": "wram",
+      "address": "$7E0920",
+      "width": 1,
+      "kind": "bitfield",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Stall signature, 0x0920",
+          "provenance": "project_trace",
+          "note": "This observed input byte responds to directional input."
+        }
+      ],
+      "assembly_operand": "$0920"
+    },
+    {
+      "id": "menu_cursor",
+      "asm_name": "MENU_CURSOR",
+      "space": "wram",
+      "address": "$7E0DC8",
+      "width": 1,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-probes",
+          "locator": "Stall signature, 0x0DC8",
+          "provenance": "project_trace",
+          "note": "Probe-derived menu cursor responds to directional input."
+        }
+      ],
+      "assembly_operand": "$0DC8"
+    },
+    {
+      "id": "player_x",
+      "asm_name": "PLAYER_X",
+      "space": "wram",
+      "address": "$7E1000",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "7E1000-7E1001",
+          "provenance": "imported_claim",
+          "note": "Public map identifies player X."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "A controlled Right input changes this word from 776 to 834 in loaded gameplay."
+        },
+        {
+          "source_id": "fantasyanime-save-1",
+          "locator": "Game Save #1, slot 1: Level 1, Chapter 1, Crystal Blue",
+          "provenance": "imported_claim",
+          "note": "Describes the local SRAM scenario used by the project trace; SHA-256 is qualified in the test and documentation."
+        }
+      ],
+      "assembly_operand": "$1000"
+    },
+    {
+      "id": "player_y",
+      "asm_name": "PLAYER_Y",
+      "space": "wram",
+      "address": "$7E1002",
+      "width": 2,
+      "kind": "scalar",
+      "access": "read_write",
+      "lifetime": "map",
+      "aliases": [],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "7E1002-7E1003",
+          "provenance": "imported_claim",
+          "note": "Public map identifies player Y."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "A controlled Right input changes this word from 112 to 128 along the isometric path in loaded gameplay."
+        }
+      ],
+      "assembly_operand": "$1002"
+    },
+    {
+      "id": "cgram_staging_buffer",
+      "asm_name": "CGRAM_STAGING_BUFFER",
+      "space": "wram",
+      "address": "$7F0600",
+      "width": 512,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "frame",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "7F0600-7F07FF",
+          "provenance": "imported_claim",
+          "note": "Public map identifies the CGRAM buffer."
+        },
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "NMI DMA transfers exactly 512 bytes from $7F0600 to CGRAM."
+        }
+      ],
+      "assembly_operand": "$7F0600"
+    },
+    {
+      "id": "inventory_items",
+      "asm_name": "INVENTORY_ITEMS",
+      "space": "wram",
+      "address": "$7F8000",
+      "width": 54,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x18000-0x18034",
+          "provenance": "imported_claim",
+          "note": "Public notes locate the item block; two-byte item records imply the final record occupies 0x18034-0x18035."
+        },
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "inventory data",
+          "provenance": "imported_claim",
+          "note": "Guide is retained as a public lead for inventory layout."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "The qualified loaded-game trace records item ID/quantity pairs beginning 10 05, 1A 01, 13 02, 11 01."
+        },
+        {
+          "source_id": "fantasyanime-save-1",
+          "locator": "Game Save #1, slot 1: Level 1, Chapter 1, Crystal Blue",
+          "provenance": "imported_claim",
+          "note": "Describes the local SRAM scenario used by the project trace; SHA-256 is qualified in the test and documentation."
+        }
+      ],
+      "assembly_operand": "$7F8000"
+    },
+    {
+      "id": "inventory_key_items",
+      "asm_name": "INVENTORY_KEY_ITEMS",
+      "space": "wram",
+      "address": "$7F8036",
+      "width": 18,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x18036",
+          "provenance": "imported_claim",
+          "note": "Public notes identify the key-item block start; its extent ends at the next documented block."
+        },
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "key item data",
+          "provenance": "imported_claim",
+          "note": "Guide is retained as a public lead for inventory layout."
+        }
+      ],
+      "assembly_operand": "$7F8036"
+    },
+    {
+      "id": "inventory_weapons",
+      "asm_name": "INVENTORY_WEAPONS",
+      "space": "wram",
+      "address": "$7F8048",
+      "width": 32,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x18048-0x1805e",
+          "provenance": "imported_claim",
+          "note": "Public notes identify normal weapons through $7F805E; later special slots extend to the next documented block."
+        },
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "weapon data",
+          "provenance": "imported_claim",
+          "note": "Guide is retained as a public lead for equipment layout."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "The qualified loaded-game trace records weapon ID/quantity pairs beginning 80 01, 81 01."
+        }
+      ],
+      "assembly_operand": "$7F8048"
+    },
+    {
+      "id": "inventory_armor",
+      "asm_name": "INVENTORY_ARMOR",
+      "space": "wram",
+      "address": "$7F8068",
+      "width": 24,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "armor data",
+          "provenance": "imported_claim",
+          "note": "Guide supplies the selected $7F8068 boundary as an imported lead; it is not trace-proven."
+        },
+        {
+          "source_id": "project-oracle-tests",
+          "locator": "local_sram_trace_verifies_gameplay_symbols / run_local_sram_trace_child",
+          "provenance": "project_test",
+          "note": "The qualified loaded-game trace records armor ID/quantity pairs beginning A1 01, A0 01 at the selected imported boundary."
+        }
+      ],
+      "assembly_operand": "$7F8068"
+    },
+    {
+      "id": "inventory_magic",
+      "asm_name": "INVENTORY_MAGIC",
+      "space": "wram",
+      "address": "$7F8080",
+      "width": 32,
+      "kind": "buffer",
+      "access": "read_write",
+      "lifetime": "persistent",
+      "aliases": [],
+      "confidence": "imported_claim",
+      "evidence": [
+        {
+          "source_id": "datacrystal-53316",
+          "locator": "0x18080",
+          "provenance": "imported_claim",
+          "note": "Public notes locate the spell block at this address."
+        },
+        {
+          "source_id": "gamefaqs-78151",
+          "locator": "magic data",
+          "provenance": "imported_claim",
+          "note": "Guide is retained as a public lead for inventory layout."
+        }
+      ],
+      "assembly_operand": "$7F8080"
+    },
+    {
+      "id": "cgram_address",
+      "asm_name": "CGRAM_ADDRESS",
+      "space": "hardware",
+      "address": "$002121",
+      "width": 1,
+      "kind": "port",
+      "access": "write_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "CGRAM destination index."
+        }
+      ],
+      "assembly_operand": "$2121"
+    },
+    {
+      "id": "cgram_data",
+      "asm_name": "CGRAM_DATA",
+      "space": "hardware",
+      "address": "$002122",
+      "width": 1,
+      "kind": "port",
+      "access": "write_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "CGRAM data port."
+        }
+      ],
+      "assembly_operand": "$2122"
+    },
+    {
+      "id": "apu_io_2_3",
+      "asm_name": "APU_IO_2_3",
+      "space": "hardware",
+      "address": "$002142",
+      "width": 2,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "16-bit CPU/APU communication port pair."
+        }
+      ],
+      "assembly_operand": "$2142"
+    },
+    {
+      "id": "dma_enable",
+      "asm_name": "DMA_ENABLE",
+      "space": "hardware",
+      "address": "$00420B",
+      "width": 1,
+      "kind": "port",
+      "access": "write_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "General DMA channel enable."
+        }
+      ],
+      "assembly_operand": "$420B"
+    },
+    {
+      "id": "hdma_enable",
+      "asm_name": "HDMA_ENABLE",
+      "space": "hardware",
+      "address": "$00420C",
+      "width": 1,
+      "kind": "port",
+      "access": "write_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "HDMA channel enable."
+        }
+      ],
+      "assembly_operand": "$420C"
+    },
+    {
+      "id": "nmi_status",
+      "asm_name": "NMI_STATUS",
+      "space": "hardware",
+      "address": "$004210",
+      "width": 1,
+      "kind": "port",
+      "access": "read_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "WaitForFrameAndPollInputBody",
+          "provenance": "static_analysis",
+          "note": "NMI status and latch."
+        }
+      ],
+      "assembly_operand": "$4210"
+    },
+    {
+      "id": "hvbjoy_status",
+      "asm_name": "HVBJOY_STATUS",
+      "space": "hardware",
+      "address": "$004212",
+      "width": 1,
+      "kind": "port",
+      "access": "read_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "H/V blank and joypad status."
+        }
+      ],
+      "assembly_operand": "$4212"
+    },
+    {
+      "id": "joypad_1_data",
+      "asm_name": "JOYPAD_1_DATA",
+      "space": "hardware",
+      "address": "$004218",
+      "width": 2,
+      "kind": "port",
+      "access": "read_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "Automatic joypad result for controller 1."
+        }
+      ],
+      "assembly_operand": "$4218"
+    },
+    {
+      "id": "joypad_2_data",
+      "asm_name": "JOYPAD_2_DATA",
+      "space": "hardware",
+      "address": "$00421A",
+      "width": 2,
+      "kind": "port",
+      "access": "read_only",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "Automatic joypad result for controller 2."
+        }
+      ],
+      "assembly_operand": "$421A"
+    },
+    {
+      "id": "dma0_control",
+      "asm_name": "DMA0_CONTROL",
+      "space": "hardware",
+      "address": "$004300",
+      "width": 1,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "DMA channel 0 transfer mode."
+        }
+      ],
+      "assembly_operand": "$4300"
+    },
+    {
+      "id": "dma0_destination",
+      "asm_name": "DMA0_DESTINATION",
+      "space": "hardware",
+      "address": "$004301",
+      "width": 1,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "DMA channel 0 destination register."
+        }
+      ],
+      "assembly_operand": "$4301"
+    },
+    {
+      "id": "dma0_source_offset",
+      "asm_name": "DMA0_SOURCE_OFFSET",
+      "space": "hardware",
+      "address": "$004302",
+      "width": 2,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "DMA channel 0 source offset."
+        }
+      ],
+      "assembly_operand": "$4302"
+    },
+    {
+      "id": "dma0_source_bank",
+      "asm_name": "DMA0_SOURCE_BANK",
+      "space": "hardware",
+      "address": "$004304",
+      "width": 1,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "DMA channel 0 source bank."
+        }
+      ],
+      "assembly_operand": "$4304"
+    },
+    {
+      "id": "dma0_size",
+      "asm_name": "DMA0_SIZE",
+      "space": "hardware",
+      "address": "$004305",
+      "width": 2,
+      "kind": "port",
+      "access": "read_write",
+      "lifetime": "hardware",
+      "aliases": [],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "project-boot-assembly",
+          "locator": "NativeNmiHandler",
+          "provenance": "static_analysis",
+          "note": "DMA channel 0 transfer size."
+        }
+      ],
+      "assembly_operand": "$4305"
+    }
+  ],
+  "conflicting_claims": [
+    {
+      "symbol_id": "inventory_armor",
+      "claimed_space": "wram",
+      "claimed_address": "$7F8066",
+      "claimed_width": 26,
+      "source_id": "datacrystal-53316",
+      "note": "Data Crystal places the armor block at $7F8066; extending to the next documented block yields $7F8066-$7F807F. Both this extent and the selected $7F8068 boundary remain imported claims."
+    }
+  ]
+}

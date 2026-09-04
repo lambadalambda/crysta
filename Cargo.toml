@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rom", "crates/oracle", "crates/disasm"]
+members = ["crates/rom", "crates/oracle", "crates/disasm", "crates/memory-map"]
 
 [workspace.package]
 version = "0.1.0"
