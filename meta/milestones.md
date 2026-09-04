@@ -56,9 +56,8 @@ Core swap: ares (ISC) replaced LakeSnes per
 - Canonical RAM/hardware symbols are shared by tools.
 - Major code, data, and indirect-dispatch regions are classified.
 
-### Issues
+### Remaining issues
 
-- [Establish a byte-matching disassembly build](issues/matching-disassembly-build.md)
 - [Disassemble boot, interrupts, and the main loop](issues/disassemble-boot-main-loop.md)
 - [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
 - [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)

@@ -66,16 +66,16 @@ version-support model.
 ## Planned repository layout
 
 ```text
-crates/                 Rust workspace (planned)
+crates/                 Rust workspace
   rom/                  ROM validation, normalization, and addressing
-  assets/               Compression and data-format codecs
-  core/                 Deterministic portable game simulation
   oracle/               Reference execution and differential testing
-  renderer/             Deterministic command consumer/classic renderer
-  audio/                Audio command model and compatibility backend
-  desktop/              Native frontend
-  web/                  WebAssembly frontend
-disasm/                 Matching 65C816 reconstruction
+  disasm/               Matching 65C816 reconstruction tooling
+  assets/               Compression and data-format codecs (planned)
+  core/                 Deterministic portable game simulation (planned)
+  renderer/             Deterministic command consumer/classic renderer (planned)
+  audio/                Audio command model and compatibility backend (planned)
+  desktop/              Native frontend (planned)
+  web/                  WebAssembly frontend (planned)
 docs/                   Architecture and reverse-engineering documentation
 local/                  Ignored ROM-backed inputs and outputs
 meta/                   Repository-local milestones and issues

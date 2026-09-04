@@ -30,3 +30,19 @@ Select an assembler and create a reconstruction that can replace opaque ROM rang
   commit-safe / local-only / review-required classes defined in
   [CONTRIBUTING](../../CONTRIBUTING.md).
 - Matching is an archival/reference property; the portable Rust build must not depend on assembling a ROM.
+
+## Verification
+
+Verified locally on 2026-08-27 with cc65 tools reporting `V2.18 - N/A`:
+
+- `cargo run -p disasm -- reconstruct <Japanese dump>` produced a 4 MiB image
+  matching SHA-256
+  `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`.
+- Temporarily changing the assembled `clc` at file offset `$008001` to `sec`
+  failed with `built $38, expected $18` and reported both `$008001` and
+  canonical SNES address `$C0:8001`; the source was then restored and the clean
+  reconstruction rerun.
+- The ROM-free workspace tests, formatting, clippy, rustdoc, tracker check, and
+  repository-safety check pass.
+- Generated ROMs, normalized slices, objects, listings, and maps are written
+  only beneath ignored `local/disasm/` run directories.

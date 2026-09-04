@@ -50,7 +50,9 @@ The repository stores hashes and metadata, never ROM bytes.
 The disassembly should initially permit opaque ranges sourced from a local ROM.
 Known routines and data replace those ranges progressively. A reconstruction
 build is considered matching only when its normalized output is byte-identical
-to the selected reference ROM.
+to the selected reference ROM. The cc65 toolchain, HiROM placement model, and
+explicit local workflow are defined in
+[ADR 0003](adr/0003-matching-disassembly-toolchain.md).
 
 The disassembly should capture:
 
@@ -185,8 +187,6 @@ must not contaminate classic comparisons.
 
 The milestone backlog intentionally leaves these choices open until measured:
 
-- assembler/disassembly toolchain;
-- reference emulator integration;
 - whether static recompilation is used as a temporary bridge;
 - rendering and audio backend libraries.
 

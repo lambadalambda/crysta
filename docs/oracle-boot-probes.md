@@ -4,7 +4,7 @@ Recorded 2026-08-26 from scratch probes (`crates/oracle/examples/probe_boot*.rs`
 removed after this write-up) against the local dumps in `local/`. These are
 ROM-backed observations; nothing here is committed as fixture content.
 
-## Boot timeline (Japan `Tenchi Souzou (Japan).sfc`, LoROM, NTSC)
+## Boot timeline (Japan `Tenchi Souzou (Japan).sfc`, HiROM, NTSC)
 
 All timings are frame counts from hard reset with the input edges shown.
 
