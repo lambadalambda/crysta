@@ -16,7 +16,12 @@ registers.
 
 ## Status
 
-Planning and repository bootstrap. No playable implementation exists yet.
+The safe repository foundation (M0) and deterministic reference oracle (M1)
+are complete. Work is now focused on the matching-disassembly foundation (M2):
+a byte-identical, initially opaque ROM reconstruction is in place, with program
+annotation and shared symbol maps still to come.
+
+No playable portable implementation exists yet.
 
 See:
 

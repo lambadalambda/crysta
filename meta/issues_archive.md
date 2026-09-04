@@ -14,3 +14,4 @@
 - [x] [Harden the oracle session boundary](issues/harden-oracle-session.md)
 - [x] [Switch reference core to bsnes](issues/switch-reference-core.md)
 - [x] [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
+- [x] [Refresh repository status documentation](issues/refresh-repository-status.md)
