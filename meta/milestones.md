@@ -58,7 +58,6 @@ Core swap: ares (ISC) replaced LakeSnes per
 
 ### Remaining issues
 
-- [Disassemble boot, interrupts, and the main loop](issues/disassemble-boot-main-loop.md)
 - [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
 - [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
 

@@ -18,14 +18,16 @@ registers.
 
 The safe repository foundation (M0) and deterministic reference oracle (M1)
 are complete. Work is now focused on the matching-disassembly foundation (M2):
-a byte-identical, initially opaque ROM reconstruction is in place, with program
-annotation and shared symbol maps still to come.
+a byte-identical reconstruction and the first boot, interrupt, frame-gate, and
+main-loop annotations are in place; shared symbol maps and broader region
+classification remain.
 
 No playable portable implementation exists yet.
 
 See:
 
 - [Architecture](docs/ARCHITECTURE.md)
+- [Boot, interrupts, and main loop](docs/boot-main-loop.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
 - [Contributing](CONTRIBUTING.md)

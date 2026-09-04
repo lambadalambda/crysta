@@ -77,6 +77,10 @@ Assembly conventions:
   externally reachable routines;
 - use linker assertions for fixed labels and region sizes.
 
+The currently annotated reset, native interrupt, frame-gate, and top-level
+control flow is indexed in
+[Boot, interrupts, and main loop](../../docs/boot-main-loop.md).
+
 A mismatch reports the first normalized file offset, its canonical SNES
 address, and the built and expected bytes. Full ROMs, normalized copies,
 objects containing opaque bytes, maps/listings, and linked outputs are all

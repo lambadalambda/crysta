@@ -52,7 +52,9 @@ Known routines and data replace those ranges progressively. A reconstruction
 build is considered matching only when its normalized output is byte-identical
 to the selected reference ROM. The cc65 toolchain, HiROM placement model, and
 explicit local workflow are defined in
-[ADR 0003](adr/0003-matching-disassembly-toolchain.md).
+[ADR 0003](adr/0003-matching-disassembly-toolchain.md). The first labeled
+[boot, interrupt, frame-gate, and main-loop flow](boot-main-loop.md) establishes
+these conventions against an ares instruction trace.
 
 The disassembly should capture:
 
