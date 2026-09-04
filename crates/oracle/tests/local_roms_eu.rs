@@ -18,6 +18,10 @@ fn local_rom(name: &str) -> Option<Vec<u8>> {
 
 #[test]
 fn scenario_eu_boot_to_name_entry_reports_named_checkpoints() {
+    if local_rom("Terranigma (E) [!].smc").is_none() {
+        eprintln!("skipping: local European dump not present");
+        return;
+    }
     // The vendored ares engine never tears down cleanly (threads + statics),
     // so the scenario executes in a forked child of this test binary.
     if std::env::var("ORACLE_EXECUTE_CHILD").is_ok() {

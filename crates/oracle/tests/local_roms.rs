@@ -51,6 +51,10 @@ fn vram_le_bytes(session: &Session) -> Vec<u8> {
 
 #[test]
 fn scenario_suite_runs_on_one_boot() {
+    if local_rom("Tenchi Souzou (Japan).sfc").is_none() {
+        eprintln!("skipping: local Japanese dump not present");
+        return;
+    }
     // The vendored ares engine never tears down cleanly (threads + statics),
     // so the scenario executes in a forked child process of this test binary.
     // Parent: spawn + assert clean exit; child (ORACLE_EXECUTE_CHILD): run

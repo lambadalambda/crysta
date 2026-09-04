@@ -16,3 +16,4 @@
 - [x] [Create initial reference replay scenarios](issues/initial-reference-scenarios.md)
 - [x] [Refresh repository status documentation](issues/refresh-repository-status.md)
 - [x] [Establish a byte-matching disassembly build](issues/matching-disassembly-build.md)
+- [x] [Make ROM-backed scenario tests skip on clean checkouts](issues/fix-rom-backed-test-skips.md)
