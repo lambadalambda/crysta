@@ -35,6 +35,9 @@ static_assert(offsetof(SnesCpuTraceEntry, status) == 6);
 static_assert(offsetof(SnesCpuTraceEntry, dataBank) == 7);
 static_assert(offsetof(SnesCpuTraceEntry, emulation) == 8);
 static constexpr uint32_t CpuTraceInstructionLimit = 2'000'000;
+static constexpr int SramSize = 8 * 1024;
+static_assert(SramSize == 8192);
+static_assert(sizeof(uint8_t) == 1);
 
 namespace ares::SuperFamicom {
   auto load(Node::System&, string) -> bool;
@@ -48,6 +51,7 @@ namespace {
 struct OraclePlatform : ares::Platform {
   std::shared_ptr<vfs::directory> systemPak;
   std::vector<u8> romBytes;
+  std::vector<u8> sramBytes;
   string bootTitle;
   string bootRegion;
   string bootBoard;
@@ -123,7 +127,7 @@ struct OraclePlatform : ares::Platform {
     cart->setAttribute("region", bootRegion);
     cart->setAttribute("board", bootBoard);
     cart->append("program.rom", std::span<const u8>{romBytes.data(), romBytes.size()});
-    cart->append("save.ram", 8 * 1024);
+    cart->append("save.ram", std::span<const u8>{sramBytes.data(), sramBytes.size()});
     return cart;
   }
 
@@ -185,13 +189,15 @@ public:
     platform.systemPak->append("ipl.rom", std::span<const u8>{gIplRom, 64});
   }
 
-  bool loadRom(const u8* data, u32 length) {
+  bool loadRom(const u8* data, u32 length, const u8* sramData, u32 sramLength) {
     if(root && root->name()) {
       // Full teardown before reload: the ares core is a process singleton.
       root->unload();
     }
     root = {};
+    // Copy both caller-owned buffers before attaching or powering the machine.
     platform.romBytes.assign(data, data + length);
+    platform.sramBytes.assign(sramData, sramData + sramLength);
     // Region sniff from the SNES internal header.
     bool pal = platform.romBytes.size() > 0xffd9 && platform.romBytes[0xffd9] == 2;
     platform.bootRegion = pal ? "PAL" : "NTSC";
@@ -248,13 +254,19 @@ void snes_reset(Snes* snes, bool hard) {
   (void)hard;
 }
 
-bool snes_loadRom(Snes* snes, const uint8_t* data, int length) {
-  if(!snes || !data || length <= 0) return false;
+bool snes_loadRomWithSram(Snes* snes, const uint8_t* data, int length,
+                          const uint8_t* sramData, int sramLength) {
+  if(!snes || !data || length <= 0 || !sramData || sramLength != SramSize) return false;
   auto* core = (OracleCore*)snes;
   if(core->loaded) return false;  // one boot per process; see snes_init
-  bool ok = core->loadRom(data, (u32)length);
-  if(ok) core->loaded = true;
-  return ok;
+  // Claim before entering ares: failed initialization is not safely retryable.
+  core->loaded = true;
+  return core->loadRom(data, (u32)length, sramData, (u32)sramLength);
+}
+
+bool snes_loadRom(Snes* snes, const uint8_t* data, int length) {
+  static constexpr uint8_t ZeroedSram[SramSize] = {};
+  return snes_loadRomWithSram(snes, data, length, ZeroedSram, SramSize);
 }
 
 void snes_runFrame(Snes* snes) {

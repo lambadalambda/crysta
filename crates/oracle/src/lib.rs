@@ -73,7 +73,13 @@ mod ffi {
             entries: *mut SnesCpuTraceEntry,
             count: *mut u32,
         ) -> c_int;
-        pub fn snes_loadRom(snes: *mut Snes, data: *const u8, length: c_int) -> bool;
+        pub fn snes_loadRomWithSram(
+            snes: *mut Snes,
+            data: *const u8,
+            length: c_int,
+            sramData: *const u8,
+            sramLength: c_int,
+        ) -> bool;
         pub fn snes_setPixelFormat(snes: *mut Snes, pixelFormat: c_int);
         pub fn snes_setPixels(snes: *mut Snes, pixelData: *mut u8);
         pub fn snes_setSamples(snes: *mut Snes, sampleData: *mut i16, samplesPerFrame: c_int);
@@ -98,6 +104,8 @@ pub const FRAME_WIDTH: usize = 512;
 pub const FRAME_HEIGHT: usize = 480;
 /// Samples per frame, stereo (legacy shim boundary capacity).
 pub const SAMPLES_PER_FRAME: usize = 534;
+/// Size in bytes of a cartridge SRAM image accepted by [`Session::new_with_sram`].
+pub const SRAM_SIZE: usize = 8 * 1024;
 /// Maximum records accepted by one bounded CPU trace.
 pub const MAX_CPU_TRACE_INSTRUCTIONS: usize = 2_000_000;
 
@@ -150,11 +158,17 @@ impl Button {
 }
 
 /// `Rom` validates to exactly [`rom::Rom::IMAGE_SIZE`] bytes, and the core's
-/// ROM length is an `i32`; a validated image therefore always fits.
+/// ROM and SRAM lengths use `i32`; both validated images therefore fit.
 const _: () = assert!(
     rom::Rom::IMAGE_SIZE <= i32::MAX as usize,
     "validated ROM image fits the core's i32 length"
 );
+const _: () = assert!(
+    SRAM_SIZE <= i32::MAX as usize,
+    "validated SRAM image fits the core's i32 length"
+);
+
+static ZEROED_SRAM: [u8; SRAM_SIZE] = [0; SRAM_SIZE];
 
 // Serializes constructors and prevents safe Rust from entering ares's
 // process-global initialization more than once.
@@ -174,6 +188,13 @@ pub struct Session {
 /// Errors from reference-session use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionError {
+    /// The SRAM image was not exactly [`SRAM_SIZE`] bytes.
+    InvalidSramLength {
+        /// Required SRAM image size.
+        expected: usize,
+        /// Supplied SRAM image size.
+        actual: usize,
+    },
     /// A session already owns the process-global ares core.
     AlreadyBooted,
     /// The core rejected the ROM image.
@@ -183,6 +204,12 @@ pub enum SessionError {
 impl fmt::Display for SessionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidSramLength { expected, actual } => {
+                write!(
+                    f,
+                    "SRAM image is {actual} bytes; expected exactly {expected} bytes"
+                )
+            }
             Self::AlreadyBooted => write!(f, "an ares session is already booted in this process"),
             Self::CoreRejectedRom => write!(f, "the emulator core rejected the ROM image"),
         }
@@ -299,8 +326,17 @@ impl fmt::Display for TraceError {
 
 impl std::error::Error for TraceError {}
 
+fn validate_sram(sram: &[u8]) -> Result<&[u8; SRAM_SIZE], SessionError> {
+    sram.try_into()
+        .map_err(|_| SessionError::InvalidSramLength {
+            expected: SRAM_SIZE,
+            actual: sram.len(),
+        })
+}
+
 impl Session {
-    /// Creates a session; the core hard-resets as part of ROM load.
+    /// Creates a session with zero-initialized 8 KiB cartridge SRAM.
+    /// The core hard-resets as part of ROM load.
     ///
     /// # Errors
     ///
@@ -312,9 +348,30 @@ impl Session {
     /// # Panics
     ///
     /// Panics if the sample-buffer size does not fit an `i32`; it is a
-    /// compile-time constant that always fits. The ROM length conversion
-    /// is guaranteed by the const assertion on [`rom::Rom::IMAGE_SIZE`].
+    /// compile-time constant that always fits. The ROM and SRAM length
+    /// conversions are guaranteed by their const assertions.
     pub fn new(rom: &Rom) -> Result<Self, SessionError> {
+        Self::new_with_sram(rom, &ZEROED_SRAM)
+    }
+
+    /// Creates a session with the supplied 8 KiB cartridge SRAM image.
+    /// SRAM is copied synchronously before the emulated system powers on.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SessionError::InvalidSramLength`] if `sram` is not exactly
+    /// [`SRAM_SIZE`] bytes. This validation occurs before claiming the
+    /// process-global core. Otherwise, returns the same errors as [`Self::new`].
+    ///
+    /// # Panics
+    ///
+    /// Panics only for compile-time-bounded length conversions; see [`Self::new`].
+    pub fn new_with_sram(rom: &Rom, sram: &[u8]) -> Result<Self, SessionError> {
+        let sram = validate_sram(sram)?;
+        Self::boot(rom, sram)
+    }
+
+    fn boot(rom: &Rom, sram: &[u8; SRAM_SIZE]) -> Result<Self, SessionError> {
         let mut claimed = SESSION_CLAIMED
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
@@ -327,8 +384,10 @@ impl Session {
         unsafe {
             let snes = ffi::snes_init();
             let image = rom.image();
-            let len = i32::try_from(image.len()).expect("validated ROM image fits i32");
-            let ok = ffi::snes_loadRom(snes, image.as_ptr(), len);
+            let image_len = i32::try_from(image.len()).expect("validated ROM image fits i32");
+            let sram_len = i32::try_from(sram.len()).expect("validated SRAM image fits i32");
+            let ok =
+                ffi::snes_loadRomWithSram(snes, image.as_ptr(), image_len, sram.as_ptr(), sram_len);
             if !ok {
                 ffi::snes_free(snes);
                 return Err(SessionError::CoreRejectedRom);
@@ -600,6 +659,105 @@ mod tests {
             crc32: d.crc32,
         }];
         Rom::load_with_known(&image, &known).expect("synthetic rom loads")
+    }
+
+    #[test]
+    fn sram_length_validation_is_rom_free_and_does_not_claim() {
+        for actual in [0, SRAM_SIZE - 1, SRAM_SIZE + 1] {
+            let sram = vec![0; actual];
+            assert!(matches!(
+                validate_sram(&sram),
+                Err(SessionError::InvalidSramLength {
+                    expected: SRAM_SIZE,
+                    actual: found
+                }) if found == actual
+            ));
+        }
+
+        let claimed = SESSION_CLAIMED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        assert!(
+            !*claimed,
+            "SRAM validation must not claim the ares singleton"
+        );
+    }
+
+    #[test]
+    fn supplied_sram_is_visible_at_boot_and_default_is_zeroed() {
+        if let Ok(mode) = std::env::var("ORACLE_SRAM_CHILD") {
+            run_sram_child(&mode);
+        }
+
+        let exe = std::env::current_exe().expect("current test executable");
+        for mode in ["supplied", "zeroed"] {
+            let output = std::process::Command::new(&exe)
+                .args([
+                    "--exact",
+                    "tests::supplied_sram_is_visible_at_boot_and_default_is_zeroed",
+                    "--nocapture",
+                ])
+                .env("ORACLE_SRAM_CHILD", mode)
+                .output()
+                .expect("spawn isolated SRAM test");
+            assert!(
+                output.status.success(),
+                "isolated {mode} SRAM test failed\nstdout:\n{}\nstderr:\n{}",
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            );
+            assert!(
+                String::from_utf8_lossy(&output.stderr).contains("synthetic SRAM check passed"),
+                "{mode} child must reach the end of its assertions"
+            );
+        }
+    }
+
+    fn run_sram_child(mode: &str) -> ! {
+        let mut image = synthetic_rom().image().to_vec();
+        // LDA $20:6000; STA $7E:0000; BRA $80:8000.
+        image[0x8000..0x800A]
+            .copy_from_slice(&[0xAF, 0x00, 0x60, 0x20, 0x8F, 0x00, 0x00, 0x7E, 0x80, 0xF6]);
+        let digest = rom::digests(&image);
+        let rom = Rom::load_with_known(
+            &image,
+            &[rom::KnownRom {
+                revision: rom::Revision::Japan,
+                sha256: digest.sha256,
+                crc32: digest.crc32,
+            }],
+        )
+        .expect("synthetic SRAM ROM loads");
+
+        let expected = 0xA5;
+        let mut sram = vec![0; SRAM_SIZE];
+        sram[0] = expected;
+        let mut session = match mode {
+            "supplied" => {
+                for actual in [0, SRAM_SIZE - 1] {
+                    assert!(matches!(
+                        Session::new_with_sram(&rom, &sram[..actual]),
+                        Err(SessionError::InvalidSramLength {
+                            expected: SRAM_SIZE,
+                            actual: found
+                        }) if found == actual
+                    ));
+                }
+                Session::new_with_sram(&rom, &sram).expect("core accepts supplied SRAM")
+            }
+            "zeroed" => Session::new(&rom).expect("core accepts zeroed SRAM"),
+            _ => panic!("unexpected SRAM child mode"),
+        };
+        // The constructor promises to copy SRAM synchronously.
+        sram.fill(0x5A);
+        session.run_frame();
+        assert_eq!(
+            session.wram(0),
+            if mode == "supplied" { expected } else { 0 }
+        );
+
+        eprintln!("synthetic SRAM check passed");
+        std::process::exit(0);
     }
 
     #[test]
