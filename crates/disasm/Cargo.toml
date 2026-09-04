@@ -11,3 +11,4 @@ workspace = true
 
 [dependencies]
 rom = { path = "../rom" }
+memory-map = { path = "../memory-map" }

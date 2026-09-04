@@ -69,6 +69,7 @@ dependencies = [
 name = "disasm"
 version = "0.1.0"
 dependencies = [
+ "memory-map",
  "rom",
 ]
 

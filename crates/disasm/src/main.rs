@@ -1,6 +1,6 @@
 //! Explicit local driver for the byte-matching reconstruction workflow.
 
-use disasm::compare_images;
+use disasm::{canonical_symbol_include, compare_images};
 use rom::{Revision, Rom};
 use std::env;
 use std::ffi::{OsStr, OsString};
@@ -63,6 +63,10 @@ fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::err
     let output_dir = create_run_directory(&workspace.join("local/disasm"))?;
     let clean_path = output_dir.join("rom-clean.bin");
     fs::write(&clean_path, reference.image())?;
+    fs::write(
+        output_dir.join("memory-symbols.inc"),
+        canonical_symbol_include()?,
+    )?;
 
     let asm_dir = workspace.join("crates/disasm/asm");
     let sources = assembly_sources(&asm_dir)?;
@@ -82,6 +86,8 @@ fn reconstruct(workspace: &Path, rom_path: &Path) -> Result<(), Box<dyn std::err
                 .arg("-W")
                 .arg("2")
                 .arg("--bin-include-dir")
+                .arg(&output_dir)
+                .arg("--include-dir")
                 .arg(&output_dir)
                 .arg("--listing")
                 .arg(&listing_path)

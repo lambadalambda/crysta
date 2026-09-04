@@ -5,6 +5,7 @@
 ; addresses. Runtime long addresses use the $80-$BF mirrors encoded by the ROM.
 
 .setcpu "65816"
+.include "memory-symbols.inc"
 .import __ROM_LOAD__, __ROM_SIZE__
 .segment "ROM"
 
@@ -17,7 +18,6 @@ BrkHandlerRuntime = $85FB01
 CopHandlerRuntime = $808378
 NativeResetRuntime = $808017
 WaitForFrameAndPollInput = $868000
-StateHandlerPointer = $049E
 
 RomBegin:
 .assert RomBegin = ROM_BASE, lderror, "ROM start moved"
@@ -65,9 +65,9 @@ NativeReset:
     jsl $86B8D6                 ; clear WRAM and initialize low-WRAM fields
     jsl $86AA9C                 ; upload the initial SPC driver/data
     lda #$01
-    sta $047C
-    stz $0484
-    inc $0488
+    sta ROOM_CHANGE_TRIGGER
+    stz MAP_LOAD_STATE
+    inc ROOM_CHANGE_TIMER
     jsl $8D86F8                 ; initialize the opening program state
 
 ; One iteration is gated by one completed NMI period, then runs common updates
@@ -82,7 +82,7 @@ MainLoop:
     jsl $8D8797
 TopLevelStateDispatch:
 .assert TopLevelStateDispatch = $C0805A, lderror, "state dispatch moved"
-    jmp (StateHandlerPointer)
+    jmp (STATE_HANDLER_POINTER)
 BootMainEnd:
 .assert BootMainEnd - Reset = $005D, error, "boot/main island size changed"
 
@@ -102,40 +102,40 @@ NativeCopHandler:
     rep #$20
     txy
     lda $04,s
-    sta $38
+    sta COP_RETURN_BANK
     lda $02,s
     dec a
-    sta $36
-    lda [$36]
-    inc $36
+    sta COP_RETURN_ADDRESS
+    lda [COP_RETURN_ADDRESS]
+    inc COP_RETURN_ADDRESS
     and #$00FF
     asl a
     tax
     jmp ($83B2,x)
 CopReturnAfterTwoBytes:
 .assert CopReturnAfterTwoBytes = $C08390, lderror, "COP 2-byte return moved"
-    lda $36
+    lda COP_RETURN_ADDRESS
     inc a
     inc a
     sta $02,s
     rti
 CopReturnAfterFourBytes:
 .assert CopReturnAfterFourBytes = $C08397, lderror, "COP 4-byte return moved"
-    lda $36
+    lda COP_RETURN_ADDRESS
     clc
     adc #$0004
     sta $02,s
     rti
 CopReturnAfterFiveBytes:
 .assert CopReturnAfterFiveBytes = $C083A0, lderror, "COP 5-byte return moved"
-    lda $36
+    lda COP_RETURN_ADDRESS
     clc
     adc #$0005
     sta $02,s
     rti
 CopReturnAfterEightBytes:
 .assert CopReturnAfterEightBytes = $C083A9, lderror, "COP 8-byte return moved"
-    lda $36
+    lda COP_RETURN_ADDRESS
     clc
     adc #$0008
     sta $02,s
@@ -196,20 +196,20 @@ NativeNmiHandler:
     lda #$81
     pha
     plb
-    stz $420C                   ; disable HDMA during NMI transfers
+    stz HDMA_ENABLE                   ; disable HDMA during NMI transfers
     jsl $86A505
-    stz $2121                   ; CGRAM destination index 0
-    stz $4300                   ; DMA mode 0, CPU -> PPU
+    stz CGRAM_ADDRESS                   ; CGRAM destination index 0
+    stz DMA0_CONTROL                   ; DMA mode 0, CPU -> PPU
     lda #$22
-    sta $4301                   ; destination $2122 (CGRAM data)
-    ldx #$0600
-    stx $4302
-    lda #$7F
-    sta $4304                   ; source $7F:0600
+    sta DMA0_DESTINATION                   ; destination $2122 (CGRAM data)
+    ldx #.loword(CGRAM_STAGING_BUFFER)
+    stx DMA0_SOURCE_OFFSET
+    lda #.bankbyte(CGRAM_STAGING_BUFFER)
+    sta DMA0_SOURCE_BANK                   ; source $7F:0600
     ldx #$0200
-    stx $4305                   ; 512 bytes
+    stx DMA0_SIZE                   ; 512 bytes
     lda #$01
-    sta $420B                   ; start DMA channel 0
+    sta DMA_ENABLE                   ; start DMA channel 0
 NmiKnownPrefixEnd:
 .assert NmiKnownPrefixEnd = $C5F9CA, lderror, "NMI prefix size changed"
 
@@ -223,36 +223,36 @@ NmiKnownPrefixEnd:
 NmiTail:
 .assert NmiTail = $C5FAB9, lderror, "NMI tail moved"
     jsr $FB08
-    lda $86
+    lda HDMA_ENABLE_SHADOW
     sta $420C
 NmiWaitForHblankEnd:
-    lda $4212
+    lda HVBJOY_STATUS
     ror a
     bcs NmiWaitForHblankEnd
     rep #$20
 .a16
-    stz $84
-    lda $4218
-    sta $0456                   ; controller port 1
-    lda $421A
-    sta $0458                   ; controller port 2
-    lda $04B8
+    stz NMI_TRANSFER_STATE
+    lda JOYPAD_1_DATA
+    sta CONTROLLER_1_RAW                   ; controller port 1
+    lda JOYPAD_2_DATA
+    sta CONTROLLER_2_RAW                   ; controller port 2
+    lda APU_UPDATE_MODE
     beq @apuUpdate
     bmi @finish
     jsl $80818F
     bra @finish
 @apuUpdate:
-    lda $42
+    lda FRAME_COUNTER
     lsr a
     lda #$0000
     bcs @writeApuPort
-    lda $04B6
-    stz $04B6
+    lda APU_QUEUED_VALUE
+    stz APU_QUEUED_VALUE
 @writeApuPort:
-    sta $2142
+    sta APU_IO_2_3
 @finish:
-    inc $42
-    inc $44
+    inc FRAME_COUNTER
+    inc FRAME_COUNTER_AUX
     pld
     ply
     plx
@@ -293,11 +293,11 @@ WaitForFrameAndPollInputBody:
 .a8
     pha
     phy
-    lda f:$004210
+    lda f:NMI_STATUS
 WaitForNmiLatch:
-    lda f:$004210
+    lda f:NMI_STATUS
     bpl WaitForNmiLatch
-    lda f:$004210
+    lda f:NMI_STATUS
     rep #$20
 .a16
 FrameGateKnownPrefixEnd:

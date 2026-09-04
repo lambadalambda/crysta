@@ -6,6 +6,15 @@
 
 use std::fmt;
 
+/// Generates the deterministic ca65 include for the canonical Japanese memory map.
+///
+/// # Errors
+///
+/// Returns an error if the committed symbol artifact does not match its schema.
+pub fn canonical_symbol_include() -> Result<String, memory_map::LoadError> {
+    memory_map::MemoryMap::built_in_japan().map(|map| map.generate_ca65_include())
+}
+
 const HIROM_BASE: usize = 0xC0_0000;
 
 /// The first difference between an expected ROM image and a reconstructed one.
@@ -82,7 +91,16 @@ pub fn compare_images(expected: &[u8], built: &[u8]) -> Result<(), ImageMismatch
 
 #[cfg(test)]
 mod tests {
-    use super::compare_images;
+    use super::{canonical_symbol_include, compare_images};
+
+    #[test]
+    fn canonical_symbol_include_is_revision_bound_and_contains_boot_symbols() {
+        let include = canonical_symbol_include().expect("built-in symbol map is valid");
+        assert!(include.contains("ROM SHA-256: f331e394"));
+        assert!(include.contains("STATE_HANDLER_POINTER = $049E\n"));
+        assert!(include.contains("NMI_STATUS = $4210\n"));
+        assert!(include.contains("PLAYER_X = $1000\n"));
+    }
 
     #[test]
     fn matching_images_are_accepted() {
