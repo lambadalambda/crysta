@@ -1,0 +1,5852 @@
+{
+  "schema_version": 1,
+  "revision": "japan",
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "sources": [
+    {
+      "id": "boot_assembly",
+      "title": "Reviewed boot, interrupt, and main-dispatch assembly",
+      "project_path": "crates/disasm/asm/boot.s"
+    },
+    {
+      "id": "japan_rom",
+      "title": "Authenticated Japanese ROM map verification",
+      "project_path": "crates/disasm/tests/local_rom_map.rs"
+    },
+    {
+      "id": "oracle_reset_trace",
+      "title": "Japanese reset-to-main-loop oracle trace",
+      "project_path": "crates/oracle/tests/local_roms.rs"
+    }
+  ],
+  "regions": [
+    {
+      "id": "boot_main",
+      "normalized": "$008000",
+      "canonical": "$C08000",
+      "length": 93,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "Reset..BootMainEnd",
+          "provenance": "static_analysis",
+          "note": "Reset, native startup, main loop, and mutable dispatch are decoded here."
+        }
+      ]
+    },
+    {
+      "id": "top_level_handler_805d_start",
+      "normalized": "$00805D",
+      "canonical": "$C0805D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "oracle_reset_trace",
+          "locator": "run_reset_trace_child: dispatch at $80:805A reaches $80:805D",
+          "provenance": "project_test",
+          "note": "At $80:805A, the mutable $7E:049E pointer contains $805D; tracing the JMP reaches runtime $80:805D."
+        }
+      ]
+    },
+    {
+      "id": "fixed_bank_helper_818f",
+      "normalized": "$00818F",
+      "canonical": "$C0818F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiTail direct helper call",
+          "provenance": "static_analysis",
+          "note": "The NMI tail directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "main_loop_helper_820c",
+      "normalized": "$00820C",
+      "canonical": "$C0820C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop",
+          "provenance": "static_analysis",
+          "note": "The main loop directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "native_cop",
+      "normalized": "$008378",
+      "canonical": "$C08378",
+      "length": 58,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeCopHandler..CopDispatchTable",
+          "provenance": "static_analysis",
+          "note": "The native COP dispatcher and return helpers are decoded here."
+        }
+      ]
+    },
+    {
+      "id": "cop_dispatch_table",
+      "normalized": "$0083B2",
+      "canonical": "$C083B2",
+      "length": 250,
+      "class": {
+        "type": "data",
+        "kind": "function_pointer_table"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; normalized offsets $0083B2-$0084AB",
+          "provenance": "static_analysis",
+          "note": "The maximal contiguous run contains 125 valid bank-$80 pointers; the following word would not lie in a bank-$80 ROM window."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_00_start",
+      "normalized": "$008592",
+      "canonical": "$C08592",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $00",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8592."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_01_start",
+      "normalized": "$0085B8",
+      "canonical": "$C085B8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $01",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:85B8."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_02_start",
+      "normalized": "$0085DF",
+      "canonical": "$C085DF",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $02",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:85DF."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_03_start",
+      "normalized": "$0085F8",
+      "canonical": "$C085F8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $03",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:85F8."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_04_start",
+      "normalized": "$008613",
+      "canonical": "$C08613",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $04",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8613."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_05_start",
+      "normalized": "$00862E",
+      "canonical": "$C0862E",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $05",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:862E."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_06_start",
+      "normalized": "$00864C",
+      "canonical": "$C0864C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $06",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:864C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_07_start",
+      "normalized": "$008669",
+      "canonical": "$C08669",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $07",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8669."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_08_start",
+      "normalized": "$008678",
+      "canonical": "$C08678",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $08",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8678."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_09_start",
+      "normalized": "$008695",
+      "canonical": "$C08695",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $09",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8695."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0a_start",
+      "normalized": "$008720",
+      "canonical": "$C08720",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8720."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0b_start",
+      "normalized": "$008746",
+      "canonical": "$C08746",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8746."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0c_start",
+      "normalized": "$00876C",
+      "canonical": "$C0876C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:876C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0d_start",
+      "normalized": "$0087C2",
+      "canonical": "$C087C2",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:87C2."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0e_start",
+      "normalized": "$008820",
+      "canonical": "$C08820",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8820."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0f_start",
+      "normalized": "$00888A",
+      "canonical": "$C0888A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:888A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_10_start",
+      "normalized": "$0088D0",
+      "canonical": "$C088D0",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $10",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:88D0."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_11_start",
+      "normalized": "$00890C",
+      "canonical": "$C0890C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $11",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:890C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_12_start",
+      "normalized": "$008978",
+      "canonical": "$C08978",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $12",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8978."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_13_start",
+      "normalized": "$0089DA",
+      "canonical": "$C089DA",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $13",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:89DA."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_14_start",
+      "normalized": "$008A23",
+      "canonical": "$C08A23",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $14",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8A23."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_15_start",
+      "normalized": "$008A58",
+      "canonical": "$C08A58",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $15",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8A58."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_16_start",
+      "normalized": "$008A95",
+      "canonical": "$C08A95",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $16",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8A95."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_17_start",
+      "normalized": "$008AC0",
+      "canonical": "$C08AC0",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $17",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8AC0."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_18_start",
+      "normalized": "$008AF7",
+      "canonical": "$C08AF7",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $18",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8AF7."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_19_start",
+      "normalized": "$008B35",
+      "canonical": "$C08B35",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $19",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8B35."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1a_start",
+      "normalized": "$008B85",
+      "canonical": "$C08B85",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8B85."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1b_start",
+      "normalized": "$008BEB",
+      "canonical": "$C08BEB",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8BEB."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1d_start",
+      "normalized": "$008C00",
+      "canonical": "$C08C00",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8C00."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1c_start",
+      "normalized": "$008C28",
+      "canonical": "$C08C28",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8C28."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1e_start",
+      "normalized": "$008C3D",
+      "canonical": "$C08C3D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8C3D."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1f_start",
+      "normalized": "$008C4A",
+      "canonical": "$C08C4A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8C4A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_20_start",
+      "normalized": "$008C9A",
+      "canonical": "$C08C9A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $20",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8C9A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_21_start",
+      "normalized": "$008CC8",
+      "canonical": "$C08CC8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $21",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8CC8."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_22_start",
+      "normalized": "$008CD8",
+      "canonical": "$C08CD8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $22",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8CD8."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_24_start",
+      "normalized": "$008D0B",
+      "canonical": "$C08D0B",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $24",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8D0B."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_23_start",
+      "normalized": "$008D1E",
+      "canonical": "$C08D1E",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $23",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8D1E."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_25_start",
+      "normalized": "$008E33",
+      "canonical": "$C08E33",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $25",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8E33."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_27_start",
+      "normalized": "$008E3D",
+      "canonical": "$C08E3D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $27",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8E3D."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_26_start",
+      "normalized": "$008E56",
+      "canonical": "$C08E56",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $26",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8E56."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_28_start",
+      "normalized": "$008FD5",
+      "canonical": "$C08FD5",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $28",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8FD5."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_29_start",
+      "normalized": "$008FE6",
+      "canonical": "$C08FE6",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $29",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8FE6."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2a_start",
+      "normalized": "$008FF5",
+      "canonical": "$C08FF5",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:8FF5."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2b_start",
+      "normalized": "$009007",
+      "canonical": "$C09007",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9007."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2c_start",
+      "normalized": "$00903C",
+      "canonical": "$C0903C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:903C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2d_start",
+      "normalized": "$00906F",
+      "canonical": "$C0906F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:906F."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2e_start",
+      "normalized": "$0090AC",
+      "canonical": "$C090AC",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:90AC."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2f_start",
+      "normalized": "$0090C0",
+      "canonical": "$C090C0",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:90C0."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_30_start",
+      "normalized": "$0090D4",
+      "canonical": "$C090D4",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $30",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:90D4."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_31_start",
+      "normalized": "$009107",
+      "canonical": "$C09107",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $31",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9107."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_32_start",
+      "normalized": "$00913C",
+      "canonical": "$C0913C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $32",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:913C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_33_start",
+      "normalized": "$00918F",
+      "canonical": "$C0918F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $33",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:918F."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_34_start",
+      "normalized": "$0091B0",
+      "canonical": "$C091B0",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $34",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:91B0."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_35_start",
+      "normalized": "$0091CC",
+      "canonical": "$C091CC",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $35",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:91CC."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_36_start",
+      "normalized": "$0091E8",
+      "canonical": "$C091E8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $36",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:91E8."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_37_start",
+      "normalized": "$0091FC",
+      "canonical": "$C091FC",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $37",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:91FC."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_38_start",
+      "normalized": "$009210",
+      "canonical": "$C09210",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $38",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9210."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_39_start",
+      "normalized": "$00921F",
+      "canonical": "$C0921F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $39",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:921F."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3a_start",
+      "normalized": "$00929C",
+      "canonical": "$C0929C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:929C."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3b_start",
+      "normalized": "$009301",
+      "canonical": "$C09301",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9301."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3c_start",
+      "normalized": "$009314",
+      "canonical": "$C09314",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9314."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3d_start",
+      "normalized": "$009327",
+      "canonical": "$C09327",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9327."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3e_start",
+      "normalized": "$00935D",
+      "canonical": "$C0935D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:935D."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3f_start",
+      "normalized": "$009393",
+      "canonical": "$C09393",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9393."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_40_start",
+      "normalized": "$0093D4",
+      "canonical": "$C093D4",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $40",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:93D4."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_41_start",
+      "normalized": "$00940A",
+      "canonical": "$C0940A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $41",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:940A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_42_start",
+      "normalized": "$009444",
+      "canonical": "$C09444",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $42",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9444."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_43_start",
+      "normalized": "$009486",
+      "canonical": "$C09486",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $43",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9486."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_44_start",
+      "normalized": "$00949B",
+      "canonical": "$C0949B",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $44",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:949B."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_45_start",
+      "normalized": "$009505",
+      "canonical": "$C09505",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $45",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9505."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_46_start",
+      "normalized": "$009532",
+      "canonical": "$C09532",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $46",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9532."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_47_start",
+      "normalized": "$00963A",
+      "canonical": "$C0963A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $47",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:963A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_48_start",
+      "normalized": "$0096CB",
+      "canonical": "$C096CB",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $48",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:96CB."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_49_start",
+      "normalized": "$0096E6",
+      "canonical": "$C096E6",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $49",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:96E6."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4a_start",
+      "normalized": "$009713",
+      "canonical": "$C09713",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9713."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4b_start",
+      "normalized": "$00975B",
+      "canonical": "$C0975B",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:975B."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4c_start",
+      "normalized": "$0097B9",
+      "canonical": "$C097B9",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:97B9."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4d_start",
+      "normalized": "$009801",
+      "canonical": "$C09801",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9801."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4e_start",
+      "normalized": "$00985F",
+      "canonical": "$C0985F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:985F."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4f_start",
+      "normalized": "$009876",
+      "canonical": "$C09876",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9876."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_50_start",
+      "normalized": "$00988D",
+      "canonical": "$C0988D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $50",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:988D."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_51_start",
+      "normalized": "$009917",
+      "canonical": "$C09917",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $51",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9917."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_52_start",
+      "normalized": "$009954",
+      "canonical": "$C09954",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $52",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9954."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_53_start",
+      "normalized": "$009991",
+      "canonical": "$C09991",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $53",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9991."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_54_start",
+      "normalized": "$0099EB",
+      "canonical": "$C099EB",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $54",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:99EB."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_60_start",
+      "normalized": "$009A04",
+      "canonical": "$C09A04",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $60",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9A04."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_55_start",
+      "normalized": "$009A5E",
+      "canonical": "$C09A5E",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $55",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9A5E."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_56_start",
+      "normalized": "$009A79",
+      "canonical": "$C09A79",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $56",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9A79."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_57_start",
+      "normalized": "$009A95",
+      "canonical": "$C09A95",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $57",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9A95."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_58_start",
+      "normalized": "$009AB2",
+      "canonical": "$C09AB2",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $58",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9AB2."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_59_start",
+      "normalized": "$009AC7",
+      "canonical": "$C09AC7",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $59",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9AC7."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5a_start",
+      "normalized": "$009AEB",
+      "canonical": "$C09AEB",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9AEB."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5b_start",
+      "normalized": "$009B29",
+      "canonical": "$C09B29",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9B29."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5c_start",
+      "normalized": "$009B57",
+      "canonical": "$C09B57",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9B57."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5d_start",
+      "normalized": "$009B74",
+      "canonical": "$C09B74",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9B74."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5e_start",
+      "normalized": "$009B96",
+      "canonical": "$C09B96",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9B96."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5f_start",
+      "normalized": "$009BEA",
+      "canonical": "$C09BEA",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9BEA."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_61_start",
+      "normalized": "$009C03",
+      "canonical": "$C09C03",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $61",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9C03."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_62_start",
+      "normalized": "$009C94",
+      "canonical": "$C09C94",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $62",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9C94."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_63_start",
+      "normalized": "$009CA5",
+      "canonical": "$C09CA5",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $63",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9CA5."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_64_start",
+      "normalized": "$009CE6",
+      "canonical": "$C09CE6",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $64",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9CE6."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_65_start",
+      "normalized": "$009D25",
+      "canonical": "$C09D25",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $65",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9D25."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_66_start",
+      "normalized": "$009D5A",
+      "canonical": "$C09D5A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $66",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9D5A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_67_start",
+      "normalized": "$009D72",
+      "canonical": "$C09D72",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $67",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9D72."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_68_start",
+      "normalized": "$009D83",
+      "canonical": "$C09D83",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $68",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9D83."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_69_start",
+      "normalized": "$009DAF",
+      "canonical": "$C09DAF",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $69",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9DAF."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6a_start",
+      "normalized": "$009DD6",
+      "canonical": "$C09DD6",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9DD6."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6b_start",
+      "normalized": "$009E14",
+      "canonical": "$C09E14",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9E14."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6c_start",
+      "normalized": "$009E45",
+      "canonical": "$C09E45",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9E45."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6d_start",
+      "normalized": "$009E5F",
+      "canonical": "$C09E5F",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6D",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9E5F."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6e_start",
+      "normalized": "$009EAF",
+      "canonical": "$C09EAF",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6E",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9EAF."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6f_start",
+      "normalized": "$009ED9",
+      "canonical": "$C09ED9",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6F",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9ED9."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_70_start",
+      "normalized": "$009F21",
+      "canonical": "$C09F21",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $70",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:9F21."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_71_start",
+      "normalized": "$00A016",
+      "canonical": "$C0A016",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $71",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A016."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_72_start",
+      "normalized": "$00A05B",
+      "canonical": "$C0A05B",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $72",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A05B."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_73_start",
+      "normalized": "$00A0AC",
+      "canonical": "$C0A0AC",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $73",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A0AC."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_74_start",
+      "normalized": "$00A0F2",
+      "canonical": "$C0A0F2",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $74",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A0F2."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_75_start",
+      "normalized": "$00A10D",
+      "canonical": "$C0A10D",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $75",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A10D."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_76_start",
+      "normalized": "$00A127",
+      "canonical": "$C0A127",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $76",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A127."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_78_start",
+      "normalized": "$00A14B",
+      "canonical": "$C0A14B",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $78",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A14B."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_79_start",
+      "normalized": "$00A79A",
+      "canonical": "$C0A79A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $79",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:A79A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_77_start",
+      "normalized": "$00B426",
+      "canonical": "$C0B426",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $77",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:B426."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7a_start",
+      "normalized": "$00C29A",
+      "canonical": "$C0C29A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7A",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:C29A."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7b_start",
+      "normalized": "$00DE9A",
+      "canonical": "$C0DE9A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7B",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:DE9A."
+        }
+      ]
+    },
+    {
+      "id": "main_loop_helper_e8af",
+      "normalized": "$00E8AF",
+      "canonical": "$C0E8AF",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop",
+          "provenance": "static_analysis",
+          "note": "The main loop directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7c_start",
+      "normalized": "$00FB9A",
+      "canonical": "$C0FB9A",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7C",
+          "provenance": "static_analysis",
+          "note": "The digest-bound pointer table identifies exact handler start $80:FB9A."
+        }
+      ]
+    },
+    {
+      "id": "native_and_emulation_vectors",
+      "normalized": "$00FFE4",
+      "canonical": "$C0FFE4",
+      "length": 28,
+      "class": {
+        "type": "data",
+        "kind": "vector_table"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeVectors..RomBankC0End",
+          "provenance": "static_analysis",
+          "note": "The complete native and emulation vector fields occupy this range."
+        }
+      ]
+    },
+    {
+      "id": "native_nmi",
+      "normalized": "$05F98F",
+      "canonical": "$C5F98F",
+      "length": 377,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeNmiHandler..InterruptIslandEnd",
+          "provenance": "static_analysis",
+          "note": "The NMI, IRQ, and BRK interrupt island is bounded and partly decoded here."
+        }
+      ]
+    },
+    {
+      "id": "nmi_tail_helper_start",
+      "normalized": "$05FB08",
+      "canonical": "$C5FB08",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiTail direct helper calls",
+          "provenance": "static_analysis",
+          "note": "NmiTail directly calls this exact start before the assembly returns to an opaque slice."
+        }
+      ]
+    },
+    {
+      "id": "frame_gate",
+      "normalized": "$068000",
+      "canonical": "$C68000",
+      "length": 21,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "InterruptIslandEnd..FrameGateKnownPrefixEnd",
+          "provenance": "static_analysis",
+          "note": "The frame gate prefix is decoded at this function start."
+        }
+      ]
+    },
+    {
+      "id": "nmi_transfer_helper",
+      "normalized": "$06A505",
+      "canonical": "$C6A505",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeNmiHandler decoded transfer prefix",
+          "provenance": "static_analysis",
+          "note": "The NMI prefix directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "spc_upload",
+      "normalized": "$06AA9C",
+      "canonical": "$C6AA9C",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "Native startup directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "wram_initializer",
+      "normalized": "$06B8D6",
+      "canonical": "$C6B8D6",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "Native startup directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "hardware_initializer",
+      "normalized": "$06B9CB",
+      "canonical": "$C6B9CB",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "Native startup directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "hardware_initialization_data_start",
+      "normalized": "$06B9E8",
+      "canonical": "$C6B9E8",
+      "length": 1,
+      "class": {
+        "type": "data",
+        "kind": "raw"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset hardware initialization calls",
+          "provenance": "static_analysis",
+          "note": "The hardware initializer is documented as consuming a data table beginning here; only its proven start byte is classified."
+        }
+      ]
+    },
+    {
+      "id": "opening_state_initializer",
+      "normalized": "$0D86F8",
+      "canonical": "$CD86F8",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset..TopLevelStateDispatch",
+          "provenance": "static_analysis",
+          "note": "Startup and each main-loop iteration directly call this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "program_state_update",
+      "normalized": "$0D8797",
+      "canonical": "$CD8797",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop",
+          "provenance": "static_analysis",
+          "note": "The main loop directly calls this exact code start."
+        }
+      ]
+    },
+    {
+      "id": "main_loop_update",
+      "normalized": "$0D9328",
+      "canonical": "$CD9328",
+      "length": 1,
+      "class": {
+        "type": "code"
+      },
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop",
+          "provenance": "static_analysis",
+          "note": "The main loop directly calls this exact code start."
+        }
+      ]
+    }
+  ],
+  "entry_points": [
+    {
+      "id": "reset",
+      "normalized": "$008000",
+      "canonical": "$C08000",
+      "runtime": "$00:8000",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "Reset..BrkTrampoline",
+          "provenance": "static_analysis",
+          "note": "The reset vector enters here with a fully documented emulation state."
+        }
+      ],
+      "asm_name": "Reset",
+      "decode_state": {
+        "e": true,
+        "m": true,
+        "x": true,
+        "dbr": "$00",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "nmi_trampoline",
+      "normalized": "$008007",
+      "canonical": "$C08007",
+      "runtime": "$00:8007",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "NmiTrampoline"
+    },
+    {
+      "id": "irq_trampoline",
+      "normalized": "$00800B",
+      "canonical": "$C0800B",
+      "runtime": "$00:800B",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "IrqTrampoline"
+    },
+    {
+      "id": "cop_trampoline",
+      "normalized": "$00800F",
+      "canonical": "$C0800F",
+      "runtime": "$00:800F",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "CopTrampoline"
+    },
+    {
+      "id": "brk_trampoline",
+      "normalized": "$008013",
+      "canonical": "$C08013",
+      "runtime": "$00:8013",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "BrkTrampoline"
+    },
+    {
+      "id": "native_reset",
+      "normalized": "$008017",
+      "canonical": "$C08017",
+      "runtime": "$80:8017",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeReset",
+          "provenance": "static_analysis",
+          "note": "The reset trampoline enters here with a fully documented native state."
+        }
+      ],
+      "asm_name": "NativeReset",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": true,
+        "dbr": "$00",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "main_loop",
+      "normalized": "$008043",
+      "canonical": "$C08043",
+      "runtime": "$80:8043",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop..TopLevelStateDispatch",
+          "provenance": "static_analysis",
+          "note": "Startup falls through here after establishing a fully known steady-state decoder state."
+        }
+      ],
+      "asm_name": "MainLoop",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "top_level_state_dispatch",
+      "normalized": "$00805A",
+      "canonical": "$C0805A",
+      "runtime": "$80:805A",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop..TopLevelStateDispatch",
+          "provenance": "static_analysis",
+          "note": "The main loop reaches this mutable pointer dispatch with known CPU state."
+        }
+      ],
+      "asm_name": "TopLevelStateDispatch"
+    },
+    {
+      "id": "top_level_handler_805d",
+      "normalized": "$00805D",
+      "canonical": "$C0805D",
+      "runtime": "$80:805D",
+      "kind": "function",
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "oracle_reset_trace",
+          "locator": "run_reset_trace_child: dispatch at $80:805A reaches $80:805D",
+          "provenance": "project_test",
+          "note": "At $80:805A, the mutable $7E:049E pointer contains $805D; tracing the JMP reaches runtime $80:805D."
+        }
+      ],
+      "asm_name": "TopLevelHandler805D",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "fixed_bank_helper_818f",
+      "normalized": "$00818F",
+      "canonical": "$C0818F",
+      "runtime": "$80:818F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "decode_state": {
+        "e": false,
+        "m": false,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "main_loop_helper_820c",
+      "normalized": "$00820C",
+      "canonical": "$C0820C",
+      "runtime": "$80:820C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "native_cop_handler",
+      "normalized": "$008378",
+      "canonical": "$C08378",
+      "runtime": "$80:8378",
+      "kind": "interrupt",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeCopHandler",
+          "provenance": "static_analysis",
+          "note": "The native COP trampoline transfers here; M and DBR are inherited."
+        }
+      ],
+      "asm_name": "NativeCopHandler",
+      "decode_state": {
+        "e": false,
+        "x": false,
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "cop_return_after_two_bytes",
+      "normalized": "$008390",
+      "canonical": "$C08390",
+      "runtime": "$80:8390",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "CopReturnAfterTwoBytes",
+      "decode_state": {
+        "e": false,
+        "m": false,
+        "x": false,
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "cop_return_after_four_bytes",
+      "normalized": "$008397",
+      "canonical": "$C08397",
+      "runtime": "$80:8397",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "CopReturnAfterFourBytes",
+      "decode_state": {
+        "e": false,
+        "m": false,
+        "x": false,
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "cop_return_after_five_bytes",
+      "normalized": "$0083A0",
+      "canonical": "$C083A0",
+      "runtime": "$80:83A0",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "CopReturnAfterFiveBytes",
+      "decode_state": {
+        "e": false,
+        "m": false,
+        "x": false,
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "cop_return_after_eight_bytes",
+      "normalized": "$0083A9",
+      "canonical": "$C083A9",
+      "runtime": "$80:83A9",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "CopReturnAfterEightBytes",
+      "decode_state": {
+        "e": false,
+        "m": false,
+        "x": false,
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "main_loop_helper_e8af",
+      "normalized": "$00E8AF",
+      "canonical": "$C0E8AF",
+      "runtime": "$80:E8AF",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "native_nmi",
+      "normalized": "$05F98F",
+      "canonical": "$C5F98F",
+      "runtime": "$85:F98F",
+      "kind": "interrupt",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeNmiHandler decoded prefix",
+          "provenance": "static_analysis",
+          "note": "The native NMI trampoline enters here; width state is inherited."
+        }
+      ],
+      "asm_name": "NativeNmiHandler",
+      "decode_state": {
+        "e": false
+      }
+    },
+    {
+      "id": "native_irq",
+      "normalized": "$05FB00",
+      "canonical": "$C5FB00",
+      "runtime": "$85:FB00",
+      "kind": "interrupt",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeIrqHandler..InterruptIslandEnd",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "NativeIrqHandler",
+      "decode_state": {
+        "e": false
+      }
+    },
+    {
+      "id": "native_brk",
+      "normalized": "$05FB01",
+      "canonical": "$C5FB01",
+      "runtime": "$85:FB01",
+      "kind": "interrupt",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeIrqHandler..InterruptIslandEnd",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "NativeBrkHandler",
+      "decode_state": {
+        "e": false
+      }
+    },
+    {
+      "id": "nmi_tail_helper",
+      "normalized": "$05FB08",
+      "canonical": "$C5FB08",
+      "runtime": "$85:FB08",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiTail..NativeNmiReturn",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "frame_gate",
+      "normalized": "$068000",
+      "canonical": "$C68000",
+      "runtime": "$86:8000",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "WaitForFrameAndPollInputBody..RomEnd",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "asm_name": "WaitForFrameAndPollInput",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "nmi_transfer_helper",
+      "normalized": "$06A505",
+      "canonical": "$C6A505",
+      "runtime": "$86:A505",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeNmiHandler decoded transfer prefix",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ],
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "spc_upload",
+      "normalized": "$06AA9C",
+      "canonical": "$C6AA9C",
+      "runtime": "$86:AA9C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "wram_initializer",
+      "normalized": "$06B8D6",
+      "canonical": "$C6B8D6",
+      "runtime": "$86:B8D6",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "hardware_initializer",
+      "normalized": "$06B9CB",
+      "canonical": "$C6B9CB",
+      "runtime": "$86:B9CB",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "opening_state_initializer",
+      "normalized": "$0D86F8",
+      "canonical": "$CD86F8",
+      "runtime": "$8D:86F8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "program_state_update",
+      "normalized": "$0D8797",
+      "canonical": "$CD8797",
+      "runtime": "$8D:8797",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "main_loop_update",
+      "normalized": "$0D9328",
+      "canonical": "$CD9328",
+      "runtime": "$8D:9328",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "named labels and direct call sites",
+          "provenance": "static_analysis",
+          "note": "The reviewed control flow establishes this exact entry start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_00",
+      "normalized": "$008592",
+      "canonical": "$C08592",
+      "runtime": "$80:8592",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $00",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $00 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_01",
+      "normalized": "$0085B8",
+      "canonical": "$C085B8",
+      "runtime": "$80:85B8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $01",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $01 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_02",
+      "normalized": "$0085DF",
+      "canonical": "$C085DF",
+      "runtime": "$80:85DF",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $02",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $02 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_03",
+      "normalized": "$0085F8",
+      "canonical": "$C085F8",
+      "runtime": "$80:85F8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $03",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $03 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_04",
+      "normalized": "$008613",
+      "canonical": "$C08613",
+      "runtime": "$80:8613",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $04",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $04 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_05",
+      "normalized": "$00862E",
+      "canonical": "$C0862E",
+      "runtime": "$80:862E",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $05",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $05 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_06",
+      "normalized": "$00864C",
+      "canonical": "$C0864C",
+      "runtime": "$80:864C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $06",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $06 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_07",
+      "normalized": "$008669",
+      "canonical": "$C08669",
+      "runtime": "$80:8669",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $07",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $07 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_08",
+      "normalized": "$008678",
+      "canonical": "$C08678",
+      "runtime": "$80:8678",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $08",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $08 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_09",
+      "normalized": "$008695",
+      "canonical": "$C08695",
+      "runtime": "$80:8695",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $09",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $09 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0a",
+      "normalized": "$008720",
+      "canonical": "$C08720",
+      "runtime": "$80:8720",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0b",
+      "normalized": "$008746",
+      "canonical": "$C08746",
+      "runtime": "$80:8746",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0c",
+      "normalized": "$00876C",
+      "canonical": "$C0876C",
+      "runtime": "$80:876C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0d",
+      "normalized": "$0087C2",
+      "canonical": "$C087C2",
+      "runtime": "$80:87C2",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0e",
+      "normalized": "$008820",
+      "canonical": "$C08820",
+      "runtime": "$80:8820",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_0f",
+      "normalized": "$00888A",
+      "canonical": "$C0888A",
+      "runtime": "$80:888A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $0F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $0F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_10",
+      "normalized": "$0088D0",
+      "canonical": "$C088D0",
+      "runtime": "$80:88D0",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $10",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $10 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_11",
+      "normalized": "$00890C",
+      "canonical": "$C0890C",
+      "runtime": "$80:890C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $11",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $11 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_12",
+      "normalized": "$008978",
+      "canonical": "$C08978",
+      "runtime": "$80:8978",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $12",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $12 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_13",
+      "normalized": "$0089DA",
+      "canonical": "$C089DA",
+      "runtime": "$80:89DA",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $13",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $13 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_14",
+      "normalized": "$008A23",
+      "canonical": "$C08A23",
+      "runtime": "$80:8A23",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $14",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $14 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_15",
+      "normalized": "$008A58",
+      "canonical": "$C08A58",
+      "runtime": "$80:8A58",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $15",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $15 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_16",
+      "normalized": "$008A95",
+      "canonical": "$C08A95",
+      "runtime": "$80:8A95",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $16",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $16 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_17",
+      "normalized": "$008AC0",
+      "canonical": "$C08AC0",
+      "runtime": "$80:8AC0",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $17",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $17 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_18",
+      "normalized": "$008AF7",
+      "canonical": "$C08AF7",
+      "runtime": "$80:8AF7",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $18",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $18 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_19",
+      "normalized": "$008B35",
+      "canonical": "$C08B35",
+      "runtime": "$80:8B35",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $19",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $19 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1a",
+      "normalized": "$008B85",
+      "canonical": "$C08B85",
+      "runtime": "$80:8B85",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1b",
+      "normalized": "$008BEB",
+      "canonical": "$C08BEB",
+      "runtime": "$80:8BEB",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1c",
+      "normalized": "$008C28",
+      "canonical": "$C08C28",
+      "runtime": "$80:8C28",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1d",
+      "normalized": "$008C00",
+      "canonical": "$C08C00",
+      "runtime": "$80:8C00",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1e",
+      "normalized": "$008C3D",
+      "canonical": "$C08C3D",
+      "runtime": "$80:8C3D",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_1f",
+      "normalized": "$008C4A",
+      "canonical": "$C08C4A",
+      "runtime": "$80:8C4A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $1F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $1F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_20",
+      "normalized": "$008C9A",
+      "canonical": "$C08C9A",
+      "runtime": "$80:8C9A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $20",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $20 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_21",
+      "normalized": "$008CC8",
+      "canonical": "$C08CC8",
+      "runtime": "$80:8CC8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $21",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $21 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_22",
+      "normalized": "$008CD8",
+      "canonical": "$C08CD8",
+      "runtime": "$80:8CD8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $22",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $22 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_23",
+      "normalized": "$008D1E",
+      "canonical": "$C08D1E",
+      "runtime": "$80:8D1E",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $23",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $23 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_24",
+      "normalized": "$008D0B",
+      "canonical": "$C08D0B",
+      "runtime": "$80:8D0B",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $24",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $24 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_25",
+      "normalized": "$008E33",
+      "canonical": "$C08E33",
+      "runtime": "$80:8E33",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $25",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $25 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_26",
+      "normalized": "$008E56",
+      "canonical": "$C08E56",
+      "runtime": "$80:8E56",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $26",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $26 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_27",
+      "normalized": "$008E3D",
+      "canonical": "$C08E3D",
+      "runtime": "$80:8E3D",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $27",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $27 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_28",
+      "normalized": "$008FD5",
+      "canonical": "$C08FD5",
+      "runtime": "$80:8FD5",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $28",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $28 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_29",
+      "normalized": "$008FE6",
+      "canonical": "$C08FE6",
+      "runtime": "$80:8FE6",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $29",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $29 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2a",
+      "normalized": "$008FF5",
+      "canonical": "$C08FF5",
+      "runtime": "$80:8FF5",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2b",
+      "normalized": "$009007",
+      "canonical": "$C09007",
+      "runtime": "$80:9007",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2c",
+      "normalized": "$00903C",
+      "canonical": "$C0903C",
+      "runtime": "$80:903C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2d",
+      "normalized": "$00906F",
+      "canonical": "$C0906F",
+      "runtime": "$80:906F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2e",
+      "normalized": "$0090AC",
+      "canonical": "$C090AC",
+      "runtime": "$80:90AC",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_2f",
+      "normalized": "$0090C0",
+      "canonical": "$C090C0",
+      "runtime": "$80:90C0",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $2F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $2F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_30",
+      "normalized": "$0090D4",
+      "canonical": "$C090D4",
+      "runtime": "$80:90D4",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $30",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $30 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_31",
+      "normalized": "$009107",
+      "canonical": "$C09107",
+      "runtime": "$80:9107",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $31",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $31 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_32",
+      "normalized": "$00913C",
+      "canonical": "$C0913C",
+      "runtime": "$80:913C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $32",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $32 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_33",
+      "normalized": "$00918F",
+      "canonical": "$C0918F",
+      "runtime": "$80:918F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $33",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $33 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_34",
+      "normalized": "$0091B0",
+      "canonical": "$C091B0",
+      "runtime": "$80:91B0",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $34",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $34 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_35",
+      "normalized": "$0091CC",
+      "canonical": "$C091CC",
+      "runtime": "$80:91CC",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $35",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $35 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_36",
+      "normalized": "$0091E8",
+      "canonical": "$C091E8",
+      "runtime": "$80:91E8",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $36",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $36 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_37",
+      "normalized": "$0091FC",
+      "canonical": "$C091FC",
+      "runtime": "$80:91FC",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $37",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $37 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_38",
+      "normalized": "$009210",
+      "canonical": "$C09210",
+      "runtime": "$80:9210",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $38",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $38 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_39",
+      "normalized": "$00921F",
+      "canonical": "$C0921F",
+      "runtime": "$80:921F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $39",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $39 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3a",
+      "normalized": "$00929C",
+      "canonical": "$C0929C",
+      "runtime": "$80:929C",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3b",
+      "normalized": "$009301",
+      "canonical": "$C09301",
+      "runtime": "$80:9301",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3c",
+      "normalized": "$009314",
+      "canonical": "$C09314",
+      "runtime": "$80:9314",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3d",
+      "normalized": "$009327",
+      "canonical": "$C09327",
+      "runtime": "$80:9327",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3e",
+      "normalized": "$00935D",
+      "canonical": "$C0935D",
+      "runtime": "$80:935D",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_3f",
+      "normalized": "$009393",
+      "canonical": "$C09393",
+      "runtime": "$80:9393",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $3F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $3F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_40",
+      "normalized": "$0093D4",
+      "canonical": "$C093D4",
+      "runtime": "$80:93D4",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $40",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $40 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_41",
+      "normalized": "$00940A",
+      "canonical": "$C0940A",
+      "runtime": "$80:940A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $41",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $41 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_42",
+      "normalized": "$009444",
+      "canonical": "$C09444",
+      "runtime": "$80:9444",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $42",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $42 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_43",
+      "normalized": "$009486",
+      "canonical": "$C09486",
+      "runtime": "$80:9486",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $43",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $43 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_44",
+      "normalized": "$00949B",
+      "canonical": "$C0949B",
+      "runtime": "$80:949B",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $44",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $44 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_45",
+      "normalized": "$009505",
+      "canonical": "$C09505",
+      "runtime": "$80:9505",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $45",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $45 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_46",
+      "normalized": "$009532",
+      "canonical": "$C09532",
+      "runtime": "$80:9532",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $46",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $46 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_47",
+      "normalized": "$00963A",
+      "canonical": "$C0963A",
+      "runtime": "$80:963A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $47",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $47 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_48",
+      "normalized": "$0096CB",
+      "canonical": "$C096CB",
+      "runtime": "$80:96CB",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $48",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $48 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_49",
+      "normalized": "$0096E6",
+      "canonical": "$C096E6",
+      "runtime": "$80:96E6",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $49",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $49 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4a",
+      "normalized": "$009713",
+      "canonical": "$C09713",
+      "runtime": "$80:9713",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4b",
+      "normalized": "$00975B",
+      "canonical": "$C0975B",
+      "runtime": "$80:975B",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4c",
+      "normalized": "$0097B9",
+      "canonical": "$C097B9",
+      "runtime": "$80:97B9",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4d",
+      "normalized": "$009801",
+      "canonical": "$C09801",
+      "runtime": "$80:9801",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4e",
+      "normalized": "$00985F",
+      "canonical": "$C0985F",
+      "runtime": "$80:985F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_4f",
+      "normalized": "$009876",
+      "canonical": "$C09876",
+      "runtime": "$80:9876",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $4F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $4F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_50",
+      "normalized": "$00988D",
+      "canonical": "$C0988D",
+      "runtime": "$80:988D",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $50",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $50 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_51",
+      "normalized": "$009917",
+      "canonical": "$C09917",
+      "runtime": "$80:9917",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $51",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $51 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_52",
+      "normalized": "$009954",
+      "canonical": "$C09954",
+      "runtime": "$80:9954",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $52",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $52 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_53",
+      "normalized": "$009991",
+      "canonical": "$C09991",
+      "runtime": "$80:9991",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $53",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $53 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_54",
+      "normalized": "$0099EB",
+      "canonical": "$C099EB",
+      "runtime": "$80:99EB",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $54",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $54 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_55",
+      "normalized": "$009A5E",
+      "canonical": "$C09A5E",
+      "runtime": "$80:9A5E",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $55",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $55 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_56",
+      "normalized": "$009A79",
+      "canonical": "$C09A79",
+      "runtime": "$80:9A79",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $56",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $56 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_57",
+      "normalized": "$009A95",
+      "canonical": "$C09A95",
+      "runtime": "$80:9A95",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $57",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $57 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_58",
+      "normalized": "$009AB2",
+      "canonical": "$C09AB2",
+      "runtime": "$80:9AB2",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $58",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $58 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_59",
+      "normalized": "$009AC7",
+      "canonical": "$C09AC7",
+      "runtime": "$80:9AC7",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $59",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $59 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5a",
+      "normalized": "$009AEB",
+      "canonical": "$C09AEB",
+      "runtime": "$80:9AEB",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5b",
+      "normalized": "$009B29",
+      "canonical": "$C09B29",
+      "runtime": "$80:9B29",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5c",
+      "normalized": "$009B57",
+      "canonical": "$C09B57",
+      "runtime": "$80:9B57",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5d",
+      "normalized": "$009B74",
+      "canonical": "$C09B74",
+      "runtime": "$80:9B74",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5e",
+      "normalized": "$009B96",
+      "canonical": "$C09B96",
+      "runtime": "$80:9B96",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_5f",
+      "normalized": "$009BEA",
+      "canonical": "$C09BEA",
+      "runtime": "$80:9BEA",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $5F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $5F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_60",
+      "normalized": "$009A04",
+      "canonical": "$C09A04",
+      "runtime": "$80:9A04",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $60",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $60 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_61",
+      "normalized": "$009C03",
+      "canonical": "$C09C03",
+      "runtime": "$80:9C03",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $61",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $61 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_62",
+      "normalized": "$009C94",
+      "canonical": "$C09C94",
+      "runtime": "$80:9C94",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $62",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $62 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_63",
+      "normalized": "$009CA5",
+      "canonical": "$C09CA5",
+      "runtime": "$80:9CA5",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $63",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $63 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_64",
+      "normalized": "$009CE6",
+      "canonical": "$C09CE6",
+      "runtime": "$80:9CE6",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $64",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $64 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_65",
+      "normalized": "$009D25",
+      "canonical": "$C09D25",
+      "runtime": "$80:9D25",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $65",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $65 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_66",
+      "normalized": "$009D5A",
+      "canonical": "$C09D5A",
+      "runtime": "$80:9D5A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $66",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $66 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_67",
+      "normalized": "$009D72",
+      "canonical": "$C09D72",
+      "runtime": "$80:9D72",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $67",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $67 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_68",
+      "normalized": "$009D83",
+      "canonical": "$C09D83",
+      "runtime": "$80:9D83",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $68",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $68 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_69",
+      "normalized": "$009DAF",
+      "canonical": "$C09DAF",
+      "runtime": "$80:9DAF",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $69",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $69 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6a",
+      "normalized": "$009DD6",
+      "canonical": "$C09DD6",
+      "runtime": "$80:9DD6",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6b",
+      "normalized": "$009E14",
+      "canonical": "$C09E14",
+      "runtime": "$80:9E14",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6c",
+      "normalized": "$009E45",
+      "canonical": "$C09E45",
+      "runtime": "$80:9E45",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6d",
+      "normalized": "$009E5F",
+      "canonical": "$C09E5F",
+      "runtime": "$80:9E5F",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6D",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6D to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6e",
+      "normalized": "$009EAF",
+      "canonical": "$C09EAF",
+      "runtime": "$80:9EAF",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6E",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6E to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_6f",
+      "normalized": "$009ED9",
+      "canonical": "$C09ED9",
+      "runtime": "$80:9ED9",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $6F",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $6F to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_70",
+      "normalized": "$009F21",
+      "canonical": "$C09F21",
+      "runtime": "$80:9F21",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $70",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $70 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_71",
+      "normalized": "$00A016",
+      "canonical": "$C0A016",
+      "runtime": "$80:A016",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $71",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $71 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_72",
+      "normalized": "$00A05B",
+      "canonical": "$C0A05B",
+      "runtime": "$80:A05B",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $72",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $72 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_73",
+      "normalized": "$00A0AC",
+      "canonical": "$C0A0AC",
+      "runtime": "$80:A0AC",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $73",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $73 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_74",
+      "normalized": "$00A0F2",
+      "canonical": "$C0A0F2",
+      "runtime": "$80:A0F2",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $74",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $74 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_75",
+      "normalized": "$00A10D",
+      "canonical": "$C0A10D",
+      "runtime": "$80:A10D",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $75",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $75 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_76",
+      "normalized": "$00A127",
+      "canonical": "$C0A127",
+      "runtime": "$80:A127",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $76",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $76 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_77",
+      "normalized": "$00B426",
+      "canonical": "$C0B426",
+      "runtime": "$80:B426",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $77",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $77 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_78",
+      "normalized": "$00A14B",
+      "canonical": "$C0A14B",
+      "runtime": "$80:A14B",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $78",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $78 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_79",
+      "normalized": "$00A79A",
+      "canonical": "$C0A79A",
+      "runtime": "$80:A79A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $79",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $79 to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7a",
+      "normalized": "$00C29A",
+      "canonical": "$C0C29A",
+      "runtime": "$80:C29A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7A",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $7A to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7b",
+      "normalized": "$00DE9A",
+      "canonical": "$C0DE9A",
+      "runtime": "$80:DE9A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7B",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $7B to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "cop_service_7c",
+      "normalized": "$00FB9A",
+      "canonical": "$C0FB9A",
+      "runtime": "$80:FB9A",
+      "kind": "function",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; COP selector $7C",
+          "provenance": "static_analysis",
+          "note": "Static table decoding resolves selector $7C to this exact runtime start."
+        }
+      ]
+    },
+    {
+      "id": "nmi_tail",
+      "normalized": "$05FAB9",
+      "canonical": "$C5FAB9",
+      "runtime": "$85:FAB9",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiTail",
+          "provenance": "static_analysis",
+          "note": "The decoded NMI tail resumes after an opaque slice with assembler-declared widths."
+        }
+      ],
+      "asm_name": "NmiTail",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "nmi_wait_for_hblank_end",
+      "normalized": "$05FAC1",
+      "canonical": "$C5FAC1",
+      "runtime": "$85:FAC1",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NmiWaitForHblankEnd",
+          "provenance": "static_analysis",
+          "note": "A direct branch loops at this exact decoded instruction start."
+        }
+      ],
+      "asm_name": "NmiWaitForHblankEnd",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    },
+    {
+      "id": "native_nmi_return",
+      "normalized": "$05FAFF",
+      "canonical": "$C5FAFF",
+      "runtime": "$85:FAFF",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeNmiReturn",
+          "provenance": "static_analysis",
+          "note": "The decoded NMI path converges on this exact RTI start."
+        }
+      ],
+      "asm_name": "NativeNmiReturn",
+      "decode_state": {
+        "e": false
+      }
+    },
+    {
+      "id": "wait_for_nmi_latch",
+      "normalized": "$068009",
+      "canonical": "$C68009",
+      "runtime": "$86:8009",
+      "kind": "internal",
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "WaitForNmiLatch..FrameGateKnownPrefixEnd",
+          "provenance": "static_analysis",
+          "note": "A direct branch loops at this exact frame-gate instruction start."
+        }
+      ],
+      "asm_name": "WaitForNmiLatch",
+      "decode_state": {
+        "e": false,
+        "m": true,
+        "x": false,
+        "dbr": "$81",
+        "d": "$0000"
+      }
+    }
+  ],
+  "indirect_dispatches": [
+    {
+      "id": "cop_services",
+      "kind": "function_pointer_table",
+      "source": {
+        "type": "rom_table",
+        "region_id": "cop_dispatch_table",
+        "layout": {
+          "entry_count": 125,
+          "stride": 2,
+          "pointer_offset": 0
+        },
+        "pointer_encoding": {
+          "type": "bank_local_u16",
+          "runtime_bank": "$80"
+        }
+      },
+      "targets": [
+        {
+          "index": 0,
+          "entry_id": "cop_service_00"
+        },
+        {
+          "index": 1,
+          "entry_id": "cop_service_01"
+        },
+        {
+          "index": 2,
+          "entry_id": "cop_service_02"
+        },
+        {
+          "index": 3,
+          "entry_id": "cop_service_03"
+        },
+        {
+          "index": 4,
+          "entry_id": "cop_service_04"
+        },
+        {
+          "index": 5,
+          "entry_id": "cop_service_05"
+        },
+        {
+          "index": 6,
+          "entry_id": "cop_service_06"
+        },
+        {
+          "index": 7,
+          "entry_id": "cop_service_07"
+        },
+        {
+          "index": 8,
+          "entry_id": "cop_service_08"
+        },
+        {
+          "index": 9,
+          "entry_id": "cop_service_09"
+        },
+        {
+          "index": 10,
+          "entry_id": "cop_service_0a"
+        },
+        {
+          "index": 11,
+          "entry_id": "cop_service_0b"
+        },
+        {
+          "index": 12,
+          "entry_id": "cop_service_0c"
+        },
+        {
+          "index": 13,
+          "entry_id": "cop_service_0d"
+        },
+        {
+          "index": 14,
+          "entry_id": "cop_service_0e"
+        },
+        {
+          "index": 15,
+          "entry_id": "cop_service_0f"
+        },
+        {
+          "index": 16,
+          "entry_id": "cop_service_10"
+        },
+        {
+          "index": 17,
+          "entry_id": "cop_service_11"
+        },
+        {
+          "index": 18,
+          "entry_id": "cop_service_12"
+        },
+        {
+          "index": 19,
+          "entry_id": "cop_service_13"
+        },
+        {
+          "index": 20,
+          "entry_id": "cop_service_14"
+        },
+        {
+          "index": 21,
+          "entry_id": "cop_service_15"
+        },
+        {
+          "index": 22,
+          "entry_id": "cop_service_16"
+        },
+        {
+          "index": 23,
+          "entry_id": "cop_service_17"
+        },
+        {
+          "index": 24,
+          "entry_id": "cop_service_18"
+        },
+        {
+          "index": 25,
+          "entry_id": "cop_service_19"
+        },
+        {
+          "index": 26,
+          "entry_id": "cop_service_1a"
+        },
+        {
+          "index": 27,
+          "entry_id": "cop_service_1b"
+        },
+        {
+          "index": 28,
+          "entry_id": "cop_service_1c"
+        },
+        {
+          "index": 29,
+          "entry_id": "cop_service_1d"
+        },
+        {
+          "index": 30,
+          "entry_id": "cop_service_1e"
+        },
+        {
+          "index": 31,
+          "entry_id": "cop_service_1f"
+        },
+        {
+          "index": 32,
+          "entry_id": "cop_service_20"
+        },
+        {
+          "index": 33,
+          "entry_id": "cop_service_21"
+        },
+        {
+          "index": 34,
+          "entry_id": "cop_service_22"
+        },
+        {
+          "index": 35,
+          "entry_id": "cop_service_23"
+        },
+        {
+          "index": 36,
+          "entry_id": "cop_service_24"
+        },
+        {
+          "index": 37,
+          "entry_id": "cop_service_25"
+        },
+        {
+          "index": 38,
+          "entry_id": "cop_service_26"
+        },
+        {
+          "index": 39,
+          "entry_id": "cop_service_27"
+        },
+        {
+          "index": 40,
+          "entry_id": "cop_service_28"
+        },
+        {
+          "index": 41,
+          "entry_id": "cop_service_29"
+        },
+        {
+          "index": 42,
+          "entry_id": "cop_service_2a"
+        },
+        {
+          "index": 43,
+          "entry_id": "cop_service_2b"
+        },
+        {
+          "index": 44,
+          "entry_id": "cop_service_2c"
+        },
+        {
+          "index": 45,
+          "entry_id": "cop_service_2d"
+        },
+        {
+          "index": 46,
+          "entry_id": "cop_service_2e"
+        },
+        {
+          "index": 47,
+          "entry_id": "cop_service_2f"
+        },
+        {
+          "index": 48,
+          "entry_id": "cop_service_30"
+        },
+        {
+          "index": 49,
+          "entry_id": "cop_service_31"
+        },
+        {
+          "index": 50,
+          "entry_id": "cop_service_32"
+        },
+        {
+          "index": 51,
+          "entry_id": "cop_service_33"
+        },
+        {
+          "index": 52,
+          "entry_id": "cop_service_34"
+        },
+        {
+          "index": 53,
+          "entry_id": "cop_service_35"
+        },
+        {
+          "index": 54,
+          "entry_id": "cop_service_36"
+        },
+        {
+          "index": 55,
+          "entry_id": "cop_service_37"
+        },
+        {
+          "index": 56,
+          "entry_id": "cop_service_38"
+        },
+        {
+          "index": 57,
+          "entry_id": "cop_service_39"
+        },
+        {
+          "index": 58,
+          "entry_id": "cop_service_3a"
+        },
+        {
+          "index": 59,
+          "entry_id": "cop_service_3b"
+        },
+        {
+          "index": 60,
+          "entry_id": "cop_service_3c"
+        },
+        {
+          "index": 61,
+          "entry_id": "cop_service_3d"
+        },
+        {
+          "index": 62,
+          "entry_id": "cop_service_3e"
+        },
+        {
+          "index": 63,
+          "entry_id": "cop_service_3f"
+        },
+        {
+          "index": 64,
+          "entry_id": "cop_service_40"
+        },
+        {
+          "index": 65,
+          "entry_id": "cop_service_41"
+        },
+        {
+          "index": 66,
+          "entry_id": "cop_service_42"
+        },
+        {
+          "index": 67,
+          "entry_id": "cop_service_43"
+        },
+        {
+          "index": 68,
+          "entry_id": "cop_service_44"
+        },
+        {
+          "index": 69,
+          "entry_id": "cop_service_45"
+        },
+        {
+          "index": 70,
+          "entry_id": "cop_service_46"
+        },
+        {
+          "index": 71,
+          "entry_id": "cop_service_47"
+        },
+        {
+          "index": 72,
+          "entry_id": "cop_service_48"
+        },
+        {
+          "index": 73,
+          "entry_id": "cop_service_49"
+        },
+        {
+          "index": 74,
+          "entry_id": "cop_service_4a"
+        },
+        {
+          "index": 75,
+          "entry_id": "cop_service_4b"
+        },
+        {
+          "index": 76,
+          "entry_id": "cop_service_4c"
+        },
+        {
+          "index": 77,
+          "entry_id": "cop_service_4d"
+        },
+        {
+          "index": 78,
+          "entry_id": "cop_service_4e"
+        },
+        {
+          "index": 79,
+          "entry_id": "cop_service_4f"
+        },
+        {
+          "index": 80,
+          "entry_id": "cop_service_50"
+        },
+        {
+          "index": 81,
+          "entry_id": "cop_service_51"
+        },
+        {
+          "index": 82,
+          "entry_id": "cop_service_52"
+        },
+        {
+          "index": 83,
+          "entry_id": "cop_service_53"
+        },
+        {
+          "index": 84,
+          "entry_id": "cop_service_54"
+        },
+        {
+          "index": 85,
+          "entry_id": "cop_service_55"
+        },
+        {
+          "index": 86,
+          "entry_id": "cop_service_56"
+        },
+        {
+          "index": 87,
+          "entry_id": "cop_service_57"
+        },
+        {
+          "index": 88,
+          "entry_id": "cop_service_58"
+        },
+        {
+          "index": 89,
+          "entry_id": "cop_service_59"
+        },
+        {
+          "index": 90,
+          "entry_id": "cop_service_5a"
+        },
+        {
+          "index": 91,
+          "entry_id": "cop_service_5b"
+        },
+        {
+          "index": 92,
+          "entry_id": "cop_service_5c"
+        },
+        {
+          "index": 93,
+          "entry_id": "cop_service_5d"
+        },
+        {
+          "index": 94,
+          "entry_id": "cop_service_5e"
+        },
+        {
+          "index": 95,
+          "entry_id": "cop_service_5f"
+        },
+        {
+          "index": 96,
+          "entry_id": "cop_service_60"
+        },
+        {
+          "index": 97,
+          "entry_id": "cop_service_61"
+        },
+        {
+          "index": 98,
+          "entry_id": "cop_service_62"
+        },
+        {
+          "index": 99,
+          "entry_id": "cop_service_63"
+        },
+        {
+          "index": 100,
+          "entry_id": "cop_service_64"
+        },
+        {
+          "index": 101,
+          "entry_id": "cop_service_65"
+        },
+        {
+          "index": 102,
+          "entry_id": "cop_service_66"
+        },
+        {
+          "index": 103,
+          "entry_id": "cop_service_67"
+        },
+        {
+          "index": 104,
+          "entry_id": "cop_service_68"
+        },
+        {
+          "index": 105,
+          "entry_id": "cop_service_69"
+        },
+        {
+          "index": 106,
+          "entry_id": "cop_service_6a"
+        },
+        {
+          "index": 107,
+          "entry_id": "cop_service_6b"
+        },
+        {
+          "index": 108,
+          "entry_id": "cop_service_6c"
+        },
+        {
+          "index": 109,
+          "entry_id": "cop_service_6d"
+        },
+        {
+          "index": 110,
+          "entry_id": "cop_service_6e"
+        },
+        {
+          "index": 111,
+          "entry_id": "cop_service_6f"
+        },
+        {
+          "index": 112,
+          "entry_id": "cop_service_70"
+        },
+        {
+          "index": 113,
+          "entry_id": "cop_service_71"
+        },
+        {
+          "index": 114,
+          "entry_id": "cop_service_72"
+        },
+        {
+          "index": 115,
+          "entry_id": "cop_service_73"
+        },
+        {
+          "index": 116,
+          "entry_id": "cop_service_74"
+        },
+        {
+          "index": 117,
+          "entry_id": "cop_service_75"
+        },
+        {
+          "index": 118,
+          "entry_id": "cop_service_76"
+        },
+        {
+          "index": 119,
+          "entry_id": "cop_service_77"
+        },
+        {
+          "index": 120,
+          "entry_id": "cop_service_78"
+        },
+        {
+          "index": 121,
+          "entry_id": "cop_service_79"
+        },
+        {
+          "index": 122,
+          "entry_id": "cop_service_7a"
+        },
+        {
+          "index": 123,
+          "entry_id": "cop_service_7b"
+        },
+        {
+          "index": 124,
+          "entry_id": "cop_service_7c"
+        }
+      ],
+      "confidence": "static_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "NativeCopHandler..CopDispatchTable",
+          "provenance": "static_analysis",
+          "note": "COP signatures select bank-local words at $83B2."
+        },
+        {
+          "source_id": "japan_rom",
+          "locator": "japanese_rom_matches_map_and_resolves_known_dispatch; normalized offsets $0083B2-$0084AB",
+          "provenance": "static_analysis",
+          "note": "The maximal contiguous run resolves 125 exact bank-$80 handler starts; the following word $109A is not in a bank-$80 ROM window."
+        }
+      ]
+    },
+    {
+      "id": "top_level_state",
+      "kind": "memory_callback",
+      "source": {
+        "type": "mutable_memory",
+        "address": "$7E049E",
+        "pointer_encoding": {
+          "type": "bank_local_u16",
+          "runtime_bank": "$80"
+        }
+      },
+      "targets": [
+        {
+          "index": 0,
+          "entry_id": "top_level_handler_805d"
+        }
+      ],
+      "confidence": "trace_corroborated",
+      "evidence": [
+        {
+          "source_id": "boot_assembly",
+          "locator": "MainLoop..TopLevelStateDispatch",
+          "provenance": "static_analysis",
+          "note": "The main loop reads a mutable 16-bit callback pointer while retaining program bank $80; this source is not directly image-backed."
+        },
+        {
+          "source_id": "oracle_reset_trace",
+          "locator": "run_reset_trace_child: dispatch at $80:805A reaches $80:805D",
+          "provenance": "project_test",
+          "note": "At $80:805A, the mutable $7E:049E pointer contains $805D; tracing the JMP reaches runtime $80:805D."
+        }
+      ]
+    }
+  ],
+  "conflicting_region_claims": []
+}

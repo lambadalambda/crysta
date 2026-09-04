@@ -4,6 +4,16 @@
 //! explicitly to validate a local Japanese dump, assemble the reconstruction,
 //! and compare the resulting image byte-for-byte.
 
+pub mod rom_map;
+
+pub use rom_map::{
+    Confidence, ConflictingRegionClaim, DataKind, DecodeState, DispatchKind, DispatchResolveError,
+    DispatchSource, DispatchTarget, EntryKind, EntryPoint, Evidence, IndirectDispatch,
+    MutableMemoryAddress, PointerEncoding, Provenance, RegionClass, ResolvedDispatchTarget,
+    RomDispatchError, RomMap, RomMapImageError, RomMapLoadError, RomMapValidationError, RomRegion,
+    Source, TableLayout, ROM_MAP_SCHEMA_VERSION,
+};
+
 use std::fmt;
 
 /// Generates the deterministic ca65 include for the canonical Japanese memory map.
@@ -13,6 +23,15 @@ use std::fmt;
 /// Returns an error if the committed symbol artifact does not match its schema.
 pub fn canonical_symbol_include() -> Result<String, memory_map::LoadError> {
     memory_map::MemoryMap::built_in_japan().map(|map| map.generate_ca65_include())
+}
+
+/// Generates the deterministic ca65 include for the canonical Japanese ROM map.
+///
+/// # Errors
+///
+/// Returns an error if the committed ROM-map artifact does not match its schema.
+pub fn canonical_rom_map_include() -> Result<String, RomMapLoadError> {
+    RomMap::built_in_japan().map(|map| map.generate_ca65_include())
 }
 
 const HIROM_BASE: usize = 0xC0_0000;
@@ -91,7 +110,7 @@ pub fn compare_images(expected: &[u8], built: &[u8]) -> Result<(), ImageMismatch
 
 #[cfg(test)]
 mod tests {
-    use super::{canonical_symbol_include, compare_images};
+    use super::{canonical_rom_map_include, canonical_symbol_include, compare_images};
 
     #[test]
     fn canonical_symbol_include_is_revision_bound_and_contains_boot_symbols() {
@@ -100,6 +119,14 @@ mod tests {
         assert!(include.contains("STATE_HANDLER_POINTER = $049E\n"));
         assert!(include.contains("NMI_STATUS = $4210\n"));
         assert!(include.contains("PLAYER_X = $1000\n"));
+    }
+
+    #[test]
+    fn canonical_rom_map_include_is_revision_bound_and_uses_derived_names() {
+        let include = canonical_rom_map_include().expect("built-in ROM map is valid");
+        assert!(include.contains("Schema version: 1\n"));
+        assert!(include.contains("NativeNmiHandlerCanonical = $C5F98F\n"));
+        assert!(include.contains("NativeNmiHandlerRuntime = $85F98F\n"));
     }
 
     #[test]
