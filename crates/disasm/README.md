@@ -42,8 +42,9 @@ The command:
 2. rejects every revision except the Japanese behavior reference;
 3. creates a fresh run directory under `local/disasm/` and writes the normalized
    input there as `rom-clean.bin`;
-4. validates the canonical Japanese memory map and generates
-   `memory-symbols.inc` in that ignored run directory;
+4. validates the canonical Japanese memory and ROM maps, resolves the known
+   ROM-backed dispatch table, and generates `memory-symbols.inc` plus
+   `rom-map.inc` in that ignored run directory;
 5. assembles `asm/*.s` in lexical order and links with `linker.cfg`;
 6. writes objects, listings, a map, and `rom-built.bin` in that same ignored run
    directory;
@@ -66,14 +67,17 @@ or structured data occupy exactly the released bytes. Link-time address and
 size assertions guard important boundaries; the final byte comparison remains
 authoritative.
 
-`memory-symbols.inc` is generated deterministically from the revision/hash-bound
-[canonical memory map](../../docs/memory-map.md); no generated copy is committed.
-The map stores canonical 24-bit addresses. A low-WRAM short operand is valid
+`memory-symbols.inc` and `rom-map.inc` are generated deterministically from the
+revision/hash-bound [canonical memory map](../../docs/memory-map.md) and
+[sparse ROM map](../../docs/rom-map.md); no generated copy is committed. The
+memory map stores canonical 24-bit addresses. A low-WRAM short operand is valid
 only when the complete symbol fits the `$7E:0000-$7E:1FFF` mirror; direct-page
 operands assume `D=$0000`. Hardware operands such as `$2121` are numerically
 the canonical bank-zero address, while using that 16-bit spelling still relies
 on the DBR mirror documented at the assembly entry point. Symbols outside the
-supported short forms retain long operands.
+supported short forms retain long operands. ROM entry constants carry explicit
+`Canonical` or `Runtime` suffixes so source labels and runtime mirrors cannot be
+confused.
 
 Assembly conventions:
 
@@ -91,6 +95,21 @@ Assembly conventions:
 The currently annotated reset, native interrupt, frame-gate, and top-level
 control flow is indexed in
 [Boot, interrupts, and main loop](../../docs/boot-main-loop.md).
+
+The classification map can be queried without a ROM. Address namespaces are
+mandatory so file offsets, canonical addresses, and runtime mirrors cannot be
+confused:
+
+```sh
+cargo run -p disasm -- inspect-rom offset:008000
+cargo run -p disasm -- inspect-rom canonical:C08000
+cargo run -p disasm -- inspect-rom runtime:80:8000
+```
+
+Each command prints the normalized/canonical location and any containing region
+or exact entry. Unknown mapped bytes remain explicitly unclassified. See
+[ROM code, data, and dispatch map](../../docs/rom-map.md) for the schema,
+sparse-classification policy, and known dispatches.
 
 A mismatch reports the first normalized file offset, its canonical SNES
 address, and the built and expected bytes. Full ROMs, normalized copies,

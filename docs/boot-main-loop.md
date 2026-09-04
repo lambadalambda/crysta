@@ -5,25 +5,28 @@ Japanese behavior reference. Source annotations and placement assertions live
 in [`crates/disasm/asm/boot.s`](../crates/disasm/asm/boot.s). All canonical
 addresses use the contiguous HiROM mapping from
 [ADR 0003](adr/0003-matching-disassembly-toolchain.md); traces preserve the
-actual runtime mirror.
+actual runtime mirror. Stable IDs refer to the versioned
+[ROM classification map](rom-map.md).
 
 ## Address map
 
-| Role | Normalized offset | Canonical source address | Runtime address |
-| --- | ---: | ---: | ---: |
-| Reset | `$008000` | `$C0:8000` | `$00:8000` |
-| Native NMI trampoline | `$008007` | `$C0:8007` | `$00:8007` |
-| Native IRQ trampoline | `$00800B` | `$C0:800B` | `$00:800B` |
-| Native COP trampoline | `$00800F` | `$C0:800F` | `$00:800F` |
-| Native BRK trampoline | `$008013` | `$C0:8013` | `$00:8013` |
-| Native reset setup | `$008017` | `$C0:8017` | `$80:8017` |
-| Main-loop frame gate | `$008043` | `$C0:8043` | `$80:8043` |
-| Top-level state dispatch | `$00805A` | `$C0:805A` | `$80:805A` |
-| Native COP handler | `$008378` | `$C0:8378` | `$80:8378` |
-| Native NMI handler | `$05F98F` | `$C5:F98F` | `$85:F98F` |
-| Native IRQ handler | `$05FB00` | `$C5:FB00` | `$85:FB00` |
-| Native BRK handler | `$05FB01` | `$C5:FB01` | `$85:FB01` |
-| Wait for NMI latch | `$068009` | `$C6:8009` | `$86:8009` |
+| Role | ROM-map entry ID | Normalized offset | Canonical source address | Runtime address |
+| --- | --- | ---: | ---: | ---: |
+| Reset | `reset` | `$008000` | `$C0:8000` | `$00:8000` |
+| Native NMI trampoline | `nmi_trampoline` | `$008007` | `$C0:8007` | `$00:8007` |
+| Native IRQ trampoline | `irq_trampoline` | `$00800B` | `$C0:800B` | `$00:800B` |
+| Native COP trampoline | `cop_trampoline` | `$00800F` | `$C0:800F` | `$00:800F` |
+| Native BRK trampoline | `brk_trampoline` | `$008013` | `$C0:8013` | `$00:8013` |
+| Native reset setup | `native_reset` | `$008017` | `$C0:8017` | `$80:8017` |
+| Main-loop frame gate | `main_loop` | `$008043` | `$C0:8043` | `$80:8043` |
+| Top-level state dispatch | `top_level_state_dispatch` | `$00805A` | `$C0:805A` | `$80:805A` |
+| Opening top-level handler | `top_level_handler_805d` | `$00805D` | `$C0:805D` | `$80:805D` |
+| Native COP handler | `native_cop_handler` | `$008378` | `$C0:8378` | `$80:8378` |
+| Native NMI handler | `native_nmi` | `$05F98F` | `$C5:F98F` | `$85:F98F` |
+| Native IRQ handler | `native_irq` | `$05FB00` | `$C5:FB00` | `$85:FB00` |
+| Native BRK handler | `native_brk` | `$05FB01` | `$C5:FB01` | `$85:FB01` |
+| Wait for frame and poll input | `frame_gate` | `$068000` | `$C6:8000` | `$86:8000` |
+| Wait for NMI latch | `wait_for_nmi_latch` | `$068009` | `$C6:8009` | `$86:8009` |
 
 ## Reset and initialization
 
@@ -77,7 +80,9 @@ changes them.
   indexes (`X=0`), and `D=$0000`; M and DBR are inherited, then M is forced to
   16-bit. The dispatcher clobbers A/X/Y and direct-page scratch `$36/$38`, reads
   the COP signature byte through the stacked return address, doubles it into a
-  16-bit index, and jumps through the service table at `$80:83B2`. Shared return
+  16-bit index, and jumps through the service table at `$80:83B2`. The ROM map's
+  `cop_services` dispatch resolves selectors `$00..$7C` to 125 exact function
+  starts; the following word is not a valid bank-`$80` ROM pointer. Shared return
   helpers advance the stacked address by two, four, five, or eight bytes before
   `RTI`.
 - **ABORT** and the native reserved slot contain `$0000`; they are unsupported.
@@ -98,10 +103,11 @@ register widths, and returns.
 The return from this routine is the authoritative main-thread frame boundary:
 one consumed NMI period permits one common-update and state-dispatch pass. The
 main loop then calls common subsystems and reaches `$80:805A`, where
-`JMP ($049E)` dispatches through a mutable 16-bit low-WRAM handler pointer.
-State handlers return to `$80:8043`, directly or through a shared tail. The
-program-state values observed elsewhere at WRAM `$0450` describe state, while
-`$049E` is the proved executable dispatch pointer.
+`JMP ($049E)` dispatches through a mutable 16-bit low-WRAM handler pointer. The
+ROM map records this as `top_level_state`; the reset trace proves its opening
+`top_level_handler_805d` target. State handlers return to `$80:8043`, directly
+or through a shared tail. The program-state values observed elsewhere at WRAM
+`$0450` describe state, while `$049E` is the proved executable dispatch pointer.
 
 ## Reference trace qualification
 
@@ -124,6 +130,7 @@ runs agreed on:
 - initial state: `P=$34`, `E=1`, `D=$0000`, `DBR=$00`;
 - state before reset's `JML`: `P=$35`, `E=0`;
 - final pre-instruction PC: `$80:8043`;
+- opening top-level handler pointer `$7E:049E`: `$805D`;
 - trace digest: `8a6db5e98dac5f7b6e085a7509f4259dafa283ab3df4b929fda76d21d7b09df9`.
 
 The version-1 digest stream starts with the domain bytes

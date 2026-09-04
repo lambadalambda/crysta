@@ -82,6 +82,23 @@ Reconstruction writes its include only to an ignored per-run directory and
 remains subject to the byte-identical ROM comparison. The schema supports SRAM,
 but no canonical SRAM fields are claimed until sufficient evidence exists.
 
+### ROM classification map
+
+The [ROM map](rom-map.md) is a separate schema-versioned, revision/hash-bound
+source of sparse code, typed data, entry-state, and indirect-dispatch metadata.
+Its typed address model distinguishes normalized file offsets, canonical HiROM
+addresses, and runtime mirrors. Unknown gaps stay unclassified, partially
+understood function starts do not imply guessed code extents, and conflicting
+claims remain outside canonical lookup.
+
+The `disasm` crate validates and exposes the committed Japanese artifact,
+resolves ROM-backed pointer tables against authenticated local input, generates
+runtime/canonical ca65 constants, and supports explicit-namespace inspection.
+Reconstruction consumes the generated include and still requires a byte-exact
+output match. The initial map classifies every direct boot/interrupt/main-loop
+target, all 125 valid COP selectors, and the trace-proved opening target of the
+mutable top-level state dispatch.
+
 ### Oracle
 
 A reference emulator or compatible execution harness should support deterministic

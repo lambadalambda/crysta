@@ -16,11 +16,11 @@ registers.
 
 ## Status
 
-The safe repository foundation (M0) and deterministic reference oracle (M1)
-are complete. Work is now focused on the matching-disassembly foundation (M2):
-a byte-identical reconstruction, the first boot/interrupt/main-loop annotations,
-a canonical revision-bound memory map, and a qualified local-SRAM symbol trace
-are in place; broader ROM region classification remains.
+The safe repository foundation (M0), deterministic reference oracle (M1), and
+matching-disassembly foundation (M2) are complete. The Japanese reference can
+be reconstructed byte-for-byte; boot, interrupts, the main loop, canonical
+memory, sparse ROM regions, and known indirect dispatch are versioned and
+inspectable. Work now moves to the content and script pipeline (M3).
 
 No playable portable implementation exists yet.
 
@@ -28,6 +28,7 @@ See:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [Canonical memory map](docs/memory-map.md)
+- [ROM code, data, and dispatch map](docs/rom-map.md)
 - [Boot, interrupts, and main loop](docs/boot-main-loop.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
