@@ -13,7 +13,6 @@ baserom.*
 # Generated or extracted copyrighted content
 /assets/generated/
 /generated/
-/disasm/build/
 /oracle/local/
 *.assets
 *.assetpack

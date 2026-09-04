@@ -1,15 +1,30 @@
-; reset.s — Initial fully-opaque ROM reconstruction.
+; reset.s — initial mixed opaque/annotated ROM reconstruction.
 ;
-; This file includes the entire verified ROM via .incbin, providing a
-; byte-for-byte baseline. As ranges are disassembled, .incbin segments
-; shrink and real 65816 assembly takes their place.
+; Opaque bytes remain local in rom-clean.bin. The first reset instructions are
+; assembled explicitly to prove that known ranges can replace bounded .incbin
+; slices without changing placement.
 
+.setcpu "65816"
+.import __ROM_SIZE__
 .segment "ROM"
 
-; Path is injected by the build script via --define or by placing the
-; clean ROM in OUT_DIR. For now, the build script writes a clean ROM
-; to OUT_DIR/rom-clean.bin and we include it with a relative path.
-; ca65's -o flag puts the .o in OUT_DIR, so the include path is
-; relative to there.
+.incbin "rom-clean.bin", $000000, $008000
 
-.incbin "rom-clean.bin"
+; Hardware reset enters through the $00:8000 mirror in emulation mode:
+; E=1, M=1, X=1, PBR=$00, DBR=$00, and direct page=$0000.
+.a8
+.i8
+NativeResetEntry = $808017
+
+Reset:
+.assert Reset = $C08000, lderror, "reset vector target moved"
+    sei
+    clc
+    xce
+    jml NativeResetEntry
+ResetPrefixEnd:
+.assert ResetPrefixEnd - Reset = 7, error, "reset prefix size changed"
+
+.incbin "rom-clean.bin", $008007, $3F7FF9
+
+.assert __ROM_SIZE__ = $400000, lderror, "reconstructed ROM size changed"
