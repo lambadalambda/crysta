@@ -6,6 +6,10 @@
 //! tooling crates and must write ROM-derived output under the ignored
 //! `local/` directory (see CONTRIBUTING.md).
 
+mod address;
+
+pub use address::{AddressError, CanonicalRomAddress, NormalizedOffset, RuntimeRomAddress};
+
 /// A known, supported cartridge revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Revision {
@@ -18,6 +22,15 @@ pub enum Revision {
 impl Revision {
     /// Every supported revision.
     pub const ALL: [Self; 2] = [Self::Japan, Self::EuropeEnglish];
+
+    /// Returns the stable lowercase identifier used for this revision.
+    #[must_use]
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::Japan => "japan",
+            Self::EuropeEnglish => "europe-english",
+        }
+    }
 
     /// The built-in known-ROM table used by [`Rom::load`].
     #[must_use]
@@ -281,6 +294,12 @@ impl Rom {
     #[must_use]
     pub fn image(&self) -> &[u8] {
         &self.image
+    }
+
+    /// Computes digests over this ROM's actual normalized image bytes.
+    #[must_use]
+    pub fn digests(&self) -> Digests {
+        digests(&self.image)
     }
 }
 
