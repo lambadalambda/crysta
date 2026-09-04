@@ -14,10 +14,27 @@
 
 #include <ares-embedded-data.hpp>
 
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <span>
 #include <vector>
+
+struct SnesCpuTraceEntry {
+  uint32_t address;
+  uint16_t directPage;
+  uint8_t status;
+  uint8_t dataBank;
+  uint8_t emulation;
+  uint8_t reserved[3];
+};
+static_assert(sizeof(SnesCpuTraceEntry) == 12);
+static_assert(offsetof(SnesCpuTraceEntry, address) == 0);
+static_assert(offsetof(SnesCpuTraceEntry, directPage) == 4);
+static_assert(offsetof(SnesCpuTraceEntry, status) == 6);
+static_assert(offsetof(SnesCpuTraceEntry, dataBank) == 7);
+static_assert(offsetof(SnesCpuTraceEntry, emulation) == 8);
+static constexpr uint32_t CpuTraceInstructionLimit = 2'000'000;
 
 namespace ares::SuperFamicom {
   auto load(Node::System&, string) -> bool;
@@ -42,6 +59,59 @@ struct OraclePlatform : ares::Platform {
   std::vector<u32> lastFrame;
 
   bool systemAttached = false;
+
+  SnesCpuTraceEntry* traceOutput = nullptr;
+  uint32_t traceCount = 0;
+  uint32_t traceTarget = 0;
+  uint32_t traceLimit = 0;
+  int traceStop = -1;
+  Event lastEvent = Event::None;
+
+  auto event(Event event) -> void override {
+    lastEvent = event;
+  }
+
+  auto stopTrace(int reason, bool exitScheduler) -> void {
+    traceStop = reason;
+    traceOutput = nullptr;
+    SuperFamicom::cpu.debugger.tracer.instruction->setEnabled(false);
+    if(exitScheduler) SuperFamicom::scheduler.exit(Event::Step);
+  }
+
+  auto beginTrace(uint32_t target, uint32_t limit, SnesCpuTraceEntry* output) -> void {
+    traceOutput = output;
+    traceCount = 0;
+    traceTarget = target;
+    traceLimit = limit;
+    traceStop = -1;
+    auto& tracer = SuperFamicom::cpu.debugger.tracer.instruction;
+    tracer->setMask(false);
+    tracer->setDepth(0);
+    tracer->setEnabled(true);
+  }
+
+  auto log(Node::Debugger::Tracer::Tracer node, string_view message) -> void override {
+    (void)message;
+    auto& tracer = SuperFamicom::cpu.debugger.tracer.instruction;
+    if(traceStop >= 0 || node != tracer) return;
+
+    auto& registers = SuperFamicom::cpu.r;
+    traceOutput[traceCount++] = {
+      (uint32_t)registers.pc.d,
+      (uint16_t)registers.d.w,
+      (uint8_t)(uint32_t)registers.p,
+      (uint8_t)registers.b,
+      (uint8_t)registers.e,
+      {},
+    };
+
+    if((uint32_t)registers.pc.d == traceTarget) {
+      stopTrace(0, true);
+    } else if(traceCount >= traceLimit) {
+      stopTrace(1, true);
+    }
+  }
+
   auto pak(Node::Object node) -> std::shared_ptr<vfs::directory> override {
     (void)node;
     if(!systemAttached) {
@@ -168,7 +238,9 @@ Snes* snes_init(void) {
 }
 
 void snes_free(Snes* snes) {
-  delete (OracleCore*)snes;
+  // The ares machine is process-global and cannot be safely destroyed or
+  // recreated. Intentionally retain the singleton until process exit.
+  (void)snes;
 }
 
 void snes_reset(Snes* snes, bool hard) {
@@ -189,6 +261,32 @@ void snes_runFrame(Snes* snes) {
   auto* core = (OracleCore*)snes;
   core->root->run();
   core->frames++;
+}
+
+int snes_traceUntil(Snes* snes, uint32_t target, uint32_t instructionLimit,
+                    uint32_t frameLimit, SnesCpuTraceEntry* entries, uint32_t* count) {
+  if(!snes || target > 0xffffff || instructionLimit == 0 ||
+     instructionLimit > CpuTraceInstructionLimit || frameLimit == 0 || !entries || !count) {
+    return -1;
+  }
+
+  auto* core = (OracleCore*)snes;
+  auto& platform = core->platform;
+  platform.beginTrace(target, instructionLimit, entries);
+  uint32_t tracedFrames = 0;
+
+  while(platform.traceStop < 0) {
+    platform.lastEvent = Event::None;
+    core->root->run();
+    if(platform.traceStop >= 0) break;
+    if(platform.lastEvent == Event::Frame) {
+      core->frames++;
+      if(++tracedFrames >= frameLimit) platform.stopTrace(2, false);
+    }
+  }
+
+  *count = platform.traceCount;
+  return platform.traceStop;
 }
 
 void snes_setPixelFormat(Snes* snes, int pixelFormat) {
@@ -277,7 +375,7 @@ uint16_t snes_cpu_pc(const Snes* snes) {
 
 uint8_t snes_cpu_bank(const Snes* snes) {
   (void)snes;
-  return SuperFamicom::cpu.r.b;
+  return SuperFamicom::cpu.r.pc.b;
 }
 
 const uint8_t* snes_apu_ram(const Snes* snes) {

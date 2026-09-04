@@ -1,6 +1,6 @@
 [package]
 name = "oracle"
-description = "Reference execution boundary: vendored LakeSnes core plus deterministic frame stepping"
+description = "Reference execution boundary: vendored ares core plus deterministic frame stepping"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

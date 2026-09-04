@@ -7,7 +7,7 @@
 //! earlier and re-running the same frames must reproduce the live run).
 
 use oracle::replay::{run_fixture, save_snapshot, Fixture};
-use oracle::{export, load_state, Button, Session};
+use oracle::{export, load_state, Button, CpuTraceStop, Session};
 use rom::Revision;
 use std::path::Path;
 
@@ -47,6 +47,79 @@ fn vram_le_bytes(session: &Session) -> Vec<u8> {
         .iter()
         .flat_map(|w| w.to_le_bytes())
         .collect()
+}
+
+#[test]
+fn reset_trace_reaches_first_main_loop_iteration() {
+    if local_rom("Tenchi Souzou (Japan).sfc").is_none() {
+        eprintln!("skipping: local Japanese dump not present");
+        return;
+    }
+    if std::env::var("ORACLE_TRACE_CHILD").is_ok() {
+        run_reset_trace_child();
+    }
+
+    let exe = std::env::current_exe().expect("current exe");
+    let out = std::process::Command::new(&exe)
+        .args([
+            "--exact",
+            "reset_trace_reaches_first_main_loop_iteration",
+            "--nocapture",
+        ])
+        .env("ORACLE_TRACE_CHILD", "1")
+        .output()
+        .expect("spawn trace child");
+    assert!(
+        out.status.success(),
+        "child trace must exit cleanly\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        text.contains("reset trace: 965059 instructions, 64 frames, 8a6db5e98dac5f7b6e085a7509f4259dafa283ab3df4b929fda76d21d7b09df9"),
+        "child must report the qualified reset trace: {text}"
+    );
+}
+
+fn run_reset_trace_child() -> ! {
+    let image = local_rom("Tenchi Souzou (Japan).sfc").expect("parent verified local dump");
+    let rom = rom::Rom::load(&image).expect("validated dump");
+    assert_eq!(rom.revision(), Revision::Japan);
+    let mut session = Session::new(&rom).expect("session");
+
+    let trace = session
+        .trace_until_pc(0x80_8043, 1_000_000, 120)
+        .expect("valid trace bounds");
+    assert_eq!(trace.stop, CpuTraceStop::TargetReached);
+    assert_eq!(trace.entries.len(), 965_059);
+    assert_eq!(session.frame_state().frames, 64);
+    assert_eq!(
+        trace
+            .entries
+            .iter()
+            .take(5)
+            .map(|entry| entry.address)
+            .collect::<Vec<_>>(),
+        [0x00_8000, 0x00_8001, 0x00_8002, 0x00_8003, 0x80_8017]
+    );
+    assert_eq!(trace.entries[0].status, 0x34);
+    assert!(trace.entries[0].emulation);
+    assert_eq!(trace.entries[3].status, 0x35);
+    assert!(!trace.entries[3].emulation);
+    assert_eq!(trace.entries.last().unwrap().address, 0x80_8043);
+
+    let digest = trace.digest_hex();
+    assert_eq!(
+        digest,
+        "8a6db5e98dac5f7b6e085a7509f4259dafa283ab3df4b929fda76d21d7b09df9"
+    );
+    eprintln!(
+        "reset trace: {} instructions, {} frames, {digest}",
+        trace.entries.len(),
+        session.frame_state().frames
+    );
+    std::process::exit(0);
 }
 
 #[test]

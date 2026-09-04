@@ -80,7 +80,7 @@ pub enum StartPoint {
     },
     /// Resume from a snapshot produced by this harness (opaque bytes).
     Snapshot {
-        /// Harness snapshot payload (`LakeSnes` state blob), local-only when
+        /// Harness snapshot payload (opaque core state), local-only when
         /// derived from a real ROM run.
         payload: Vec<u8>,
     },

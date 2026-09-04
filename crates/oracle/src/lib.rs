@@ -6,6 +6,7 @@
 //! and no filesystem access here — callers own persistence.
 
 use std::fmt;
+use std::sync::Mutex;
 
 use rom::Rom;
 use sha2::{Digest, Sha256};
@@ -23,6 +24,27 @@ mod ffi {
     pub struct Snes {
         _private: [u8; 0],
     }
+
+    #[repr(C)]
+    #[derive(Clone, Copy, Default)]
+    pub struct SnesCpuTraceEntry {
+        pub address: u32,
+        pub direct_page: u16,
+        pub status: u8,
+        pub data_bank: u8,
+        pub emulation: u8,
+        pub reserved: [u8; 3],
+    }
+
+    const _: () = assert!(std::mem::size_of::<SnesCpuTraceEntry>() == 12);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, direct_page) == 4);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, status) == 6);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, data_bank) == 7);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, emulation) == 8);
+
+    pub const TRACE_TARGET_REACHED: c_int = 0;
+    pub const TRACE_INSTRUCTION_LIMIT: c_int = 1;
+    pub const TRACE_FRAME_LIMIT: c_int = 2;
 
     pub const PIXEL_FORMAT_XRGB: c_int = 0;
     pub const BUTTON_SELECT: c_int = 2;
@@ -43,6 +65,14 @@ mod ffi {
         pub fn snes_free(snes: *mut Snes);
         pub fn snes_reset(snes: *mut Snes, hard: bool);
         pub fn snes_runFrame(snes: *mut Snes);
+        pub fn snes_traceUntil(
+            snes: *mut Snes,
+            target: u32,
+            instructionLimit: u32,
+            frameLimit: u32,
+            entries: *mut SnesCpuTraceEntry,
+            count: *mut u32,
+        ) -> c_int;
         pub fn snes_loadRom(snes: *mut Snes, data: *const u8, length: c_int) -> bool;
         pub fn snes_setPixelFormat(snes: *mut Snes, pixelFormat: c_int);
         pub fn snes_setPixels(snes: *mut Snes, pixelData: *mut u8);
@@ -50,7 +80,7 @@ mod ffi {
         pub fn snes_setButtonState(snes: *mut Snes, player: c_int, button: c_int, pressed: bool);
         pub fn snes_saveState(snes: *mut Snes, data: *mut u8) -> c_int;
         pub fn snes_loadState(snes: *mut Snes, data: *const u8, size: c_int) -> bool;
-        // shim accessors (vendor/lakesnes/shims.c)
+        // project-authored ares shim accessors (vendor/ares/shims.cpp)
         pub fn snes_ram(snes: *const Snes) -> *const u8;
         pub fn snes_frames(snes: *const Snes) -> u32;
         pub fn snes_cycles(snes: *const Snes) -> u64;
@@ -66,8 +96,10 @@ mod ffi {
 pub const FRAME_WIDTH: usize = 512;
 /// Framebuffer height in pixels.
 pub const FRAME_HEIGHT: usize = 480;
-/// Samples per frame, stereo (`LakeSnes` NTSC upper bound).
+/// Samples per frame, stereo (legacy shim boundary capacity).
 pub const SAMPLES_PER_FRAME: usize = 534;
+/// Maximum records accepted by one bounded CPU trace.
+pub const MAX_CPU_TRACE_INSTRUCTIONS: usize = 2_000_000;
 
 /// A controller button for [`Session::set_button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -118,12 +150,15 @@ impl Button {
 }
 
 /// `Rom` validates to exactly [`rom::Rom::IMAGE_SIZE`] bytes, and the core's
-/// ROM length is an `i32`; a validated image therefore always fits, and no
-/// fallible path in [`Session::new`] can leak the core allocation.
+/// ROM length is an `i32`; a validated image therefore always fits.
 const _: () = assert!(
     rom::Rom::IMAGE_SIZE <= i32::MAX as usize,
     "validated ROM image fits the core's i32 length"
 );
+
+// Serializes constructors and prevents safe Rust from entering ares's
+// process-global initialization more than once.
+static SESSION_CLAIMED: Mutex<bool> = Mutex::new(false);
 
 /// A headless reference session over a validated ROM.
 pub struct Session {
@@ -139,6 +174,8 @@ pub struct Session {
 /// Errors from reference-session use.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionError {
+    /// A session already owns the process-global ares core.
+    AlreadyBooted,
     /// The core rejected the ROM image.
     CoreRejectedRom,
 }
@@ -146,6 +183,7 @@ pub enum SessionError {
 impl fmt::Display for SessionError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::AlreadyBooted => write!(f, "an ares session is already booted in this process"),
             Self::CoreRejectedRom => write!(f, "the emulator core rejected the ROM image"),
         }
     }
@@ -164,13 +202,112 @@ pub struct FrameState {
     pub wram_sha256: [u8; 32],
 }
 
+/// CPU state captured immediately before one instruction executes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CpuTraceEntry {
+    /// Actual 24-bit execution address (`PBR:PC`), without mirror normalization.
+    pub address: u32,
+    /// Processor status register.
+    pub status: u8,
+    /// Whether the CPU is in emulation mode.
+    pub emulation: bool,
+    /// Direct-page register.
+    pub direct_page: u16,
+    /// Data-bank register.
+    pub data_bank: u8,
+}
+
+/// Why a bounded CPU trace stopped.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CpuTraceStop {
+    /// The requested target instruction was reached and included in the trace.
+    TargetReached,
+    /// The requested maximum number of instructions was captured.
+    InstructionLimit,
+    /// The requested maximum number of video frames elapsed.
+    FrameLimit,
+}
+
+/// Version of the canonical structured CPU-trace digest stream.
+pub const CPU_TRACE_FORMAT_VERSION: u32 = 1;
+
+/// Result of one bounded CPU trace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CpuTrace {
+    /// Structured pre-instruction CPU states, including the target when reached.
+    pub entries: Vec<CpuTraceEntry>,
+    /// Why tracing stopped.
+    pub stop: CpuTraceStop,
+}
+
+impl CpuTrace {
+    /// Returns the canonical lowercase SHA-256 for this trace's structured
+    /// records. The stream is domain-separated and includes its format version
+    /// and record count before the fixed-width entries.
+    #[must_use]
+    pub fn digest_hex(&self) -> String {
+        let mut digest = Sha256::new();
+        digest.update(b"terranigma.cpu-trace\0");
+        digest.update(CPU_TRACE_FORMAT_VERSION.to_le_bytes());
+        digest.update((self.entries.len() as u64).to_le_bytes());
+        for entry in &self.entries {
+            digest.update(entry.address.to_le_bytes());
+            digest.update([entry.status, u8::from(entry.emulation)]);
+            digest.update(entry.direct_page.to_le_bytes());
+            digest.update([entry.data_bank]);
+        }
+        export::bytes_to_hex(&digest.finalize())
+    }
+}
+
+/// Invalid bounds or core failures from [`Session::trace_until_pc`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TraceError {
+    /// A 24-bit target address was exceeded.
+    TargetOutOfRange(u32),
+    /// At least one instruction must be allowed.
+    ZeroInstructionLimit,
+    /// The requested instruction capacity does not fit the shim ABI.
+    InstructionLimitTooLarge(usize),
+    /// At least one frame must be allowed.
+    ZeroFrameLimit,
+    /// The reference core rejected otherwise validated tracing parameters.
+    CoreFailure(i32),
+}
+
+impl fmt::Display for TraceError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::TargetOutOfRange(target) => {
+                write!(
+                    f,
+                    "CPU trace target ${target:X} exceeds 24-bit address space"
+                )
+            }
+            Self::ZeroInstructionLimit => write!(f, "CPU trace instruction limit must be nonzero"),
+            Self::InstructionLimitTooLarge(limit) => {
+                write!(
+                    f,
+                    "CPU trace instruction limit {limit} exceeds maximum {MAX_CPU_TRACE_INSTRUCTIONS}"
+                )
+            }
+            Self::ZeroFrameLimit => write!(f, "CPU trace frame limit must be nonzero"),
+            Self::CoreFailure(code) => write!(f, "reference core trace failed with code {code}"),
+        }
+    }
+}
+
+impl std::error::Error for TraceError {}
+
 impl Session {
     /// Creates a session; the core hard-resets as part of ROM load.
     ///
     /// # Errors
     ///
-    /// Returns [`SessionError::CoreRejectedRom`] if the vendored core
-    /// refuses the image (distinct from rom-crate digest validation).
+    /// Returns [`SessionError::AlreadyBooted`] if any session construction has
+    /// already entered the process-global ares core, or
+    /// [`SessionError::CoreRejectedRom`] if the core refuses the image
+    /// (distinct from rom-crate digest validation).
     ///
     /// # Panics
     ///
@@ -178,6 +315,15 @@ impl Session {
     /// compile-time constant that always fits. The ROM length conversion
     /// is guaranteed by the const assertion on [`rom::Rom::IMAGE_SIZE`].
     pub fn new(rom: &Rom) -> Result<Self, SessionError> {
+        let mut claimed = SESSION_CLAIMED
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if *claimed {
+            return Err(SessionError::AlreadyBooted);
+        }
+        // ares cannot safely recover or reinitialize after construction starts.
+        *claimed = true;
+
         unsafe {
             let snes = ffi::snes_init();
             let image = rom.image();
@@ -222,6 +368,74 @@ impl Session {
         for _ in 0..n {
             self.run_frame();
         }
+    }
+
+    /// Captures bounded pre-instruction CPU state until `target` is reached.
+    ///
+    /// The target entry is included, but that instruction has not executed when
+    /// this method returns. Addresses preserve the core's actual execution
+    /// mirror rather than being normalized to the canonical disassembly bank.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TraceError`] for a target above 24 bits, zero bounds, an
+    /// instruction limit that does not fit the shim ABI, or an unexpected core
+    /// failure.
+    pub fn trace_until_pc(
+        &mut self,
+        target: u32,
+        instruction_limit: usize,
+        frame_limit: u32,
+    ) -> Result<CpuTrace, TraceError> {
+        if target > 0xFF_FFFF {
+            return Err(TraceError::TargetOutOfRange(target));
+        }
+        if instruction_limit == 0 {
+            return Err(TraceError::ZeroInstructionLimit);
+        }
+        if instruction_limit > MAX_CPU_TRACE_INSTRUCTIONS {
+            return Err(TraceError::InstructionLimitTooLarge(instruction_limit));
+        }
+        let instruction_limit = u32::try_from(instruction_limit)
+            .map_err(|_| TraceError::InstructionLimitTooLarge(instruction_limit))?;
+        if frame_limit == 0 {
+            return Err(TraceError::ZeroFrameLimit);
+        }
+
+        let mut raw = vec![ffi::SnesCpuTraceEntry::default(); instruction_limit as usize];
+        let mut count = 0u32;
+        let stop = unsafe {
+            ffi::snes_traceUntil(
+                self.snes,
+                target,
+                instruction_limit,
+                frame_limit,
+                raw.as_mut_ptr(),
+                &raw mut count,
+            )
+        };
+        if count > instruction_limit {
+            return Err(TraceError::CoreFailure(stop));
+        }
+        raw.truncate(count as usize);
+
+        let stop = match stop {
+            ffi::TRACE_TARGET_REACHED => CpuTraceStop::TargetReached,
+            ffi::TRACE_INSTRUCTION_LIMIT => CpuTraceStop::InstructionLimit,
+            ffi::TRACE_FRAME_LIMIT => CpuTraceStop::FrameLimit,
+            code => return Err(TraceError::CoreFailure(code)),
+        };
+        let entries = raw
+            .into_iter()
+            .map(|entry| CpuTraceEntry {
+                address: entry.address,
+                status: entry.status,
+                emulation: entry.emulation != 0,
+                direct_page: entry.direct_page,
+                data_bank: entry.data_bank,
+            })
+            .collect();
+        Ok(CpuTrace { entries, stop })
     }
 
     /// Sets a button state for player 1; applies to subsequent frames.
@@ -331,7 +545,7 @@ impl Drop for Session {
 #[must_use]
 pub fn save_state(session: &Session) -> Vec<u8> {
     unsafe {
-        // LakeSnes returns the used size; a NULL probe is not offered, so
+        // The shim returns the used size; a NULL probe is not offered, so
         // allocate the documented maximum and truncate.
         let mut buf = vec![0u8; STATE_SIZE_MAX];
         let n = ffi::snes_saveState(session.snes, buf.as_mut_ptr());
@@ -362,12 +576,14 @@ mod tests {
     use super::*;
 
     fn synthetic_rom() -> Rom {
-        // A minimum valid cart image: a 4 MiB image with a tiny reset-vector
-        // program (an SEI/WAI spin loop), so the core boots deterministically
-        // without copyrighted content. Digests are injected.
+        // A minimum valid cart image with a reset prefix that enters native
+        // mode, long-jumps to bank $80, and then spins at $80:8000.
         let mut image = vec![0u8; Rom::IMAGE_SIZE];
-        let code = vec![0x78, 0x18, 0xFB, 0xCB, 0x4C, 0xC0, 0xFF]; // SEI CLC XCE WAI JMP $FFC0
-        image[0xFFC0..0xFFC0 + code.len()].copy_from_slice(&code);
+        // SEI; CLC; XCE; JML $80:8000.
+        let reset = [0x78, 0x18, 0xFB, 0x5C, 0x00, 0x80, 0x80];
+        image[0xFFC0..0xFFC0 + reset.len()].copy_from_slice(&reset);
+        // BRA $80:8000.
+        image[0x8000..0x8002].copy_from_slice(&[0x80, 0xFE]);
         // NMI/IRQ/RESET vectors all land on the spin loop.
         image[0xFFEA] = 0xC0;
         image[0xFFEB] = 0xFF;
@@ -387,9 +603,115 @@ mod tests {
     }
 
     #[test]
+    fn trace_digest_v1_is_stable() {
+        let trace = CpuTrace {
+            entries: vec![CpuTraceEntry {
+                address: 0x12_3456,
+                status: 0xA5,
+                emulation: true,
+                direct_page: 0x789A,
+                data_bank: 0xBC,
+            }],
+            stop: CpuTraceStop::TargetReached,
+        };
+        assert_eq!(
+            trace.digest_hex(),
+            "8daa7f434165e6b0d5bf06879937036f89f73713171fcf34589ac5681b6f04ad"
+        );
+    }
+
+    #[test]
     fn session_accessors_and_replay() {
+        if std::env::var("ORACLE_UNIT_CHILD").is_ok() {
+            run_session_child();
+        }
+        let exe = std::env::current_exe().expect("current test executable");
+        let output = std::process::Command::new(exe)
+            .args([
+                "--exact",
+                "tests::session_accessors_and_replay",
+                "--nocapture",
+            ])
+            .env("ORACLE_UNIT_CHILD", "1")
+            .output()
+            .expect("spawn isolated ares test");
+        assert!(
+            output.status.success(),
+            "isolated ares test failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("synthetic ares checks passed"),
+            "child must reach the end of its assertions"
+        );
+    }
+
+    fn run_session_child() -> ! {
         let rom = synthetic_rom();
         let mut s = Session::new(&rom).expect("core accepts image");
+        assert!(matches!(
+            Session::new(&rom),
+            Err(SessionError::AlreadyBooted)
+        ));
+        assert_eq!(s.frame_state().frames, 0, "first session remains valid");
+
+        assert_eq!(
+            s.trace_until_pc(0x100_0000, 1, 1),
+            Err(TraceError::TargetOutOfRange(0x100_0000))
+        );
+        assert_eq!(
+            s.trace_until_pc(0x80_8000, 0, 1),
+            Err(TraceError::ZeroInstructionLimit)
+        );
+        assert_eq!(
+            s.trace_until_pc(0x80_8000, MAX_CPU_TRACE_INSTRUCTIONS + 1, 1),
+            Err(TraceError::InstructionLimitTooLarge(
+                MAX_CPU_TRACE_INSTRUCTIONS + 1
+            ))
+        );
+        assert_eq!(
+            s.trace_until_pc(0x80_8000, 1, 0),
+            Err(TraceError::ZeroFrameLimit)
+        );
+
+        let reset_trace = s
+            .trace_until_pc(0x80_8000, 8, 1)
+            .expect("valid trace bounds");
+        assert_eq!(reset_trace.stop, CpuTraceStop::TargetReached);
+        assert_eq!(
+            reset_trace
+                .entries
+                .iter()
+                .map(|entry| entry.address)
+                .collect::<Vec<_>>(),
+            [0x00_FFC0, 0x00_FFC1, 0x00_FFC2, 0x00_FFC3, 0x80_8000]
+        );
+        assert_eq!(reset_trace.entries[0].status, 0x34);
+        assert!(reset_trace.entries[0].emulation);
+        assert_eq!(reset_trace.entries[3].status, 0x35);
+        assert!(!reset_trace.entries[3].emulation);
+        assert_eq!(reset_trace.entries[0].direct_page, 0);
+        assert_eq!(reset_trace.entries[0].data_bank, 0);
+        assert_eq!(s.cpu_bank(), 0x80);
+        assert_eq!(s.frame_state().frames, 0);
+
+        let loop_trace = s
+            .trace_until_pc(0x80_9000, 3, 1)
+            .expect("valid trace bounds");
+        assert_eq!(loop_trace.stop, CpuTraceStop::InstructionLimit);
+        assert_eq!(loop_trace.entries.len(), 3);
+        assert!(loop_trace
+            .entries
+            .iter()
+            .all(|entry| entry.address == 0x80_8000));
+
+        let frame_trace = s
+            .trace_until_pc(0x80_9000, 1_000_000, 1)
+            .expect("valid frame bound");
+        assert_eq!(frame_trace.stop, CpuTraceStop::FrameLimit);
+        assert!(!frame_trace.entries.is_empty());
+        assert_eq!(s.frame_state().frames, 1);
 
         // Memory-model accessor shapes.
         assert_eq!(s.vram().len(), 0x8000);
@@ -410,7 +732,9 @@ mod tests {
         assert!(!snap.is_empty());
         load_state(&mut s, &snap);
         // The vendored ares engine does not tear down cleanly at process exit;
-        // exit before static destructors run.
+        // exit before static destructors run. The parent test verifies this
+        // marker and the child status.
+        eprintln!("synthetic ares checks passed");
         std::process::exit(0);
     }
 }
