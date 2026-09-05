@@ -1,4 +1,4 @@
-//! Qualified Japanese runtime map layer, not a static ROM map decoder.
+//! Qualified Japanese static and runtime map layers.
 //!
 //! The loader stores pixel dimensions at `$7E:0826/082A`, in 256-pixel units.
 //! The first runtime layer at `$7E:A000` consists of row-major 16-bit cells for
@@ -6,6 +6,9 @@
 //! portable movement specification. See `docs/maps.md` for qualification limits.
 
 use std::fmt;
+
+mod static_layer;
+pub use static_layer::{StaticLayer, StaticMapError};
 
 const WRAM_SIZE: usize = 0x20000;
 const LAYER_START: usize = 0xA000;
