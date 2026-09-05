@@ -79,6 +79,38 @@ This deliberately differs from the community script's permissive malformed-
 input behavior (warnings, synthesized bytes, and corrected invalid references).
 Only well-formed, authenticated packets were used as reference evidence.
 
+## Deterministic encoder
+
+`assets::compression::encode(uncompressed)` accepts 1–65,535 bytes. It emits the
+same zero-header variant with the exact uncompressed size, zero unused control
+bits, and a zero-offset terminator. There is no empty/64 KiB wrapping mode.
+
+The wiki's original greedy rule is implemented directly:
+
+1. Search starts in the previous 8,192 bytes for the longest match, up to 256
+   bytes. Overlap is allowed. Prefer the nearest start when lengths tie.
+2. For this search, read beyond the input as virtual zero padding. **Only after
+   choosing the winner** clamp its length to the actual remaining input. This
+   can choose a different final copy distance than an unpadded greedy search.
+3. Use short copies for lengths 2–5 within distance 256. Otherwise emit a
+   literal for matches of at most two bytes, compact long copies for lengths
+   3–9, and extended long copies for longer matches.
+
+The implementation uses predecessor chains of equal first bytes to avoid
+searching positions that cannot match; it does not change the search order or
+skip positions consumed by previous copy tokens. This is a bounded offline
+compressor, not a minimal-size optimizer.
+
+All six qualified JP/EU packets **re-encode byte-for-byte**, including packet
+boundaries and final control bits. This does not claim universal byte identity:
+a legal packet may choose different tokens, ignored terminator offset bits, or
+unused control bits. Such inputs decode losslessly but re-encode canonically.
+Synthetic tests verify that distinction, tie-breaking, padding before clamping,
+window boundaries, and deterministic round trips through the maximum length.
+An exact original encoding outside this qualified set must be retained by a
+future container representation if preservation of arbitrary source packets is
+required.
+
 ## Qualified local packets
 
 All offsets below are normalized/headerless. The test authenticates the entire

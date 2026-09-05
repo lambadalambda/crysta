@@ -6,6 +6,9 @@
 
 use std::fmt;
 
+mod encoder;
+pub use encoder::{encode, EncodeError};
+
 /// Largest representable nonempty packet output (16-bit header length).
 pub const MAX_OUTPUT_SIZE: usize = u16::MAX as usize;
 

@@ -1,7 +1,7 @@
 //! Optional checks against authenticated local JP/EU dumps. Only metadata and
 //! independent community-decoder output hashes are committed (see docs/compression.md).
 
-use assets::compression::{decode, MAX_OUTPUT_SIZE};
+use assets::compression::{decode, encode, MAX_OUTPUT_SIZE};
 use rom::{Revision, Rom};
 use std::path::Path;
 
@@ -91,6 +91,22 @@ fn verify_local_packets(name: &str, revision: Revision) {
             packet.name
         );
         assert_eq!(decode(source, packet.output_size).unwrap(), decoded);
+        let encoded = encode(&decoded.data).expect("qualified output must encode");
+        assert_eq!(
+            encoded.len(),
+            source.len(),
+            "{} encoded length",
+            packet.name
+        );
+        assert!(
+            encoded == source,
+            "{} must re-encode byte-for-byte",
+            packet.name
+        );
+        assert_eq!(
+            decode(&encoded, packet.output_size).unwrap().data,
+            decoded.data
+        );
         eprintln!(
             "{} {}: offset=${:06X}, {} -> {} bytes",
             revision.id(),
