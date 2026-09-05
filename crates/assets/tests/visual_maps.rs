@@ -120,3 +120,21 @@ fn rejects_unqualified_cell_bits_and_definition_adjustment() {
         assert!(CavernBackground::from_rom(&image).is_err());
     }
 }
+
+#[test]
+fn named_background_preserves_cavern_and_rejects_unqualified_maps() {
+    use assets::maps::visual::StaticBackground;
+    let image = fixture();
+    let scene = StaticBackground::from_rom(&image, 0x128).unwrap();
+    assert_eq!(scene.tiles().len(), 512);
+    assert_eq!(
+        scene.pixel(8, 0).unwrap(),
+        CavernBackground::from_rom(&image)
+            .unwrap()
+            .pixel(8, 0)
+            .unwrap()
+    );
+    for id in [0, 4, 0x25, 0xffff] {
+        assert!(StaticBackground::from_rom(&image, id).is_err());
+    }
+}
