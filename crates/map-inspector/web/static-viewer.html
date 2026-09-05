@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>Terranigma · Static full-map inspector</title>
+<style>
+:root{color-scheme:dark;--bg:#0d151c;--panel:#15232c;--line:#30444e;--ink:#e5ecea;--muted:#9badb2;--accent:#73dec0;--gold:#e8ba71}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}header,main,footer{max-width:1600px;margin:auto;padding:24px 32px}header{display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid var(--line)}h1{font-size:27px;font-weight:600;margin:3px 0}h2{font-size:17px;margin:0 0 12px}p{margin:8px 0}.eyebrow{font:11px monospace;letter-spacing:2px;color:var(--accent)}.badge{border:1px solid var(--line);padding:7px 12px;border-radius:5px;color:var(--accent);font:12px monospace}.muted,small{color:var(--muted)}.hint{font-size:13px}.notice{border-left:3px solid var(--gold);padding:10px 15px;background:#26271f;color:#dbd2b5;font-size:13px;margin-bottom:22px;overflow-wrap:anywhere}.layout{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:20px;align-items:start}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}.panel-head,.controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}.panel-head{justify-content:space-between}.panel-head h2{margin-bottom:4px}label{display:flex;align-items:center;gap:8px;margin:9px 0;cursor:pointer}input{accent-color:var(--accent)}input[type=range]{width:135px}output{min-width:4ch;font-family:monospace}input:focus-visible,canvas:focus-visible,summary:focus-visible,.scroll:focus-within{outline:2px solid var(--accent);outline-offset:3px}.scroll{overflow:auto;max-height:65vh;background:#080d12;border:1px solid var(--line);border-radius:5px;overscroll-behavior:contain;margin-top:12px}canvas{image-rendering:pixelated}#atlas{display:block;cursor:crosshair;max-width:none}#preview{display:block;width:128px;height:128px;background:#080d12;border:1px solid var(--line)}.selection{display:flex;gap:18px;align-items:center;margin:16px 0}.code{font:26px monospace;color:var(--gold);margin:8px 0}#tile-index{font-family:monospace}table{width:100%;border-collapse:collapse;font:12px/1.5 monospace;text-align:left;white-space:nowrap}th,td{padding:7px 4px;border-bottom:1px solid var(--line)}thead th{color:var(--muted);font-weight:normal}caption{text-align:left;font:13px system-ui,sans-serif;margin:0 0 8px;color:var(--muted)}.table-scroll{overflow-x:auto}details{margin-top:20px}summary{cursor:pointer;color:var(--accent)}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;color:var(--muted)}#error{color:#ff9790;font-weight:bold;margin-bottom:12px}#error:empty{display:none}footer{font-size:12px;color:var(--muted);padding-top:0}
+@media(max-width:1050px){header,main,footer{padding:18px}.layout{grid-template-columns:1fr}.inspection{max-width:100%}.selection{float:left;margin:12px 24px 12px 0}.table-scroll{max-width:600px}.inspection .hint{clear:both}h1{font-size:23px}}
+@media(max-width:540px){header{align-items:flex-start;flex-direction:column;gap:12px}.panel{padding:14px}.controls{gap:12px}.selection{float:none}.scroll{max-height:55vh}header,main,footer{padding:14px}h1{font-size:22px}}
+</style>
+</head>
+<body>
+<header><div><div class="eyebrow">REFERENCE LANE / STATIC TERRAIN</div><h1>Static full-map inspector</h1><span class="muted">Terranigma · natural-palette background</span></div><span class="badge">LOCAL ONLY · NO UPLOADS</span></header>
+<main>
+<div class="notice" id="limitations"><strong>Static background only.</strong> No sprites, animation, runtime events, or raster effects. Tile priority is inspectable metadata, not runtime layer composition. Transparent pixels use the generator’s neutral checker, already baked into the BMP; this is not the game’s final composited scene.<p id="manifest-limits"></p></div>
+<div id="error" role="alert"></div>
+<div class="layout">
+<section class="panel" aria-labelledby="map-heading">
+<div class="panel-head"><div><h2 id="map-heading">Full background map</h2><span class="muted hint">Map <span id="map-id"></span> · <span id="dimensions"></span></span></div><div class="controls"><label for="zoom">Zoom <input id="zoom" type="range" min="25" max="400" step="25" value="100"><output id="zoom-value" for="zoom">100%</output></label><label for="grid"><input id="grid" type="checkbox">16-pixel grid</label></div></div>
+<p class="hint muted" id="navigation-help">Scroll or swipe to explore; click a cell to inspect. Focus the map and use arrow keys to move, Home/End for row edges, or Ctrl+Home/End for map corners. Coordinates start at zero.</p>
+<div class="scroll" id="atlas-scroll"><canvas id="atlas" width="1280" height="512" tabindex="0" aria-label="Full static background map" aria-describedby="navigation-help coordinates">Use the cell inspection below to read the selected background cell.</canvas></div>
+<p class="hint muted" id="image-status" role="status">Loading local background BMP…</p>
+</section>
+<section class="panel inspection" aria-labelledby="inspection-heading">
+<h2 id="inspection-heading">Cell inspection</h2>
+<div aria-live="polite" aria-atomic="true"><span class="muted" id="coordinates"></span><p class="code" id="raw"></p><span class="hint muted">Metatile · low nine bits </span><span id="tile-index"></span></div>
+<div class="selection"><canvas id="preview" width="128" height="128" role="img" aria-label="Selected metatile, enlarged eight times"></canvas><p class="hint muted">16 × 16 pixels<br>8× nearest-neighbor preview<br>Original BMP · no grid</p></div>
+<div class="table-scroll"><table><caption>Raw SNES tile words · TL / TR / BL / BR</caption><thead><tr><th scope="col">Part</th><th scope="col">Word</th><th scope="col"><abbr title="Graphics tile index, bits 0–9">Gfx</abbr></th><th scope="col"><abbr title="Palette bank, bits 10–12">Pal</abbr></th><th scope="col"><abbr title="Priority, bit 13">Pri</abbr></th><th scope="col"><abbr title="Horizontal flip, bit 14">H</abbr></th><th scope="col"><abbr title="Vertical flip, bit 15">V</abbr></th></tr></thead><tbody id="tile-words"></tbody></table></div>
+<p class="hint muted">Gfx: 10-bit graphics index. Pal: 3-bit palette bank. Pri: priority bit. H/V: horizontal/vertical flip. Words describe the four 8 × 8 quadrants; upper cell bits are preserved, not interpreted as verified collision rules.</p>
+<p class="hint muted" id="palette-info"></p>
+</section>
+</div>
+<details class="panel"><summary>Source provenance &amp; decoding boundaries</summary><p class="hint muted">ROM SHA-256 and decoded resource SHA-256 digests identify the local inputs. Source ranges are ROM byte offsets as supplied by the generator. This viewer does not verify hashes or emulate the game.</p><pre id="provenance"></pre></details>
+</main>
+<footer>Open this page directly from disk and keep the BMP beside it. No framework, network requests, uploads, or external fonts. The BMP is rendered by the generator; this page only displays it and inspects the embedded raw data.</footer>
+<script>
+'use strict';
+const mapData=__STATIC_JSON__;
+const $=id=>document.getElementById(id);
+const hex=(value,width=4)=>'$'+value.toString(16).toUpperCase().padStart(width,'0');
+const atlas=$('atlas'),ac=atlas.getContext('2d'),preview=$('preview'),pc=preview.getContext('2d');
+const mapImage=new Image();
+let selected=[0,0],imageReady=false;
+const parseTile=word=>({graphics:word&0x3FF,palette:(word>>>10)&7,priority:(word>>>13)&1,h:!!(word&0x4000),v:!!(word&0x8000)});
+
+$('map-id').textContent=mapData.map_id+' ('+hex(mapData.map_id)+')';
+$('dimensions').textContent=mapData.width+' × '+mapData.height+' cells · '+mapData.width*16+' × '+mapData.height*16+' px';
+$('manifest-limits').textContent=mapData.limits;
+$('palette-info').textContent=mapData.palette.length+' raw SNES palette colors supplied; the BMP retains the generator’s natural palette.';
+const {cells,metatiles,palette,...provenance}=mapData;
+$('provenance').textContent=JSON.stringify(provenance,null,2);
+atlas.width=mapData.width*16;
+atlas.height=mapData.height*16;
+
+function inspect(){
+ const [x,y]=selected,raw=mapData.cells[y*mapData.width+x],id=raw&0x1FF;
+ $('coordinates').textContent='Cell '+x+', '+y+' · pixel '+x*16+', '+y*16;
+ $('raw').textContent=hex(raw);
+ $('tile-index').textContent=hex(id,3)+' ('+id+')';
+ $('tile-words').replaceChildren(...mapData.metatiles[id].map((word,i)=>{
+  const tile=parseTile(word),row=document.createElement('tr');
+  const values=[['TL','TR','BL','BR'][i],hex(word),hex(tile.graphics,3)+' ('+tile.graphics+')',tile.palette,tile.priority,tile.h?'Yes':'No',tile.v?'Yes':'No'];
+  values.forEach((value,column)=>{const cell=document.createElement(column===0?'th':'td');if(column===0)cell.scope='row';cell.textContent=value;row.append(cell);});
+  return row;
+ }));
+ pc.clearRect(0,0,128,128);
+ pc.imageSmoothingEnabled=false;
+ if(imageReady)pc.drawImage(mapImage,x*16,y*16,16,16,0,0,128,128);
+ preview.setAttribute('aria-label','Metatile '+id+' at cell '+x+', '+y+', enlarged eight times'+(imageReady?'':'; image unavailable'));
+}
+function render(){
+ ac.clearRect(0,0,atlas.width,atlas.height);
+ ac.imageSmoothingEnabled=false;
+ if(imageReady)ac.drawImage(mapImage,0,0);
+ if($('grid').checked){
+  ac.strokeStyle='#ffffff66';ac.lineWidth=1;
+  for(let y=0;y<mapData.height;y++)for(let x=0;x<mapData.width;x++)ac.strokeRect(x*16+.5,y*16+.5,15,15);
+ }
+ // Contrasting outlines remain visible on both pale and dark terrain.
+ const [x,y]=selected;
+ ac.lineWidth=3;ac.strokeStyle='#080d12';ac.strokeRect(x*16+1.5,y*16+1.5,13,13);
+ ac.lineWidth=1;ac.strokeStyle='#ffffff';ac.strokeRect(x*16+1.5,y*16+1.5,13,13);
+ const zoom=Number($('zoom').value)/100;
+ atlas.style.width=atlas.width*zoom+'px';atlas.style.height=atlas.height*zoom+'px';
+ $('zoom-value').textContent=$('zoom').value+'%';
+ inspect();
+}
+function revealSelection(){
+ const box=$('atlas-scroll'),size=16*Number($('zoom').value)/100;
+ const left=selected[0]*size,top=selected[1]*size;
+ if(left<box.scrollLeft)box.scrollLeft=left;
+ else if(left+size>box.scrollLeft+box.clientWidth)box.scrollLeft=left+size-box.clientWidth;
+ if(top<box.scrollTop)box.scrollTop=top;
+ else if(top+size>box.scrollTop+box.clientHeight)box.scrollTop=top+size-box.clientHeight;
+}
+function select(x,y){
+ selected=[Math.max(0,Math.min(mapData.width-1,x)),Math.max(0,Math.min(mapData.height-1,y))];
+ render();revealSelection();
+}
+atlas.addEventListener('click',event=>{
+ const bounds=atlas.getBoundingClientRect();
+ const x=Math.floor((event.clientX-bounds.left)*atlas.width/bounds.width/16);
+ const y=Math.floor((event.clientY-bounds.top)*atlas.height/bounds.height/16);
+ atlas.focus({preventScroll:true});select(x,y);
+});
+atlas.addEventListener('keydown',event=>{
+ if(event.altKey||event.metaKey||event.shiftKey)return;
+ const [x,y]=selected,delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
+ if(delta){event.preventDefault();select(x+delta[0],y+delta[1]);}
+ else if(event.key==='Home'){event.preventDefault();select(0,event.ctrlKey?0:y);}
+ else if(event.key==='End'){event.preventDefault();select(mapData.width-1,event.ctrlKey?mapData.height-1:y);}
+});
+$('grid').addEventListener('input',render);
+$('zoom').addEventListener('input',()=>{render();revealSelection();});
+function imageError(message){
+ imageReady=false;atlas.dataset.ready='false';$('image-status').textContent='Background unavailable; raw cell inspection still works.';
+ $('error').textContent=message;render();
+}
+mapImage.onload=()=>{
+ if(mapImage.naturalWidth!==atlas.width||mapImage.naturalHeight!==atlas.height){imageError('BMP dimensions do not match the manifest. Expected '+atlas.width+' × '+atlas.height+' pixels.');return;}
+ imageReady=true;atlas.dataset.ready='true';$('error').textContent='';
+ $('image-status').textContent='Full background loaded · '+mapData.image+' · transparency checker baked in.';render();
+};
+mapImage.onerror=()=>imageError('Background BMP could not be loaded. Keep '+mapData.image+' beside this HTML file.');
+render();
+// Only a local BMP basename is accepted: the viewer never loads a remote URL.
+if(typeof mapData.image==='string'&&/^[a-zA-Z0-9_.-]+\.bmp$/i.test(mapData.image))mapImage.src=mapData.image;
+else imageError('Expected a local BMP filename beside this HTML file.');
+</script>
+</body>
+</html>
