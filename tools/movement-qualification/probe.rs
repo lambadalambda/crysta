@@ -26,6 +26,12 @@ fn main() {
         let p: Vec<_> = v.split(':').collect();
         inputs.push((p[0], p[1].parse().unwrap()..p[2].parse().unwrap()));
     }
+    let checkpoints: Vec<u32> = std::env::var("CHECKPOINTS")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.parse().expect("checkpoint must be a frame number"))
+        .collect();
     let mut csv = std::fs::File::create(format!("{out}/frames.csv")).unwrap();
     writeln!(csv,"frame,input,map,x,y,flags,flags8,resume,timer,dir,ptrx,ptry,cntx,cnty,outx,outy,dx,dy,anim,joy,edge").unwrap();
     for f in 0..end {
@@ -51,7 +57,7 @@ fn main() {
                 .collect::<Vec<_>>()
                 .join("+");
             writeln!(csv,"{},{},{:x},{},{},{:04x},{:04x},{:02x}{:04x},{},{},{:04x},{:04x},{},{},{},{},{},{},{:04x},{:04x},{:04x}",f+1,active,u(0x47e),u(0x1000),u(0x1002),u(0x1004),u(0x1008),w[0x100c],u(0x100a),u(0x100e),u(0x1014),u(0x11010),u(0x11012),i(0x1028),i(0x102a),i(0x1100c),i(0x1100e),i(0x11018),i(0x1101a),u(0x13014),u(0x454),u(0x456)).unwrap();
-            if f + 1 == 1601 || f + 1 == end {
+            if f + 1 == 1601 || f + 1 == end || checkpoints.contains(&(f + 1)) {
                 std::fs::write(format!("{out}/f{}.wram", f + 1), &w).unwrap();
             }
         }

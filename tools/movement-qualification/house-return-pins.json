@@ -1,0 +1,157 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+  "csv_sha256": "f2c2c1379903db6e93db4299e0bf2fa7f648c4e7f4633a278ef4c3dfca54d8c7",
+  "checkpoints": {
+    "1601": {
+      "wram_sha256": "655ea43073c4a4f7f0f1b8d736125c1a7b62ddbe07af912ee958c3eb162f0dd6",
+      "map": 15,
+      "x": 472,
+      "y": 176,
+      "flags": 1044,
+      "resume": 8692312,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1801": {
+      "wram_sha256": "22e775d46572211cca57fe9b763499173e16c6aab18f3e5506d0338313098d90",
+      "map": 16,
+      "x": 392,
+      "y": 353,
+      "flags": 1044,
+      "resume": 8692312,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1815": {
+      "wram_sha256": "46e8d83d3c80a6abca3b5b9bea06e267ea149c195b6414b3a2b5000e5297d763",
+      "map": 16,
+      "x": 392,
+      "y": 336,
+      "flags": 1045,
+      "resume": 8692583,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1816": {
+      "wram_sha256": "d141d21a9ead6d119f584357a3996d852cbdc1b05e27f03059f3080b21730894",
+      "map": 16,
+      "x": 392,
+      "y": 335,
+      "flags": 5137,
+      "resume": 8698286,
+      "control_gate": 32768,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1831": {
+      "wram_sha256": "b2900b3494d6bc6cbad2cac60f3719bd5d95f9e4be35a1463f07e3e399571bd5",
+      "map": 16,
+      "x": 392,
+      "y": 320,
+      "flags": 5137,
+      "resume": 8698286,
+      "control_gate": 32768,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1832": {
+      "wram_sha256": "27239dedefe52e38e6e6cb56fd5314ac194ad4c814a95d60f36ff1d0565a387b",
+      "map": 15,
+      "x": 392,
+      "y": 319,
+      "flags": 5137,
+      "resume": 8698286,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1842": {
+      "wram_sha256": "294f1fa60de577d5bf630420aa23088def7d45517b69c6f604ec65773c0549fe",
+      "map": 15,
+      "x": 392,
+      "y": 208,
+      "flags": 17428,
+      "resume": 8692014,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1871": {
+      "wram_sha256": "3a5032c846100534f5f38a89b510102570a96d216906e15cf63726996c9689d3",
+      "map": 15,
+      "x": 392,
+      "y": 191,
+      "flags": 1044,
+      "resume": 8692504,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1872": {
+      "wram_sha256": "c0aad80b922a108a9dac32ecac7fb97da94fb6bbc5c5d52474b979a4ebbc3e61",
+      "map": 15,
+      "x": 392,
+      "y": 191,
+      "flags": 1044,
+      "resume": 8692312,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    },
+    "1950": {
+      "wram_sha256": "bd3568b39ccd569705b688aecf2406b427ee175c6ff6b42ed043c22934a63f73",
+      "map": 15,
+      "x": 392,
+      "y": 191,
+      "flags": 1044,
+      "resume": 8692312,
+      "control_gate": 0,
+      "events_sha256": "bf7d61f4953777ab96d024578f0a147a6700c9a75085c45454f9aec69e801fcb"
+    }
+  },
+  "sources": [
+    {
+      "meaning": "selector-6 departure pointer",
+      "offset": 887146,
+      "length": 3,
+      "sha256": "1745ee4a98dcdd69a46329a2950bece91dea72a26c7b86fc8006f8b1762158a5"
+    },
+    {
+      "meaning": "selector-6 signed adjustment",
+      "offset": 887197,
+      "length": 4,
+      "sha256": "6e90b5d2b8ce7b775b3f74bafd0a28d18344b287eff41d0cf938f18344ea8fa2"
+    },
+    {
+      "meaning": "selector-6 arrival pointer",
+      "offset": 296970,
+      "length": 2,
+      "sha256": "d700f0b8364c6139ef9a932883c2840ac1cdcec78f4d8226da63b3e6aa8f33ac"
+    },
+    {
+      "meaning": "map-F actor pointer",
+      "offset": 229406,
+      "length": 2,
+      "sha256": "714c03dea483c08c6cd3fc4363d31bcda5b820daf7e432294b6c801c10354943"
+    },
+    {
+      "meaning": "map-F FD player record",
+      "offset": 232736,
+      "length": 8,
+      "sha256": "7aaa00e2f8fbc6000e5da6dcfe338ffa79a8ca381bcef53f425b4e6edfe27311"
+    },
+    {
+      "meaning": "departure actor and COP translation",
+      "offset": 309625,
+      "length": 57,
+      "sha256": "4f0dc64a52c2c15751180e52b9354d3ad202875b75e2c48a19ebcf3eefdaf807"
+    },
+    {
+      "meaning": "arrival actor and COP translation",
+      "offset": 310132,
+      "length": 57,
+      "sha256": "14ea3b3a80f29c3061e8b9306f902c047d89fd3d5091065b47bac0a115229171"
+    },
+    {
+      "meaning": "spawn queue override",
+      "offset": 63475,
+      "length": 35,
+      "sha256": "86d5ccc7298f80f7606abde7bb8737bf73c49c3a027b67e5ef820a170bb3fd02"
+    }
+  ]
+}
