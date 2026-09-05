@@ -25,7 +25,9 @@ compression decoder and deterministic encoder reproduce qualified JP/EU graphics
 and map packets byte-for-byte. A local loaded-map inspector now shows qualified
 portal-cavern captures and raw tile/collision structure. The cavern layer can
 also be decoded directly from ROM, with attribute initialization matched against
-loader execution. Broader maps and collision behavior qualification remain.
+loader execution. A bounded map-loading script projection resolves five tested
+map IDs into eight layer packets, with loader equality for the menu and cavern.
+Broader map behavior and collision qualification remain.
 
 No playable portable implementation exists yet.
 
@@ -38,6 +40,7 @@ See:
 - [Compression packets](docs/compression.md)
 - [Local map viewer and runtime layout](docs/maps.md)
 - [Static map layers and loader qualification](docs/static-maps.md)
+- [Map-ID lookup and loading scripts](docs/map-scripts.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
 - [Contributing](CONTRIBUTING.md)

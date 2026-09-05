@@ -5,7 +5,9 @@ a trace-qualified attribute initialization path. Static output matches the
 emulator **byte-for-byte at two loader stages**. This is one qualified map, not
 a general map-script interpreter, full map renderer, or collision engine.
 
-The [loaded-map viewer](maps.md) still displays runtime captures. The distinction
+A follow-up [loading-script projection](map-scripts.md) now resolves layer
+sources from map IDs for a supported subset, and additionally qualifies the menu
+layer. The [loaded-map viewer](maps.md) still displays runtime captures. The distinction
 between compressed source words, initialized words, and gameplay changes matters.
 
 ## Reproduce
@@ -82,9 +84,10 @@ For the cavern this is normalized **`$069914`**, producing script pointer
 `$B3:89BF`; the pointer conversion routine at `$86:90E7` resolves its encoded
 pointer to **`$C9:0000`** in direct-page `$66..$68`.
 
-These are observed pointer provenance, not a new general static script resolver.
-Script control flow and packed relative-pointer variants remain separate work.
-Static extraction currently takes the qualified normalized offset explicitly.
+These observations established the initial pointer provenance. The subsequent
+[script projection](map-scripts.md) now follows supported calls, jumps and deferred
+streams and resolves their packed pointers. `decode-layer` still takes an explicit
+offset; `resolve-map` takes an ID. State-dependent variants remain unsupported.
 
 ### Qualified ROM extents
 
@@ -108,8 +111,10 @@ SHA-256:
 
 ### Reproducible trace stops
 
-Replay labels `0..1112` run normally with the documented Start/A inputs. A is
-released before tracing. Each stop has an 80-frame / 2,000,000-instruction bound.
+The documented Start/A inputs through label 1111 are preserved. The current
+command first inserts the [menu qualification stops](map-scripts.md), then resumes
+input scheduling by completed-frame count. A is released before the cavern
+trace. Each cavern stop has an 80-frame / 2,000,000-instruction bound.
 The target entry is included **before** its instruction executes. A frame number
 at a mid-frame stop is the number of completed frames, not a replay label.
 All ten stops have direct page `$0000`.
@@ -183,6 +188,6 @@ research used the vendored ares opcode metadata; no decoded instruction dumps or
 extracted map bytes were committed.
 
 The [parent map issue](../meta/issues/decode-map-collision-formats.md) remains
-open: general map-script/pointer resolution, graphics/metatile reconstruction,
+open: state-dependent loading and final layer composition, graphics/metatile reconstruction,
 representative indoor/outdoor/dungeon/world maps, placements/regions/exits,
 dynamic changes and trace-qualified collision behavior are still required.

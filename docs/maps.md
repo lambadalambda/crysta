@@ -114,8 +114,8 @@ The conflicting imported field `$7E:081E` is intentionally not used.
 - Public terranigma.be ROM-layout, map-script, map-flags and map-exit pages were
   inaccessible during this research attempt. No new format claims rest on them.
 
-Beyond the one qualified static layer, still required: general ROM pointer/script
-resolution, metatile/graphics reconstruction,
+The [map-ID script projection](map-scripts.md) now handles a bounded loading
+subset. Still required: conditional loading and final composition, metatile/graphics reconstruction,
 indoor/outdoor/dungeon/world-map coverage, placements/regions/transitions, and
 trace-qualified collision behavior. This tool is a visual aid for that work,
 not a portable gameplay collision API or an asset pack.

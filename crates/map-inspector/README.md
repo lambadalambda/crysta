@@ -15,7 +15,8 @@ cavern), original before/after viewports, a full raw layer, collision/grid/playe
 overlays, zoom, and cell inspection. Collision meanings and low-nine-bit metatile
 indices are explicitly provisional. No server or network access is needed.
 
-Inputs must match the Japanese reference ROM and pinned three-slot SRAM. Neither
+Runtime capture/qualification inputs must match the Japanese reference ROM and
+pinned three-slot SRAM. Neither
 is provided. See [maps and qualification](../../docs/maps.md) for hashes, replay,
 runtime layout, the eight-row border assumption, provenance, and remaining work.
 Building the native oracle requires a C++20 compiler (see its
@@ -34,12 +35,18 @@ All captures contain ROM-derived material: **do not commit or redistribute them*
 cargo run -p map-inspector -- decode-layer \
   'local/Tenchi Souzou (Japan).sfc' 0x90000
 
-# Fixed cavern experiment; asserts intermediate equality and reports final differences.
+# Map-ID lookup and resource provenance; no SRAM read or emulator boot.
+cargo run -p map-inspector -- resolve-map \
+  'local/Tenchi Souzou (Japan).sfc' 128
+
+# Menu/cavern experiment; asserts intermediate equality and reports final differences.
 cargo run -p map-inspector -- qualify-loader \
   'local/Tenchi Souzou (Japan).sfc' 'local/saves/Terranigma.srm'
 ```
 
-Offsets are hexadecimal and normalized/headerless. Redirect extracted JSON only
+Map IDs and offsets are hexadecimal; offsets are normalized/headerless.
+See [loading-script projection](../../docs/map-scripts.md) for command coverage,
+strict failures and multi-layer source-load output. Redirect extracted JSON only
 to ignored `local/`. See [static map layers](../../docs/static-maps.md) for source
 ranges, pointer provenance, attribute lookup, trace stops and remaining gaps.
 The viewer remains a runtime view; these commands do not replace its capture data.
@@ -50,10 +57,10 @@ The viewer remains a runtime view; these commands do not replace its capture dat
 cargo test -p map-inspector
 ```
 
-BMP/HTML tests are synthetic. Local tests authenticate
-inputs, check ROM-only extraction, and qualify runtime checkpoints and loader
-stages in fresh subprocesses. They skip explicitly without their local inputs. Browser QA additionally checks interaction and
-responsive rendering. With `agent-browser` installed, run the atlas draw-order
+BMP/HTML tests are synthetic. Local tests authenticate inputs, check ROM-only
+extraction and map-ID inspection, and qualify runtime checkpoints and loader
+stages in fresh subprocesses. They skip explicitly without their local inputs.
+Browser QA additionally checks interaction and responsive rendering. With `agent-browser` installed, run the atlas draw-order
 and changed-count regression on a generated viewer:
 
 ```sh

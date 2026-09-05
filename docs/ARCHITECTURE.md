@@ -183,9 +183,13 @@ ROM/SRAM authentication, deterministic oracle replay, and ignored local exports;
 its browser viewer displays raw structure alongside captured original viewports.
 A [static-layer reader](static-maps.md) additionally decodes dimension-prefixed
 containers and applies the loader's metatile attributes without execution.
-Intermediate byte equality qualifies the cavern; general map-script resolution
-and collision semantics remain open. No emulator or filesystem dependency enters
-the pure model.
+Intermediate byte equality qualifies the cavern. A bounded [map-loading script
+projection](map-scripts.md) resolves map IDs, packed resource pointers, calls,
+jumps and deferred streams while rejecting state-dependent branches. It uses
+`rom`'s typed address validation and records original instructions; it does not
+execute sound/display effects or compose cached/partial layer transfers. Menu
+and cavern layers have loader equality checks; collision semantics remain open.
+No emulator or filesystem dependency enters the pure model.
 
 Event bytecode is treated as a first-class language with a disassembler,
 readable intermediate representation, and eventually an assembler or compiler.
