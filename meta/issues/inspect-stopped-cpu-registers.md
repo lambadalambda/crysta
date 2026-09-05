@@ -25,3 +25,12 @@ collision research can identify actual entities and return values without guessi
 
 - Supports [transition qualification](qualify-opening-room-transition.md) and
   [portable movement qualification](portable-room-slice.md).
+
+## Completion
+
+Implemented `Session::cpu_registers` with a layout-checked read-only snapshot
+call. Synthetic red-green test establishes every native register, matches trace
+endpoint fields, proves repeated reads leave frame/WRAM/PC unchanged and confirms
+the stopped store has not executed. Existing trace ABI/digests are unchanged.
+Independent review found no blockers; oracle/workspace tests, strict Clippy,
+formatting and rustdoc passed in the ROM-free implementation worktree.

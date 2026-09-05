@@ -27,3 +27,4 @@
 - [x] [Qualify static map loading and decode the cavern layer](issues/static-map-cavern.md)
 - [x] [Resolve map loading scripts and qualify additional layers](issues/resolve-map-loading-scripts.md)
 - [x] [Render the static cavern from decoded graphics](issues/render-static-cavern.md)
+- [x] [Inspect stopped CPU registers for gameplay qualification](issues/inspect-stopped-cpu-registers.md)

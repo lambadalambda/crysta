@@ -3,7 +3,6 @@
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [ ] [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)
-- [ ] [Inspect stopped CPU registers for gameplay qualification](issues/inspect-stopped-cpu-registers.md)
 - [ ] [Qualify an opening room transition](issues/qualify-opening-room-transition.md)
 - [ ] [Reverse the event script bytecode](issues/reverse-event-bytecode.md)
 - [ ] [Reverse the CPU-to-SPC audio protocol](issues/reverse-audio-protocol.md)
