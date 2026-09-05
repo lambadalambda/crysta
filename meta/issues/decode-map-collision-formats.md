@@ -22,6 +22,12 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
 - Collision fixtures agree with reference traces in selected rooms.
 - Pointer and bounds validation rejects malformed data.
 
+## Subissues
+
+- [Build a local loaded-map inspector](loaded-map-inspector.md): first visual
+  deliverable using a qualified runtime checkpoint, without claiming complete
+  static map decoding.
+
 ## Notes
 
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)

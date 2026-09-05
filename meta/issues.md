@@ -1,6 +1,8 @@
 # Open Issues
 
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
+- [ ] [Build a local loaded-map inspector](issues/loaded-map-inspector.md)
+- [ ] [Preserve oracle framebuffer colors](issues/oracle-framebuffer-colors.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [ ] [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)
 - [ ] [Reverse the event script bytecode](issues/reverse-event-bytecode.md)
