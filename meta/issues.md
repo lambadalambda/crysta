@@ -8,7 +8,6 @@
 - [ ] [Build the reproducible local asset pack](issues/local-asset-pack.md)
 - [ ] [Define the deterministic portable core model](issues/deterministic-core-model.md)
 - [ ] [Validate extraction and the core boundary in WebAssembly](issues/validate-web-extraction-spike.md)
-- [ ] [Implement a reference-qualified portable room slice](issues/portable-room-slice.md)
 - [ ] [Port input, player movement, and animation](issues/port-player-input-movement.md)
 - [ ] [Port map loading, transitions, and collision](issues/port-map-loading-collision.md)
 - [ ] [Port the actor system and combat primitives](issues/port-actors-combat.md)

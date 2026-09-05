@@ -29,3 +29,4 @@
 - [x] [Render the static cavern from decoded graphics](issues/render-static-cavern.md)
 - [x] [Inspect stopped CPU registers for gameplay qualification](issues/inspect-stopped-cpu-registers.md)
 - [x] [Qualify an opening room transition](issues/qualify-opening-room-transition.md)
+- [x] [Implement a reference-qualified portable room slice](issues/portable-room-slice.md)
