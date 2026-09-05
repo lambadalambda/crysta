@@ -181,8 +181,11 @@ The [`assets::maps` runtime model](maps.md) preserves a bounded loaded layer and
 metadata from caller-owned WRAM. The separate native `map-inspector` tool owns
 ROM/SRAM authentication, deterministic oracle replay, and ignored local exports;
 its browser viewer displays raw structure alongside captured original viewports.
-This is reference-lane research, not static map decoding or portable collision
-semantics. No emulator or filesystem dependency enters the pure model.
+A [static-layer reader](static-maps.md) additionally decodes dimension-prefixed
+containers and applies the loader's metatile attributes without execution.
+Intermediate byte equality qualifies the cavern; general map-script resolution
+and collision semantics remain open. No emulator or filesystem dependency enters
+the pure model.
 
 Event bytecode is treated as a first-class language with a disassembler,
 readable intermediate representation, and eventually an assembler or compiler.

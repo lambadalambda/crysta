@@ -10,9 +10,12 @@ Currently implemented:
   deterministic greedy encoder; unknown packet variants fail explicitly.
 - [Loaded-map model](../../docs/maps.md): validated metadata, raw cell words,
   coordinate lookup, and lossless runtime layer export from caller-owned WRAM.
-  Static ROM map decoding and collision semantics remain unqualified.
+- [Static map layers](../../docs/static-maps.md): bounded dimension-prefixed
+  containers, exact source preservation, and pure metatile-attribute lookup.
+  The cavern matches actual loader output; general pointer/script resolution
+  and collision movement semantics remain unqualified.
 
-Graphics interpretation, static map formats, and the local asset pack remain
+Graphics interpretation, broader static map formats, and the local asset pack remain
 separate M3 work. The [map inspector](../map-inspector/README.md) supplies local
 oracle capture and browser visualization without adding I/O to this library.
 

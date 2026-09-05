@@ -1,7 +1,7 @@
 # Local map inspector
 
 A native oracle capture CLI plus a dependency-free browser viewer. This is a
-**loaded-map research tool**, not a static ROM map decoder or a playable port.
+**map research tool**, not a general map loader or a playable port.
 
 From the repository root:
 
@@ -22,10 +22,27 @@ Building the native oracle requires a C++20 compiler (see its
 [build configuration](../oracle/build.rs)). `assets::maps`
 owns the pure runtime model; this binary owns authentication, replay, and local I/O.
 
-Outputs are always written to a fresh ignored `local/maps/` directory, never over
+`capture` writes files to a fresh ignored `local/maps/` directory, never over
 inputs. `verify` instead of `capture` prints the JSON manifest without exporting
 files. Both modes run one process-global emulator session and exit the process.
 All captures contain ROM-derived material: **do not commit or redistribute them**.
+
+## ROM-only decoding and loader qualification
+
+```sh
+# JSON to stdout; no SRAM read or emulator boot.
+cargo run -p map-inspector -- decode-layer \
+  'local/Tenchi Souzou (Japan).sfc' 0x90000
+
+# Fixed cavern experiment; asserts intermediate equality and reports final differences.
+cargo run -p map-inspector -- qualify-loader \
+  'local/Tenchi Souzou (Japan).sfc' 'local/saves/Terranigma.srm'
+```
+
+Offsets are hexadecimal and normalized/headerless. Redirect extracted JSON only
+to ignored `local/`. See [static map layers](../../docs/static-maps.md) for source
+ranges, pointer provenance, attribute lookup, trace stops and remaining gaps.
+The viewer remains a runtime view; these commands do not replace its capture data.
 
 ## Tests
 
@@ -33,9 +50,9 @@ All captures contain ROM-derived material: **do not commit or redistribute them*
 cargo test -p map-inspector
 ```
 
-BMP/HTML tests are synthetic. The optional local integration test authenticates
-inputs and checks runtime checkpoints in a fresh subprocess; it skips explicitly
-without the local ROM or save. Browser QA additionally checks interaction and
+BMP/HTML tests are synthetic. Local tests authenticate
+inputs, check ROM-only extraction, and qualify runtime checkpoints and loader
+stages in fresh subprocesses. They skip explicitly without their local inputs. Browser QA additionally checks interaction and
 responsive rendering. With `agent-browser` installed, run the atlas draw-order
 and changed-count regression on a generated viewer:
 

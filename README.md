@@ -23,8 +23,9 @@ memory, sparse ROM regions, and known indirect dispatch are versioned and
 inspectable. Work is now on the content and script pipeline (M3). A bounded
 compression decoder and deterministic encoder reproduce qualified JP/EU graphics
 and map packets byte-for-byte. A local loaded-map inspector now shows qualified
-portal-cavern captures and raw tile/collision structure; static map decoding and
-collision behavior qualification remain.
+portal-cavern captures and raw tile/collision structure. The cavern layer can
+also be decoded directly from ROM, with attribute initialization matched against
+loader execution. Broader maps and collision behavior qualification remain.
 
 No playable portable implementation exists yet.
 
@@ -36,6 +37,7 @@ See:
 - [Boot, interrupts, and main loop](docs/boot-main-loop.md)
 - [Compression packets](docs/compression.md)
 - [Local map viewer and runtime layout](docs/maps.md)
+- [Static map layers and loader qualification](docs/static-maps.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
 - [Contributing](CONTRIBUTING.md)

@@ -5,7 +5,9 @@ complete static ROM map decoder. It combines the original captured viewport with
 a full raw tile/collision layer. Original graphics are shown only in the captured
 viewport; the rest of the map uses structural colors, not reconstructed terrain.
 The parent [map-format issue](../meta/issues/decode-map-collision-formats.md)
-remains open.
+remains open. A subsequent [static-layer qualification](static-maps.md) now
+decodes this cavern directly from ROM and reproduces its attribute initialization;
+the viewer described here continues to display runtime captures.
 
 ## Generate a local viewer
 
@@ -106,12 +108,14 @@ The conflicting imported field `$7E:081E` is intentionally not used.
 - A Japanese static-ROM scan found `STA $0826` at normalized `$00F690` and
   `STA $082A` at `$00F69A`. Surrounding instructions read bytes through `[$6E],Y`,
   mask with `$00FF`, then `XBA`. A probe from label 1100 failed to reach
-  `$80:F690` before its frame limit (1,765,420 entries). **No loader trace or
-  map-pointer qualification is claimed.**
+  `$80:F690` before its frame limit (1,765,420 entries). That probe qualified
+  nothing. The later [loader trace](static-maps.md) found the actual cavern path
+  at `$86:8ADA` / `$86:9538`, not this candidate.
 - Public terranigma.be ROM-layout, map-script, map-flags and map-exit pages were
   inaccessible during this research attempt. No new format claims rest on them.
 
-Still required: static ROM pointers and bounds, metatile/graphics reconstruction,
+Beyond the one qualified static layer, still required: general ROM pointer/script
+resolution, metatile/graphics reconstruction,
 indoor/outdoor/dungeon/world-map coverage, placements/regions/transitions, and
 trace-qualified collision behavior. This tool is a visual aid for that work,
 not a portable gameplay collision API or an asset pack.
