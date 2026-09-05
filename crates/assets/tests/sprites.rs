@@ -18,7 +18,7 @@ fn tile(color: u8) -> Vec<u8> {
 fn frame(parts: &[[u8; 7]]) -> Vec<u8> {
     let mut b = vec![4, 12, 24, 8];
     b.extend([0; 12]);
-    b.push(parts.len() as u8);
+    b.push(u8::try_from(parts.len()).unwrap());
     for p in parts {
         b.extend(p);
     }
@@ -126,19 +126,20 @@ fn rejects_malformed_records_and_missing_tiles_without_panics() {
 }
 
 fn synthetic_rom() -> Vec<u8> {
-    let mut r = vec![0; 0x400000];
+    let mut r = vec![0; 0x40_0000];
     r[0xa252..0xa255].copy_from_slice(&[0, 0x80, 0xa0]);
     r[0xa258..0xa25b].copy_from_slice(&[0, 0x80, 0xa1]);
     r[0xf941..0xf948].copy_from_slice(&[2, 0x5a, 0xb2, 0, 0x80, 0x80, 0x10]);
-    r[0x328002..0x328004].copy_from_slice(&0x7fffu16.to_le_bytes());
-    for (base, count) in [(0x24a1e4, 1), (0x1ad064, 6)] {
+    r[0x32_8002..0x32_8004].copy_from_slice(&0x7fffu16.to_le_bytes());
+    for (base, count) in [(0x24_a1e4, 1), (0x1a_d064, 6)] {
         for axis in 0..3 {
             let seq = 0x100 + axis * 0x20;
-            r[base + axis * 2..base + axis * 2 + 2].copy_from_slice(&(seq as u16).to_le_bytes());
+            r[base + axis * 2..base + axis * 2 + 2]
+                .copy_from_slice(&u16::try_from(seq).unwrap().to_le_bytes());
             for step in 0..count {
                 let offset = 0x200 + (axis * 6 + step) * 0x40;
                 r[base + seq + 4 * step + 2..base + seq + 4 * step + 4]
-                    .copy_from_slice(&(offset as u16).to_le_bytes());
+                    .copy_from_slice(&u16::try_from(offset).unwrap().to_le_bytes());
                 let b = frame(&[[0, 4, 12, 24, 8, 0, 0x20]]);
                 r[base + offset..base + offset + b.len()].copy_from_slice(&b);
             }
@@ -153,14 +154,14 @@ fn rom_loader_follows_relocated_pointers_and_retains_frame_ids() {
     let r = synthetic_rom();
     let a = ArkSprites::from_rom(&r).unwrap();
     assert_eq!(a.frames().len(), 21);
-    assert_eq!(a.frames()[0].id(), 0xa4a3e8);
-    assert_eq!(a.frames()[3].id(), 0x9ad268);
+    assert_eq!(a.frames()[0].id(), 0xa4_a3e8);
+    assert_eq!(a.frames()[3].id(), 0x9a_d268);
     assert_eq!(a.palette()[1].raw(), 0x7fff);
     assert_eq!(a.graphics(0).unwrap().len(), 512);
     assert!(a.graphics(2).is_none());
-    assert!(a.source_ranges().contains(&(0x208000..0x20c000)));
-    assert!(a.source_ranges().contains(&(0x328000..0x328020)));
-    assert_eq!(a.frame(0xa4a3e8).unwrap().resource(), 0);
+    assert!(a.source_ranges().contains(&(0x20_8000..0x20_c000)));
+    assert!(a.source_ranges().contains(&(0x32_8000..0x32_8020)));
+    assert_eq!(a.frame(0xa4_a3e8).unwrap().resource(), 0);
     assert!(a.frame(0).is_none());
 }
 #[test]
@@ -171,12 +172,41 @@ fn rom_loader_rejects_changed_shapes_bad_offsets_and_unsupported_palette() {
         (0xf942, 0),
         (0xf947, 0x20),
         (0xa254, 0x7f),
-        (0x24a1e4, 0xff),
-        (0x24a1e5, 0xff),
-        (0x24a3e4 + 23, 0x22),
+        (0x24_a1e4, 0xff),
+        (0x24_a1e5, 0xff),
+        (0x24_a3e4 + 23, 0x22),
     ] {
         let mut r = synthetic_rom();
         r[offset] = value;
         assert!(ArkSprites::from_rom(&r).is_err(), "{offset:x}");
+    }
+}
+
+#[test]
+#[allow(clippy::many_single_char_names)] // Pixel/bounds coordinate fixture.
+fn asymmetric_pixels_flip_within_tiles_and_bounds_keep_signed_offsets() {
+    let mut b = vec![0; 32];
+    b[0] = 0x80; // Only the top-left pixel is opaque.
+    let tiles = decode_tiles_4bpp(&b).unwrap();
+    let f = SpriteFrame::decode(&frame(&[[0, 2, 10, 3, 13, 0, 0]])).unwrap();
+    assert_eq!(f.bounds(false, false), (-2, -21, 6, -13));
+    assert_eq!(f.bounds(true, true), (-2, 5, 6, 13));
+    for (h, v, x, y) in [
+        (false, false, -2, -21),
+        (true, false, 5, -21),
+        (false, true, -2, 12),
+        (true, true, 5, 12),
+    ] {
+        assert!(matches!(
+            f.sample(&tiles, h, v, x, y).unwrap(),
+            SpritePixel::Opaque { .. }
+        ));
+        let (l, t, r, b) = f.bounds(h, v);
+        for (x, y) in [(l - 1, t), (r, t), (l, t - 1), (l, b)] {
+            assert_eq!(
+                f.sample(&tiles, h, v, x, y).unwrap(),
+                SpritePixel::Transparent
+            );
+        }
     }
 }

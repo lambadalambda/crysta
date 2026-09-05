@@ -90,7 +90,7 @@ extents used, including relocated graphics/palette pointers and every frame.
 ## Qualification and limits
 
 Synthetic TDD was red before each production layer: missing composition module,
-then missing resource loader. Six tests cover transparency, placement, whole-part
+then missing resource loader. Seven tests cover transparency, placement, whole-part
 flips, stride-16 tiles, priority/order, exact extents, bounds and pointer relocation.
 `local_sprites` authenticates the owned ROM and checks 14 selected indexed
 compositions against the independently reconstructed capture evidence.
@@ -135,3 +135,26 @@ sh tools/player-sprite-qualification/replay.sh 'local/Tenchi Souzou (Japan).sfc'
 The source/capture metadata and reproducible checker live in
 `tools/player-sprite-qualification/`. No raw ROM, tile, palette or framebuffer
 bytes are distributed.
+
+## Local evidence/export tools
+
+`replay.sh` builds the capture and ROM-only export binaries in ignored `local/`,
+runs the shared fresh bootstrap twice in separate processes, recomputes selected
+hardware/image comparisons and checks `reference.json` plus `sources.json`.
+The final qualification run was `local/player-sprite-qualification/replay-F6SsYO`;
+its selected reports also match the earlier independent pair `replay-5vVdX5`.
+
+The export is deliberately not a browser atlas. It writes **28** tightly bounded
+RGBA buffers (21 normal frames plus the seven horizontal mirrors), parallel
+one-byte priority buffers (`255` means transparent), and `export.json` containing
+opaque frame IDs, resources, bounds, sizes and source/output SHA-256 pins. Output
+RGB uses natural `Bgr555::rgb8`, not ares's display gamma. Everything generated
+stays local; the committed JSON contains metadata/hashes only.
+
+`check.py ROM CAPTURE` authenticates supplied artifacts; freshness comes from the
+separate-process replay, not from an artifact checker. It fails closed under
+Python optimization (`-O` or `PYTHONOPTIMIZE`), which would disable its assertions.
+`test_checks.py` was red before that guard: a tampered export incorrectly passed
+with optimization enabled. It is now green for optimized imports and for tampered
+exports under both modes. The latter regression uses an optional existing local
+replay and never changes that replay's files.

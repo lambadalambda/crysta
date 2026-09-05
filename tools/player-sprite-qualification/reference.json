@@ -1,0 +1,1427 @@
+[
+  {
+    "observed_opaque_rgb_sha256": "fd5cc7e39ec68ce2c42449a8b36222c9ecaf6bfc24ac1a147cd7599a6157aa5b",
+    "frame": 6800,
+    "map": 15,
+    "pointer": "0xa5f839",
+    "resource": 5,
+    "mirror": false,
+    "anchor": [
+      11,
+      32
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -32
+        ],
+        "size": 16,
+        "tile": 336,
+        "word": 8528,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -11,
+          -15
+        ],
+        "size": 8,
+        "tile": 213,
+        "word": 24789,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -11,
+          -23
+        ],
+        "size": 8,
+        "tile": 197,
+        "word": 24773,
+        "slot": 4
+      },
+      {
+        "offset": [
+          0,
+          -8
+        ],
+        "size": 8,
+        "tile": 289,
+        "word": 8481,
+        "slot": 6
+      },
+      {
+        "offset": [
+          3,
+          -14
+        ],
+        "size": 8,
+        "tile": 213,
+        "word": 8405,
+        "slot": 2
+      },
+      {
+        "offset": [
+          3,
+          -22
+        ],
+        "size": 8,
+        "tile": 197,
+        "word": 8389,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 16,
+        "tile": 256,
+        "word": 8448,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -4,
+          -21
+        ],
+        "size": 8,
+        "tile": 196,
+        "word": 8388,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -8,
+          -8
+        ],
+        "size": 8,
+        "tile": 288,
+        "word": 8480,
+        "slot": 12
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 407,
+    "best_image_translation": [
+      203,
+      0,
+      8
+    ],
+    "indexed_sha256": "c9c1d065d2549a7681a778c6dc4759dcaa9837eb4a15133262118e22216098f5",
+    "hashes": {
+      "wram": "49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82",
+      "vram": "6f3d0b6a209adb17fb55b0ed5b5c3c3b5a33068b8a321a2e450503d098e16799",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "eb7269c9cfae9312395d4450d732e6f27d68a8bf9de453c8067d30255e0ccf5b",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "b0706f1605900e2993d9e041bd7f138318f024d3d2184f9986f33e7b27bfa88e",
+    "frame": 6805,
+    "map": 15,
+    "pointer": "0x9ad76a",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      12,
+      34
+    ],
+    "components": [
+      {
+        "offset": [
+          8,
+          -22
+        ],
+        "size": 8,
+        "tile": 155,
+        "word": 8347,
+        "slot": 0
+      },
+      {
+        "offset": [
+          0,
+          -22
+        ],
+        "size": 8,
+        "tile": 154,
+        "word": 8346,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -4,
+          -18
+        ],
+        "size": 16,
+        "tile": 151,
+        "word": 8343,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -6,
+          -34
+        ],
+        "size": 16,
+        "tile": 68,
+        "word": 8260,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -12,
+          -17
+        ],
+        "size": 8,
+        "tile": 150,
+        "word": 8342,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -23
+        ],
+        "size": 8,
+        "tile": 169,
+        "word": 8361,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -12,
+          -9
+        ],
+        "size": 8,
+        "tile": 166,
+        "word": 8358,
+        "slot": 12
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 389,
+    "best_image_translation": [
+      173,
+      -3,
+      8
+    ],
+    "indexed_sha256": "cab1328186e4b444131579b913c7acba79cca5d1da163ec4611902cbe8345523",
+    "hashes": {
+      "wram": "dbc73e155498dffd55bae98d4561415068c3cfae656550005f0f5c6b42de8ecb",
+      "vram": "f8dddca7283644401c0f7157803a226e614aa45a644936291a7e1d3e467b9096",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "f8ccc75c60a073bb13ca45b63c134ae70d717a7fe49d94b501e09351f19ce0c7",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "8ee5f1f56b0ca3f7daccf6e29b4eadca177f66dc2a68504b759aaca555787590",
+    "frame": 6815,
+    "map": 15,
+    "pointer": "0x9ad7ac",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      8,
+      34
+    ],
+    "components": [
+      {
+        "offset": [
+          0,
+          -22
+        ],
+        "size": 8,
+        "tile": 171,
+        "word": 8363,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -22
+        ],
+        "size": 8,
+        "tile": 170,
+        "word": 8362,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -7,
+          -34
+        ],
+        "size": 16,
+        "tile": 70,
+        "word": 8262,
+        "slot": 4
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 129,
+        "word": 8321,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 128,
+        "word": 8320,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 144,
+        "word": 8336,
+        "slot": 10
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 332,
+    "best_image_translation": [
+      249,
+      -3,
+      8
+    ],
+    "indexed_sha256": "6acebec5e4db33528e280b67e48aaa3db3bbc62e14b7163ef347d1d71f008780",
+    "hashes": {
+      "wram": "0e40f0fbdc94afc94609223d24975c46dda86dcb614d8152307377478a7429c5",
+      "vram": "22c72417e8aa3731394bc4d70a32109c084afbb0e0093697f83b8e3abe42cb0e",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "76bea956e73b671c62237bda9bf36165a5ee2a2fbf40fd551beaaa0849d4bb57",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "ba5b33cd21f64a4988124bbc1833e4c282de38f96d1d3da90b79f84c5a4bef80",
+    "frame": 6825,
+    "map": 15,
+    "pointer": "0x9ad7e7",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      8,
+      34
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -21
+        ],
+        "size": 8,
+        "tile": 156,
+        "word": 8348,
+        "slot": 0
+      },
+      {
+        "offset": [
+          0,
+          -21
+        ],
+        "size": 8,
+        "tile": 172,
+        "word": 8364,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -7,
+          -34
+        ],
+        "size": 16,
+        "tile": 72,
+        "word": 8264,
+        "slot": 4
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 131,
+        "word": 8323,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 130,
+        "word": 8322,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 146,
+        "word": 8338,
+        "slot": 10
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 327,
+    "best_image_translation": [
+      319,
+      -3,
+      8
+    ],
+    "indexed_sha256": "52291ddb5a9062e1d53b13e72711f14e20fc40e63fecad8700b9743e05d4e1cf",
+    "hashes": {
+      "wram": "8bf90088eeb4adc8e5e680ca9bddf00245362be4ab46c2f6327cefa31cc4fb23",
+      "vram": "067c0f0ae5a6d3aa3078e3241ff35cf0f93c6c726c8973cacf50c5fceca27e99",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "9c773c0f08281ccf73b18cb875ee6d95290891835ca9e8efa9e3821f537032db",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "0d66769c40ce41ed39b2d9414a0b8d94fb39cb543afb5c85d5abe3ab80b9c17a",
+    "frame": 6890,
+    "map": 15,
+    "pointer": "0xa4a5e0",
+    "resource": 0,
+    "mirror": false,
+    "anchor": [
+      8,
+      35
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 16,
+        "tile": 52,
+        "word": 8244,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -35
+        ],
+        "size": 16,
+        "tile": 76,
+        "word": 8268,
+        "slot": 2
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 5,
+        "word": 8197,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 4,
+        "word": 8196,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 20,
+        "word": 8212,
+        "slot": 8
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 362,
+    "best_image_translation": [
+      319,
+      0,
+      8
+    ],
+    "indexed_sha256": "69ee6e91b11f6627e3e0dfff524a714903276ad6eddbd81ff829191b93acd15e",
+    "hashes": {
+      "wram": "c2f5ce9e2f67f4c5d394618e6945af535e078d4f7f0910dc4d395f11cd1739e6",
+      "vram": "79729194978fa077f687847197a29bbb57329335342010ece075dc1224b3587d",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "cb4f197daf6e2102587ac803b5cb2c9ca8c1b3bbf3ed61a53bcfabe03905121c",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "3488c3018fb9985eae767f0b147277b34447a888fe89071395cb5b5423e8aca7",
+    "frame": 6905,
+    "map": 15,
+    "pointer": "0x9ad48a",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      9,
+      30
+    ],
+    "components": [
+      {
+        "offset": [
+          -7,
+          -19
+        ],
+        "size": 8,
+        "tile": 174,
+        "word": 8366,
+        "slot": 0
+      },
+      {
+        "offset": [
+          1,
+          -19
+        ],
+        "size": 8,
+        "tile": 175,
+        "word": 8367,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -30
+        ],
+        "size": 16,
+        "tile": 4,
+        "word": 8196,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -9,
+          -23
+        ],
+        "size": 8,
+        "tile": 159,
+        "word": 8351,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -4,
+          -23
+        ],
+        "size": 8,
+        "tile": 105,
+        "word": 8297,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 96,
+        "word": 8288,
+        "slot": 10
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 339,
+    "best_image_translation": [
+      317,
+      0,
+      5
+    ],
+    "indexed_sha256": "7c06f3cd07eab3f5ee028b50f65cc1bdc5c4312e11faabba8e34d03d0916e723",
+    "hashes": {
+      "wram": "8f95744288ad8e0d8af0a9f3d75b4a136162f0a85149bded0b390af5784524a5",
+      "vram": "b435dc7c4c83ec035c943cfe35d35f525c073c831ee0414c3716e63bc64a4dc5",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "1c0b0a9fb25f7ef30bd6367ab54df56af530fe0c0bc5b3315f02cb83273b922e",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "34aaa4dd29aaead0cad1d223ddc508a63cd2679686c69716226e654fe17287ba",
+    "frame": 6915,
+    "map": 15,
+    "pointer": "0x9ad4c5",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      10,
+      30
+    ],
+    "components": [
+      {
+        "offset": [
+          2,
+          -16
+        ],
+        "size": 8,
+        "tile": 205,
+        "word": 8397,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -10,
+          -16
+        ],
+        "size": 8,
+        "tile": 204,
+        "word": 8396,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -30
+        ],
+        "size": 16,
+        "tile": 6,
+        "word": 8198,
+        "slot": 4
+      },
+      {
+        "offset": [
+          2,
+          -24
+        ],
+        "size": 8,
+        "tile": 189,
+        "word": 8381,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -10,
+          -24
+        ],
+        "size": 8,
+        "tile": 188,
+        "word": 8380,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -4,
+          -24
+        ],
+        "size": 8,
+        "tile": 105,
+        "word": 8297,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 98,
+        "word": 8290,
+        "slot": 12
+      }
+    ],
+    "oam_start": 4,
+    "opaque_pixels": 368,
+    "best_image_translation": [
+      368,
+      0,
+      5
+    ],
+    "indexed_sha256": "59edf5e32284129c1a0f81b1987b0fc2c16edda503f89987dd39cc5ecd3d76d1",
+    "hashes": {
+      "wram": "3ecfe9ba2203f137dc5c5622affe10acdca30e0c63f3352163712dddc57a20c2",
+      "vram": "85da2f93e0d5beb6692d6c19b26a985329bb02c171b880f806cda76df66db2cb",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "24bbcd93d6c1d5151654fcfc42ac0bd6dad1fd4444c7a42fb85fc3c290c43f9a",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "f1fc0cd80004a59340bcb96dd0f09adb6f8bd79afc302fe283c9df15b5a3097b",
+    "frame": 6925,
+    "map": 15,
+    "pointer": "0x9ad507",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      9,
+      30
+    ],
+    "components": [
+      {
+        "offset": [
+          -9,
+          -16
+        ],
+        "size": 8,
+        "tile": 206,
+        "word": 8398,
+        "slot": 0
+      },
+      {
+        "offset": [
+          2,
+          -16
+        ],
+        "size": 8,
+        "tile": 207,
+        "word": 8399,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -30
+        ],
+        "size": 16,
+        "tile": 8,
+        "word": 8200,
+        "slot": 4
+      },
+      {
+        "offset": [
+          2,
+          -24
+        ],
+        "size": 8,
+        "tile": 191,
+        "word": 8383,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -9,
+          -24
+        ],
+        "size": 8,
+        "tile": 190,
+        "word": 8382,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -4,
+          -25
+        ],
+        "size": 8,
+        "tile": 105,
+        "word": 8297,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -8,
+          -17
+        ],
+        "size": 16,
+        "tile": 100,
+        "word": 8292,
+        "slot": 12
+      }
+    ],
+    "oam_start": 0,
+    "opaque_pixels": 362,
+    "best_image_translation": [
+      362,
+      0,
+      5
+    ],
+    "indexed_sha256": "4946e6bb347bbbfe85ac3761119581f04058c406aaa2ed377a6cdfb7f3c5cd13",
+    "hashes": {
+      "wram": "6e3c6e210d495f22dff3255a1323167eb5db575c38967371b10f00f956ea8fef",
+      "vram": "35f26d71393b3a84263cd1380a0683cf5c28ac77c80be7647ed7430413e6e186",
+      "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+      "oam": "d7cc8ce1fe234dbd4ea6053b76b1f9ae51518c654d9e92f4b34a95d91c7a7763",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "6b5d1184e4a5f75d60cb13a9dee0bab792593bfdc23768ce2433a1093e34615f",
+    "frame": 7050,
+    "map": 16,
+    "pointer": "0xa4a54e",
+    "resource": 0,
+    "mirror": false,
+    "anchor": [
+      9,
+      32
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -32
+        ],
+        "size": 16,
+        "tile": 12,
+        "word": 8204,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 0,
+        "word": 8192,
+        "slot": 2
+      },
+      {
+        "offset": [
+          1,
+          -15
+        ],
+        "size": 8,
+        "tile": 65,
+        "word": 8257,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 16,
+        "word": 8208,
+        "slot": 6
+      },
+      {
+        "offset": [
+          1,
+          -23
+        ],
+        "size": 8,
+        "tile": 49,
+        "word": 8241,
+        "slot": 8
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 1,
+        "word": 8193,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -9,
+          -23
+        ],
+        "size": 8,
+        "tile": 48,
+        "word": 8240,
+        "slot": 12
+      },
+      {
+        "offset": [
+          -9,
+          -15
+        ],
+        "size": 8,
+        "tile": 64,
+        "word": 8256,
+        "slot": 14
+      }
+    ],
+    "oam_start": 6,
+    "opaque_pixels": 390,
+    "best_image_translation": [
+      390,
+      0,
+      8
+    ],
+    "indexed_sha256": "7545faa75875f7e52b35bece4e647cffb10731eeb9a392c47b5e5a01c1d3c4c5",
+    "hashes": {
+      "wram": "e21bc39ac7349446bf4de7d37bddb48072b644dfbd7291662f9ad9c247192560",
+      "vram": "4ba56006265f72cb089ee4ce06cf24bef933454fa3706c943a7c608de1ffe65f",
+      "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+      "oam": "2d4a2f910911b594cd7de5eeea1f5b4f4ca90ee353d11ed418a76125eb412a5b",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "aee8ebd0d55b5887f13cb5cc646a0a3bd9bcc27c6a2e7cc1db3c378236a33dff",
+    "frame": 7105,
+    "map": 16,
+    "pointer": "0x9ad608",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      9,
+      31
+    ],
+    "components": [
+      {
+        "offset": [
+          8,
+          -20
+        ],
+        "size": 8,
+        "tile": 223,
+        "word": 8415,
+        "slot": 0
+      },
+      {
+        "offset": [
+          0,
+          -20
+        ],
+        "size": 8,
+        "tile": 222,
+        "word": 8414,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -9,
+          -24
+        ],
+        "size": 8,
+        "tile": 221,
+        "word": 8413,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -8,
+          -31
+        ],
+        "size": 16,
+        "tile": 36,
+        "word": 8228,
+        "slot": 6
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 103,
+        "word": 8295,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 102,
+        "word": 8294,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 118,
+        "word": 8310,
+        "slot": 12
+      }
+    ],
+    "oam_start": 6,
+    "opaque_pixels": 366,
+    "best_image_translation": [
+      366,
+      0,
+      11
+    ],
+    "indexed_sha256": "ac6105149397e7fb82d73a1759e138c4bd7ca5a8b152f36a1e06c2860557f60e",
+    "hashes": {
+      "wram": "645a2c018d9fc2d13f1b544ce0f939956be4f8db96be68bba19598f28adc8aaa",
+      "vram": "329c0d15cf74becbc8f89a9c0e9da2ff49dbdbbda8209eec42407d83cec54a75",
+      "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+      "oam": "ec98c8bc0d0341cfa7e7005f2931f03219ee7da61756ae2cd4f5bf23b35020bd",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "0904a420849207827e74c46998306e0da779788882af83909a3eb275fba63109",
+    "frame": 7114,
+    "map": 16,
+    "pointer": "0x9ad64a",
+    "resource": 1,
+    "mirror": false,
+    "anchor": [
+      10,
+      31
+    ],
+    "components": [
+      {
+        "offset": [
+          -10,
+          -22
+        ],
+        "size": 8,
+        "tile": 238,
+        "word": 8430,
+        "slot": 0
+      },
+      {
+        "offset": [
+          1,
+          -24
+        ],
+        "size": 8,
+        "tile": 239,
+        "word": 8431,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -31
+        ],
+        "size": 16,
+        "tile": 38,
+        "word": 8230,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -4,
+          -24
+        ],
+        "size": 8,
+        "tile": 104,
+        "word": 8296,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 120,
+        "word": 8312,
+        "slot": 8
+      }
+    ],
+    "oam_start": 6,
+    "opaque_pixels": 364,
+    "best_image_translation": [
+      364,
+      0,
+      10
+    ],
+    "indexed_sha256": "5c2e1881f11e1e524bdf260f04569c6364a4e989953b6640b39c39c5c5e763d6",
+    "hashes": {
+      "wram": "f81b2e4c6c257b2fb175899666c5d8ccfd37c5f0291ecb95397da01700202e94",
+      "vram": "e7e1e35314ae074de94d31f4adc5df66aacbf6674405f27221da62281f163120",
+      "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+      "oam": "101ea0c3972040850cb2431c900ca58c6b4028948bcb7462b1a1dde9801ff146",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "fa24204e58e8227ea8b4164eac0de5687b03f84218d75d00c2ad4a98d874e47b",
+    "frame": 7250,
+    "map": 15,
+    "pointer": "0xa4a597",
+    "resource": 0,
+    "mirror": false,
+    "anchor": [
+      8,
+      32
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 8,
+        "tile": 66,
+        "word": 8258,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 50,
+        "word": 8242,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -32
+        ],
+        "size": 16,
+        "tile": 44,
+        "word": 8236,
+        "slot": 4
+      },
+      {
+        "offset": [
+          1,
+          -24
+        ],
+        "size": 8,
+        "tile": 51,
+        "word": 8243,
+        "slot": 6
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 3,
+        "word": 8195,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 2,
+        "word": 8194,
+        "slot": 10
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 18,
+        "word": 8210,
+        "slot": 12
+      },
+      {
+        "offset": [
+          1,
+          -16
+        ],
+        "size": 8,
+        "tile": 67,
+        "word": 8259,
+        "slot": 14
+      }
+    ],
+    "oam_start": 0,
+    "opaque_pixels": 396,
+    "best_image_translation": [
+      396,
+      0,
+      8
+    ],
+    "indexed_sha256": "0fb9d7580f5151296f40d818f72ee27d3cc9fa5b16e84fc47643d72534fb58b2",
+    "hashes": {
+      "wram": "b2d8a371f8f21f0470aa104b5b61fa821a9933c9f910573a5f0d3dc22536ea68",
+      "vram": "175923a500b2a59fc55afb5147e49d8402042ca1de333fef90b5a0276e739635",
+      "cgram": "d924d821a7f9ae10a1df5d8d3b64eeb234274dbda22636dc4762312146e2631a",
+      "oam": "e901dcac46ca2f7d440cb77eafb1c363bb3a761ca3553ffc127a978fec23af5b",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "6cec913976d082e88d7fb1ffd2cc17b444123d3dcf5cabc25922cddb78dea577",
+    "frame": 7315,
+    "map": 15,
+    "pointer": "0x9ad76a",
+    "resource": 1,
+    "mirror": true,
+    "anchor": [
+      16,
+      34
+    ],
+    "components": [
+      {
+        "offset": [
+          -16,
+          -22
+        ],
+        "size": 8,
+        "tile": 155,
+        "word": 8347,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -22
+        ],
+        "size": 8,
+        "tile": 154,
+        "word": 8346,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -12,
+          -18
+        ],
+        "size": 16,
+        "tile": 151,
+        "word": 8343,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -10,
+          -34
+        ],
+        "size": 16,
+        "tile": 68,
+        "word": 8260,
+        "slot": 6
+      },
+      {
+        "offset": [
+          4,
+          -17
+        ],
+        "size": 8,
+        "tile": 150,
+        "word": 8342,
+        "slot": 8
+      },
+      {
+        "offset": [
+          0,
+          -23
+        ],
+        "size": 8,
+        "tile": 169,
+        "word": 8361,
+        "slot": 10
+      },
+      {
+        "offset": [
+          4,
+          -9
+        ],
+        "size": 8,
+        "tile": 166,
+        "word": 8358,
+        "slot": 12
+      }
+    ],
+    "oam_start": 0,
+    "opaque_pixels": 389,
+    "best_image_translation": [
+      389,
+      3,
+      8
+    ],
+    "indexed_sha256": "ea1533e142dd2ff0c9036a885b4b9e0c066859083cc0fe68992237ea4d024ff3",
+    "hashes": {
+      "wram": "5f85c943e37c85ba87647fbe3edfbb49c08456ca408847e19ba08a4e8672fc93",
+      "vram": "c205ad1029c0674dc82a4d8e92a333b61a41c256a95de65d041725c67fe70017",
+      "cgram": "d924d821a7f9ae10a1df5d8d3b64eeb234274dbda22636dc4762312146e2631a",
+      "oam": "34af9602f8373fa0be38707642c14095a8367b9fef78f830b302a7ec1717d321",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "bddc56d2a03ff53a6d7fd1cce8bce3bd1407819ffa22799de0b74bef224a23b7",
+    "frame": 7325,
+    "map": 15,
+    "pointer": "0x9ad7ac",
+    "resource": 1,
+    "mirror": true,
+    "anchor": [
+      9,
+      34
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -22
+        ],
+        "size": 8,
+        "tile": 171,
+        "word": 8363,
+        "slot": 0
+      },
+      {
+        "offset": [
+          0,
+          -22
+        ],
+        "size": 8,
+        "tile": 170,
+        "word": 8362,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -9,
+          -34
+        ],
+        "size": 16,
+        "tile": 70,
+        "word": 8262,
+        "slot": 4
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 129,
+        "word": 8321,
+        "slot": 6
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 128,
+        "word": 8320,
+        "slot": 8
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 144,
+        "word": 8336,
+        "slot": 10
+      }
+    ],
+    "oam_start": 0,
+    "opaque_pixels": 332,
+    "best_image_translation": [
+      332,
+      3,
+      8
+    ],
+    "indexed_sha256": "ba4187c4edf2dcdb8277e85e8ae35c90a4d36e02d6262f5aca65471053821244",
+    "hashes": {
+      "wram": "77e4cf542fefdfbaa2c551e605256237c2f3b9e3c70de7198fab1572846d823e",
+      "vram": "3cf92f5afe2f9aa2694ed9afbcdc368b5f7e828dbf8b78de6c118d06d1359f90",
+      "cgram": "d924d821a7f9ae10a1df5d8d3b64eeb234274dbda22636dc4762312146e2631a",
+      "oam": "ba3820c72f5f2f52132f295d39155ce190868e8960747d1bfa6d383ec600f90a",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  },
+  {
+    "observed_opaque_rgb_sha256": "c1eb56333be18e585b5b9939fd129359dfa669bf66c0d2621ab091748a1d28a0",
+    "frame": 7360,
+    "map": 15,
+    "pointer": "0xa4a5e0",
+    "resource": 0,
+    "mirror": true,
+    "anchor": [
+      8,
+      35
+    ],
+    "components": [
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 16,
+        "tile": 52,
+        "word": 8244,
+        "slot": 0
+      },
+      {
+        "offset": [
+          -8,
+          -35
+        ],
+        "size": 16,
+        "tile": 76,
+        "word": 8268,
+        "slot": 2
+      },
+      {
+        "offset": [
+          -8,
+          -24
+        ],
+        "size": 8,
+        "tile": 5,
+        "word": 8197,
+        "slot": 4
+      },
+      {
+        "offset": [
+          0,
+          -24
+        ],
+        "size": 8,
+        "tile": 4,
+        "word": 8196,
+        "slot": 6
+      },
+      {
+        "offset": [
+          -8,
+          -16
+        ],
+        "size": 16,
+        "tile": 20,
+        "word": 8212,
+        "slot": 8
+      }
+    ],
+    "oam_start": 0,
+    "opaque_pixels": 362,
+    "best_image_translation": [
+      362,
+      0,
+      8
+    ],
+    "indexed_sha256": "620884b65f16ee577142a028fd555e37577abeaed882ca3220789082e7b6bbd0",
+    "hashes": {
+      "wram": "c7265c2e0f26b38edacd2651e95f97dd6c38f9d624c32e9d535d7f1e9641f68f",
+      "vram": "f5bd03611d38889a99f59c58579007799fc8a9cfa2df5d5de2cc7c7ee2f33a48",
+      "cgram": "d924d821a7f9ae10a1df5d8d3b64eeb234274dbda22636dc4762312146e2631a",
+      "oam": "9a3c415bf5ca3ebff02451684e61628ad43add3d18b383c6541d3dd2bdb842b3",
+      "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+    }
+  }
+]
