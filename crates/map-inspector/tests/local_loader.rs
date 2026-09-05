@@ -22,6 +22,11 @@ fn static_cavern_layers_match_loader_stages() {
         String::from_utf8_lossy(&output.stderr)
     );
     let result: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(result["visual"]["graphics_bytes_equal"], 16384);
+    assert_eq!(result["visual"]["definition_bytes_equal"], 4096);
+    assert_eq!(result["visual"]["palette_bytes_equal"], 192);
+    assert_eq!(result["visual"]["tilemap_words_equal"], 672);
+    assert_eq!(result["visual"]["reference_pixels_equal"], 256);
     assert_eq!(result["menu"]["map_id"], 4);
     assert_eq!(result["menu"]["entry"], 0xB3_8002);
     assert_eq!(

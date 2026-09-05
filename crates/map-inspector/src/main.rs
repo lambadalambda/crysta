@@ -11,6 +11,8 @@ use std::{
 
 mod qualification;
 mod script_inspection;
+mod visual_export;
+mod visual_qualification;
 
 const SAVE_SHA256: &str = "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055";
 const VIEWER: &str = include_str!("../web/viewer.html");
@@ -35,23 +37,29 @@ fn invalid(message: &str) -> io::Error {
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let [mode, rom_path, parameter] = args else {
         return Err(invalid(
-            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector resolve-map <japanese-rom> <hex-map-id>",
+            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("verify" | "qualify-loader" | "decode-layer" | "resolve-map") => false,
-        _ => {
-            return Err(invalid(
-                "mode must be capture, verify, qualify-loader, decode-layer or resolve-map",
-            )
-            .into())
-        }
+        Some("verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
+        _ => return Err(invalid(
+            "mode must be capture, verify, qualify-loader, decode-layer, resolve-map or render-map",
+        )
+        .into()),
     };
     let rom = Rom::load(&fs::read(rom_path)?)?;
     if rom.revision() != Revision::Japan {
-        return Err(invalid("map capture is qualified only for the Japanese reference").into());
+        return Err(invalid("map inspection is qualified only for the Japanese reference").into());
+    }
+    if mode == "render-map" {
+        let map_id = u16::try_from(parse_hex(parameter)?)?;
+        println!(
+            "Local static map viewer: {}",
+            visual_export::export(&rom, map_id)?.display()
+        );
+        return Ok(());
     }
     if mode == "resolve-map" {
         let map_id = u16::try_from(parse_hex(parameter)?)?;

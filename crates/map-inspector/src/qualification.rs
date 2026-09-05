@@ -91,7 +91,8 @@ pub(super) fn run(session: &mut Session, rom: &Rom) -> Result<Value> {
         "attribute_source":[attribute_offset,attribute_offset + packet.consumed],
         "static_sha256":sha256(&raw),"attribute_sha256":sha256(attributes),
         "attributed_sha256":sha256(&initialized),"runtime_sha256":sha256(&map.layer_bytes()),
-        "runtime_differences":differences,"stops":stops,"menu":menu
+        "runtime_differences":differences,"stops":stops,"menu":menu,
+        "visual":crate::visual_qualification::check(session,rom)?
     }))
 }
 
