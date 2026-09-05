@@ -9,6 +9,7 @@ use std::fmt;
 
 pub mod scripts;
 mod static_layer;
+pub mod visual;
 pub use static_layer::{StaticLayer, StaticMapError};
 
 const WRAM_SIZE: usize = 0x20000;
