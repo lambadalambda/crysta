@@ -26,3 +26,4 @@
 - [x] [Preserve oracle framebuffer colors](issues/oracle-framebuffer-colors.md)
 - [x] [Qualify static map loading and decode the cavern layer](issues/static-map-cavern.md)
 - [x] [Resolve map loading scripts and qualify additional layers](issues/resolve-map-loading-scripts.md)
+- [x] [Render the static cavern from decoded graphics](issues/render-static-cavern.md)
