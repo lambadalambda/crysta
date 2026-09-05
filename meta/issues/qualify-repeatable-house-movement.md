@@ -62,3 +62,15 @@ Replace the preview's permanent used-direction guard and narrow flat-only collis
   per-step snapshots preserve both route ownerships, including map switches.
 - [Return evidence](../../docs/house-return-doorway.md). Fresh startup integration,
   additional materials and an actual browser exploration test remain outstanding.
+
+## Progress: partial furniture and passive flagged walls
+
+- Profile5 adds source-decoded P16 pair responses and an explicit passive-room
+  constructor. New-edge flags dispatch as class3; old stored slopes6/7 still fail.
+- 238 additional native/Python/Rust material steps match with zero exclusions;
+  two cold boots reproduce both CSV/final-WRAM pairs. Traces verify P/S nudges
+  and flagged-hook early return under `$0980 & $0050 == 0`.
+- The CPU-free adapter opts into passive geometry for cardinal-only walking;
+  active hooks, actions and dynamic event writers are not implemented.
+- [Material evidence](../../docs/house-materials.md). Goal remains open pending
+  fresh portable initialization and end-to-end browser exploration.

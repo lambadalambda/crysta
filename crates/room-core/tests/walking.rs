@@ -76,7 +76,7 @@ fn four_full_walls_block_without_stopping_cadence() {
 
 #[test]
 fn errors_are_atomic_including_input_history() {
-    for raw in [16 << 9, 6 << 9, (12 << 9) | 0x8000] {
+    for raw in [17 << 9, 6 << 9, (12 << 9) | 0x8000] {
         let mut cells = vec![0; 2048];
         cells[6 * 32 + 7] = raw;
         let room = Room::new(32, 64, cells).unwrap();

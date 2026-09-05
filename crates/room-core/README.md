@@ -15,7 +15,7 @@ player controller or collision engine.
   representation/history invariants and player bounds against the supplied room.
   The parent authenticates room/data identity and simulation policy separately.
 
-Only unflagged types 0/2/22 (open) and 12/14 (solid) are admitted. Old samples
+Unflagged types0/2/22 (open),12/14 (solid), and16 (partial) are admitted. Old samples
 conservatively reject unsupported materials. Mixed open/solid edges preserve the
 reference perpendicular corner nudge while retaining main-axis snap/rollback.
 Ordinary direction reactivation is supported by the measured 11-tick onset
@@ -31,9 +31,10 @@ to bypass the history guard. Submit input before each step and select exits
 at `(392,209)` belongs to walking; the next frame belongs to the parent's
 transition logic. The component intentionally has no exit or map-switch code.
 
-Raw collision bit `$8000` is preserved and rejected. Adapters may explicitly
-mark reference-checkpoint guard cells; the component does not derive dynamic
-collision changes from static graphics or silently clear those flags. Actors,
+Raw collision bit `$8000` is preserved. `Room::new` rejects flagged samples;
+`Room::new_passive` explicitly opts into their class3 geometry under the
+action-free `$0980 & $0050 == 0` contract. Neither constructor derives dynamic
+events or implements collision action hooks. Actors,
 interaction effects, arbitrary idle histories, camera, graphics, clocks, devices,
 original CPU execution and top-level game/snapshot identity are outside this API.
 
@@ -77,14 +78,15 @@ video-frame timing. It does not execute COP services or a CPU. See
 [the complete preview boundary](../../docs/portable-room.md); the native local
 host and browser frontend live in `map-inspector`, never in this crate.
 
-## Profile v3
+## Profile v5
 
 The original flat-only profile has been extended to decoded open/solid corner
-responses. Walking-component snapshot version 3 and slice profile version 3
+responses. Walking-component snapshot version 3 and slice profile version 5
 reject old semantics; the layout remains 16-byte little-endian. Twelve local
 trajectories now include positive/negative perpendicular nudges observed through
 fresh input-only boots. See [house movement progress](../../docs/house-movement.md).
-This does not qualify type16, raw bit15, dash or interaction-hook effects.
+P16 and passive flags now have [separate qualification](../../docs/house-materials.md);
+dash execution and interaction-hook effects remain unsupported.
 
 [Admission qualification](../../docs/input-admission.md) adds 42 authenticated
 fixture pairs with 3,994 ordinary transitions and 19 atomic trigger rejections,

@@ -72,18 +72,18 @@ fn compile_room(rom: &Rom, id: u16) -> Result<Room> {
         .iter()
         .map(|c| c.raw())
         .collect();
-    // These cells are changed by runtime state at the authenticated checkpoints.
-    // Mark them outside the static simulation domain, not as emulated event effects.
-    // The walking core rejects bit 15 rather than treating it as a generic wall.
-    let excluded: &[usize] = if id == 15 {
+    // Frozen ordinary-house profile: these are the measured runtime flag additions.
+    // Passive geometry is qualified; this does NOT simulate the event writers.
+    // Only cardinal walking is admitted; no action/interaction hook is executed.
+    let flagged: &[usize] = if id == 15 {
         &[317]
     } else {
         &[731, 732, 826, 827]
     };
-    for &index in excluded {
+    for &index in flagged {
         cells[index] |= 0x8000;
     }
-    Ok(Room::new(32, 64, cells)?)
+    Ok(Room::new_passive(32, 64, cells)?)
 }
 
 fn compile(rom: &Rom) -> Result<GameData> {
@@ -157,6 +157,7 @@ fn compile(rom: &Rom) -> Result<GameData> {
     for list in &lists {
         content.extend(list.source_bytes());
     }
+    content.push(1); // explicit passive collision policy; Room::new is not equivalent
     content.extend([1, room_core::slice::PROFILE_VERSION, 0, 1]); // slice/profile/no-RNG/policy versions
     content.extend(queue.0.to_le_bytes());
     content.extend(queue.1.to_le_bytes());
@@ -262,5 +263,14 @@ mod tests {
                 "map {id:X} must equal the grids used by all1971 portable reference steps"
             );
         }
+        let mut preview = Preview::new(&rom).unwrap();
+        for _ in 0..189 {
+            preview.step(3);
+        }
+        assert_eq!(preview.state()["error"], Value::Null);
+        assert_eq!(
+            (preview.state()["x"].as_u64(), preview.state()["y"].as_u64()),
+            (Some(472), Some(176))
+        );
     }
 }

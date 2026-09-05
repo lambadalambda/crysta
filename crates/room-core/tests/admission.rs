@@ -85,7 +85,7 @@ fn errors_roll_back_history_timer_cadence_and_delayed_input() {
 
     // A collision error must also undo a newly admitted direction and countdown.
     let mut cells = vec![0; 2048];
-    cells[6 * 32 + 5] = 16 << 9;
+    cells[6 * 32 + 5] = 17 << 9;
     let unsupported = Room::new(32, 64, cells).unwrap();
     let mut state = WalkingState::new(104, 112);
     for _ in 0..2 {
@@ -94,7 +94,7 @@ fn errors_roll_back_history_timer_cadence_and_delayed_input() {
     let before = state;
     assert_eq!(
         state.step(&unsupported, input(Some(Direction::Right))),
-        Err(Unqualified::UnsupportedType(16))
+        Err(Unqualified::UnsupportedType(17))
     );
     assert_eq!(state, before);
 }

@@ -39,10 +39,14 @@ not an implementation of the save menu or new game.
 
 [Movement qualification](movement-qualification.md) describes the exact
 supported reference trajectories and source witnesses. Unflagged types 0/2/22
-are open and 12/14 are solid. Profile v4 retains resolution of open/solid corner pairs
+are open and 12/14 are solid. Profile v5 retains resolution of open/solid corner pairs
 with the decoded perpendicular nudge and main-axis snap/rollback. Unknown
-materials, bit-15 cells, map-edge samples and coordinate overflow return explicit errors.
-A failed update leaves state unchanged. Blocking does not stop movement cadence.
+materials, old slopes, map-edge samples and coordinate overflow return explicit errors.
+P16 has its distinct pair rules, and the adapter explicitly opts into passive
+flagged-cell geometry for ordinary cardinal walking. Native action hooks are
+not implemented; this profile requires `$0980 & $0050 == 0`. See
+[material qualification](house-materials.md). A failed update leaves state
+unchanged. Blocking does not stop movement cadence.
 
 Ordinary direction reuse is supported by the [measured onset gate](input-admission.md).
 The last activation direction stays remembered; its 11-tick window starts at
@@ -109,12 +113,13 @@ transition pacing, animation, flags VM or actor scheduler.
   is an explicit lifecycle operation, not a hidden input.
 
 The adapter initializes collision attributes directly from decoded ROM data.
-Five known runtime-modified cells are excluded from this static simulation:
-map F index 317; map 10 indices 731, 732, 826, 827. They differ from the static
-initialization by bit 15 at the authenticated checkpoints. The adapter marks
-these cells out of scope so the core **rejects** them; this does not implement
-the dynamic events that changed them. All other initial attributed cells match
-the corresponding checkpoint. Ongoing actor/event grid changes are unsupported.
+Five known runtime-modified cells have frozen bit-15 additions in this profile:
+map F index317; map10 indices731,732,826,827. All other attributed cells match
+the corresponding saved-game checkpoints. Passive new-edge flags dispatch as
+class3 solids; old stored slopes6/7 still reject even when flagged. This is
+qualified passive geometry, not execution of the events that changed the grid.
+The explicit passive policy is included in the compiled content identity;
+ongoing actor/event changes and active collision hooks remain unsupported.
 
 ## Rendering and host limits
 
@@ -141,9 +146,12 @@ one accepted step always performs one deterministic core update.
   snapshots are version 3; older versions are rejected.
 - Thirteen authenticated private trajectories match **all 1,985 walking steps**,
   attempted stream outputs, positions, blocking and restored continuations.
-  Compiled ROM grids (with explicit exclusions above) match those fixture grids:
+  Compiled ROM grids (with frozen flag additions above) match those fixture grids:
   F SHA-256 `c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1`;
   10 SHA-256 `261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed`.
+- Two material fixture pairs reproduce238 ordinary steps with zero exclusions,
+  including P/S nudges and passive flag-hook returns; four synthetic material
+  tests cover directions, pair ordering, remainders and stored old slopes.
 - `verify-room` repeats byte-identical JSON results across fresh CPU-free processes.
   Handoff is logical tick 80; departure/map switch/spawn/arrival endpoints match
   reference evidence. Arrival is preview tick 115, **not a reference-frame pin**.

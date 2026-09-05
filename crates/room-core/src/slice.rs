@@ -4,8 +4,8 @@ use crate::{FrameInput, Room, Unqualified, WalkingState};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v4 adds the qualified reverse doorway.
-pub const PROFILE_VERSION: u8 = 4;
+/// Semantic profile version; v5 adds partial and passive flagged-cell materials.
+pub const PROFILE_VERSION: u8 = 5;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

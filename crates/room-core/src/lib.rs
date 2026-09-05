@@ -2,7 +2,7 @@
 //! Deterministic, reference-qualified cardinal walking over immutable collision cells.
 //!
 //! Only ordinary walking with fixed (-8,-16), 16×16 bounds is modeled. Unknown
-//! materials, flagged cells and accelerated input triggers fail closed. Qualified
+//! materials, flagged cells (unless explicitly passive) and accelerated input triggers fail closed. Qualified
 //! open/solid corners retain the native perpendicular nudge.
 //! The caller owns mode admission, room identity, actors, exits and transitions;
 //! in particular it must hand off after the qualified doorway movement step.

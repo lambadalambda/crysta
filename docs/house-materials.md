@@ -32,9 +32,9 @@ still fails closed. This preserves the ordering that a blanket flag mask loses.
 Other unflagged stored types remain unsupported.
 
 The policy is stored on the immutable Room, not in mutable walking history.
-Parent integration must choose it deliberately and include the changed collision
-semantics/policy in the combined profile identity. This work does not bump slice
-`PROFILE_VERSION`, alter walking snapshots, or switch the slice's Room constructor.
+The native adapter now chooses it explicitly in semantic profile5 and includes
+the passive-policy marker in compiled content identity. Walking snapshots
+remain v3; no mutable history fields change.
 A walking snapshot alone does not authenticate which Room policy the caller used.
 
 ## Pair rules (same in all four directions)
@@ -203,10 +203,9 @@ The separate P-as-S diagnostic mutation fails at completed 1624.
 
 Scoped Clippy with `-D warnings`, the Wasm crate build, the five legacy Python
 flat-profile tests, and the 42-case input-admission research/native replay pass.
-Full crate tests remain blocked by parent-owned old admission API assertions.
-Also update the admission atomic-collision synthetic test's sentinel from now
-supported **16** to an actually unsupported type such as **17**; do not weaken
-its rollback assertion. This work intentionally does not edit those files.
+Parent integration updates the atomic-collision sentinel to unsupported17
+without weakening rollback assertions. The full crate suite now passes with
+1,985 legacy/doorway steps,3,994 input-admission steps and238 material steps.
 Independent read-only precommit review of implementation, evidence harness and
 report found no blockers. Its small source-assertion/probe-drift hardening points
 were addressed and the full two-boot capture command rerun successfully. Shared
@@ -216,5 +215,5 @@ private `first`/`second` captures were copied into the parent's ignored
 No action hook, push/interaction/attack behavior, slope 6/7, arbitrary unknown
 unflagged material, mode transition, or flagged action-enabled history is
 implemented. Passive mode is a documented external precondition, not a silently
-ignored flag. Parent integration must enforce that precondition and combine its
-collision/input profile version changes before enabling the policy in the slice.
+ignored flag. The cardinal-only semantic slice opts into this external
+precondition explicitly in profile5; its identity includes the passive policy.
