@@ -24,6 +24,9 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
 
 ## Subissues
 
+- [Resolve map loading scripts and qualify additional layers](resolve-map-loading-scripts.md):
+  map-ID lookup, bounded script resolution and broader resource qualification.
+
 - [Qualify static map loading and decode the cavern layer](static-map-cavern.md):
   trace pointer provenance and compare static output to the loaded checkpoint.
 
