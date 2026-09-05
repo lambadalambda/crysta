@@ -39,3 +39,7 @@ The cavern now has source/VRAM/WRAM/CGRAM equality, 672 tilemap words and a
 1280×512 layer in its natural ROM palette. See [static graphics](../../docs/static-graphics.md).
 This parent remains open: other graphics families/maps, sprites, animation,
 resource caching and final scene effects still need qualification.
+
+## Current bounded milestone
+
+- [Render Ark standing and walking in the portable house](render-ark-house-sprite.md)

@@ -27,3 +27,7 @@ Reimplement Ark's basic input processing, movement state, direction, and animati
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Advanced combat moves may remain in the actor/combat issue unless required by the opening slice.
+
+## Current bounded milestone
+
+- [Render Ark standing and walking in the portable house](render-ark-house-sprite.md)

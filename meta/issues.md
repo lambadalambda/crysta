@@ -26,3 +26,6 @@
 - [ ] [Add enhanced and widescreen rendering](issues/enhanced-widescreen-rendering.md)
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
+- [ ] [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
+- [ ] [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
+- [ ] [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
