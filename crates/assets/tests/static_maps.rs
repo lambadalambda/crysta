@@ -61,9 +61,50 @@ fn rejects_bad_offsets_dimensions_packets_and_output_extent() {
 }
 
 #[test]
+fn applies_loader_attributes_without_mutating_static_words() {
+    let mut words = vec![0; 256];
+    words[0] = 0x8145;
+    words[1] = 0xFFFF;
+    let layer = StaticLayer::from_rom(&container(1, 1, &words), 0).unwrap();
+    let mut table = [0; 512];
+    table[0x145] = 0x8E; // Table bit 7 is discarded; lower seven become bits 9..15.
+    table[0x1FF] = 0x7F;
+    let attributed = layer.attributed_cells(&table);
+    assert_eq!(attributed[0].raw(), 0x1D45);
+    assert_eq!(attributed[1].raw(), 0xFFFF);
+    assert_eq!(attributed[2].raw(), 0);
+    assert_eq!(layer.cells()[0].raw(), 0x8145);
+}
+
+#[test]
 fn accepts_exact_supported_layer_capacity() {
     let bytes = container(8, 4, &vec![0; 8192]);
     let layer = StaticLayer::from_rom(&bytes, 0).unwrap();
     assert_eq!((layer.width(), layer.height()), (128, 64));
     assert_eq!(layer.layer_bytes().len(), 0x4000);
+}
+
+#[test]
+fn enforces_rom_and_bank_boundaries_without_reencoding() {
+    let mut bytes = container(1, 1, &vec![0; 256]);
+    // Ignored long-terminator offset bits: legal, intentionally noncanonical.
+    let end = bytes.len();
+    bytes[end - 3] = 0xFF;
+    bytes[end - 2] = 0xF8;
+    let layer = StaticLayer::from_rom(&bytes, 0).unwrap();
+    assert_eq!(layer.source_bytes(), bytes);
+    assert_ne!(
+        &layer.source_bytes()[2..],
+        compression::encode(&layer.layer_bytes()).unwrap()
+    );
+    let start = 0x10000 - bytes.len();
+    let mut image = vec![0; start];
+    image.extend(&bytes);
+    assert!(StaticLayer::from_rom(&image, start).is_ok());
+    image.insert(0, 0); // Container now crosses the bank even though all bytes exist.
+    assert!(StaticLayer::from_rom(&image, start + 1).is_err());
+    assert!(StaticLayer::from_rom(&image, 0xFFFF).is_err());
+    let mut large = vec![0; 0x40_0000];
+    large.extend(bytes);
+    assert!(StaticLayer::from_rom(&large, 0x40_0000).is_err());
 }

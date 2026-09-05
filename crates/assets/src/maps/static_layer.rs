@@ -141,6 +141,21 @@ impl StaticLayer {
             Some(self.cells[y * self.width + x])
         }
     }
+    /// Applies the trace-qualified loader's 512-entry metatile attribute lookup.
+    ///
+    /// For each cell, the loader keeps its low nine bits and replaces all upper
+    /// bits with `(table[index] & 0x7F) << 9`. The static words remain unchanged.
+    /// This reproduces initialization, not later object changes or passability.
+    #[must_use]
+    pub fn attributed_cells(&self, table: &[u8; 512]) -> Vec<MapCell> {
+        self.cells
+            .iter()
+            .map(|cell| {
+                let index = cell.tile_index();
+                MapCell(index | (u16::from(table[usize::from(index)] & 0x7F) << 9))
+            })
+            .collect()
+    }
     /// Original normalized source extent, including dimensions and packet.
     #[must_use]
     pub fn source_range(&self) -> Range<usize> {
