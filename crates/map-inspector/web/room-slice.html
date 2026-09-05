@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Crysta — experimental semantic preview</title>
+<style>
+:root{color-scheme:dark;font:16px/1.5 system-ui,sans-serif;background:#10151d;color:#e5edf5}
+*{box-sizing:border-box}body{margin:0}main{max-width:1080px;margin:auto;padding:clamp(12px,3vw,28px)}
+h1{font-size:clamp(1.3rem,3vw,1.9rem);line-height:1.3;margin:0 0 12px}h2{font-size:1.1rem;margin:0 0 10px}
+p{margin:.6em 0}.warning{border-left:4px solid #f2c574;background:#28251e;padding:12px 16px}
+.layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;margin-top:20px}
+.panel{min-width:0;background:#19212d;border:1px solid #354252;border-radius:8px;padding:16px}
+canvas{display:block;width:100%;max-width:512px;height:auto;image-rendering:pixelated;background:#10151d;margin:auto;border:1px solid #526476}
+.legend{color:#58f5ff;font-size:.9rem}.actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
+button{font:inherit;color:inherit;background:#263647;border:1px solid #6b8196;border-radius:6px;padding:9px 13px;min-height:44px;cursor:pointer}
+button:hover:not(:disabled){background:#354d65}button:focus-visible{outline:3px solid #58f5ff;outline-offset:3px}button:disabled{opacity:.5;cursor:not-allowed}
+.pad{display:grid;grid-template-columns:repeat(3,minmax(44px,64px));gap:8px;justify-content:center;margin:16px auto}
+.pad button{touch-action:none;user-select:none;min-height:54px;font-size:1.4rem}.up{grid-column:2}.left{grid-column:1;grid-row:2}.down{grid-column:2;grid-row:2}.right{grid-column:3;grid-row:2}
+dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0}dt{color:#aabbd0}dd{margin:0;overflow-wrap:anywhere;font-variant-numeric:tabular-nums}
+#error{color:#ffd1c9;background:#3b2025;border:1px solid #d58578;border-radius:6px;padding:10px;overflow-wrap:anywhere}#error:empty{display:none}
+#status{min-height:3em;color:#bcd1e4}.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}small{color:#b7c5d5}ul{padding-left:20px}code{overflow-wrap:anywhere}
+@media(max-width:720px){.layout{grid-template-columns:minmax(0,1fr)}.panel{padding:12px}}
+</style>
+</head>
+<body>
+<main>
+<h1>Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU</h1>
+<p class="warning"><strong>This is a bounded canvas preview, not a playable full game.</strong>
+One activation per direction per reset. Mixed corners, type16 and flagged cells are unsupported — use Reset after an error.
+No combat, sprites or audio. The background is static BG1 only, without BG2, animation, windows or scene effects.</p>
+<div class="layout">
+<section class="panel" aria-label="Room preview">
+<canvas id="room" width="256" height="224" aria-label="Static room background with a cyan player bounding box">Canvas is required for the preview.</canvas>
+<p class="legend">Cyan box = player position, not an original sprite. Bottom center marks the feet.</p>
+<div class="actions">
+<button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
+<button id="reset" disabled>Reset</button><button id="demo" disabled>Doorway demonstration</button>
+</div>
+<div class="pad" aria-label="Touch cardinal controls">
+<button class="up" data-direction="3" aria-label="Up" disabled>↑</button>
+<button class="left" data-direction="1" aria-label="Left" disabled>←</button>
+<button class="down" data-direction="4" aria-label="Down" disabled>↓</button>
+<button class="right" data-direction="2" aria-label="Right" disabled>→</button>
+</div>
+<p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
+Release before changing direction. Escape pauses. Touch and hold a cardinal button; sliding outside releases it.</p>
+</section>
+<section class="panel" aria-labelledby="inspector-heading">
+<h2 id="inspector-heading">Host state inspector</h2>
+<dl><dt>Map</dt><dd id="map">—</dd><dt>Position</dt><dd id="position">—</dd>
+<dt>Camera</dt><dd id="camera">—</dd><dt>Tick</dt><dd id="tick">—</dd>
+<dt>Phase</dt><dd id="phase">—</dd><dt>Policy</dt><dd>semantic-preview</dd></dl>
+<p id="status">Connecting to the local host…</p>
+<p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
+<p id="error" role="alert"></p>
+<h2>Doorway demonstration</h2>
+<p>Resets first, then sends <strong>56 Left + 24 Down</strong> steps to the handoff,
+followed by <strong>35 neutral transition steps</strong>, then pauses. Live controls are ignored during the sequence.</p>
+<p>These are logical host steps, <strong>not reference-video timing</strong>.
+The client sends at most one step at a time, at up to 60 Hz; a slow connection slows the preview without a catch-up queue.</p>
+<ul><li>Transition input is neutral; held input is discarded at handoff.</li>
+<li>Errors pause input. Reset to try a fresh supported path.</li>
+<li>Blur or a hidden tab pauses and releases all controls. Resume explicitly when you return.</li></ul>
+<small>All simulation belongs to the Rust host. This page only sends input and draws its state over <code>/map.bmp</code>.</small>
+</section>
+</div>
+</main>
+<script>
+(() => {
+  'use strict';
+  const keyDirections = {arrowleft: 1, a: 1, arrowright: 2, d: 2, arrowup: 3, w: 3, arrowdown: 4, s: 4};
+  function validateState(state) {
+    if (!state || state.policy !== 'semantic-preview' || !Number.isInteger(state.map_id) ||
+        !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
+        typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
+        !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
+      throw new Error('Invalid host state or policy. Pause and reset; no input was queued.');
+    }
+    return state;
+  }
+  function createController({request, render, schedule, cancel, now}) {
+    let state = null, error = null, paused = true, busy = false, hidden = false, timer = null;
+    let initialized = false, pendingReset = false, demoAfterReset = false, mode = 'live', demoIndex = 0;
+    let note = 'Paused. Resume to use cardinal controls.', walkingPhase = null;
+    let lastStepAt = -Infinity, singlePending = false;
+    const interval = 1000 / 60;
+    const held = new Map();
+    // The protocol leaves phase names open. Learn the normal phase only at a
+    // known reset checkpoint; a reloaded mid-session page must Reset first.
+    const transition = () => state && state.phase !== walkingPhase;
+    const view = () => ({state, error, paused, busy: busy || singlePending, mode, demoIndex, note,
+      canDrive: walkingPhase !== null, walking: !!state && !transition()});
+    const notify = () => render(view());
+    function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
+    function stop(message) { paused = true; singlePending = false; held.clear(); clearTimer(); if (message) note = message; }
+    function reject(message) { error = message; demoAfterReset = false; stop('Input paused — use Reset.'); notify(); }
+    function arm() {
+      if (timer !== null || busy || (paused && !singlePending) || hidden || error || !state || pendingReset) return;
+      const remaining = Math.max(0, interval - (now() - lastStepAt));
+      timer = schedule(() => {
+        timer = null;
+        if (now() - lastStepAt < interval) { arm(); return; }
+        const direction = singlePending || transition() ? 0 : mode === 'demo' ? (demoIndex < 56 ? 1 : demoIndex < 80 ? 4 : 0) : (held.values().next().value || 0);
+        singlePending = false; lastStepAt = now(); transact('/step', String(direction));
+      }, Math.ceil(singlePending ? remaining : Math.max(interval, remaining)));
+    }
+    async function transact(url, body) {
+      if (busy) return;
+      clearTimer(); busy = true; notify();
+      try {
+        const next = validateState(await request(url, body));
+        if (state && (next.phase !== state.phase || next.map_id !== state.map_id)) held.clear();
+        state = next;
+        if (url === '/state') {
+          if (state.map_id === 15 && state.x === 472 && state.y === 176 && state.tick === 0) walkingPhase = state.phase;
+          else note = 'Existing host session — Reset before driving this preview.';
+        }
+        if (url === '/reset') {
+          walkingPhase = state.phase; error = null; held.clear(); demoIndex = 0; mode = demoAfterReset ? 'demo' : 'live';
+          paused = !demoAfterReset || hidden;
+          note = mode === 'demo' ? 'Doorway demonstration: 0 / 115 logical steps.' : 'Reset complete. Resume when ready.';
+        } else if (url === '/step' && mode === 'demo') {
+          demoIndex++;
+          if (!paused) note = `Doorway demonstration: ${demoIndex} / 115 logical steps.`;
+          if (demoIndex === 115) { mode = 'live'; stop('Doorway demonstration complete — paused.'); }
+        }
+        if (state.error !== null) reject(state.error || 'Unsupported host step.');
+      } catch (failure) { reject(`Host request failed: ${failure.message || failure}`); }
+      finally {
+        busy = false; notify();
+        if (pendingReset) { pendingReset = false; transact('/reset', ''); }
+        else arm();
+      }
+    }
+    function reset(demo = false) {
+      demoAfterReset = demo; pendingReset = true; stop('Resetting the host…'); notify();
+      if (!busy) { pendingReset = false; transact('/reset', ''); }
+    }
+    return {
+      init() { if (!initialized) { initialized = true; transact('/state'); } },
+      press(token, direction) {
+        if (paused || mode === 'demo' || transition() || error || pendingReset || hidden) return;
+        if (![1, 2, 3, 4].includes(direction)) { reject('Unsupported input. Use one cardinal direction.'); return; }
+        held.set(token, direction);
+        if (new Set(held.values()).size > 1) reject('Only one direction at a time is supported. Reset to continue.');
+      },
+      release(token) { held.delete(token); },
+      pause(message = 'Paused — controls released.') { demoAfterReset = false; stop(message); notify(); },
+      resume() {
+        if (!state || walkingPhase === null || error || hidden || pendingReset) return;
+        singlePending = false; clearTimer(); paused = false; note = mode === 'demo' ? `Doorway demonstration: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
+        notify(); arm();
+      },
+      setHidden(value) { hidden = value; if (hidden) this.pause('Tab hidden — paused and controls released.'); },
+      stepOnce() {
+        if (busy || singlePending || !state || walkingPhase === null || error || hidden || pendingReset) return;
+        demoAfterReset = false; mode = 'live'; stop('Single neutral logical step — paused.'); singlePending = true; notify(); arm();
+      },
+      reset() { reset(false); }, demo() { reset(true); }, reject,
+    };
+  }
+  function bindInputs(controller, doc, win, buttons) {
+    doc.addEventListener('keydown', event => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      const key = event.key.toLowerCase();
+      if (keyDirections[key]) {
+        event.preventDefault(); if (!event.repeat) controller.press(`key:${key}`, keyDirections[key]);
+      } else if (key === 'escape') controller.pause();
+      else if (key.length === 1 && key !== ' ') controller.press(`key:${key}`, 0);
+    });
+    doc.addEventListener('keyup', event => controller.release(`key:${event.key.toLowerCase()}`));
+    win.addEventListener('blur', () => controller.pause('Window lost focus — paused and controls released.'));
+    doc.addEventListener('visibilitychange', () => controller.setHidden(doc.hidden));
+    for (const button of buttons) {
+      const release = event => {
+        controller.release(`pointer:${event.pointerId}`);
+        if (button.hasPointerCapture(event.pointerId)) button.releasePointerCapture(event.pointerId);
+      };
+      button.addEventListener('pointerdown', event => {
+        if (event.button !== 0) return;
+        event.preventDefault(); button.setPointerCapture(event.pointerId);
+        controller.press(`pointer:${event.pointerId}`, Number(button.dataset.direction));
+      });
+      for (const name of ['pointerup', 'pointercancel', 'pointerleave', 'lostpointercapture']) button.addEventListener(name, release);
+      button.addEventListener('pointermove', event => {
+        const rect = button.getBoundingClientRect();
+        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) release(event);
+      });
+    }
+  }
+  function drawScene(ctx, image, state) {
+    ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#10151d'; ctx.fillRect(0, 0, 256, 224);
+    if (!state) return;
+    const [cx, cy] = state.camera;
+    if (image) ctx.drawImage(image, cx, cy, 256, 224, 0, 0, 256, 224);
+    ctx.strokeStyle = '#58f5ff'; ctx.lineWidth = 1;
+    ctx.strokeRect(state.x - cx - 8, state.y - cy - 16, 16, 16);
+  }
+  // The same controller/bindings are evaluated by the dependency-free Node test.
+  globalThis.RoomSlice = {createController, bindInputs, drawScene};
+  if (typeof document === 'undefined') return;
+  const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
+  const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
+  let ready = false, lastView = null, lastAnnouncement = '';
+  function render(view) {
+    lastView = view;
+    const {state, error, paused, busy, mode, note, canDrive, walking} = view;
+    if (state) {
+      $('map').textContent = `$${state.map_id.toString(16).toUpperCase().padStart(4, '0')}`;
+      $('position').textContent = `${state.x}, ${state.y}`; $('camera').textContent = state.camera.join(', ');
+      $('tick').textContent = String(state.tick); $('phase').textContent = state.phase;
+    }
+    $('error').textContent = error || '';
+    $('status').textContent = note + (busy ? ' Waiting for host…' : '');
+    const announcement = error ? 'Input paused — use Reset.' : paused ? note : mode === 'demo' ? 'Doorway demonstration running.' : 'Preview running.';
+    if (announcement !== lastAnnouncement) { $('announcement').textContent = announcement; lastAnnouncement = announcement; }
+    $('pause').textContent = paused ? 'Resume' : 'Pause';
+    $('pause').disabled = !ready || !canDrive || !!error;
+    $('step').disabled = !ready || !canDrive || !!error || busy || !paused;
+    $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
+    for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
+    drawScene(ctx, ready ? image : null, state);
+  }
+  const controller = createController({render, now: () => performance.now(), schedule: (fn, ms) => setTimeout(fn, ms), cancel: clearTimeout,
+    async request(url, body) {
+      const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 5000);
+      try {
+        const response = await fetch(url, {method: body === undefined ? 'GET' : 'POST',
+          ...(body === undefined ? {} : {body, headers: {'Content-Type': 'text/plain'}}), signal: abort.signal, cache: 'no-store'});
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        return await response.json();
+      } finally { clearTimeout(timeout); }
+    },
+  });
+  $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
+  $('step').addEventListener('click', () => controller.stepOnce());
+  $('reset').addEventListener('click', () => controller.reset());
+  $('demo').addEventListener('click', () => controller.demo());
+  bindInputs(controller, document, window, buttons);
+  controller.setHidden(document.hidden);
+  image.onload = () => {
+    if (image.naturalWidth !== 512 || image.naturalHeight !== 1024) { controller.reject('Expected a 512×1024 first-background sheet from /map.bmp.'); return; }
+    ready = true; if (lastView) render(lastView);
+  };
+  image.onerror = () => controller.reject('Could not load /map.bmp. Check the local host and reload this page.');
+  image.src = '/map.bmp'; controller.init();
+})();
+</script>
+</body>
+</html>
