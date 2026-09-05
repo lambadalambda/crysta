@@ -259,12 +259,32 @@ async function main() {
   assert.deepEqual(draws[0], [image, 256, 256, 256, 224, 0, 0, 256, 224]);
   assert.deepEqual(draws[1], [128, 81, 16, 16]); assert.equal(ctx.strokeStyle, '#58f5ff');
   assert.equal(ctx.imageSmoothingEnabled, false);
+  // A supplied player raster replaces (not overlays) the diagnostic marker.
+  // Its source rectangle and signed anchor offset must survive camera movement.
+  const spriteCalls = [], texture = {};
+  const spriteCtx = {fillRect(){}, drawImage(...args){spriteCalls.push(['draw',...args]);},
+    save(){spriteCalls.push(['save']);}, restore(){spriteCalls.push(['restore']);},
+    translate(...args){spriteCalls.push(['translate',...args]);}, scale(...args){spriteCalls.push(['scale',...args]);},
+    strokeRect(){throw new Error('sprite rendering must replace the marker');}};
+  const actor = {image:texture, source:[16,32,24,32], offset:[-10,-28], flipX:false};
+  drawScene(spriteCtx, image, {...initial(),x:392,y:353,camera:[256,256]}, actor);
+  assert.deepEqual(spriteCalls, [
+    ['draw',image,256,256,256,224,0,0,256,224], ['save'], ['translate',136,97],
+    ['draw',texture,16,32,24,32,-10,-28,24,32], ['restore'],
+  ]);
+  spriteCalls.length=0;
+  drawScene(spriteCtx, null, {...initial(),x:304,y:112}, {...actor,flipX:true});
+  assert.deepEqual(spriteCalls, [
+    ['save'], ['translate',48,112], ['scale',-1,1],
+    ['draw',texture,16,32,24,32,-10,-28,24,32], ['restore'],
+  ]);
+
   assert(html.includes('Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU'));
   assert(/id="new-game"[^>]*>New Game<\/button>/.test(html));
   assert(html.includes("$('new-game').addEventListener('click', () => controller.newGame())"));
   assert(html.includes('Checkpoint Reset')); assert(html.includes('Checkpoint doorway demo'));
   assert(html.includes('default name')); assert(html.includes('intro'));
   assert(html.includes('/map.bmp')); assert(!/https?:\/\/|<script[^>]+src=/i.test(html));
-  console.log('PASS: New Game, serialized start precedence, paused input cleanup, checkpoint reset/demo, pacing, bindings, errors, and drawing');
+  console.log('PASS: New Game, serialized start precedence, paused input cleanup, checkpoint reset/demo, pacing, bindings, errors, sprite anchors/mirroring, and drawing');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

@@ -222,11 +222,21 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       });
     }
   }
-  function drawScene(ctx, image, state) {
+  function drawScene(ctx, image, state, actor = null) {
     ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#10151d'; ctx.fillRect(0, 0, 256, 224);
     if (!state) return;
     const [cx, cy] = state.camera;
     if (image) ctx.drawImage(image, cx, cy, 256, 224, 0, 0, 256, 224);
+    if (actor) {
+      // The asset adapter supplies a composed raster and its original anchor.
+      // Mirroring is around the player, not the cropped image's left edge.
+      const [sx, sy, width, height] = actor.source;
+      ctx.save(); ctx.translate(state.x - cx, state.y - cy);
+      if (actor.flipX) ctx.scale(-1, 1);
+      ctx.drawImage(actor.image, sx, sy, width, height, actor.offset[0], actor.offset[1], width, height);
+      ctx.restore();
+      return;
+    }
     ctx.strokeStyle = '#58f5ff'; ctx.lineWidth = 1;
     ctx.strokeRect(state.x - cx - 8, state.y - cy - 16, 16, 16);
   }
