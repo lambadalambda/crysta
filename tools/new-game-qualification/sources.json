@@ -1,0 +1,54 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "ranges": [
+    {
+      "name": "player-init",
+      "cpu_start": "84a12e",
+      "cpu_end_exclusive": "84a1a3",
+      "normalized_start": 303406,
+      "sha256": "d09ae486890c10a878795a3140e5bde3c48c1754f51b036d856a200d698ade37"
+    },
+    {
+      "name": "selected-tail",
+      "cpu_start": "84a21a",
+      "cpu_end_exclusive": "84a223",
+      "normalized_start": 303642,
+      "sha256": "2b1f80e369c4e10d23a3e3aa69dd2b1ab44fb5a81d86c4a00177ed864d81f50b"
+    },
+    {
+      "name": "startup-selector",
+      "cpu_start": "8487ce",
+      "cpu_end_exclusive": "8487fe",
+      "normalized_start": 296910,
+      "sha256": "97cc77342bc443cd1b1aaaff85a8dcaf2012f598007dec405232e1b75d9e4d60"
+    },
+    {
+      "name": "selector-zero",
+      "cpu_start": "8487fe",
+      "cpu_end_exclusive": "848800",
+      "normalized_start": 296958,
+      "sha256": "2fd40072f18a34daf15f1117d7a39085ef2c6378422f5b723f604c516af61f99"
+    },
+    {
+      "name": "common-handoff",
+      "cpu_start": "8488ac",
+      "cpu_end_exclusive": "8488e8",
+      "normalized_start": 297132,
+      "sha256": "6b83c325d71cdb0c2c13bcee1a84b997b0eeef25a68950ca6540eb084ac12844"
+    },
+    {
+      "name": "player-recovery",
+      "cpu_start": "84a2f3",
+      "cpu_end_exclusive": "84a308",
+      "normalized_start": 303859,
+      "sha256": "65000a18bbf5131d03a2e61a20d5dd7c74b1f975c37ab18adda953fec5da319f"
+    },
+    {
+      "name": "control-gate",
+      "cpu_start": "80a016",
+      "cpu_end_exclusive": "80a05a",
+      "normalized_start": 40982,
+      "sha256": "3a9495eaea88e32cb67b674502650110186c4a4d929de1a1da73b2a456b2c2fe"
+    }
+  ]
+}

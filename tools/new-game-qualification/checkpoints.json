@@ -1,0 +1,487 @@
+{
+  "boot": "Session::new / default zero SRAM / one session per process",
+  "checkpoints": [
+    {
+      "actor_flags": [
+        32768,
+        256
+      ],
+      "actor_resume": 8880576,
+      "actor_timer": 0,
+      "controller_index": 0,
+      "controller_resume": 3380,
+      "event_flags_nonzero": [],
+      "event_flags_sha256": "f5a5fd42d16a20302798ef6ed309979b43003d2320d9f0e8ea9831a92759fb4b",
+      "frame": 800,
+      "framebuffer_xrgb_sha256": "f0b6b3b4bdb0aa65c99aed4b389416792f4aaf6feacf8dce348a46c31efa1780",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 4,
+      "name": "empty-load-menu-new-game-selected",
+      "player": [
+        8,
+        16
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "d844bc00d2552e1e432d7e573cda334581739b70429578b429adb7051c8f37c7",
+      "player_index": 0,
+      "program_state": 174,
+      "vram_le_sha256": "2053648c73719c0a37b811bbf43a7a43abf9b84cffcc0e56fc7a04a1ff7242e8",
+      "wram_sha256": "5001cbc0953f2bbcdaa36a4d7118c585b9f0afeb9655ce3005d45585b1e0afa8"
+    },
+    {
+      "actor_flags": [
+        32768,
+        256
+      ],
+      "actor_resume": 8882691,
+      "actor_timer": 0,
+      "controller_index": 0,
+      "controller_resume": 3380,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 1100,
+      "framebuffer_xrgb_sha256": "9e7a3c95ecd1d28815522717086896c786a70518c83c0a64229572b5b2737360",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 4,
+      "name": "kana-grid-default-ark",
+      "player": [
+        8,
+        16
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "002bfb624810ab91270c35bb6f305c81db6d903ca904ffa4931e4482070d8575",
+      "player_index": 4352,
+      "program_state": 174,
+      "vram_le_sha256": "c8828403c867be619b5ccfee11f68d629a99835f8f4a81c4f3882ac5fdb68032",
+      "wram_sha256": "34d60a1b9d2d7e64a00fe6319b2b71e3e6a58df67e8dba4e8991c96cae392b99"
+    },
+    {
+      "actor_flags": [
+        32768,
+        0
+      ],
+      "actor_resume": 9471910,
+      "actor_timer": 464,
+      "controller_index": 0,
+      "controller_resume": 3380,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 1800,
+      "framebuffer_xrgb_sha256": "138f8e68f8a2792974943abe1854392337afd739d11ab4c6ad5001c329f2c16b",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 297,
+      "name": "prologue-title",
+      "player": [
+        8,
+        0
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "fafe564b114ce06274b866b434eaf4fe055de9816c47ea05b70629c2460f113e",
+      "player_index": 4352,
+      "program_state": 157,
+      "vram_le_sha256": "ce1d70c663f120ccf06086f5216438361cbf2549fc774ce8e5342940fbbe7c9c",
+      "wram_sha256": "17bc898c6d292ebac2aa04caf780b56ef62c4440c22df52ce13ec489adf32a21"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692483,
+      "actor_timer": 0,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 2500,
+      "framebuffer_xrgb_sha256": "b272f3d0195cac45cbb9f93fda93d26fc0c83e0bdac052d6d920e501b93da069",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 65360,
+      "input_held": 0,
+      "map": 15,
+      "name": "bedroom-intro",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "326c80d87dd6e553da197f91ca0c7619fef7cbab7fb4cbdbb55b6c791abcf689",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "d5895f0ec2c538376589e10d934fac493126ec11dfca8e46d77a22e03528d164",
+      "wram_sha256": "bed5e800e677d07231cfc93e562605e7efb7c06c66d13418abb66bb1700a7814"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 441,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 3500,
+      "framebuffer_xrgb_sha256": "3f688234e133546ba9888833a8f01ca3d2e276038c7ec13e8aba8eb9540e9c0f",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "elle-dialogue-1",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "b67197a223c535ff34ba69eafe1b34ebf5ae6d8a075dc25246883463980a3496",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "9c81af411d5f9830e83805f3d695f08cfbf5d85499258c1c5cd344f6733669b0",
+      "wram_sha256": "6a19b7a5f931390430b47c992d7fb7964696cf797a19a16187635f9cab510828"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 441,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 4100,
+      "framebuffer_xrgb_sha256": "85ea3b7419d31b9a299fcbdf0297689d7bba5fe89b7b819a38dc58648d6428b9",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "ark-dialogue",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "b67197a223c535ff34ba69eafe1b34ebf5ae6d8a075dc25246883463980a3496",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "f2e6d60e1188300487928ae2c9ce7bd249cbcc3b7b0bca5daee46bee7e6855b8",
+      "wram_sha256": "642e5a1d15f887df63280f4c4861349830c5c8c0cb58903f547cdf207a148676"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 441,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 4700,
+      "framebuffer_xrgb_sha256": "55c60c7d688b11d6e65fe765976155af2e79eba48641a888aeb40f153a360a97",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "elle-dialogue-2",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "b67197a223c535ff34ba69eafe1b34ebf5ae6d8a075dc25246883463980a3496",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "dea00674ec6e5b34cd50e9a6801395f4eb9b4e15cf7cf85c5111c4ff5cd1c3f4",
+      "wram_sha256": "a7dcac6bf61d71f8db6c80373d12ad12fba809c1688203b2dbf8cad260e07a89"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 441,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 5300,
+      "framebuffer_xrgb_sha256": "e0f58f503c6a9b31f9e4c48a82777c019a951a572e2a4b03b3f239a3ada492a5",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "elle-dialogue-3",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "b67197a223c535ff34ba69eafe1b34ebf5ae6d8a075dc25246883463980a3496",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "98abe6e25bbcf4bf8b451829480fbb408e4f2e300bee7b863310f85205396fa0",
+      "wram_sha256": "4c4e81af034875c664306cfcbfd05a7d1c2d65c246e803d43bdb3caa83f3c508"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 441,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "2e65fafd44bb10b41da06d445673a68f2441d68dae0cbf1ba7c62c75e9fcdd5d",
+      "frame": 5900,
+      "framebuffer_xrgb_sha256": "3426c4e08d7287722b4a9990a81b3a6b229a659f01ba64d3e8bf4b2a9f52f875",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "elle-dialogue-final",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "b67197a223c535ff34ba69eafe1b34ebf5ae6d8a075dc25246883463980a3496",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "def7b888dba434e22dcb6de8ff1a0a9dbb644404958cfd49bdaabc47cb8f05d9",
+      "wram_sha256": "9c16c6a7bb7dce1eb2b588bb802b9ee26df1a502e834fb2ba7386eecc96ecfbe"
+    },
+    {
+      "actor_flags": [
+        1044,
+        0
+      ],
+      "actor_resume": 8692387,
+      "actor_timer": 141,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          4,
+          1
+        ],
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "frame": 6800,
+      "framebuffer_xrgb_sha256": "8cd0093d7c3a6d6fcffeafb7bafe83ad6ce500d28ee8470cca1a8c1dc50c2a0e",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "intro-done-neutral",
+      "player": [
+        304,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "7729216c04b44cf877af6dd3bac66edba89cd41df1cdfc090c099c92ff1122e1",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "6f3d0b6a209adb17fb55b0ed5b5c3c3b5a33068b8a321a2e450503d098e16799",
+      "wram_sha256": "49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82"
+    },
+    {
+      "actor_flags": [
+        1045,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 403,
+      "controller_index": 4544,
+      "controller_resume": 8686330,
+      "event_flags_nonzero": [
+        [
+          4,
+          1
+        ],
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "frame": 6900,
+      "framebuffer_xrgb_sha256": "47956111c7c003f3b566ddf6edc3c74daf2cfcd427af652704855464bec17fe2",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "right-released-neutral",
+      "player": [
+        332,
+        112
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "0abeeda092a3a1c1f320450d7c94442ea8d34b4b533afa66602d5fc1cf85d653",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "d1fd42677332929679f7d21c5ccff0bbed34234a8cb77c156bdea5c0c3eca1e6",
+      "wram_sha256": "e311d50a104790a2b36078614d8ab5d191b242700dd58f32cd57e1afad4dc5e8"
+    },
+    {
+      "actor_flags": [
+        1045,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 403,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          4,
+          1
+        ],
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "frame": 7000,
+      "framebuffer_xrgb_sha256": "f4504661de741609547f11b7c4845656c974ebe84c5e97e1184c2c7fd9faf01c",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "down-released-neutral",
+      "player": [
+        332,
+        140
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "70b7f02c60ced4b9cd111febb687179d709c8c061a13eb96df0aa3dde1f27c53",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "4f810e9dc17f4fd469abeed655cae4348433336a3af405c899c9918f4a65bb8b",
+      "wram_sha256": "604049ad60edc376a93210403d41426b98baee8a8fa5ae61fd116cce753cafc3"
+    },
+    {
+      "actor_flags": [
+        1045,
+        0
+      ],
+      "actor_resume": 8692312,
+      "actor_timer": 303,
+      "controller_index": 4544,
+      "controller_resume": 8685802,
+      "event_flags_nonzero": [
+        [
+          4,
+          1
+        ],
+        [
+          31,
+          8
+        ]
+      ],
+      "event_flags_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "frame": 7100,
+      "framebuffer_xrgb_sha256": "9ef8ed09bee7615b884618a2b907531dfb7d0cc7a21a776c79180d1d144d969c",
+      "gate_097c": 0,
+      "gate_097e": 0,
+      "input_edge": 0,
+      "input_filter": 0,
+      "input_held": 0,
+      "map": 15,
+      "name": "control-checkpoint",
+      "player": [
+        332,
+        140
+      ],
+      "player_aux_7f301e": 0,
+      "player_entity_sha256": "49103b531e5f108c9d79ed9dd94f7dd9599844ac3112dbfb4106d09965974306",
+      "player_index": 4096,
+      "program_state": 170,
+      "vram_le_sha256": "250d7b4bf4bfc7248597b1f06173a9c93cba230aea44ba724d5d937bf19a8b20",
+      "wram_sha256": "1e64faa91c8d975524dc63494b44ea68053a400378c1a5fd017fa665e32e6de2"
+    }
+  ],
+  "frames_sha256": "0be0605689766805a364c02f5f8aacb3d39b9e089cdc2f7c642dab1eb3c2dd32",
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "version": 1
+}
