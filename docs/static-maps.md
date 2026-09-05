@@ -9,6 +9,9 @@ A follow-up [loading-script projection](map-scripts.md) now resolves layer
 sources from map IDs for a supported subset, and additionally qualifies the menu
 layer. The [loaded-map viewer](maps.md) still displays runtime captures. The distinction
 between compressed source words, initialized words, and gameplay changes matters.
+A separate [static graphics recipe and full-map viewer](static-graphics.md) now
+renders the cavern from ROM and qualifies graphics/palette/definition output.
+This document records the earlier layer/attribute qualification.
 
 ## Reproduce
 
@@ -150,8 +153,9 @@ initialized_word = index | ((attributes[index] & $7F) << 9)
 
 `StaticLayer::attributed_cells(&[u8; 512])` reproduces that transformation without
 mutating the original static layer. This qualifies the low-nine-bit **attribute
-index** and initialization arithmetic. It does not yet qualify how metatile
-indices map to terrain graphics or what attribute values mean for movement.
+index** and initialization arithmetic. This earlier attribute check alone does
+not qualify graphics or movement semantics. The subsequent [graphics check](static-graphics.md)
+qualifies cavern metatile-to-terrain mapping; movement remains unqualified.
 
 Applying the attribute table changes **656** of 2,560 raw source words. Continuing
 to the existing frame-1601 gameplay checkpoint leaves only **one** difference
@@ -188,6 +192,6 @@ research used the vendored ares opcode metadata; no decoded instruction dumps or
 extracted map bytes were committed.
 
 The [parent map issue](../meta/issues/decode-map-collision-formats.md) remains
-open: state-dependent loading and final layer composition, graphics/metatile reconstruction,
+open: state-dependent loading and final layer composition, broader graphics/metatile reconstruction,
 representative indoor/outdoor/dungeon/world maps, placements/regions/exits,
 dynamic changes and trace-qualified collision behavior are still required.

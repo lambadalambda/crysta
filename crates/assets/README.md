@@ -18,7 +18,11 @@ Currently implemented:
   packed pointers, calls/jumps/deferred streams and lossless resource instructions.
   State-dependent branches and full runtime composition remain unsupported.
 
-Graphics interpretation, broader static map formats, and the local asset pack remain
+- [Static cavern graphics](../../docs/static-graphics.md): pure 4bpp tile/color/word
+  primitives and a conservative map-ID-resolved cavern background recipe with
+  transparency and priority preserved. Full layer sampling needs no oracle.
+
+Broader graphics/animation, static map formats, and the local asset pack remain
 separate M3 work. The [map inspector](../map-inspector/README.md) supplies local
 oracle capture and browser visualization without adding I/O to this library.
 

@@ -189,6 +189,11 @@ jumps and deferred streams while rejecting state-dependent branches. It uses
 `rom`'s typed address validation and records original instructions; it does not
 execute sound/display effects or compose cached/partial layer transfers. Menu
 and cavern layers have loader equality checks; collision semantics remain open.
+A separate [static cavern background recipe](static-graphics.md) uses pure
+`assets::graphics` tile/color/word primitives to draw a full layer from resolved
+ROM resources. Indexed pixels retain transparency and priority; local BMP/HTML
+export and reference-only color-effect comparison belong to `map-inspector`.
+This is a bounded asset inspector, not the planned runtime renderer.
 No emulator or filesystem dependency enters the pure model.
 
 Event bytecode is treated as a first-class language with a disassembler,

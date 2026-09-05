@@ -7,7 +7,10 @@ viewport; the rest of the map uses structural colors, not reconstructed terrain.
 The parent [map-format issue](../meta/issues/decode-map-collision-formats.md)
 remains open. A subsequent [static-layer qualification](static-maps.md) now
 decodes this cavern directly from ROM and reproduces its attribute initialization;
-the viewer described here continues to display runtime captures.
+the viewer described here continues to display runtime captures. The new
+[ROM-only static graphics viewer](static-graphics.md) separately draws the full
+cavern from decoded assets and qualifies its metatile indexing. Historical
+candidate labels in this runtime viewer are unchanged; collision is still open.
 
 ## Generate a local viewer
 
@@ -115,7 +118,7 @@ The conflicting imported field `$7E:081E` is intentionally not used.
   inaccessible during this research attempt. No new format claims rest on them.
 
 The [map-ID script projection](map-scripts.md) now handles a bounded loading
-subset. Still required: conditional loading and final composition, metatile/graphics reconstruction,
+subset. Still required: conditional loading and final composition, broader metatile/graphics reconstruction,
 indoor/outdoor/dungeon/world-map coverage, placements/regions/transitions, and
 trace-qualified collision behavior. This tool is a visual aid for that work,
 not a portable gameplay collision API or an asset pack.

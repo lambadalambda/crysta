@@ -26,3 +26,16 @@ Extract the visual data needed for classic rendering while preserving palette an
 
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
 - Do not flatten priority or palette relationships into presentation-only PNG metadata.
+
+## Subissues
+
+- [Render the static cavern from decoded graphics](render-static-cavern.md):
+  ROM-only full first-background viewer with pure 4bpp/palette/word primitives.
+
+## Progress
+
+The cavern now has source/VRAM/WRAM/CGRAM equality, 672 tilemap words and a
+256-pixel effect-matched reference patch. The static artifact renders the full
+1280×512 layer in its natural ROM palette. See [static graphics](../../docs/static-graphics.md).
+This parent remains open: other graphics families/maps, sprites, animation,
+resource caching and final scene effects still need qualification.

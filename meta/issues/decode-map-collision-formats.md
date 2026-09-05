@@ -24,6 +24,9 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
 
 ## Subissues
 
+- [Render the static cavern from decoded graphics](render-static-cavern.md):
+  full ROM-only background artifact and qualified quadrant expansion.
+
 - [Resolve map loading scripts and qualify additional layers](resolve-map-loading-scripts.md):
   map-ID lookup, bounded script resolution and broader resource qualification.
 
@@ -57,7 +60,11 @@ five map IDs into eight layer packets without hard-coded layer offsets. Menu
 `$0004` and cavern `$0128` have loader equality; the other cases are static-only.
 Calls, jumps and deferred streams are supported, not unspecified game flags.
 
+The [static graphics viewer](../../docs/static-graphics.md) now renders the full
+cavern directly from graphics, palette and metatile resources. Low-nine-bit
+metatile indexing and quadrant order are qualified for this cavern, not all maps.
+
 This parent remains open. State-dependent loading and final layer composition,
-visited indoor/outdoor/dungeon/world-map coverage, graphics, placements/regions/
+visited indoor/outdoor/dungeon/world-map coverage, broader graphics, placements/regions/
 exits, and behavior-qualified collision fixtures remain. The old dimension-store probe
 was a false lead; the qualified cavern loader uses another path.

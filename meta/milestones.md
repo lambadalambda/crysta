@@ -81,6 +81,8 @@ map packets, including byte-exact re-encoding; see the
 checkpoints and raw structure. The [static cavern layer and attribute lookup](../docs/static-maps.md)
 now match actual loader output. A bounded [map-ID loading-script projection](../docs/map-scripts.md)
 resolves five tested IDs into eight layers, with menu and cavern loader equality.
+A [ROM-only full-map viewer](../docs/static-graphics.md) now draws the cavern
+from decoded graphics/palettes/metatiles with runtime resource and patch equality.
 State-dependent loading, broader gameplay coverage and collision behavior
 qualification remain open.
 

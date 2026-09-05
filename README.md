@@ -27,6 +27,9 @@ portal-cavern captures and raw tile/collision structure. The cavern layer can
 also be decoded directly from ROM, with attribute initialization matched against
 loader execution. A bounded map-loading script projection resolves five tested
 map IDs into eight layer packets, with loader equality for the menu and cavern.
+A ROM-only full-map viewer now renders the cavern from decoded 4bpp graphics,
+palettes and metatiles, with runtime resource and representative pixel equality.
+It shows natural-palette terrain, not sprites or final scene effects.
 Broader map behavior and collision qualification remain.
 
 No playable portable implementation exists yet.
@@ -40,6 +43,7 @@ See:
 - [Compression packets](docs/compression.md)
 - [Local map viewer and runtime layout](docs/maps.md)
 - [Static map layers and loader qualification](docs/static-maps.md)
+- [ROM-only full-map viewer and static graphics](docs/static-graphics.md)
 - [Map-ID lookup and loading scripts](docs/map-scripts.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
@@ -87,7 +91,7 @@ crates/                 Rust workspace
   disasm/               Matching 65C816 reconstruction tooling
   memory-map/           Typed revision-bound memory symbols
   assets/               Bounded compression and content codecs
-  map-inspector/        Local runtime map captures and browser viewer
+  map-inspector/        Local runtime captures and ROM-only static map viewers
   core/                 Deterministic portable game simulation (planned)
   renderer/             Deterministic command consumer/classic renderer (planned)
   audio/                Audio command model and compatibility backend (planned)

@@ -1,7 +1,25 @@
 # Local map inspector
 
-A native oracle capture CLI plus a dependency-free browser viewer. This is a
+A native capture/extraction CLI plus dependency-free browser viewers. This is a
 **map research tool**, not a general map loader or a playable port.
+
+## ROM-only full-map viewer
+
+```sh
+cargo run -p map-inspector -- render-map \
+  'local/Tenchi Souzou (Japan).sfc' 128
+```
+
+Open the printed `local/static-maps/run-*/index.html`. It renders the complete
+1280×512 portal cavern from decoded graphics, palettes and metatiles, not
+framebuffer samples. No SRAM or emulator execution is needed. Natural palette,
+checkerboard transparency, zoom/grid, cell/word inspection and metatile previews
+are included; sprites, animation and final scene effects are not. Only map `$0128`
+is supported. See [static graphics](../../docs/static-graphics.md) for resource
+formats, source/VRAM equality and the qualified 16×16 reference-pixel patch.
+Generated assets remain local; do not commit or redistribute them.
+
+## Runtime capture viewer
 
 From the repository root:
 
@@ -12,8 +30,10 @@ cargo run -p map-inspector -- capture \
 
 Open the printed `local/maps/run-*/index.html` file. It shows map `$0128` (portal
 cavern), original before/after viewports, a full raw layer, collision/grid/player
-overlays, zoom, and cell inspection. Collision meanings and low-nine-bit metatile
-indices are explicitly provisional. No server or network access is needed.
+overlays, zoom, and cell inspection. Its historical candidate labels are retained;
+low-nine-bit metatile indexing is now qualified for the cavern by the static
+renderer, but collision meanings remain provisional. No server or network access
+is needed.
 
 Runtime capture/qualification inputs must match the Japanese reference ROM and
 pinned three-slot SRAM. Neither
@@ -49,7 +69,10 @@ See [loading-script projection](../../docs/map-scripts.md) for command coverage,
 strict failures and multi-layer source-load output. Redirect extracted JSON only
 to ignored `local/`. See [static map layers](../../docs/static-maps.md) for source
 ranges, pointer provenance, attribute lookup, trace stops and remaining gaps.
-The viewer remains a runtime view; these commands do not replace its capture data.
+The original capture viewer remains a runtime view; these inspection commands do
+not replace its capture data. `render-map` creates a separate static viewer.
+`qualify-loader` now also checks graphics, palette, definition and tilemap equality,
+plus a fixed opaque background pixel patch after the reference effect profile.
 
 ## Tests
 
