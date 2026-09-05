@@ -158,3 +158,112 @@ Python optimization (`-O` or `PYTHONOPTIMIZE`), which would disable its assertio
 with optimization enabled. It is now green for optimized imports and for tampered
 exports under both modes. The latter regression uses an optional existing local
 replay and never changes that replay's files.
+
+## Qualified house background/OBJ ordering (bounded follow-up)
+
+**Parent renderer policy:** for the portable first background in rooms F/10,
+ordinary Ark OBJ-priority-2 pixels are above low-priority background pixels and
+behind **opaque high-priority** background pixels. Background color zero must
+not occlude, even when its tile has the priority bit. This qualifies the small
+first-background/Ark ordering previously excluded above; it does **not** qualify
+whole-scene windows, BG3, color math, shadows or special sprite modes.
+
+### Actual house mode, not an assumed SNES default
+
+Two new independent `Session::new` executions reuse the real menu prefix. One
+runs to completed 2340, then traces the initial F load; the other runs the known
+Right `[6800,6862)` / Down `[6900,6967)` route, releases input at 6967, then traces
+the map-10 load. No input edge is crossed by either bounded trace. Every stop is
+pre-instruction, `TargetReached`, without RAM writes/restores or a new PPU API:
+
+| Stop | F frame count | 10 frame count | Evidence |
+|---|---:|---:|---|
+| `$86:8D6B` | 2346 | 6984 | Before `LDA $96:BB6A,X`; X=`$00B9` |
+| `$86:8D6F` | 2346 | 6984 | Before `STA $2105`; A=`$0009`, P=`$24`, DB=`$81` |
+| `$86:8D72` | 2346 | 6984 | Immediately after the 8-bit `$2105` write |
+
+The selected nine-byte ROM profile is `$96:BC1D..BC26`; its BGMODE byte is
+**`$96:BC23 = $09`**. Thus the house loader writes **mode 1, BG3-priority flag
+set, 8×8 BG tile sizes**, not literal `$01` and not the unrelated mode-7 writer
+at `$86:BB77`. `$86:8C77..8CC0` resolves the profile and writes screen masks;
+`$86:8D10..8D72` assigns tilemaps and writes BGMODE. The selected main-screen mask
+is `$17`, enabling hardware BG1, BG2 and OBJ; it also matches WRAM `$0468` in the
+settled checkpoints. These stops establish the room-loading configuration, not
+an atomic readback of all PPU/output state or a claim about arbitrary later
+cutscenes/raster overrides.
+
+### Naming correction: the portable first background is hardware BG2
+
+The house profile's layer-assignment byte `$96:BC22 = $80` selects the swapped
+branch at `$86:8D3F`: BG1SC comes from `$0839`, BG2SC from `$0837`. At completed
+6800 (F), 7050 (10) and 7250 (returned F), register shadows are consistently
+**`$046D=$3C`, `$046E=$38`**. The portable first background is therefore in
+**hardware BG2's 32×32 ring buffer at VRAM word `$3800`**, not hardware BG1.
+The earlier first-background/BG1 resource terminology refers to game resource
+order, not the hardware layer assignment in this profile.
+
+This correction does not change the proposed high/low rule. For BGMODE `$09`,
+the vendored ares `PPU::updateVideoMode` assigns:
+
+| Hardware layer/sample | Effective rank |
+|---|---:|
+| BG2 low (portable first background) | 4 |
+| BG1 low | 5 |
+| **OBJ priority 2 (ordinary Ark)** | **6** |
+| BG2 high (portable first background) | 7 |
+| BG1 high | 8 |
+
+`ppu/background.cpp` selects rank using the **actual tile word bit 13**, and
+returns without contributing a pixel when its color is zero. `ppu/dac.cpp`
+selects the greater effective rank. Component priority 2 is independently pinned
+by the sprite qualification above. Do not confuse tile-word bit `$2000` with
+runtime **map-cell** high-bit overlays or component order within Ark.
+
+### Priority survives actual room loading
+
+The pure ROM decoder reconstructs the shared definitions from headerless
+`$2ABA43..$2AC506`. Their 4096 decoded bytes match WRAM `$2000..3000` exactly at
+all three checkpoints. The native adjustment at `$86:92AC` applies `$FDFF`
+(clears bit 9, **preserves bit 13**) and ORs the graphics adjustment; the room
+projection already qualifies zero adjustment.
+
+For each of the two existing fresh capture processes, the checker expands the
+runtime first-layer cells through those ROM-authenticated definitions and
+compares **full words**, not just graphics indices, with hardware BG2 VRAM:
+
+| Completed frame | Room/camera | Compared words | Priority-high | Priority-low |
+|---:|---|---:|---:|---:|
+| 6800 | F / `(256,0)` | 672 | 122 | 550 |
+| 7050 | 10 / `(256,256)` | 672 | 126 | 546 |
+| 7250 | returned F / `(256,0)` | 672 | 122 | 550 |
+
+World 8×8 tile columns `[34,62)` and rows `[camera_y/8+2, camera_y/8+26)` avoid
+ring-buffer edge assumptions. Addressing is `$3800 + (y%32)*32 + x%32` in VRAM
+**words**. All comparisons are exact, with both priority values exercised. A
+one-off research control comparison against hardware BG1 at `$3C00` mismatched
+all 672 words in each checkpoint (not recomputed by the committed checker). This is selected loaded-region evidence, not every world cell
+or a final framebuffer/color-math comparison.
+
+### Reproduce and verify
+
+```sh
+python3 -B tools/player-sprite-qualification/test_scene_order.py
+sh tools/player-sprite-qualification/scene-order-replay.sh \
+  'local/Tenchi Souzou (Japan).sfc' \
+  local/player-sprite-qualification/replay-F6SsYO
+```
+
+Pass any matching two-boot capture directory produced by the sprite `replay.sh`;
+raw source/witness data stays ignored. `scene-order-reference.json` pins ROM and
+ares consumer sources, native register reports/trace/WRAM hashes, decoded
+definitions and selected tilemap capture hashes. The standalone checker uses
+explicit exceptions (also effective under Python optimization). Three synthetic
+comparison tests were red against an unimplemented checker, then green for
+high/low coverage, cleared-priority rejection, wrong hardware assignment,
+vacuous coverage, extent and camera checks. Native source research itself used
+reproducible experimental stops rather than synthetic CPU tests.
+
+The final replay/check completed successfully at ignored
+`local/player-sprite-qualification/scene-order-MHoLd4`, reproducing both room
+writer reports and the existing two-process tilemap evidence. Independent
+correctness/architecture review found no blockers.
