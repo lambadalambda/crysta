@@ -39,8 +39,9 @@ not an implementation of the save menu or new game.
 
 [Movement qualification](movement-qualification.md) describes the exact
 supported reference trajectories and source witnesses. Unflagged types 0/2/22
-are open and 12/14 are solid. Unknown materials, bit-15 cells, mixed open/solid
-corner pairs, map-edge samples and coordinate overflow return explicit errors.
+are open and 12/14 are solid. Profile v2 also resolves open/solid corner pairs
+with the decoded perpendicular nudge and main-axis snap/rollback. Unknown
+materials, bit-15 cells, map-edge samples and coordinate overflow return explicit errors.
 A failed update leaves state unchanged. Blocking does not stop movement cadence.
 
 Dash activation is not qualified. Therefore each direction may have only **one
@@ -119,10 +120,10 @@ one accepted step always performs one deterministic core update.
 
 ## Verification
 
-- Ten ROM-free walking tests, eight semantic/snapshot tests and a portable-boundary
+- Thirteen ROM-free walking tests, eight semantic/snapshot tests and a portable-boundary
   architecture guard pass. Repeated synthetic snapshots resume identically at
   every logical update, including transition ownership.
-- Seven authenticated private trajectories match **all 1,204 walking steps**,
+- Twelve authenticated private trajectories match **all 1,971 walking steps**,
   attempted stream outputs, positions, blocking and restored continuations.
   Compiled ROM grids (with explicit exclusions above) match those fixture grids:
   F SHA-256 `c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1`;
@@ -144,3 +145,8 @@ one accepted step always performs one deterministic core update.
 No ROM, SRAM, graphics or raw reference trajectories are distributed. The local
 trajectory harness can reproduce fixtures; absent optional inputs skip clearly,
 while explicitly required or hash-mismatched fixtures fail closed.
+
+The current [new-game/house exploration goal](../meta/issues/start-and-explore-arks-house.md)
+remains open. Corner support is incremental progress, not removal of the saved
+checkpoint bootstrap, permanent direction-admission guard, or other remaining
+preview restrictions. [Corner evidence and reproduction](house-movement.md).

@@ -16,8 +16,9 @@ player controller or collision engine.
   The parent authenticates room/data identity and simulation policy separately.
 
 Only unflagged types 0/2/22 (open) and 12/14 (solid) are admitted. Old samples
-conservatively reject unsupported materials; mixed new open/solid sample pairs
-stop rather than implementing corner nudges. Direction reactivation is rejected,
+conservatively reject unsupported materials. Mixed open/solid edges preserve the
+reference perpendicular corner nudge while retaining main-axis snap/rollback.
+Direction reactivation is still rejected,
 not treated as ordinary walking or an emulated dash cooldown. Unknown cells may
 exist elsewhere in the grid; `Room::new` validates shape, not all materials.
 
@@ -47,8 +48,8 @@ cargo build -p room-core --lib --target wasm32-unknown-unknown
 
 Synthetic tests are ROM-free. The optional `local_trajectories` integration test
 uses existing ignored `local/movement` artifacts, authenticated by pinned CSV,
-full-WRAM and extracted collision-grid SHA-256 values. It matches all **1,204**
-strict-profile position/stream steps, including doorway handoff, and repeats each
+full-WRAM and extracted collision-grid SHA-256 values. It matches all **1,971**
+qualified-profile position/stream steps, including doorway handoff, and repeats each
 step through a restored walking snapshot. No capture bytes are committed.
 
 If the default fixture directory is absent the optional test skips and emits a
@@ -75,3 +76,12 @@ Its 17/load/17 logical-update policy preserves qualified endpoints, not native
 video-frame timing. It does not execute COP services or a CPU. See
 [the complete preview boundary](../../docs/portable-room.md); the native local
 host and browser frontend live in `map-inspector`, never in this crate.
+
+## Collision profile v2
+
+The original flat-only profile has been extended to decoded open/solid corner
+responses. Walking-component snapshot version 2 and slice profile version 2
+reject old semantics; the layout remains 16-byte little-endian. Twelve local
+trajectories now include positive/negative perpendicular nudges observed through
+fresh input-only boots. See [house movement progress](../../docs/house-movement.md).
+This does not qualify type16, raw bit15, dash or interaction-hook effects.

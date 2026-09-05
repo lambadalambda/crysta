@@ -18,7 +18,7 @@ validated but not wired into this frontend yet. Port `0` selects an unused port.
 
 **Limited semantic preview:** reference-qualified flat walking and an
 endpoint-qualified doorway policy, not native video-frame transition timing.
-Mixed corners, unknown/flagged cells and direction reactivation stop explicitly;
+Open/solid corner responses are supported. Unknown/flagged cells and direction reactivation still stop explicitly;
 use Reset. The player is a bounds marker; no sprites, actors, combat or audio.
 See [portable boundary, evidence and limits](../../docs/portable-room.md).
 `verify-room ROM semantic-preview` repeats the same CPU-free route as JSON.
