@@ -1,6 +1,6 @@
 //! Local full-layer export from ROM assets, without an emulator session.
-use crate::{bitmap, invalid, run_directory, sha256, Result};
-use assets::{graphics::IndexedPixel, maps::visual::CavernBackground};
+use crate::{bitmap, run_directory, sha256, Result};
+use assets::{graphics::IndexedPixel, maps::visual::StaticBackground};
 use rom::Rom;
 use serde_json::{json, Value};
 use std::{
@@ -9,13 +9,10 @@ use std::{
 };
 
 const VIEWER: &str = include_str!("../web/static-viewer.html");
-pub(super) const LIMITS:&str="Static portal-cavern background only: natural full-brightness ROM palette, checkerboard transparency. No sprites, animation, windows, color math, brightness effects, cached graphics transfers or multi-layer composition. Cell high-bit collision semantics are not inferred.";
+pub(super) const LIMITS: &str = "Static first background only, for allowlisted Japanese maps $000F, $0010 and $0128: natural full-brightness ROM palette, checkerboard transparency. No sprites, animation, windows, color math, brightness effects, cached graphics transfers, BG2 or multi-layer composition. Room profiles recognize fixed script shapes without evaluating conditional audio state. Cell high-bit collision semantics are not inferred.";
 
 pub(super) fn export(rom: &Rom, id: u16) -> Result<PathBuf> {
-    if id != 0x128 {
-        return Err(invalid("static rendering is qualified only for map $0128").into());
-    }
-    let scene = CavernBackground::from_rom(rom.image())?;
+    let scene = StaticBackground::from_rom(rom.image(), id)?;
     let width = scene.layer().width() * 16;
     let height = scene.layer().height() * 16;
     let mut indices = Vec::with_capacity(width * height);
@@ -42,7 +39,7 @@ pub(super) fn export(rom: &Rom, id: u16) -> Result<PathBuf> {
     resources.push(json!({"kind":"Layer","source_range":[scene.layer().source_range().start,scene.layer().source_range().end],
         "source_sha256":sha256(scene.layer().source_bytes()),"decoded_sha256":sha256(&scene.layer().layer_bytes())}));
     let metadata = json!({
-        "schema_version":1,"kind":"static-cavern-background","map_id":id,"revision":rom.revision().id(),
+        "schema_version":1,"kind":if id == 0x128 { "static-cavern-background" } else { "static-room-background" },"map_id":id,"revision":rom.revision().id(),
         "rom_sha256":sha256(rom.image()),"width":scene.layer().width(),"height":scene.layer().height(),
         "image":"map.bmp","cells":scene.layer().cells().iter().map(|c|c.raw()).collect::<Vec<_>>(),
         "metatiles":scene.metatiles().iter().map(|words|words.map(assets::graphics::BgTileWord::raw)).collect::<Vec<_>>(),
@@ -63,7 +60,7 @@ pub(super) fn export(rom: &Rom, id: u16) -> Result<PathBuf> {
     fs::write(directory.join("index.html"), render_html(&metadata))?;
     Ok(directory.canonicalize()?.join("index.html"))
 }
-fn pixel_rgb(index: u8, scene: &CavernBackground, x: usize, y: usize) -> [u8; 3] {
+fn pixel_rgb(index: u8, scene: &StaticBackground, x: usize, y: usize) -> [u8; 3] {
     if index == 0 {
         checker(x, y)
     } else {
