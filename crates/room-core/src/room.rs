@@ -1,0 +1,166 @@
+use crate::{Direction, Unqualified};
+use alloc::vec::Vec;
+
+/// Immutable row-major raw collision grid. Construction validates shape, not materials.
+///
+/// Unknown material cells may exist elsewhere in the room; touching one during
+/// movement fails closed. Preserve raw bit 15 instead of masking it during decode.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Room {
+    width: u16,
+    height: u16,
+    cells: Vec<u16>,
+}
+
+impl Room {
+    /// Takes ownership of a grid, without copying or normalizing raw cells.
+    ///
+    /// # Errors
+    /// Rejects zero/overflowing pixel dimensions and an incorrect cell count.
+    pub fn new(width: u16, height: u16, cells: Vec<u16>) -> Result<Self, Unqualified> {
+        if width == 0
+            || height == 0
+            || width.checked_mul(16).is_none()
+            || height.checked_mul(16).is_none()
+        {
+            return Err(Unqualified::RoomDimensions);
+        }
+        if usize::from(width).checked_mul(usize::from(height)) != Some(cells.len()) {
+            return Err(Unqualified::CellCount);
+        }
+        Ok(Self {
+            width,
+            height,
+            cells,
+        })
+    }
+    /// Width in 16-pixel cells.
+    #[must_use]
+    pub const fn width(&self) -> u16 {
+        self.width
+    }
+    /// Height in 16-pixel cells.
+    #[must_use]
+    pub const fn height(&self) -> u16 {
+        self.height
+    }
+    /// Unmodified row-major cells; no mutable grid access is exposed.
+    #[must_use]
+    pub fn cells(&self) -> &[u16] {
+        &self.cells
+    }
+
+    pub(crate) fn validate_position(&self, x: u16, y: u16) -> Result<(), Unqualified> {
+        if x < 8
+            || y < 16
+            || x.checked_add(8).is_none_or(|right| right > self.width * 16)
+            || y > self.height * 16
+        {
+            return Err(Unqualified::PositionOutOfBounds);
+        }
+        Ok(())
+    }
+
+    fn solid(&self, x: u16, y: u16) -> Result<bool, Unqualified> {
+        let (col, row) = (x / 16, y / 16);
+        if col >= self.width || row >= self.height {
+            return Err(Unqualified::SampleOutOfBounds);
+        }
+        let raw = self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)];
+        if raw & 0x8000 != 0 {
+            return Err(Unqualified::FlaggedCell(raw));
+        }
+        let kind = ((raw >> 9) & 31) as u8;
+        match kind {
+            0 | 2 | 22 => Ok(false),
+            12 | 14 => Ok(true),
+            _ => Err(Unqualified::UnsupportedType(kind)),
+        }
+    }
+
+    // Old edges only validate types: actual old-edge diversions depend on 6/7,
+    // not an O/S pair dispatch. New edges additionally require a uniform class.
+    #[allow(clippy::verbose_bit_mask)] // Preserve the reference pixel-remainder test.
+    fn samples(&self, x: u16, y: u16, direction: Direction) -> Result<(bool, bool), Unqualified> {
+        let (u, v) = match direction {
+            Direction::Right => (x.checked_add(7), y.checked_sub(16)),
+            Direction::Left | Direction::Up => (x.checked_sub(8), y.checked_sub(16)),
+            Direction::Down => (x.checked_sub(8), y.checked_sub(1)),
+        };
+        let (u, v) = (
+            u.ok_or(Unqualified::ArithmeticOverflow)?,
+            v.ok_or(Unqualified::ArithmeticOverflow)?,
+        );
+        let first = self.solid(u, v)?;
+        let perpendicular = if direction.horizontal() { v } else { u };
+        let second = if perpendicular & 15 == 0 {
+            first
+        } else {
+            let neighbor = (perpendicular & !15)
+                .checked_add(16)
+                .ok_or(Unqualified::ArithmeticOverflow)?;
+            if direction.horizontal() {
+                self.solid(u, neighbor)?
+            } else {
+                self.solid(neighbor, v)?
+            }
+        };
+        Ok((first, second))
+    }
+
+    pub(crate) fn resolve(
+        &self,
+        x: u16,
+        y: u16,
+        direction: Option<Direction>,
+        dx: i16,
+        dy: i16,
+    ) -> Result<(u16, u16, bool), Unqualified> {
+        let Some(direction) = direction.filter(|_| dx != 0 || dy != 0) else {
+            return Ok((x, y, false));
+        };
+        self.samples(x, y, direction)?;
+        let next_x = x
+            .checked_add_signed(dx)
+            .ok_or(Unqualified::ArithmeticOverflow)?;
+        let next_y = y
+            .checked_add_signed(dy)
+            .ok_or(Unqualified::ArithmeticOverflow)?;
+        let (first, second) = self.samples(next_x, next_y, direction)?;
+        if first != second {
+            return Err(Unqualified::MixedPair);
+        }
+        let (mut resolved_x, mut resolved_y) = (next_x, next_y);
+        if first {
+            // Positive samples use edge-1, but correction tests the unmodified edge.
+            let edge = match direction {
+                Direction::Left => next_x.checked_sub(8),
+                Direction::Right => next_x.checked_add(8),
+                Direction::Up => next_y.checked_sub(16),
+                Direction::Down => Some(next_y),
+            }
+            .ok_or(Unqualified::ArithmeticOverflow)?;
+            let snap = (edge & 8 != 0) == direction.negative();
+            let corrected = if snap {
+                match direction {
+                    Direction::Left => (edge & !15).checked_add(24),
+                    Direction::Right => (edge & !15).checked_sub(8),
+                    Direction::Up => (edge & !15).checked_add(32),
+                    Direction::Down => Some(edge & !15),
+                }
+                .ok_or(Unqualified::ArithmeticOverflow)?
+            } else if direction.horizontal() {
+                x
+            } else {
+                y
+            };
+            if direction.horizontal() {
+                resolved_x = corrected;
+            } else {
+                resolved_y = corrected;
+            }
+        }
+        self.validate_position(resolved_x, resolved_y)?;
+        Ok((resolved_x, resolved_y, first))
+    }
+}
