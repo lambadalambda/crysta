@@ -55,11 +55,9 @@ ROOM_CORE_ADMISSION_FIXTURES=/path/to/local/input-admission \
 
 The evidence was copied to the parent's ignored `local/input-admission/first`
 and `second` directories for shared use. No private data is committed.
-The parent's existing v2 snapshot/used-mask tests require coordinated updates;
-this work deliberately leaves `walking.rs`, `local_trajectories.rs`, `slice.rs`
-and slice `PROFILE_VERSION` untouched. In particular, the old Left→Right→Left
-rejection must become success, not merely be renamed. Parent integration must
-combine the slice profile bump with its collision/input changes before release.
+Parent integration updates the previous used-mask tests, including successful
+Left→Right→Left, and advances the slice compatibility profile to v3. The full
+core suite passes alongside the existing 1,971 collision/doorway steps.
 Scoped Clippy (`--lib --test admission --test local_input_admission`, `-D warnings`)
 and the `wasm32-unknown-unknown` crate build pass. Independent read-only production
 review found no blockers; it explicitly confirmed that decoding is structural

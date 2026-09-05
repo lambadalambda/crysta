@@ -95,7 +95,7 @@ fn errors_are_atomic_including_input_history() {
     let before = state;
     assert_eq!(
         state.step(&room, input(Direction::Left)),
-        Err(Unqualified::ReactivatedDirection(Direction::Left))
+        Err(Unqualified::AcceleratedTrigger(Direction::Left))
     );
     assert_eq!(state, before);
 }
@@ -163,12 +163,8 @@ fn boundary_attempts_and_reversals_are_atomic() {
     let mut state = WalkingState::new(104, 112);
     state.step(&room, input(Direction::Left)).unwrap();
     state.step(&room, input(Direction::Right)).unwrap();
-    let before = state;
-    assert_eq!(
-        state.step(&room, input(Direction::Left)),
-        Err(Unqualified::ReactivatedDirection(Direction::Left))
-    );
-    assert_eq!(state, before);
+    state.step(&room, input(Direction::Left)).unwrap();
+    assert_eq!(state.last_activation_direction(), Some(Direction::Left));
 }
 
 #[test]
@@ -200,17 +196,17 @@ fn snapshots_validate_encoding_phase_history_and_room_bounds() {
     let bytes = state.encode_snapshot();
     assert_eq!(
         bytes,
-        [b'R', b'W', b'K', 0, 2, 0, 104, 0, 112, 0, 4, 4, 0, 8, 0, 0]
+        [b'R', b'W', b'K', 0, 3, 0, 104, 0, 112, 0, 4, 4, 0, 4, 10, 0]
     );
     for (offset, value) in [
-        (4, 3),
+        (4, 2),
         (5, 1),
         (10, 5),
         (11, 255),
         (12, 54),
         (13, 0),
         (13, 16),
-        (14, 1),
+        (14, 11),
         (15, 1),
     ] {
         let mut invalid = bytes;

@@ -265,10 +265,8 @@ fn replay(directory: &Path, fixture: &Fixture) -> usize {
         assert_eq!(state.phase(), 2);
         assert_eq!(state.active_direction(), Some(Direction::Down));
         assert_eq!(state.delayed_direction(), Some(Direction::Down));
-        assert_eq!(
-            state.used_direction_mask(),
-            Direction::Left.mask() | Direction::Down.mask()
-        );
+        assert_eq!(state.last_activation_direction(), Some(Direction::Down));
+        assert_eq!(state.onset_remaining(), 0);
     }
     rows.len() - 1
 }

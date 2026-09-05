@@ -4,8 +4,8 @@ use crate::{Direction, FrameInput, Room, Unqualified, WalkingState};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Collision/semantic profile version; v2 admits qualified open/solid corner nudges.
-pub const PROFILE_VERSION: u8 = 2;
+/// Semantic profile version; v3 admits qualified repeatable ordinary input.
+pub const PROFILE_VERSION: u8 = 3;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -158,6 +158,7 @@ impl GameState {
     /// Advances one walking frame or one *logical* doorway update. While the
     /// doorway owns control, inputs are discarded rather than buffered. Completion
     /// begins a fresh input-admission epoch at the measured arrival endpoint.
+    /// This history reset is preview policy, not native admission qualification.
     /// # Errors
     /// Rejects incompatible data, unsupported walking/exit behavior, or overflow;
     /// failure is atomic and the caller decides how to report/pause it.
@@ -450,6 +451,7 @@ mod tests {
             neutral.step(&data, FrameInput::default()).unwrap();
             assert_eq!(state, neutral);
         }
-        assert_eq!(state.walking.used_direction_mask(), 0);
+        assert_eq!(state.walking.last_activation_direction(), None);
+        assert_eq!(state.walking.onset_remaining(), 0);
     }
 }

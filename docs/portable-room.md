@@ -39,16 +39,18 @@ not an implementation of the save menu or new game.
 
 [Movement qualification](movement-qualification.md) describes the exact
 supported reference trajectories and source witnesses. Unflagged types 0/2/22
-are open and 12/14 are solid. Profile v2 also resolves open/solid corner pairs
+are open and 12/14 are solid. Profile v3 retains resolution of open/solid corner pairs
 with the decoded perpendicular nudge and main-axis snap/rollback. Unknown
 materials, bit-15 cells, map-edge samples and coordinate overflow return explicit errors.
 A failed update leaves state unchanged. Blocking does not stop movement cadence.
 
-Dash activation is not qualified. Therefore each direction may have only **one
-contiguous activation interval per reset/input epoch**. Releasing and retapping,
-or returning to a previously used direction, stops the preview rather than
-quietly treating a dash as walking. Diagonals/actions are not accepted. This is
-an intentionally conservative admission rule, not the game's actual cooldown.
+Ordinary direction reuse is supported by the [measured onset gate](input-admission.md).
+The last activation direction stays remembered; its 11-tick window starts at
+onset, not release.
+Same-direction onset separation of 10 ticks triggers an explicit accelerated-action
+error; 11 ticks is ordinary. A different direction replaces that history, and a
+long hold followed by release/repress is ordinary. Dash execution and
+diagonals/actions remain unsupported.
 Use Reset after a scope error; the automatic doorway demonstration gives a
 reproducible route without needing frame-perfect key release.
 
@@ -68,7 +70,8 @@ The chosen **SemanticPreview** policy is:
    map `$0010`.
 3. 17 logical `(0,+1)` arrival updates: `(392,336)` → `(392,353)`.
 4. Restore walking ownership with a fresh input-admission epoch. Inputs during
-   the doorway are discarded, not buffered.
+   the doorway are discarded, not buffered. This history reset is preview policy,
+   not reference-qualified post-transition admission behavior.
 
 The **endpoints and source path are reference-qualified**. Distributing movement
 into 17/load/17 logical updates is an explicit preview policy. The native path
@@ -84,7 +87,7 @@ transition pacing, animation, flags VM or actor scheduler.
 ## Data and state boundary
 
 - `Room` holds immutable dimensions and raw attributed cells. `WalkingState`
-  holds integer position, delayed/active input, phase and conservative history.
+  holds integer position, delayed/active input, phase and measured onset history.
 - `GameData` owns the two compiled rooms, ordered exit metadata and caller-
   authenticated source/content SHA-256 identities. No device or file handles.
 - `GameState::step` consumes `FrameInput` and produces a semantic `FrameOutput`.
@@ -123,6 +126,10 @@ one accepted step always performs one deterministic core update.
 - Thirteen ROM-free walking tests, eight semantic/snapshot tests and a portable-boundary
   architecture guard pass. Repeated synthetic snapshots resume identically at
   every logical update, including transition ownership.
+- Five admission tests plus 42 authenticated fixture pairs match 3,994 ordinary
+  transitions and 19 atomic accelerated-trigger rejections, with per-step
+  snapshot replay. A 209-step route revisits directions and positions. Walking
+  snapshots are version 3; older versions are rejected.
 - Twelve authenticated private trajectories match **all 1,971 walking steps**,
   attempted stream outputs, positions, blocking and restored continuations.
   Compiled ROM grids (with explicit exclusions above) match those fixture grids:
@@ -135,7 +142,7 @@ one accepted step always performs one deterministic core update.
   absolute request deadline. Synthetic browser tests cover serialized requests,
   keyboard/touch release, blur/hidden pause, reset, demonstration and error handling.
 - Real browser QA exercised the complete doorway demonstration, manual west-wall
-  walking, explicit reactivation error and pausing, desktop/mobile rendering,
+  walking, explicit quick-retap error and pausing (before the admission extension), desktop/mobile rendering,
   and no horizontal document overflow at 390px. No console errors were observed.
   Screenshots stay in `local/map-research/portable-room-{desktop,mobile}.png`.
 - Native/`wasm32-unknown-unknown` builds, workspace tests, strict Clippy/rustdoc,
@@ -147,6 +154,5 @@ trajectory harness can reproduce fixtures; absent optional inputs skip clearly,
 while explicitly required or hash-mismatched fixtures fail closed.
 
 The current [new-game/house exploration goal](../meta/issues/start-and-explore-arks-house.md)
-remains open. Corner support is incremental progress, not removal of the saved
-checkpoint bootstrap, permanent direction-admission guard, or other remaining
-preview restrictions. [Corner evidence and reproduction](house-movement.md).
+remains open. Corner and repeatable-input support are incremental progress, not
+removal of the saved-checkpoint bootstrap or other remaining preview restrictions. [Corner evidence and reproduction](house-movement.md).

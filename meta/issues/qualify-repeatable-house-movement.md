@@ -38,3 +38,15 @@ Replace the preview's permanent used-direction guard and narrow flat-only collis
   explicitly rejected; source/data identity includes the new profile version.
 - See [corner evidence](../../docs/house-movement.md). This is partial progress:
   repeatable direction admission and the new-game/exploration goal remain open.
+
+## Progress: measured ordinary reactivation
+
+- Replaced the permanent used-direction mask with the source-backed last-onset
+  direction and 11-tick countdown. Reversals and ordinary release/repress work;
+  accelerated triggers reject atomically rather than masquerading as walking.
+- 42 authenticated fixture pairs match 3,994 successful transitions and 19
+  accelerated-trigger rejections, including a 209-step revisit route. Every
+  accepted step has a snapshot-restored comparison; walking encoding is v3.
+- [Admission evidence](../../docs/input-admission.md) records two fresh boots,
+  native gate traces and boundary mutations. Additional materials and the
+  fresh-start exploration integration remain open.

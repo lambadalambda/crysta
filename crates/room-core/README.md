@@ -7,7 +7,7 @@ player controller or collision engine.
 
 - `Room` owns an immutable row-major `Vec<u16>` of raw collision cells.
 - `WalkingState` owns position, delayed/active cardinal input, cadence phase and
-  a conservative used-directions mask. No emulator stream pointers are required.
+  last activation direction and onset countdown. No emulator stream pointers are required.
 - `step` is atomic: any `Unqualified` error leaves the entire component unchanged.
 - `MovementOutput` distinguishes actual `dx/dy` from attempted stream deltas and
   reports solid-wall blocking. A rejected operation is **not** a blocked frame.
@@ -18,8 +18,8 @@ player controller or collision engine.
 Only unflagged types 0/2/22 (open) and 12/14 (solid) are admitted. Old samples
 conservatively reject unsupported materials. Mixed open/solid edges preserve the
 reference perpendicular corner nudge while retaining main-axis snap/rollback.
-Direction reactivation is still rejected,
-not treated as ordinary walking or an emulated dash cooldown. Unknown cells may
+Ordinary direction reactivation is supported by the measured 11-tick onset
+window; accelerated triggers fail atomically. Dash execution is not implemented. Unknown cells may
 exist elsewhere in the grid; `Room::new` validates shape, not all materials.
 
 ## Caller responsibilities
@@ -61,7 +61,7 @@ ROOM_CORE_FIXTURES=/path/to/local/movement \
   cargo test -p room-core --test local_trajectories -- --nocapture
 ```
 
-Only this native integration test invokes the host `shasum -a 256` or `sha256sum`
+The native integration tests invoke the host `shasum -a 256` or `sha256sum`
 command (also checked against the standard `abc` digest). Missing hashing tooling
 with fixtures present is an error, not an unauthenticated fallback. This avoids
 adding even dev dependencies; it is not part of the native/Wasm library boundary.
@@ -77,11 +77,15 @@ video-frame timing. It does not execute COP services or a CPU. See
 [the complete preview boundary](../../docs/portable-room.md); the native local
 host and browser frontend live in `map-inspector`, never in this crate.
 
-## Collision profile v2
+## Profile v3
 
 The original flat-only profile has been extended to decoded open/solid corner
-responses. Walking-component snapshot version 2 and slice profile version 2
+responses. Walking-component snapshot version 3 and slice profile version 3
 reject old semantics; the layout remains 16-byte little-endian. Twelve local
 trajectories now include positive/negative perpendicular nudges observed through
 fresh input-only boots. See [house movement progress](../../docs/house-movement.md).
 This does not qualify type16, raw bit15, dash or interaction-hook effects.
+
+[Admission qualification](../../docs/input-admission.md) adds 42 authenticated
+fixture pairs with 3,994 ordinary transitions and 19 atomic trigger rejections,
+including a 209-step revisit route and per-step snapshot restoration.
