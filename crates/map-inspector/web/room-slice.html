@@ -31,11 +31,11 @@ Choose <strong>New Game</strong>, then <strong>Resume</strong> to explore the su
 This semantic start uses the default name and skips the intro and dialogue; it does not play the original opening.
 Ordinary walking, partial furniture and passive flagged walls are supported; rapid same-direction double taps trigger an unsupported dash error.
 Actions and other exits remain unsupported.
-No combat, sprites or audio. The background is static BG1 only, without BG2, animation, windows or scene effects.</p>
+Ark uses ROM-derived standing/walking sprites. No NPCs, combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
 <div class="layout">
 <section class="panel" aria-label="Room preview">
-<canvas id="room" width="256" height="224" aria-label="Static room background with a cyan player bounding box">Canvas is required for the preview.</canvas>
-<p class="legend">Cyan box = player position, not an original sprite. Bottom center marks the feet.</p>
+<canvas id="room" width="256" height="224" aria-label="Room background with ROM-derived Ark standing and walking sprites">Canvas is required for the preview.</canvas>
+<p class="legend">ROM-derived Ark sprites, natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
 <div class="actions">
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
@@ -54,7 +54,7 @@ Release before changing direction. Escape pauses. Touch and hold a cardinal butt
 <h2 id="inspector-heading">Host state inspector</h2>
 <dl><dt>Map</dt><dd id="map">—</dd><dt>Position</dt><dd id="position">—</dd>
 <dt>Camera</dt><dd id="camera">—</dd><dt>Tick</dt><dd id="tick">—</dd>
-<dt>Phase</dt><dd id="phase">—</dd><dt>Policy</dt><dd>semantic-preview</dd></dl>
+<dt>Phase</dt><dd id="phase">—</dd><dt>Sprite key</dt><dd id="actor-key">—</dd><dt>Policy</dt><dd>semantic-preview</dd></dl>
 <p id="status">Connecting to the local host…</p>
 <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
 <p id="error" role="alert"></p>
@@ -103,7 +103,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     // The protocol leaves phase names open. Learn the normal phase only at a
     // known new-game start or saved checkpoint, never a mid-session response.
     const transition = () => state && state.phase !== walkingPhase;
-    const view = () => ({state, error, paused, busy: busy || singlePending, mode, demoIndex, note,
+    const view = () => ({state, error, paused, busy: busy || singlePending || pendingStart !== null, mode, demoIndex, note,
       canDrive: walkingPhase !== null, walking: !!state && !transition()});
     const notify = () => render(view());
     function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
@@ -222,7 +222,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       });
     }
   }
-  function drawScene(ctx, image, state, actor = null) {
+  function drawScene(ctx, image, state, actor = null, foreground = null) {
     ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#10151d'; ctx.fillRect(0, 0, 256, 224);
     if (!state) return;
     const [cx, cy] = state.camera;
@@ -235,17 +235,54 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (actor.flipX) ctx.scale(-1, 1);
       ctx.drawImage(actor.image, sx, sy, width, height, actor.offset[0], actor.offset[1], width, height);
       ctx.restore();
+      if (foreground) ctx.drawImage(foreground, cx, cy, 256, 224, 0, 0, 256, 224);
       return;
     }
     ctx.strokeStyle = '#58f5ff'; ctx.lineWidth = 1;
     ctx.strokeRect(state.x - cx - 8, state.y - cy - 16, 16, 16);
   }
+  // Decode once, not per tick. Mirrored native compositions have alternate
+  // component offsets/anchors, so the host supplies their exact raster too.
+  function prepareArt(bundle, background, makeRaster) {
+    if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
+    const actors = Object.create(null), foreground = Object.create(null);
+    for (const [key, frame] of Object.entries(bundle.frames)) {
+      const {width, height, offset, rgba} = frame;
+      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 64 || height > 64 ||
+          !Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger) ||
+          !Array.isArray(rgba) || rgba.length !== width * height * 4 || !rgba.every(v => Number.isInteger(v) && v >= 0 && v <= 255)) {
+        throw new Error('Invalid sprite raster');
+      }
+      actors[key] = {image:makeRaster(width, height, rgba), source:[0,0,width,height], offset, flipX:false};
+    }
+    for (const [id, mask] of Object.entries(bundle.foreground)) {
+      if (mask.width !== background.width || mask.height !== background.height ||
+          !Array.isArray(mask.runs) || mask.runs.length % 2) throw new Error('Invalid foreground mask');
+      const rgba = new Uint8ClampedArray(background.data.length);
+      let end = 0;
+      for (let i = 0; i < mask.runs.length; i += 2) {
+        const start = mask.runs[i], length = mask.runs[i + 1];
+        if (!Number.isInteger(start) || !Number.isInteger(length) || start < end || length < 1 || start + length > mask.width * mask.height) {
+          throw new Error('Invalid foreground run');
+        }
+        end = start + length;
+        for (let at = start * 4; at < end * 4; at++) rgba[at] = background.data[at];
+      }
+      foreground[id] = makeRaster(mask.width, mask.height, rgba);
+    }
+    return {actors, foreground};
+  }
+  function selectActor(art, state) {
+    const actor = art.actors[state.actor_key];
+    if (!actor || !art.foreground[state.map_id]) throw new Error('Unsupported sprite or background key');
+    return actor;
+  }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene};
+  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
-  let ready = false, lastView = null, lastAnnouncement = '';
+  let ready = false, art = null, assetError = null, lastView = null, lastAnnouncement = '';
   function render(view) {
     lastView = view;
     const {state, error, paused, busy, mode, note, canDrive, walking} = view;
@@ -253,8 +290,9 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       $('map').textContent = `$${state.map_id.toString(16).toUpperCase().padStart(4, '0')}`;
       $('position').textContent = `${state.x}, ${state.y}`; $('camera').textContent = state.camera.join(', ');
       $('tick').textContent = String(state.tick); $('phase').textContent = state.phase;
+      $('actor-key').textContent = state.actor_key || 'unavailable';
     }
-    $('error').textContent = error || '';
+    $('error').textContent = assetError || error || '';
     $('status').textContent = note + (busy ? ' Waiting for host…' : '');
     const announcement = error ? 'Input paused — choose New Game or Checkpoint Reset.' : paused ? note : mode === 'demo' ? 'Checkpoint doorway demo running.' : 'Preview running.';
     if (announcement !== lastAnnouncement) { $('announcement').textContent = announcement; lastAnnouncement = announcement; }
@@ -263,7 +301,21 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('step').disabled = !ready || !canDrive || !!error || busy || !paused;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
-    drawScene(ctx, ready ? image : null, state);
+    // Missing/unsupported art is a visible paused error, never a cyan fallback.
+    if (ready && state) {
+      try {
+        drawScene(ctx, image, state, selectActor(art, state), art.foreground[state.map_id]);
+        assetError = null; $('error').textContent = error || '';
+      }
+      catch (failure) {
+        const message = String(failure.message || failure);
+        drawScene(ctx, null, null);
+        assetError = message;
+        // A start may still be replacing the old state; reject its final result,
+        // even if it repeats a previous bad key, without recursive notifications.
+        if (!busy && error !== message) controller.reject(message);
+      }
+    } else drawScene(ctx, null, null);
   }
   const controller = createController({render, now: () => performance.now(), schedule: (fn, ms) => setTimeout(fn, ms), cancel: clearTimeout,
     async request(url, body) {
@@ -283,12 +335,37 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   $('demo').addEventListener('click', () => controller.demo());
   bindInputs(controller, document, window, buttons);
   controller.setHidden(document.hidden);
-  image.onload = () => {
-    if (image.naturalWidth !== 512 || image.naturalHeight !== 1024) { controller.reject('Expected a 512×1024 first-background sheet from /map.bmp.'); return; }
-    ready = true; if (lastView) render(lastView);
-  };
-  image.onerror = () => controller.reject('Could not load /map.bmp. Check the local host and reload this page.');
-  image.src = '/map.bmp'; controller.init();
+  function makeRaster(width, height, rgba) {
+    const raster = document.createElement('canvas'); raster.width = width; raster.height = height;
+    const context = raster.getContext('2d');
+    context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
+    return raster;
+  }
+  async function loadArt() {
+    let timer;
+    try {
+      const loaded = new Promise((resolve, reject) => {
+        image.onload = resolve; image.onerror = () => reject(new Error('Could not load /map.bmp'));
+      });
+      image.src = '/map.bmp';
+      const metadata = fetch('/art.json', {cache:'no-store', signal:AbortSignal.timeout(5000)}).then(response => {
+        if (!response.ok) throw new Error(`Art HTTP ${response.status}`);
+        return response.json();
+      });
+      const [bundle] = await Promise.race([Promise.all([metadata, loaded]), new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error('Art loading timed out')), 5000);
+      })]);
+      if (image.naturalWidth !== 512 || image.naturalHeight !== 1024) throw new Error('Expected a 512×1024 first-background sheet');
+      const scratch = document.createElement('canvas'); scratch.width = 512; scratch.height = 1024;
+      const context = scratch.getContext('2d'); context.drawImage(image, 0, 0);
+      art = prepareArt(bundle, context.getImageData(0, 0, 512, 1024), makeRaster);
+      ready = true; if (lastView) render(lastView);
+    } catch (failure) {
+      assetError = `Art load failed: ${failure.message || failure}. Reload this page to retry.`;
+      controller.reject(assetError);
+    } finally { clearTimeout(timer); }
+  }
+  loadArt(); controller.init();
 })();
 </script>
 </body>

@@ -10,7 +10,7 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1);
 const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
-const {createController, bindInputs, drawScene} = sandbox.RoomSlice;
+const {createController, bindInputs, drawScene, prepareArt, selectActor} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0]});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
@@ -47,7 +47,52 @@ class Target {
   releasePointerCapture(id) { this.captured.delete(id); }
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
+// Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
+function browserHarness({stallBitmap = false, actorKey = '0:0'} = {}) {
+  const elements = new Map(), timers = new Map(); let timerId = 0, key = actorKey;
+  const context = {fillRect(){},drawImage(){},save(){},restore(){},translate(){},putImageData(){},
+    getImageData(){return {width:512,height:1024,data:new Uint8ClampedArray(512*1024*4)};}};
+  const element = id => {
+    if (!elements.has(id)) {
+      const target = new Target(); target.textContent=''; target.getContext=()=>context;
+      elements.set(id,target);
+    }
+    return elements.get(id);
+  };
+  const doc = new Target(); doc.getElementById=element; doc.querySelectorAll=()=>[];
+  doc.createElement=()=>({getContext:()=>context});
+  const win = new Target();
+  const bundle = {schema_version:1,frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
+    foreground:{'15':{width:512,height:1024,runs:[]}}};
+  const browser = {console,document:doc,window:win,performance:{now:()=>0},AbortController,AbortSignal,Uint8ClampedArray,
+    ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
+    Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
+    setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
+    async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key};}};},
+  };
+  vm.runInNewContext(scripts[0][1], browser);
+  return {element,timers,setKey(value){key=value;}};
+}
 async function main() {
+  const recovery = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
+  assert.match(recovery.element('error').textContent, /sprite/i);
+  recovery.element('new-game').emit('click'); await flush();
+  assert.equal(recovery.element('pause').disabled, true, 'a repeated bad key must still reject a new start');
+  recovery.element('demo').emit('click'); await flush();
+  assert.equal(recovery.element('pause').disabled, true);
+  assert.equal(recovery.timers.size, 0, 'invalid art cannot start demo stepping');
+  recovery.setKey('0:0'); recovery.element('new-game').emit('click'); await flush();
+  assert.equal(recovery.element('error').textContent, '', 'valid New Game reuses cached art after a bad key');
+  assert.equal(recovery.element('pause').disabled, false);
+  const recoveredDemo = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
+  recoveredDemo.setKey('0:0'); recoveredDemo.element('demo').emit('click'); await flush();
+  assert.equal(recoveredDemo.element('error').textContent, '');
+  assert.equal(recoveredDemo.timers.size, 1, 'valid demo replacement must retain autoplay intent');
+  const stalled = browserHarness({stallBitmap:true}); await flush();
+  const deadlines=[...stalled.timers.values()].filter(t => t.ms===5000);
+  assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
+  assert.match(stalled.element('error').textContent, /timed out/i);
+  assert.equal(stalled.element('pause').disabled,true);
   // Start paused; requests and timers never overlap or accumulate a catch-up queue.
   const h = harness(); await h.start();
   assert.equal(h.calls[0].url, '/state'); assert.equal(h.timers.size, 0);
@@ -278,6 +323,25 @@ async function main() {
     ['save'], ['translate',48,112], ['scale',-1,1],
     ['draw',texture,16,32,24,32,-10,-28,24,32], ['restore'],
   ]);
+
+  // Real asset adapter: pre-mirrored bounds, transparent gaps, and high-only occlusion.
+  const rgba = [10,20,30,255, 40,50,60,255, 70,80,90,255, 100,110,120,255];
+  const bundle = {schema_version:1, frames:{'2:1':{width:2,height:2,offset:[-9,-31],rgba}},
+    foreground:{'15':{width:2,height:2,runs:[1,1,3,1]}}};
+  const rasterCalls = [];
+  const art = prepareArt(bundle, {width:2,height:2,data:rgba}, (width,height,data) => {
+    const result = {width,height,data:Array.from(data)}; rasterCalls.push(result); return result;
+  });
+  assert.deepEqual(rasterCalls[1].data, [0,0,0,0,40,50,60,255,0,0,0,0,100,110,120,255]);
+  const selected = selectActor(art, {...initial(),actor_key:'2:1'});
+  assert.deepEqual(Array.from(selected.offset), [-9,-31]);
+  assert.equal(selected.flipX, false, 'native alternate mirror anchors are already composed');
+  assert.throws(() => selectActor(art, {...initial(),actor_key:'unknown'}), /sprite/i);
+  assert.throws(() => prepareArt({...bundle,schema_version:99}, {width:2,height:2,data:rgba}, () => {}), /art/i);
+  spriteCalls.length = 0;
+  drawScene(spriteCtx, image, initial(), selected, art.foreground['15']);
+  assert.equal(spriteCalls.at(-1)[1], art.foreground['15'], 'opaque high background is drawn after Ark');
+  assert(!html.includes('Cyan box ='));
 
   assert(html.includes('Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU'));
   assert(/id="new-game"[^>]*>New Game<\/button>/.test(html));
