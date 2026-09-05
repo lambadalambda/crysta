@@ -14,10 +14,19 @@ Open the printed `local/static-maps/run-*/index.html`. It renders the complete
 1280×512 portal cavern from decoded graphics, palettes and metatiles, not
 framebuffer samples. No SRAM or emulator execution is needed. Natural palette,
 checkerboard transparency, zoom/grid, cell/word inspection and metatile previews
-are included; sprites, animation and final scene effects are not. Only map `$0128`
-is supported. See [static graphics](../../docs/static-graphics.md) for resource
+are included; sprites, animation and final scene effects are not. Maps `$000F`,
+`$0010` and `$0128` have explicit supported profiles. Use `f` or `10` instead
+of `128` for the [Crysta first-background sheet](../../docs/room-graphics.md). See [static graphics](../../docs/static-graphics.md) for resource
 formats, source/VRAM equality and the qualified 16×16 reference-pixel patch.
 Generated assets remain local; do not commit or redistribute them.
+
+## Qualified Crysta doorway replay
+
+`qualify-opening ROM SRAM` runs seven pinned checkpoints from actual save slot 1
+through the `$000F` → `$0010` doorway. `trace-opening ROM SRAM` independently
+checks eight native trigger/controller/loader stops against the decoded exit.
+See [inputs, hashes and scope](../../docs/opening-doorway.md). These commands
+run the oracle; static `render-map` does not. Neither is a portable simulation.
 
 ## Runtime capture viewer
 

@@ -101,7 +101,7 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
     }
     let manifest = json!({
         "schema_version":1,"revision":rom.revision().id(),"rom_sha256":sha256(rom.image()),
-        "sram_sha256":SAVE_SHA256,"scenario":"qualified-slot-1-right-movement",
+        "sram_sha256":SAVE_SHA256,"scenario":"qualified-slot-3-right-movement",
         "checkpoints":captures.iter().map(|capture|capture.metadata.clone()).collect::<Vec<_>>()
     });
     if export {

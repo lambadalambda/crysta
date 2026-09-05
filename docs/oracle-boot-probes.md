@@ -4,6 +4,12 @@ Recorded 2026-08-26 from scratch probes (`crates/oracle/examples/probe_boot*.rs`
 removed after this write-up) against the local dumps in `local/`. These are
 ROM-backed observations; nothing here is committed as fixture content.
 
+> Historical **LakeSnes** probe report, not a diagnosis of current ares behavior.
+> Its old symbol interpretations are not current guidance: `$047C` is pending
+> map and `$0482` is previous map in the qualified doorway, not pending map.
+> Current name-entry inputs do not prove successful confirmation or a stall.
+> See [the input-only saved-game Crysta qualification](opening-doorway.md).
+
 ## Boot timeline (Japan `Tenchi Souzou (Japan).sfc`, HiROM, NTSC)
 
 All timings are frame counts from hard reset with the input edges shown.

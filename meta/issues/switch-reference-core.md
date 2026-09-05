@@ -42,9 +42,9 @@ Swapped the vendored reference core to ares (ISC) behind the unchanged
   applies by design.
 - Input frame timings and checkpoint state bytes are core-dependent; the
   fixtures (input streams) stay, their reference checkpoints get re-pinned.
-- **Verification finding (prototype, 2026-08-26):** the wedge reproduces
-  identically under the ares core with the same input stream — the stall is
-  the game's own script desync on the name-entry input sequence, NOT an
-  emulator accuracy defect. The SPC-upload handshake diagnosis from
-  [oracle-boot-probes.md](../../docs/oracle-boot-probes.md) applies only to
-  LakeSnes; under ares the SPC runs and the game still waits.
+- **Correction:** the prototype's claim that the same name-entry input stream
+  proved a game-script desync under ares was not qualified. Visible name entry
+  does not prove confirmation, a stall, or an emulator defect. Historical
+  LakeSnes SPC-upload observations are separate from current ares behavior.
+  The [input-only Crysta doorway](../../docs/opening-doorway.md) now establishes
+  saved-game gameplay without patches; new-game confirmation remains open.

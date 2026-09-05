@@ -31,5 +31,18 @@ Crysta opening, then decode the event/trigger path and required destination data
 
 - Parents: [event bytecode](reverse-event-bytecode.md),
   [map formats](decode-map-collision-formats.md).
-- The existing new-game name-entry stall and unqualified save-slot navigation
-  must be investigated rather than hidden behind memory patches.
+- Actual slot 1 is now selected by two Up taps; the older cavern replay used
+  default slot 3. Name-entry experiments do not prove an ares/game-script stall.
+  See [doorway qualification](../../docs/opening-doorway.md).
+
+## Verification
+
+- Pure bounded exit parser: synthetic framing/geometry tests and owned-ROM
+  source hashes for maps `$000F` / `$0010`.
+- `qualify-opening`: seven full-WRAM pins and two complete cold-boot JSON results
+  identical; `trace-opening`: eight PC/register/state stops connect the selected
+  record to pending/current map changes and destination actor initialization.
+- ROM-only `render-map … f` / `10`: first-background assets extracted with strict
+  profiles and runtime equality tests; see [room graphics](../../docs/room-graphics.md).
+- Workspace tests, strict Clippy, safety/tracker checks and independent reviews
+  passed. Native/COP path evidence is documented, not promoted to a full VM.

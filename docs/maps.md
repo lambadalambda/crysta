@@ -58,6 +58,11 @@ A frame runs before each capture, so labels and core frame counters differ by on
 | Before movement | 1600 | 1601 | 648, 0 | 776, 112 |
 | After 40 Right frames | 1840 | 1841 | 706, 16 | 834, 128 |
 
+This Start/A-only replay selects default **save slot 3**, not slot 1 as older
+metadata claimed. Actual slot 1 and its [Crysta doorway](opening-doorway.md)
+are now separately qualified. The capture scenario ID is corrected to
+`qualified-slot-3-right-movement`; checkpoint hashes and inputs are unchanged.
+
 Both checkpoints are map **`$0128`, the portal cavern**, not Crysta town. The
 layer is 1280×512 pixels, or 80×32 cells: 2560 words / 5120 bytes. Both copies hash
 to `c3c7af3a0ef3c6c53e641b058ccaccad8a9b5ea42dca79c28e41c41ecaa450c5`.

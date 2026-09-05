@@ -99,6 +99,8 @@ fn run_local_sram_trace_child() -> ! {
     let mut trace = export::SymbolTrace::new(
         &map,
         rom.revision().sha256(),
+        // Historical mislabel retained to preserve the published v1 digest.
+        // This Start/A-only replay loads slot 3; see docs/opening-doorway.md.
         "qualified-sram-slot-1-movement",
         &[
             "current_map",

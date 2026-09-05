@@ -135,7 +135,7 @@ sampled values rather than a serializer choice.
 The qualified ROM-backed scenario uses the Japanese ROM and an optional local
 save obtained externally from
 [FantasyAnime's Terranigma save page](https://fantasyanime.com/legacy/terran_saves.htm):
-**Game Save #1, slot 1** (`Level 1, Chapter 1, Crystal Blue`). The required 8 KiB
+**Game Save #1, default slot 3** (`Chapter 2, World Resurrection`). The required 8 KiB
 SRAM SHA-256 is:
 
 ```text
@@ -148,8 +148,10 @@ it and the Japanese ROM are present. The source record and hash qualify the
 local input used by the scenario, but do not elevate unrelated FantasyAnime,
 Data Crystal, or GameFAQs meanings to project-verified facts.
 
-The scenario ID is `qualified-sram-slot-1-movement`. It loads the Chapter 1
-Crystal Blue save and selects `current_map`, `player_x`, `player_y`,
+The historical scenario ID `qualified-sram-slot-1-movement` is retained only
+to preserve its published v1 digest. It actually loads default **slot 3**;
+[the Crysta replay](opening-doorway.md) qualifies real slot 1 using two Up taps.
+The trace selects `current_map`, `player_x`, `player_y`,
 `event_flags`, `inventory_items`, `inventory_weapons`, and `inventory_armor`.
 
 | Scenario label | Actual core frame | Controlled assertions |

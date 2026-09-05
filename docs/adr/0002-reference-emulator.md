@@ -70,9 +70,11 @@ would mean a different core family (bsnes/ares), per the decision above.
 The vendored core has been replaced with **ares** (ISC, near/ares team),
 vendored under `vendor/ares/`. Ares provides pixel-accurate PPU, cycle-accurate
 DSP, and proper SMC header handling. The swap was motivated by the M1
-post-name-entry scenarios: while the game-script stall reproduces identically
-under ares (confirming it is not an emulator defect), ares's higher accuracy
-provides a more trustworthy reference for the M2+ disassembly and content work.
+post-name-entry scenarios and the need for a more trustworthy reference for
+M2+ disassembly and content work. The earlier claim that matching name-entry
+observations proved a game-script stall was not qualified: successful name
+confirmation and the alleged defect remain unproven. A separate
+[input-only saved-game Crysta doorway](../opening-doorway.md) now reaches gameplay.
 
 Key implementation notes:
 - `vendor/ares/shims.cpp` is project-authored, mapping ares's Super Famicom

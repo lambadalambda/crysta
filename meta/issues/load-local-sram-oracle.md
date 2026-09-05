@@ -23,7 +23,7 @@ Allow ROM-backed verification scenarios to boot ares with caller-provided local 
 ## Notes
 
 - This enables controlled memory-symbol verification from user-supplied or externally sourced local saves; it does not make SRAM contents commit-safe.
-- The qualified local scenario uses FantasyAnime Game Save #1, slot 1 from
+- The qualified local scenario uses FantasyAnime Game Save #1, default slot 3 from
   <https://fantasyanime.com/legacy/terran_saves.htm>, with local SRAM SHA-256
   `709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055`.
   The save is not bundled, and its provenance does not verify unrelated public
