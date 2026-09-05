@@ -48,6 +48,14 @@ using namespace ares;
 
 namespace {
 
+// Screen::refreshPalette supplies ARGB8888, not RGB30.
+constexpr uint32_t xrgb8888(uint32_t value) {
+  return value & 0x00ffffff;
+}
+static_assert(xrgb8888(0xff112233) == 0x00112233, "video channels must be preserved");
+static_assert(xrgb8888(0xffff0000) == 0x00ff0000, "red must remain red");
+static_assert(xrgb8888(0xff000000) == 0x00000000, "alpha must not contaminate black");
+
 struct OraclePlatform : ares::Platform {
   std::shared_ptr<vfs::directory> systemPak;
   std::vector<u8> romBytes;
@@ -132,7 +140,7 @@ struct OraclePlatform : ares::Platform {
   }
 
   auto video(Node::Video::Screen, const u32* data, u32 pitch, u32 width, u32 height) -> void override {
-    // Convert the ares RGB30 screen into an internal XRGB8888 image.
+    // Discard ares ARGB8888 alpha for the public XRGB8888 image.
     this->width = width;
     this->height = height;
     lastFrame.assign((std::size_t)width * height, 0);
@@ -143,12 +151,7 @@ struct OraclePlatform : ares::Platform {
     for(u32 y = 0; y < copyHeight; y++) {
       const u32* src = data + (y + sourceY) * (pitch >> 2) + sourceX;
       for(u32 x = 0; x < copyWidth; x++) {
-        u32 v = src[x];
-        u32 r = (v >> 20) & 0x3ff;
-        u32 g = (v >> 10) & 0x3ff;
-        u32 b = (v >> 0) & 0x3ff;
-        u32 p = (b >> 2) | ((g >> 2) << 8) | ((r >> 2) << 16);
-        lastFrame[y * width + x] = p;
+        lastFrame[y * width + x] = xrgb8888(src[x]);
       }
     }
   }
