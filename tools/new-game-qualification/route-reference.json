@@ -1,0 +1,203 @@
+{
+  "checkpoints": [
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1044,
+        0
+      ],
+      "frame": 6800,
+      "grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+      "map": 15,
+      "player": [
+        304,
+        112
+      ],
+      "resume": 8692387,
+      "wram_sha256": "49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1045,
+        0
+      ],
+      "frame": 6967,
+      "grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+      "map": 15,
+      "player": [
+        392,
+        208
+      ],
+      "resume": 8692561,
+      "wram_sha256": "148844442967d5305cd47652baf9b9638a5e66fcd0ac95ae808d3d1a523fd128"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        5137,
+        0
+      ],
+      "frame": 6968,
+      "grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+      "map": 15,
+      "player": [
+        392,
+        209
+      ],
+      "resume": 8698229,
+      "wram_sha256": "df6c2a1d8c9295a2892eb25a900f3d35e35a858b189a67cf86d14aca9852dfa6"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        5137,
+        0
+      ],
+      "frame": 6984,
+      "grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+      "map": 16,
+      "player": [
+        392,
+        225
+      ],
+      "resume": 8698229,
+      "wram_sha256": "37aeb663ccb19fbf25bf5220032240b547837d8ef0732ffe612139b238be19f8"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        17428,
+        0
+      ],
+      "frame": 6989,
+      "grid_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+      "map": 16,
+      "player": [
+        392,
+        336
+      ],
+      "resume": 8692014,
+      "wram_sha256": "0cae4770b66d2b0033dfbc66e2ddcef3da2af1b02b54d104a06884a9824ad57e"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1044,
+        0
+      ],
+      "frame": 7050,
+      "grid_sha256": "261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed",
+      "map": 16,
+      "player": [
+        392,
+        353
+      ],
+      "resume": 8692312,
+      "wram_sha256": "e21bc39ac7349446bf4de7d37bddb48072b644dfbd7291662f9ad9c247192560"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1045,
+        0
+      ],
+      "frame": 7114,
+      "grid_sha256": "261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed",
+      "map": 16,
+      "player": [
+        392,
+        336
+      ],
+      "resume": 8692583,
+      "wram_sha256": "f81b2e4c6c257b2fb175899666c5d8ccfd37c5f0291ecb95397da01700202e94"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        5137,
+        0
+      ],
+      "frame": 7131,
+      "grid_sha256": "261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed",
+      "map": 15,
+      "player": [
+        392,
+        319
+      ],
+      "resume": 8698286,
+      "wram_sha256": "847cea4d423cc308739ac31ad430ff69c68c3dbbcc898ce30898b6b8fefefe79"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        17428,
+        0
+      ],
+      "frame": 7141,
+      "grid_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+      "map": 15,
+      "player": [
+        392,
+        208
+      ],
+      "resume": 8692014,
+      "wram_sha256": "83c6ab2be6b526511f52e9a47174a8c145330af81d1246a8f76f2617916385b0"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1044,
+        0
+      ],
+      "frame": 7250,
+      "grid_sha256": "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1",
+      "map": 15,
+      "player": [
+        392,
+        191
+      ],
+      "resume": 8692312,
+      "wram_sha256": "b2d8a371f8f21f0470aa104b5b61fa821a9933c9f910573a5f0d3dc22536ea68"
+    },
+    {
+      "event_sha256": "6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b",
+      "flags": [
+        1045,
+        16384
+      ],
+      "frame": 7460,
+      "grid_sha256": "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1",
+      "map": 15,
+      "player": [
+        392,
+        191
+      ],
+      "resume": 8692312,
+      "wram_sha256": "5562b74dab516f77005195ed6f109899a790c904d8580aec120919121a575407"
+    }
+  ],
+  "end": 7460,
+  "frames_sha256": "dd9c58cd57be3f33a61286c363e133e217ba34e595e8efedb92077b62b91bf74",
+  "grid_differences": [
+    {
+      "index": 317,
+      "runtime": 38981,
+      "static": 6213,
+      "x": 29,
+      "y": 9
+    },
+    {
+      "index": 504,
+      "runtime": 40168,
+      "static": 7400,
+      "x": 24,
+      "y": 15
+    }
+  ],
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "runtime_grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+  "start": 6800,
+  "static_bg1_grid_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+  "version": 1
+}

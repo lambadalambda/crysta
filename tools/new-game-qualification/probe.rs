@@ -2,24 +2,11 @@
 //! Exactly one Session::new, default empty SRAM, no restores or mutations.
 use oracle::{export::digest_hex, Button, Session};
 use serde_json::json;
+mod bootstrap;
 mod native_trace;
 use std::io::Write;
 
-const INPUTS: &[(Button, u32, u32)] = &[
-    (Button::Start, 400, 410),
-    (Button::Down, 700, 712),
-    (Button::Down, 730, 742),
-    (Button::Down, 760, 772),
-    (Button::A, 900, 912),
-    (Button::Start, 1200, 1210),
-    (Button::A, 3500, 3512),
-    (Button::A, 4100, 4112),
-    (Button::A, 4700, 4712),
-    (Button::A, 5300, 5312),
-    (Button::A, 5900, 5912),
-    (Button::Right, 6800, 6820),
-    (Button::Down, 6900, 6920),
-];
+const INPUTS: &[(Button, u32, u32)] = &[(Button::Right, 6800, 6820), (Button::Down, 6900, 6920)];
 const CHECKPOINTS: &[(u32, &str)] = &[
     (800, "empty-load-menu-new-game-selected"),
     (1100, "kana-grid-default-ark"),
@@ -67,12 +54,15 @@ fn main() {
     let mut checkpoints = Vec::new();
     for label in 0..trace_plan.map_or(7100, |(end, _)| end) {
         for button in [Button::Start, Button::Down, Button::A, Button::Right] {
-            let pressed = INPUTS.iter().any(|&(b, start, end)| {
-                b == button
-                    && (start..end).contains(&label)
-                    && !(mode == "no-confirm" && start == 1200)
-                    && !(mode == "no-movement" && start >= 6800)
-            });
+            let pressed = bootstrap::INPUTS
+                .iter()
+                .chain(INPUTS)
+                .any(|&(b, start, end)| {
+                    b == button
+                        && (start..end).contains(&label)
+                        && !(mode == "no-confirm" && start == 1200)
+                        && !(mode == "no-movement" && start >= 6800)
+                });
             session.set_button(button, pressed);
         }
         session.run_frame();

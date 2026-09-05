@@ -314,3 +314,110 @@ The exact name character encoding, inventory/stat effects of the reset table,
 rendering, dialogue text processing and later actor lifecycle remain outside
 this projection. No full intro VM, save reconstruction, core or frontend change
 is part of this qualification.
+
+## One fresh F → 10 → F route and repeatable ordinary input
+
+```sh
+sh tools/new-game-qualification/route-replay.sh 'local/Tenchi Souzou (Japan).sfc'
+python3 -B tools/new-game-qualification/route_check.py CAPTURE/a CAPTURE/b
+```
+
+This is **one route**, captured twice from independent `Session::new` boots.
+Both execute the same real menu/intro inputs as the original qualification;
+`bootstrap.rs` now shares that prefix between probes. No SRAM input or emulator
+restore is involved. Every process exits 0. The CPU-free initializer remains
+separate from capture and does not ingest its WRAM/CSV.
+
+After the common startup, apply these half-open **input labels**:
+
+| Direction | Labels |
+| --- | --- |
+| Right | `[6800,6862)` |
+| Down | `[6900,6967)` |
+| Up | `[7100,7119)` |
+| Right | `[7260,7280)` |
+| Left | `[7310,7330)` |
+| Right | `[7360,7380)` |
+| Left | `[7410,7430)` |
+
+All intervening inputs are neutral. The shortest successive-onset spacing is
+50 labels; both repeated Right and repeated Left are safely outside the
+qualified 11-tick ordinary-onset boundary. `route_check.py` reuses the existing
+input-admission checker, rather than introducing another dash/collision model.
+
+| Completed frame | Map | Position | Ownership / observation |
+| ---: | --- | --- | --- |
+| 6800 | F | 304,112 | Authenticated fresh neutral boundary |
+| 6900 | F | 393,112 | First Right released; subsequent Down nudges X to 392 |
+| 6967 | F | 392,208 | Last sampled ordinary-walking state before departure |
+| 6968 | F | 392,209 | Already transition-owned: flags `$1411`, resume `$84:B975` |
+| 6984 | 10 | 392,225 | Current-map switch; loading has not yet populated arrival |
+| 6989 | 10 | 392,336 | Destination player populated, before arrival animation |
+| 7050 | 10 | 392,353 | Neutral, ordinary control restored |
+| 7114 | 10 | 392,336 | Last ordinary frame before reverse departure |
+| 7131 | F | 392,319 | Reverse current-map switch, loader underway |
+| 7141 | F | 392,208 | Return player populated |
+| 7250 | F | 392,191 | Reverse arrival complete, neutral |
+| 7460 | F | 392,191 | Right/Left/Right/Left completed and released |
+
+Do not transplant saved-route completed-frame timing into this run. In
+particular, 6968 already combines the doorway contact coordinate with controller
+ownership; it is **not** another free-walking sample. The forward map switch is
+sampled at Y=225 here, rather than Y=226 in the saved baseline. Both reach the
+same destination spawn/settled positions. This fixture records the original
+scheduler's boundaries; it does not expand the semantic transition timing policy.
+
+### Parent walking fixtures
+
+`frames.csv` has **661 contiguous rows**, completed 6800–7460 inclusive. Column
+layout matches the input-admission corpus: `frame,input,map,x,y,flags,flags8,
+resume,timer,dir,ptrx,ptry,cntx,cnty,outx,outy,dx,dy,anim,joy,edge,window,last`.
+`input` belongs to label `frame−1`; hex fields follow that existing corpus.
+Runtime grids are at WRAM `$A000..B000`. Each segment begins with its neutral
+boundary row; create `WalkingState` there, then submit subsequent rows:
+
+- **6800..6967:** fresh `(304,112)`, **167** ordinary steps.
+- **7050..7114:** map 10 `(392,353)`, **64** ordinary steps.
+- **7250..7460:** returned F `(392,191)`, **210** ordinary/revisit steps.
+
+A local comparator against the existing `room-core::WalkingState` matched all
+**441** position and attempted-delta steps. Transition/loader intervals were
+explicitly excluded, not passed through walking or silently treated as idle.
+The committed route checker authenticates the fixture and onset admission; it
+does not itself implement or claim differential transition simulation. Initial
+normal flags are `$0414/0000`; final flags are `$0415/4000`, also retained rather
+than normalized away.
+
+### Static BG1 versus actual runtime grid
+
+At completed 6800, decode `StaticBackground::from_rom(ROM, 15)`, then apply its
+512-byte attribute table through `StaticLayer::attributed_cells`. Dimensions are
+32×64. **All 2,048 low-15-bit words match runtime**, but full equality is false:
+
+| Cell index | Tile position | Static word | Runtime word |
+| ---: | --- | --- | --- |
+| 317 | 29,9 | `$1845` | `$9845` |
+| 504 | 24,15 | `$1CE8` | `$9CE8` |
+
+Only bit `$8000` differs. Both unmasked grids and this exact difference list are
+captured/authenticated. The probe fails on any low-15-bit mismatch, and the
+reference report rejects changed high-bit overlays. These are runtime overlays,
+**not permission to discard `$8000` or assume dynamic actors are decoded**.
+At 7050, differing cells are 731,732,826,827; after returning at 7250 only 317
+differs. Raw WRAM/grid hashes at those boundaries are separately pinned; the
+initial grid must not be reused blindly across map loading.
+
+Metadata/hashes: `route-reference.json`. Selected pins:
+
+- CSV: `dd9c58cd57be3f33a61286c363e133e217ba34e595e8efedb92077b62b91bf74`.
+- Static attributed BG1: `18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db`.
+- Fresh 6800 runtime grid: `a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f`.
+- Fresh 6800 full WRAM remains the original
+  `49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82`.
+
+The route's selected 64-byte event block is unchanged throughout. Eleven raw
+WRAM/framebuffer checkpoints, both grids and CSV stay ignored. `test_route.py`
+was red before implementing grid comparison, then passed equality, explicit
+high-bit reporting, low-bit rejection and extent checks. Two final route boots
+match every report field and CSV byte. No additional room/collision production
+support or tracker edits are included.

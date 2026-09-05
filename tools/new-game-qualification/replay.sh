@@ -6,7 +6,7 @@ python3 tools/new-game-qualification/test_verify.py
 python3 tools/new-game-qualification/test_startup.py
 mkdir -p local/new-game-qualification/probe/src
 cp tools/new-game-qualification/probe.rs local/new-game-qualification/probe/src/main.rs
-cp tools/new-game-qualification/native_trace.rs local/new-game-qualification/probe/src/
+cp tools/new-game-qualification/native_trace.rs tools/new-game-qualification/bootstrap.rs local/new-game-qualification/probe/src/
 cat >local/new-game-qualification/probe/Cargo.toml <<'TOML'
 [package]
 name = "new-game-qualification"
