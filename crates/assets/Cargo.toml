@@ -9,5 +9,5 @@ repository.workspace = true
 [lints]
 workspace = true
 
-[dev-dependencies]
+[dependencies]
 rom = { path = "../rom" }

@@ -7,6 +7,7 @@
 
 use std::fmt;
 
+pub mod scripts;
 mod static_layer;
 pub use static_layer::{StaticLayer, StaticMapError};
 
