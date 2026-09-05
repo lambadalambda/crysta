@@ -79,13 +79,14 @@ map packets, including byte-exact re-encoding; see the
 [format and verification record](../docs/compression.md). A first
 [local loaded-map inspector](../docs/maps.md) now visualizes qualified cavern
 checkpoints and raw structure. The [static cavern layer and attribute lookup](../docs/static-maps.md)
-now match actual loader output. General map-script resolution, broader map
-coverage and collision behavior qualification remain open.
+now match actual loader output. A bounded [map-ID loading-script projection](../docs/map-scripts.md)
+resolves five tested IDs into eight layers, with menu and cavern loader equality.
+State-dependent loading, broader gameplay coverage and collision behavior
+qualification remain open.
 
 ### Issues
 
 - [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
-- [Resolve map loading scripts and qualify additional layers](issues/resolve-map-loading-scripts.md)
 - [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)
 - [Reverse the event script bytecode](issues/reverse-event-bytecode.md)

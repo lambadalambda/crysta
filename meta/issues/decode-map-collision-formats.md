@@ -52,7 +52,12 @@ attribute table; pure static decoding matches both raw and initialized runtime
 bytes exactly. One later cell-bit change is isolated, without claiming its
 gameplay semantics. See [static maps](../../docs/static-maps.md).
 
-This parent remains open. General map-script/pointer resolution, additional
-indoor/outdoor/dungeon/world-map coverage, graphics, placements/regions/exits,
-and behavior-qualified collision fixtures remain. The old dimension-store probe
+The [map-loading script projection](resolve-map-loading-scripts.md) now resolves
+five map IDs into eight layer packets without hard-coded layer offsets. Menu
+`$0004` and cavern `$0128` have loader equality; the other cases are static-only.
+Calls, jumps and deferred streams are supported, not unspecified game flags.
+
+This parent remains open. State-dependent loading and final layer composition,
+visited indoor/outdoor/dungeon/world-map coverage, graphics, placements/regions/
+exits, and behavior-qualified collision fixtures remain. The old dimension-store probe
 was a false lead; the qualified cavern loader uses another path.
