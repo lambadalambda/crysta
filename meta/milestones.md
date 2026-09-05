@@ -118,6 +118,7 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
+- [Inspect read-only sprite hardware state](issues/inspect-sprite-hardware-state.md)
 - [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
 - [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
 

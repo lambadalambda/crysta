@@ -29,3 +29,4 @@
 - [ ] [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
 - [ ] [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
 - [ ] [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
+- [ ] [Inspect read-only sprite hardware state](issues/inspect-sprite-hardware-state.md)
