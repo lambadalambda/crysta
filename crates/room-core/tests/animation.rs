@@ -1,8 +1,5 @@
 //! Animation tests deliberately stand apart from walking/snapshot integration.
-pub use room_core::Direction;
-#[path = "../src/animation.rs"]
-mod animation;
-use animation::{AnimationSet, AnimationState};
+use room_core::{AnimationSet, AnimationState, Direction};
 use Direction::{Down, Left, Right, Up};
 
 #[test]

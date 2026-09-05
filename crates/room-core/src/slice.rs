@@ -1,11 +1,13 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
 use crate::transition::Transition;
-use crate::{FrameInput, Room, Unqualified, WalkingState};
+use crate::{
+    AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
+};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v6 adds ROM-compiled fresh bedroom initialization.
-pub const PROFILE_VERSION: u8 = 6;
+/// Semantic profile version; v7 adds ordinary animation and directional doorway poses.
+pub const PROFILE_VERSION: u8 = 7;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -159,6 +161,8 @@ pub struct FrameOutput {
     pub position: (u16, u16),
     /// Owner of movement for the next update.
     pub phase: Phase,
+    /// Ordinary sprite asset key; doorway poses use explicit standing policy.
+    pub animation: AnimationFrame,
 }
 
 /// Minimal mutable slice state. No clock, filesystem, original CPU or RNG usage.
@@ -168,6 +172,7 @@ pub struct GameState {
     tick: u64,
     map_id: u16,
     walking: WalkingState,
+    animation: AnimationState,
     transition: Option<Transition>,
     fresh_bedroom: bool,
 }
@@ -180,6 +185,7 @@ impl GameState {
             tick: 0,
             map_id: 15,
             walking: WalkingState::new(472, 176),
+            animation: AnimationState::standing(Direction::Down),
             transition: None,
             fresh_bedroom: false,
         }
@@ -195,6 +201,7 @@ impl GameState {
             tick: 0,
             map_id: 15,
             walking: WalkingState::new(x, y),
+            animation: AnimationState::standing(Direction::Down),
             transition: None,
             fresh_bedroom: true,
         }
@@ -214,6 +221,7 @@ impl GameState {
         next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
         if let Some(mut transition) = next.transition {
             transition.advance();
+            next.animation = AnimationState::standing(transition.direction());
             next.map_id = transition.map_id();
             if next.map_id != transition.source_map() {
                 next.fresh_bedroom = false;
@@ -229,6 +237,7 @@ impl GameState {
             next.walking
                 .step(data.room(next.map_id, next.fresh_bedroom)?, input)
                 .map_err(SliceError::Walking)?;
+            next.animation.advance(next.walking.active_direction());
             if let Some((index, _)) = data.exit(next.map_id, next.walking.position()) {
                 let transition = Transition::start(next.map_id, next.walking.position())
                     .ok_or(SliceError::Exit)?;
@@ -239,6 +248,7 @@ impl GameState {
                 // A canonical anchor keeps the private representation stable.
                 let (x, y) = transition.handoff();
                 next.walking = WalkingState::new(x, y);
+                next.animation = AnimationState::standing(transition.direction());
                 next.transition = Some(transition);
             }
         }
@@ -251,6 +261,7 @@ impl GameState {
     pub fn output(&self) -> FrameOutput {
         FrameOutput {
             tick: self.tick,
+            animation: self.animation.frame(),
             map_id: self.map_id,
             position: self
                 .transition
@@ -282,13 +293,18 @@ impl GameState {
             self.walking.encode_snapshot()
         });
         bytes.push(u8::from(self.fresh_bedroom));
+        bytes.extend([
+            self.animation.facing() as u8,
+            u8::from(self.animation.is_walking()),
+            self.animation.phase(),
+        ]);
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
     /// # Errors
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
-        if bytes.len() != 100
+        if bytes.len() != 103
             || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
@@ -325,11 +341,49 @@ impl GameState {
             }
             walking
         };
+        let facing = match bytes[100] {
+            0 => Direction::Down,
+            1 => Direction::Up,
+            2 => Direction::Left,
+            3 => Direction::Right,
+            _ => return Err(SliceError::Snapshot),
+        };
+        let is_walking = match bytes[101] {
+            0 => false,
+            1 => true,
+            _ => return Err(SliceError::Snapshot),
+        };
+        let animation = AnimationState::from_parts(facing, is_walking, bytes[102])
+            .ok_or(SliceError::Snapshot)?;
+        let coherent = if let Some(t) = transition {
+            !is_walking && facing == t.direction()
+        } else if let Some(active) = walking.active_direction() {
+            // Animation and horizontal movement share a 54-tick cycle. Vertical
+            // movement keeps parity across animation wraps (phase zero may be
+            // setup or an even tick at a later wrap).
+            let phase_matches = if active.horizontal() {
+                walking.phase() == animation.phase()
+            } else {
+                match walking.phase() {
+                    0 => animation.phase() == 0,
+                    1 => animation.phase() % 2 == 1,
+                    2 => animation.phase() % 2 == 0,
+                    _ => false,
+                }
+            };
+            is_walking && facing == active && phase_matches
+        } else {
+            !is_walking
+        };
+        if !coherent {
+            return Err(SliceError::Snapshot);
+        }
         Ok(Self {
             identity: data.identity,
             tick,
             map_id,
             walking,
+            animation,
             transition,
             fresh_bedroom,
         })
@@ -370,6 +424,7 @@ mod tests {
                 tick: 0,
                 map_id: 15,
                 position: (304, 112),
+                animation: AnimationState::standing(Direction::Down).frame(),
                 phase: Phase::Walking
             }
         );
@@ -466,6 +521,7 @@ mod tests {
                 tick: 115,
                 map_id: 16,
                 position: (392, 353),
+                animation: AnimationState::standing(Direction::Down).frame(),
                 phase: Phase::Walking
             }
         );
@@ -500,6 +556,7 @@ mod tests {
                 tick: 164,
                 map_id: 15,
                 position: (392, 191),
+                animation: AnimationState::standing(Direction::Up).frame(),
                 phase: Phase::Walking
             }
         );

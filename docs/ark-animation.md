@@ -4,16 +4,21 @@ Qualified Japanese reference ROM: SHA-256
 `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`.
 This is animation **selection**, not graphics/palette/composition decoding or a
 replacement for [qualified movement cadence](input-admission.md). The asset
-qualification owns art; the parent owns core module/state/snapshot and renderer
-integration. No oracle changes, patches, restores, SRAM bootstrap, save-state
-observations, or native animation VM are required.
+qualification owns art; the parent owns renderer/host/UI integration. Core
+module/state/snapshot integration is implemented below. No oracle changes,
+patches, native restores, SRAM bootstrap, save-state observations, or native
+animation VM are required.
 
 ## Integration contract (usable subset)
 
-`crates/room-core/src/animation.rs` is intentionally not wired into `lib.rs` here.
-The separate `tests/animation.rs` imports it by path so it is tested before parent
-integration. Parent can export the three types and include `AnimationState` in
-its atomic core state and snapshot versioning.
+`AnimationState`, `AnimationFrame`, and `AnimationSet` are exported at the crate
+root. `GameState` owns the animation component and exposes its derived key as
+**`FrameOutput.animation`**, both from `output()` and successful `step()` calls.
+Both constructors start in ordinary Down standing. Internally, walking and
+animation advance on a cloned candidate state; late exit failures discard that
+candidate along with all its movement, input history, tick, and animation changes.
+
+For other core callers the same ownership order applies:
 
 ```rust,ignore
 // New-game semantic pose; native initial facing is Down.
@@ -45,11 +50,33 @@ Held wall-blocked input continues the same animation clock. Neutral immediately
 selects ordinary standing in the last facing. A subsequent same-direction walk
 restarts at record zero (only when the walking admission gate accepts it).
 
-Snapshot parts are `facing: Direction`, `walking: bool`, `phase: u8`.
-`from_parts` rejects phase≥54 and nonzero idle phase. Accessors expose these parts;
-`frame` is derived, not separately serialized. Parent must also validate state
-coherence with walking/mode when restoring, and retain facing over neutral and
-semantic transitions. This module does not own snapshot encoding/versioning.
+### Integrated snapshot profile 7
+
+`GameState` retains the top-level `RSLC` format version 1 and bumps the semantic
+profile byte at offset 5 to **7**. Snapshots are now **103 bytes**; profiles ≤6 and
+other lengths are rejected, not implicitly upgraded. Existing layout is stable:
+
+| Byte offset | Encoding |
+|---|---|
+| 83..99 | unchanged 16-byte walking v3 component, or all zero during a doorway |
+| 99 | unchanged fresh-bedroom flag |
+| 100 | animation facing: Down=0, Up=1, Left=2, Right=3 |
+| 101 | animation walking: false=0, true=1, other values rejected |
+| 102 | animation phase 0..53; standing requires zero |
+
+`frame` remains derived, not separately serialized. `GameState::restore` checks
+canonical animation parts plus ownership coherence: ordinary active walking must
+have walking animation facing the **active**, not delayed, direction; ordinary
+neutral must be standing, with any retained facing permitted. Horizontal phases
+must agree. Vertical movement phase must match animation parity, allowing phase
+zero both at setup and at later 54-tick animation wraps. Doorway animation must
+be standing in `transition.direction()`.
+
+On the handoff tick, during every departure/arrival update, and on completion,
+`GameState` explicitly selects standing in the transition direction (Down F→10,
+Up 10→F). Transition inputs remain discarded. Completion resets walking admission
+history but preserves that pose; neutral after completion retains its facing.
+This is semantic rendering policy, **not native doorway animation timing**.
 
 ### Asset stream selector mapping (metadata, not decoded art)
 
@@ -102,7 +129,7 @@ fidgets. Likewise, doorway departure/arrival sprite timing is **semantic policy*
 not ordinary animation qualification. Native arrival frame holds include
 scheduler stalls (e.g. first map-10 arrival record 6998→7010 takes 12 frames), so
 feeding wall-clock ages across transitions into this component is incorrect.
-Parent may select a directional standing pose at each semantic handoff; exact
+`GameState` selects a directional standing pose at each semantic handoff; exact
 native doorway timing and fidgets remain outside the usable subset.
 
 ## Source and stopped-native witnesses
@@ -150,7 +177,7 @@ ambiguity. `save_state` is not used as a passive observation.
 ## Reproduction and red/green tests
 
 ```sh
-cargo test -p room-core --test animation          # ROM-free, separate tests
+cargo test -p room-core                         # pure component + slice integration
 ./tools/player-animation-qualification/replay.sh # local JP ROM symlink by default
 # To recheck existing private captures without rebooting:
 python3 tools/player-animation-qualification/verify.py ROM local/player-animation-qualification/replay-XXXXXX
@@ -200,5 +227,13 @@ TDD: five synthetic tests first failed because the module did not exist, then
 passed after implementation. A deliberately wrong two-frame comparator fails at
 **6820** (`D76A` predicted vs native `D7E7`); the real six-record component passes
 both 827-step runs, including timestamp/cursor checks. Restore-part tests cover
-canonical validation and deterministic continuation. Parent integration remains
-responsible for whole-state atomic rejection and serialized snapshots.
+canonical validation and deterministic continuation.
+
+Integration TDD: `tests/slice_animation.rs` first failed on the missing root
+exports and `FrameOutput.animation`. It now covers initial pose, delayed setup,
+turn/release, blocked six-record cycles in all directions with snapshot replay,
+profile/layout and malformed/coherence rejection, early admission and late exit
+rollback, and both complete doorway routes. The original component tests now
+exercise the root exports rather than a path-imported duplicate module. Existing
+slice snapshot-replay tests also compare the added animation field. Host/UI
+adapters are intentionally outside this change and must consume `output.animation`.

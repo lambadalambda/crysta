@@ -10,11 +10,13 @@
 
 extern crate alloc;
 
+mod animation;
 mod room;
 pub mod slice;
 mod snapshot;
 mod transition;
 
+pub use animation::{AnimationFrame, AnimationSet, AnimationState};
 pub use room::Room;
 pub use snapshot::{SNAPSHOT_SIZE, SNAPSHOT_VERSION};
 
