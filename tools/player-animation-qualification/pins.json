@@ -1,0 +1,399 @@
+{
+  "version": 1,
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "bootstrap_wram_sha256": "49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82",
+  "sources": [
+    {
+      "name": "standing scripts / directional walk COP83 and COP84",
+      "start": 8692457,
+      "end": 8692617,
+      "sha256": "3a28679c890f43164aacc741babea8692623f86aa1a1e0fd8c50ab50136ac4ad"
+    },
+    {
+      "name": "idle fidget scripts (outside pure policy)",
+      "start": 8692308,
+      "end": 8692457,
+      "sha256": "1371f57bcb2a872e028499424319cdd4b48b2732f2196f17ef78fa384c42ebca"
+    },
+    {
+      "name": "COP83/84 table selection and COP8E animation advance",
+      "start": 8430080,
+      "end": 8430398,
+      "sha256": "7057544b99f0d066613ef50b242ca55f6ce7b42a9846577b716c70820be2fbba"
+    },
+    {
+      "name": "timer decrement / scheduler resume",
+      "start": 8439536,
+      "end": 8439645,
+      "sha256": "dd699be20ef7d56ac0bf1d4fe6fb219690065b85823975021b81728b0a8d682b"
+    },
+    {
+      "name": "record select / duration-facing load / sentinel / left mirror",
+      "start": 8449361,
+      "end": 8449556,
+      "sha256": "5b24b5b4cc16d054f412adebd5eed4db726450b37b218f4ff7d56d92520a3883"
+    },
+    {
+      "name": "walking sequence metadata only",
+      "start": 10145892,
+      "end": 10146066,
+      "sha256": "80613fac9fd48680f742a06c68d92cf35ce87dbb2d660ee0bb232f085367f48b"
+    },
+    {
+      "name": "standing sequence metadata only",
+      "start": 10789348,
+      "end": 10789454,
+      "sha256": "f0d3b61f4fd937e8a6536c94f8ccae9c98acd44e63f9840937a0cacb75e1ac7d"
+    }
+  ],
+  "captures": {
+    "house": {
+      "report": {
+        "frames_sha256": "7efe94668ec12463ba5c2072686debc260a5b8257c60cc41b6e28c53b407b8cb",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": []
+      },
+      "final_wram_sha256": "2c40eaff652d3773c5e061dda9f1c103f1f398f5fbd117a697e2d3682873d420",
+      "trace_text_sha256": []
+    },
+    "map10": {
+      "report": {
+        "frames_sha256": "90ddaf4a925ce878656a1382b9f076473643f9d5a53864de34fe66210c9dce91",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": []
+      },
+      "final_wram_sha256": "f3a97b8fe8258b00b1bd94a63da473f32fdf43e8eb825e034e7266089ec9d183",
+      "trace_text_sha256": []
+    },
+    "idle": {
+      "report": {
+        "frames_sha256": "10d440584c005227f943229ff439bae5a1c8de08a5ccc6448a3a54ff5eaaaedc",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": []
+      },
+      "final_wram_sha256": "d9c7cec037475ddc570331ef0394a67fa2ecaa85735b6ececd29a60ed07071ea",
+      "trace_text_sha256": []
+    },
+    "setup": {
+      "report": {
+        "frames_sha256": "cb20b941f24a453b9a3732a90706d3242d39ea4570fdd93fb200b25dc42533b8",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": [
+          {
+            "a": 1045,
+            "composition": 63545,
+            "cursor": 0,
+            "db": 129,
+            "facing": 0,
+            "frame": 6801,
+            "instructions": 502,
+            "p": 4,
+            "pc": 8692608,
+            "sequence": 33,
+            "timer": 0,
+            "trace_sha256": "d3e30368691385bcfe363b055221a36c20bb66018d9ec19f4049c0f2342f6edc",
+            "wram_sha256": "8084529cc3d744c8580e82c2b43f8891e9a854102e8097794589690bc472a9d4",
+            "x": 4096,
+            "y": 4096
+          },
+          {
+            "a": 264,
+            "composition": 63545,
+            "cursor": 0,
+            "db": 129,
+            "facing": 0,
+            "frame": 6801,
+            "instructions": 15,
+            "p": 4,
+            "pc": 8430229,
+            "sequence": 33,
+            "timer": 0,
+            "trace_sha256": "fb5a4e05456c6e33b0f2189000bb12168a4f17230933947f54545c033ddeeff8",
+            "wram_sha256": "031a5fe6af476fb0d9107a8c5759773f9150aae765b9d00a4c4d53cbaa18efe3",
+            "x": 264,
+            "y": 4096
+          },
+          {
+            "a": 53496,
+            "composition": 63545,
+            "cursor": 0,
+            "db": 154,
+            "facing": 0,
+            "frame": 6801,
+            "instructions": 85,
+            "p": 132,
+            "pc": 8449433,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "915b54a47474a809acbbb14d5a8f01a5c6e1a825e3d4532b02d57a599d029e7c",
+            "wram_sha256": "b0ede0e456124e096d26ef34283e5418d52d5f264089eae2339ffb8b18b912cc",
+            "x": 4096,
+            "y": 53496
+          },
+          {
+            "a": 16,
+            "composition": 55146,
+            "cursor": 0,
+            "db": 154,
+            "facing": 3,
+            "frame": 6801,
+            "instructions": 74,
+            "p": 6,
+            "pc": 8449531,
+            "sequence": 2,
+            "timer": 8,
+            "trace_sha256": "f0d30ab070b079c1981d7e6db661a41d0edb6a36a9483dc792a58748337dcbee",
+            "wram_sha256": "e6ee3e1a3d20a18720e40597d770608155101a790fc78a3e1f462cfb53c8778a",
+            "x": 4096,
+            "y": 55146
+          },
+          {
+            "a": 0,
+            "composition": 55146,
+            "cursor": 1,
+            "db": 154,
+            "facing": 3,
+            "frame": 6801,
+            "instructions": 5,
+            "p": 6,
+            "pc": 8449553,
+            "sequence": 2,
+            "timer": 8,
+            "trace_sha256": "0eb46a23306cef4b546db3110989169ba5d988415060ad78d9cd951b3e784e0b",
+            "wram_sha256": "2bcbe6aba0e6a30e009c43dc5c68149bf406551217338cc0b035d4d94df86218",
+            "x": 4096,
+            "y": 55146
+          }
+        ]
+      },
+      "final_wram_sha256": "d2a2cc621cc70fe2574575cc1fe96b0d568f64b8852dcfba4400c222103ba351",
+      "trace_text_sha256": [
+        "6cf21e36a52dde6651e04083250b1cc6a39c40821f311af4a21cfbf11eae5b36",
+        "4592003f3e6460dce1ec0110e02ae82f57cce987401f20f959c29192d6cf2d17",
+        "40996db500a175292127b220ec700a75d33690b6da99b8a84be22e6b387cbeee",
+        "b071395bb6b005a3655fee84ec3162021878e5a8d8b9bf649ead9b9c50d9553c",
+        "2200e88a66fd55c459af75ccdde7ac023cb962db291b2cf754ab7cffb5096cf6"
+      ]
+    },
+    "release": {
+      "report": {
+        "frames_sha256": "54ef0e5f56dcaef8811d61e613b98ff0d8f2b22dfb4f09a4214853207bf0abb2",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": [
+          {
+            "a": 41768,
+            "composition": 55146,
+            "cursor": 1,
+            "db": 129,
+            "facing": 3,
+            "frame": 6863,
+            "instructions": 580,
+            "p": 4,
+            "pc": 8692533,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "3a494e1088a0e48ac41b4176abcf3be8329116046663e0d5b71b23725307de51",
+            "wram_sha256": "9ec6c756e5c0be445f28bebf13fbf795ebd2f2c170802d09e3c5ddaa14e2b549",
+            "x": 4096,
+            "y": 4096
+          },
+          {
+            "a": 264,
+            "composition": 55146,
+            "cursor": 1,
+            "db": 129,
+            "facing": 3,
+            "frame": 6863,
+            "instructions": 15,
+            "p": 4,
+            "pc": 8430229,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "fb5a4e05456c6e33b0f2189000bb12168a4f17230933947f54545c033ddeeff8",
+            "wram_sha256": "a00c10e39128553d5c2d99e650ff07cf5b12cfabf40668e8064fbfdcc146cd71",
+            "x": 264,
+            "y": 4096
+          },
+          {
+            "a": 41544,
+            "composition": 55146,
+            "cursor": 0,
+            "db": 164,
+            "facing": 3,
+            "frame": 6863,
+            "instructions": 85,
+            "p": 132,
+            "pc": 8449433,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "05248c7daead47a44bd4e398085a81cf0968ef497070828fc746af105b0b5570",
+            "wram_sha256": "0d08fa5403af0e01e54ef60ab6259ef6bbda8b235f7324d7faae1538a24ed6f3",
+            "x": 4096,
+            "y": 41544
+          },
+          {
+            "a": 16,
+            "composition": 42464,
+            "cursor": 0,
+            "db": 164,
+            "facing": 3,
+            "frame": 6863,
+            "instructions": 74,
+            "p": 6,
+            "pc": 8449531,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "af2d07c96e39062b69a3be52bfe017f67bf8a40612e5be447cdf2591ebe00369",
+            "wram_sha256": "1e2d48f70a4286f9a9655e19767c57a2fa1d1ae7ab60305baa1562642cd2c2f0",
+            "x": 4096,
+            "y": 42464
+          },
+          {
+            "a": 0,
+            "composition": 42464,
+            "cursor": 1,
+            "db": 164,
+            "facing": 3,
+            "frame": 6863,
+            "instructions": 5,
+            "p": 6,
+            "pc": 8449553,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "e6f655d7ee002ff93c8de9b86a03e2e6e9fa6c0055eb66ac9b3f25f977b98dfb",
+            "wram_sha256": "7ce7cb7ca06abbf52c4327d486dd86a610bfbfda9240db68f00df5eeef12c077",
+            "x": 4096,
+            "y": 42464
+          }
+        ]
+      },
+      "final_wram_sha256": "096aece9c5188000128415f491c0b19e0f4df406b9df28fa3408df31102c3c43",
+      "trace_text_sha256": [
+        "f53d030f21285da1ff504be783c3b6cd9e37dcdd168c8181d34c822357eda183",
+        "4592003f3e6460dce1ec0110e02ae82f57cce987401f20f959c29192d6cf2d17",
+        "8210a0c2f3854cbe6ddc21ab2bc29bdb37a0cccfbf421d5b2130e568baa98e93",
+        "1e5b95a7a70029d82b18752133359faafd7bd2554adb9233dd32dfd37516ee4c",
+        "3595a74636919ed70590f24b70f20865224c8509544fee90c19a3d4d4b9d18e3"
+      ]
+    },
+    "wrap": {
+      "report": {
+        "frames_sha256": "e3c2fd53acd2e5fef52c4f6c354948fa9c32c7c3563f93d778eea1ae09b393b3",
+        "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+        "stops": [
+          {
+            "a": 41860,
+            "composition": 55462,
+            "cursor": 6,
+            "db": 129,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 387,
+            "p": 132,
+            "pc": 8692613,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "110f2584298ed5fe0e0967a28042cf478870f05fcbe488fabffad5077cded7e4",
+            "wram_sha256": "b66391eeac52da3b45ccbf47563b2def519c2591e5891e88b8af7d7ce71c861f",
+            "x": 4096,
+            "y": 4544
+          },
+          {
+            "a": 65535,
+            "composition": 55462,
+            "cursor": 6,
+            "db": 154,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 39,
+            "p": 132,
+            "pc": 8449361,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "8a81f903e9f24741a652cfe743b8ce2d386ac4583b8429944f5971be23313a8e",
+            "wram_sha256": "9956462554e9fd1ae2f5eba8d5ba40965599afa3b1fc2e33ba7df10279b28bfa",
+            "x": 4096,
+            "y": 53520
+          },
+          {
+            "a": 41863,
+            "composition": 55462,
+            "cursor": 0,
+            "db": 129,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 11,
+            "p": 132,
+            "pc": 8692615,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "50d61391cab85edffc2d65c878785a035cf7064145af4d668d9b790cbc66949d",
+            "wram_sha256": "ad762762210e46a0b1b6c47eeafce56036a14c311b910bba2b2a987dc42e7ef8",
+            "x": 4096,
+            "y": 53520
+          },
+          {
+            "a": 1045,
+            "composition": 55462,
+            "cursor": 0,
+            "db": 129,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 4,
+            "p": 4,
+            "pc": 8692608,
+            "sequence": 2,
+            "timer": 0,
+            "trace_sha256": "bbdf44e744258583fc6ecd2cb4c366e1f7e2e2c439715d67093a24ecdb302b9b",
+            "wram_sha256": "ad762762210e46a0b1b6c47eeafce56036a14c311b910bba2b2a987dc42e7ef8",
+            "x": 4096,
+            "y": 53520
+          },
+          {
+            "a": 16,
+            "composition": 55146,
+            "cursor": 0,
+            "db": 154,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 174,
+            "p": 6,
+            "pc": 8449531,
+            "sequence": 2,
+            "timer": 8,
+            "trace_sha256": "4c94ad5707e07669de157787cad2226070c7bff5bf5386226c227f900b3ff689",
+            "wram_sha256": "16e204b00c5429f414fa109c79513637fccfe96674eea493387bf888b3ca92f8",
+            "x": 4096,
+            "y": 55146
+          },
+          {
+            "a": 0,
+            "composition": 55146,
+            "cursor": 1,
+            "db": 154,
+            "facing": 3,
+            "frame": 6855,
+            "instructions": 5,
+            "p": 6,
+            "pc": 8449553,
+            "sequence": 2,
+            "timer": 8,
+            "trace_sha256": "0eb46a23306cef4b546db3110989169ba5d988415060ad78d9cd951b3e784e0b",
+            "wram_sha256": "3f29c3ea7e2d878ee0a082f195bd3048e5309b539fecf33f5a945772267e6df5",
+            "x": 4096,
+            "y": 55146
+          }
+        ]
+      },
+      "final_wram_sha256": "33f4fe5705bfd5db32f18dbdc7efa39b4bb8190bf0b93f6572310d880a6f0a94",
+      "trace_text_sha256": [
+        "f96aab1ebf2df3d13d961e96022c65274fd45d8c9c2d1070fc6fd98f6f8882b3",
+        "d1c11b6001ad35f5d819b2f34dd0a259e0616e6cf6f37db5faac569f3073f546",
+        "a4845b446aa46ae9710399ae40e17ef43a4eea94a19dbda69668cb0d9a710e24",
+        "fa20145a1ab5519503ee39c7e138c1c9d473b2c28c2c5f4385ae16aa4426fd11",
+        "b02899f5a073b6602c9960966b306233257a9afaf79efdebed3204884fed2852",
+        "2200e88a66fd55c459af75ccdde7ac023cb962db291b2cf754ab7cffb5096cf6"
+      ]
+    }
+  }
+}

@@ -25,3 +25,7 @@ Establish the facing, pose-selection and animation-timing semantics needed to di
 ## Notes
 
 - Subissue of [render Ark in the portable house](render-ark-house-sprite.md).
+- Bounded ordinary selection is implemented and independently reviewed; see [animation contract and source/native witnesses](../../docs/ark-animation.md). Six walking records last nine ticks each; turns reset, blocked holds keep animating, delayed release selects standing in the retained facing.
+- `tools/player-animation-qualification/` reproduces six input-only plans twice from fresh frame 6800, with 827 real walking/animation per-step comparisons per replay set. Five separate ROM-free red/green tests cover the pure component and canonical restore parts. Raw captures remain private.
+- Fresh initial facing is Down, but native frame 6800 is an idle-fidget pose. Ordinary Down standing and indefinite neutral/doorway rendering are explicit semantic policies, not claims of native idle/transition timing equality.
+- Parent still owns exporting the new module, whole-state atomic rejection, snapshot/mode coherence and host/UI integration. Existing lib/state/snapshot/walking tests and tracker indexes are intentionally untouched by this bounded task.
