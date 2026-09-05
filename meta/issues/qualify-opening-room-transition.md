@@ -46,3 +46,6 @@ Crysta opening, then decode the event/trigger path and required destination data
   profiles and runtime equality tests; see [room graphics](../../docs/room-graphics.md).
 - Workspace tests, strict Clippy, safety/tracker checks and independent reviews
   passed. Native/COP path evidence is documented, not promoted to a full VM.
+- Desktop/mobile browser QA passed for both static room exports; keyboard/grid
+  interaction works, no page overflow at 390px and no console errors. Local
+  screenshots are retained. Completed and archived.
