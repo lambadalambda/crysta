@@ -49,7 +49,7 @@ New Game, Checkpoint Reset and the demo share the existing single-request pump:
   resuming without fresh input sends neutral—not the formerly held direction.
 
 These are client-side serialization guarantees, not a new backend transaction or
-cancellation protocol. The parent owns `/new-game`, source initialization,
+cancellation protocol. The native backend owns `/new-game`, source initialization,
 collision/profile deployment and host-side state ownership.
 
 ## Verification
@@ -71,5 +71,7 @@ cancels its autoplay, but the disabled Pause/Resume button cannot do so. This do
 not affect New Game, which never autoplays.
 
 This bounded change modifies only the HTML, its offline JavaScript test and this
-document. The tests use a synthetic host: they do **not** claim a real-backend
-New Game/browser exploration acceptance run. That remains parent integration work.
+document. The offline tests use a synthetic host. Separate parent integration now passes
+`tools/verify-house-browser.js` against the actual CPU-free host: two identical
+511-step runs click New Game, traverse both doorways and revisit positions.
+See [playable house evidence](playable-house.md).

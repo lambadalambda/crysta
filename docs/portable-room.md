@@ -1,5 +1,9 @@
 # Portable room preview
 
+**New Game is now available:** see [playable house instructions and evidence](playable-house.md).
+It uses source-derived initialization, skips intro presentation explicitly, and
+supports the bedroom/adjoining-room round trip with repeatable walking.
+
 The `room-core` crate is a deterministic, device-free **bounded walking core**
 and an explicitly opted-in **semantic doorway preview**. It is not classic-mode
 frame fidelity or a complete game engine. Original CPU execution is not part of
@@ -13,9 +17,10 @@ cargo run -p map-inspector -- serve-room \
 ```
 
 Open the printed `http://127.0.0.1:8765/` address. Use port `0` for an OS-assigned
-loopback port. No SRAM is needed. Choose **Doorway demonstration** to reset and
-run the complete bounded route, or Resume and use Arrow/WASD/touch controls.
-Reset starts a fresh preview; Ctrl-C stops the native host.
+loopback port. No SRAM is needed. Choose **New Game**, then **Resume** and use
+Arrow/WASD/touch controls. **Checkpoint doorway demo** and **Checkpoint Reset**
+retain the older diagnostic route described below; they are not New Game.
+Ctrl-C stops the native host.
 
 ```sh
 cargo run -p map-inspector -- verify-room \
@@ -32,14 +37,14 @@ The host also writes an ignored static export using the shared renderer.
 
 Walking implements measured input delay, setup frames, vertical 1/2 cadence,
 the horizontal 54-frame restart gap, and four-direction flat-wall resolution.
-It is not constant-speed generic AABB movement. The initial checkpoint is actual
+It is not constant-speed generic AABB movement. The diagnostic checkpoint is actual
 save slot 1, room `$000F`, player `(472,176)`, corresponding to completed
 reference frame 1601. Initialization is a deliberate preview lifecycle operation,
 not an implementation of the save menu or new game.
 
 [Movement qualification](movement-qualification.md) describes the exact
 supported reference trajectories and source witnesses. Unflagged types 0/2/22
-are open and 12/14 are solid. Profile v5 retains resolution of open/solid corner pairs
+are open and 12/14 are solid. Profile v6 retains resolution of open/solid corner pairs
 with the decoded perpendicular nudge and main-axis snap/rollback. Unknown
 materials, old slopes, map-edge samples and coordinate overflow return explicit errors.
 P16 has its distinct pair rules, and the adapter explicitly opts into passive
@@ -60,7 +65,8 @@ reproducible route without needing frame-perfect key release.
 
 ### Doorways: endpoint-qualified, not frame-qualified
 
-The exact supported handoff is `(392,209)` after 56 Left and 24 Down updates.
+The saved diagnostic handoff is `(392,209)` after56 Left and24 Down updates.
+The fresh route separately qualifies `(392,208)` after167 walking updates.
 The selected exit is direct map `$0010`, mode 0, selector 5. Other exits or
 handoff positions outside the qualified pair fail explicitly. The asset adapter validates the departure
 pointer, signed arrival adjustment, destination FD/player header and arrival
@@ -99,7 +105,8 @@ transition pacing, animation, flags VM or actor scheduler.
 
 - `Room` holds immutable dimensions and raw attributed cells. `WalkingState`
   holds integer position, delayed/active input, phase and measured onset history.
-- `GameData` owns the two compiled rooms, ordered exit metadata and caller-
+- `GameData` owns two reloaded room profiles plus fresh bedroom initialization,
+  ordered exit metadata and caller-
   authenticated source/content SHA-256 identities. No device or file handles.
 - `GameState::step` consumes `FrameInput` and produces a semantic `FrameOutput`.
   Rendering and the host's tick clock do not affect the update implementation.
@@ -107,12 +114,14 @@ transition pacing, animation, flags VM or actor scheduler.
   ROM, asset/profile schema and compiled data; it does not embed immutable assets.
   The RNG policy is version 0 (**no RNG used in this subset**), not a fabricated
   replacement for the game's RNG. Unknown versions/fields or incompatible data
-  are rejected. Profile v4 uses a zero walking payload while a doorway owns
+  are rejected. Since v4, snapshots use a zero walking payload while a doorway owns
   control, so erasing the transition marker cannot restore a walking component.
   No deterministic host-service responses are needed yet; reset
   is an explicit lifecycle operation, not a hidden input.
 
 The adapter initializes collision attributes directly from decoded ROM data.
+Fresh New Game additionally uses the distinct bedroom overlay317+504 until the
+first map load; it is not retained when returning to the bedroom.
 Five known runtime-modified cells have frozen bit-15 additions in this profile:
 map F index317; map10 indices731,732,826,827. All other attributed cells match
 the corresponding saved-game checkpoints. Passive new-edge flags dispatch as
@@ -137,7 +146,7 @@ one accepted step always performs one deterministic core update.
 
 ## Verification
 
-- Thirteen ROM-free walking tests, ten semantic/snapshot tests and a portable-boundary
+- Thirteen ROM-free walking tests, thirteen semantic/snapshot tests and a portable-boundary
   architecture guard pass. Repeated synthetic snapshots resume identically at
   every logical update, including transition ownership.
 - Five admission tests plus 42 authenticated fixture pairs match 3,994 ordinary
@@ -170,6 +179,8 @@ No ROM, SRAM, graphics or raw reference trajectories are distributed. The local
 trajectory harness can reproduce fixtures; absent optional inputs skip clearly,
 while explicitly required or hash-mismatched fixtures fail closed.
 
-The current [new-game/house exploration goal](../meta/issues/start-and-explore-arks-house.md)
-remains open. Corner and repeatable-input support are incremental progress, not
-removal of the saved-checkpoint bootstrap or other remaining preview restrictions. [Corner evidence and reproduction](house-movement.md).
+The bounded [new-game/house exploration goal](../meta/issues/start-and-explore-arks-house.md)
+is verified: source-derived fresh initialization,441 authenticated walking steps
+plus70 semantic doorway updates, and two byte-identical actual-browser511-step
+runs. Profile6 snapshots contain100 bytes, including fresh-overlay ownership;
+walking snapshots remain16-byte v3. See [precise playable boundary](playable-house.md).

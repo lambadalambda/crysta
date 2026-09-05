@@ -11,8 +11,9 @@ cargo run -p map-inspector -- serve-room \
   'local/Tenchi Souzou (Japan).sfc' 8765
 ```
 
-Open `http://127.0.0.1:8765/` and choose **Doorway demonstration**, or Resume and
-walk with Arrow/WASD/touch. No SRAM or original CPU execution is required.
+Open `http://127.0.0.1:8765/`, choose **New Game**, then **Resume** and walk with
+Arrow/WASD/touch. This source-derived default-name start explicitly skips intro
+presentation. No SRAM or original CPU execution is required.
 The Rust core runs natively behind the local browser UI; its Wasm build is
 validated but not wired into this frontend yet. Port `0` selects an unused port.
 
@@ -22,7 +23,9 @@ Open/solid corner responses are supported. Ordinary direction reuse is supported
 same-direction accelerated triggers still stop explicitly;
 use Reset. The player is a bounds marker; no sprites, actors, combat or audio.
 See [portable boundary, evidence and limits](../../docs/portable-room.md).
-`verify-room ROM semantic-preview` repeats the same CPU-free route as JSON.
+`verify-house ROM semantic-preview` verifies the fresh511-step house round trip.
+`verify-room ROM semantic-preview` retains the saved-position diagnostic route.
+See [playable boundary and verification](../../docs/playable-house.md).
 
 ## ROM-only full-map viewer
 

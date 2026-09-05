@@ -118,10 +118,12 @@ With your own Japanese ROM in `local/`:
 cargo run -p map-inspector -- serve-room 'local/Tenchi Souzou (Japan).sfc' 8765
 ```
 
-Open the printed loopback URL and choose **Doorway demonstration**. Walking is
-reference-qualified on bounded flat paths; doorway pacing is an explicit semantic
-preview, not native frame fidelity. No original CPU runs in the simulation loop.
-See [portable room scope and controls](docs/portable-room.md).
+Open the printed loopback URL and choose **New Game**, then **Resume**.
+The source-derived default-name start explicitly skips intro presentation.
+Ordinary passive walking and the bedroom/adjoining-room doorway pair are
+reference-qualified; doorway pacing is semantic, not native frame timing.
+No original CPU runs in the simulation loop. See
+[playable house scope, controls and evidence](docs/playable-house.md).
 
 ## License
 

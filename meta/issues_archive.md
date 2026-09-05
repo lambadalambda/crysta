@@ -31,3 +31,5 @@
 - [x] [Qualify an opening room transition](issues/qualify-opening-room-transition.md)
 - [x] [Implement a reference-qualified portable room slice](issues/portable-room-slice.md)
 - [x] [Qualify a fresh new-game house bootstrap](issues/qualify-new-game-house-bootstrap.md)
+- [x] [Start a new game and explore Ark's house](issues/start-and-explore-arks-house.md)
+- [x] [Qualify repeatable house movement and collision](issues/qualify-repeatable-house-movement.md)

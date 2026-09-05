@@ -71,18 +71,19 @@ the independently authenticated private ROM/SRAM inputs.
 
 ## Semantic slice integration
 
-`slice::{GameData, GameState, FrameOutput, Policy}` adds source-bound snapshots,
+`slice::{GameData, NewGameData, GameState, FrameOutput, Policy}` adds source-bound snapshots,
 ordered exit selection and an explicitly opted-in `SemanticPreview` doorway.
 Its 17/load/17 logical-update policy preserves qualified endpoints, not native
 video-frame timing. It does not execute COP services or a CPU. See
 [the complete preview boundary](../../docs/portable-room.md); the native local
 host and browser frontend live in `map-inspector`, never in this crate.
 
-## Profile v5
+## Profile v6
 
 The original flat-only profile has been extended to decoded open/solid corner
-responses. Walking-component snapshot version 3 and slice profile version 5
-reject old semantics; the layout remains 16-byte little-endian. Twelve local
+responses. Walking-component snapshot version 3 and slice profile version 6
+reject old semantics: walking remains16-byte v3; slice is100-byte profile6.
+The original twelve local
 trajectories now include positive/negative perpendicular nudges observed through
 fresh input-only boots. See [house movement progress](../../docs/house-movement.md).
 P16 and passive flags now have [separate qualification](../../docs/house-materials.md);
@@ -91,3 +92,10 @@ dash execution and interaction-hook effects remain unsupported.
 [Admission qualification](../../docs/input-admission.md) adds 42 authenticated
 fixture pairs with 3,994 ordinary transitions and 19 atomic trigger rejections,
 including a 209-step revisit route and per-step snapshot restoration.
+
+`GameState::new_game` consumes the source-compiled `NewGameData`, not a saved
+checkpoint. Fresh bedroom overlays and reloaded bedroom overlays are distinct;
+slice snapshots are100 bytes and preserve that selection until first map load.
+The fresh handoff208 and saved handoff209 retain their separate departure
+endpoints. [House verification](../../docs/playable-house.md) covers441 fresh
+walking steps plus70 semantic updates through both rooms and repeated inputs.

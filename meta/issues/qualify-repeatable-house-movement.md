@@ -26,6 +26,8 @@ Replace the preview's permanent used-direction guard and narrow flat-only collis
 - Subissue of [start and explore Ark's house](start-and-explore-arks-house.md).
 - The previous 1,204-step strict profile remains a regression corpus, not sufficient evidence for arbitrary input histories.
 
+Historical progress below is superseded by **Verified completion** at the end.
+
 ## Progress: open/solid corners
 
 - Collision profile v2 now supports decoded mixed open/solid perpendicular
@@ -74,3 +76,18 @@ Replace the preview's permanent used-direction guard and narrow flat-only collis
   active hooks, actions and dynamic event writers are not implemented.
 - [Material evidence](../../docs/house-materials.md). Goal remains open pending
   fresh portable initialization and end-to-end browser exploration.
+
+## Verified completion
+
+- Fresh-start corpus adds441 authenticated ordinary position/stream comparisons
+  across both doors and repeated Right/Left activations. Full slice state is
+  preserved across two35-update semantic transitions; there are no checkpoint
+  teleports between reference segments.
+- Fresh-room overlay317+504 and returned-room overlay317 are compiled separately;
+  profile6/snapshot ownership preserves the correct one. Fresh handoff208 is
+  separately admitted from saved handoff209, respecting actual ownership pins.
+- Required reference fixtures, atomic-error/snapshot tests and native/Wasm
+  builds pass. The actual New Game browser route passes twice at511 logical
+  steps without scope errors. See [playable-house evidence](../../docs/playable-house.md).
+- This closes the coveredF/10 ordinary-walking scope, not dash execution, active
+  interaction hooks, NPC dynamics, other exits/interiors or native loader timing.
