@@ -30,3 +30,4 @@
 - [x] [Inspect stopped CPU registers for gameplay qualification](issues/inspect-stopped-cpu-registers.md)
 - [x] [Qualify an opening room transition](issues/qualify-opening-room-transition.md)
 - [x] [Implement a reference-qualified portable room slice](issues/portable-room-slice.md)
+- [x] [Qualify a fresh new-game house bootstrap](issues/qualify-new-game-house-bootstrap.md)

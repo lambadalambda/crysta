@@ -27,5 +27,4 @@
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
 - [ ] [Start a new game and explore Ark's house](issues/start-and-explore-arks-house.md)
-- [ ] [Qualify a fresh new-game house bootstrap](issues/qualify-new-game-house-bootstrap.md)
 - [ ] [Qualify repeatable house movement and collision](issues/qualify-repeatable-house-movement.md)

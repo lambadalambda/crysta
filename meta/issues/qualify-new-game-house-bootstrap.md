@@ -25,3 +25,18 @@ Establish the actual Japanese new-game input path and initialization needed to r
 ## Notes
 
 - Subissue of [start and explore Ark's house](start-and-explore-arks-house.md).
+
+## Verified result
+
+- Committed owned-ROM harness reproduces13 checkpoint reports and the7,100-frame
+  stream in two independent empty-SRAM processes. Both exit0; fresh negative
+  controls without name confirmation or deliberate movement fail the checker.
+- Visually identified the load menu and actual kana entry. Default アーク confirms
+  with Start; no name-confirmation stall is established.
+- Controllable bedroom mapF begins at304,112; deliberate Right/Down and release
+  stabilize at332,140 with ownership/event/input checks, not just elapsed time.
+- Parent reran `sh tools/new-game-qualification/replay.sh` successfully; captures
+  are ignored under `local/new-game-qualification/replay-oOSrnU/`.
+- [Evidence and decoded/opaque initialization boundary](../../docs/new-game-bootstrap.md).
+  This reference-qualification issue is complete; portable initialization and
+  user-facing New Game remain part of the open house-exploration parent.
