@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Terranigma · Loaded-map inspector</title>
+<style>
+:root{color-scheme:dark;--bg:#0d151c;--panel:#15232c;--line:#30444e;--ink:#e5ecea;--muted:#9badb2;--accent:#73dec0;--gold:#e8ba71}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}header,main,footer{max-width:1480px;margin:auto;padding:24px 32px}header{display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line)}h1{font-size:27px;font-weight:600;margin:3px 0}h2{font-size:17px;margin:0 0 12px}p{margin:8px 0}.eyebrow{font:11px monospace;letter-spacing:2px;color:var(--accent)}.badge{border:1px solid var(--line);padding:7px 12px;border-radius:5px;color:var(--accent);font:12px monospace}.muted,small{color:var(--muted)}.notice{border-left:3px solid var(--gold);padding:10px 15px;background:#26271f;color:#dbd2b5;font-size:13px;margin-bottom:22px}.top{display:grid;grid-template-columns:minmax(380px,1fr) minmax(250px,.75fr) minmax(230px,.7fr);gap:20px}.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:20px;min-width:0}.panel-head{display:flex;gap:15px;align-items:center;justify-content:space-between;flex-wrap:wrap}.reference{background:#080d12;border-radius:5px;display:flex;justify-content:center;padding:12px;overflow:auto}canvas{image-rendering:pixelated;cursor:crosshair}#screen{width:512px;max-width:100%;height:auto}button,select{background:#1e333d;color:var(--ink);border:1px solid #49616b;border-radius:5px;padding:7px 10px;font:inherit}button:hover{border-color:var(--accent)}button:focus-visible,select:focus-visible,input:focus-visible,canvas:focus-visible{outline:2px solid var(--accent);outline-offset:3px}label{display:flex;align-items:center;gap:8px;margin:9px 0;cursor:pointer}input{accent-color:var(--accent)}input[type=range]{width:125px}dl{display:grid;grid-template-columns:1fr auto;gap:8px;margin:15px 0}dt{color:var(--muted)}dd{margin:0;font-family:monospace}.rule{border-top:1px solid var(--line);margin:18px 0}.hint{font-size:13px}.code{font:26px monospace;color:var(--gold)}#detail-note{min-height:68px}.legend{display:grid;grid-template-columns:1fr 1fr;gap:9px;font-size:12px}.swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px}.atlas-panel{margin-top:20px}.scroll{overflow:auto;max-height:600px;background:#080d12;border:1px solid var(--line);border-radius:5px;margin-top:12px;overscroll-behavior:contain}.controls{display:flex;align-items:center;gap:16px;flex-wrap:wrap}#atlas{display:block}footer{font-size:12px;color:var(--muted);padding-top:0}details{margin-top:18px}summary{cursor:pointer;color:var(--muted)}pre{white-space:pre-wrap;overflow-wrap:anywhere;font-size:11px;color:var(--muted)}#error{color:#ff9790;font-weight:bold}.capture-state{font:12px monospace;color:var(--accent)}@media(max-width:1050px){.top{grid-template-columns:1fr 1fr}.top .panel:last-child{grid-column:1/-1}.reference{min-height:200px}header,main,footer{padding:18px}h1{font-size:23px}}@media(max-width:640px){.top{display:block}.panel{margin-bottom:15px}header{align-items:flex-start;gap:10px}.badge{font-size:10px}.controls{gap:8px}}
+</style>
+</head>
+<body>
+<header><div><div class="eyebrow">REFERENCE LANE / FIELD NOTES 01</div><h1>Loaded-map inspector</h1><span class="muted">Terranigma · Japanese behavior reference</span></div><span class="badge">LOCAL ONLY · NO UPLOADS</span></header>
+<main>
+<div class="notice">A runtime research view, not a complete ROM map decoder. The captured viewport contains original game graphics; the full map below shows raw tile/collision structure. Collision labels are community hypotheses, not verified movement rules.</div>
+<div id="error" role="alert"></div>
+<div class="top">
+<section class="panel"><div class="panel-head"><h2>Reference viewport</h2><span id="frame" class="capture-state"></span></div><div class="reference"><canvas id="screen" width="256" height="240" tabindex="0" aria-label="Reference viewport. Click a tile to inspect its runtime word."></canvas></div><p class="hint muted">Captured 256×240 view · click a tile to inspect<br>Player position is marked with a cyan cross.</p></section>
+<section class="panel"><h2>Checkpoint & layers</h2><label for="checkpoint">Capture</label><select id="checkpoint" aria-label="Capture checkpoint"></select><dl><dt>Map ID</dt><dd id="map-id"></dd><dt>Layer size</dt><dd id="dimensions"></dd><dt>Camera</dt><dd id="camera"></dd><dt>Player</dt><dd id="player"></dd></dl><div class="rule"></div><label><input id="collision" type="checkbox">Collision overlay</label><label><input id="grid" type="checkbox">16-pixel grid</label><label><input id="player-marker" type="checkbox" checked>Player marker</label><label><input id="changes" type="checkbox">Changed cells between captures</label><p class="hint muted"><span id="change-count"></span><br>Raw layer words only; player/camera movement is separate.</p><p class="hint muted">Before: stationary at frame 1601.<br>After: 40 frames of Right input, frame 1841.</p></section>
+<section class="panel"><h2>Cell inspection</h2><span class="muted" id="coordinates">Select a cell on either view</span><p class="code" id="raw">—</p><dl><dt>Metatile candidate</dt><dd id="tile-index">—</dd><dt>Collision code</dt><dd id="collision-code">—</dd><dt>WRAM address</dt><dd id="address">—</dd><dt>Other capture</dt><dd id="other-word">—</dd></dl><p id="detail-note" class="hint muted">Raw words are authoritative. The low nine bits and upper-byte collision mask remain separately inspectable.</p><div class="rule"></div><div class="legend"><span><i class="swatch" style="background:#56b9a2"></i>Open lead</span><span><i class="swatch" style="background:#db786d"></i>Solid lead</span><span><i class="swatch" style="background:#658ec8"></i>Water lead</span><span><i class="swatch" style="background:#bd9e66"></i>Other / unknown</span></div><p class="hint muted">Keyboard: focus a canvas, then use arrow keys to inspect adjacent cells.</p></section>
+</div>
+<section class="panel atlas-panel"><div class="panel-head"><div><h2>Full runtime layer</h2><span class="muted hint">Row-major cells from $7E:A000 · only the captured viewport has terrain art</span></div><div class="controls"><label>Color by <select id="atlas-mode"><option value="collision">Collision code</option><option value="tile">Metatile candidate</option></select></label><label><input type="checkbox" id="place-image" checked>Place reference</label><label>Zoom <input id="zoom" type="range" min="25" max="200" step="25" value="75"><output id="zoom-value">75%</output></label><button id="locate">Locate player</button></div></div><div class="scroll" id="atlas-scroll"><canvas id="atlas" tabindex="0" aria-label="Full runtime layer. Click a cell or use arrow keys to inspect."></canvas></div><details><summary>Capture provenance and boundaries</summary><pre id="provenance"></pre></details></section>
+</main>
+<footer>Generated from your authenticated local ROM and SRAM. No network requests, external libraries, or extracted assets in the repository. Full WRAM/VRAM/CGRAM snapshots and capture.json sit beside this page for further research.</footer>
+<script>
+'use strict';
+const capture=__CAPTURE_JSON__;
+const $=id=>document.getElementById(id);
+const hex=(value,width=4)=>'$'+value.toString(16).toUpperCase().padStart(width,'0');
+const screen=$('screen'),atlas=$('atlas');
+const sc=screen.getContext('2d'),ac=atlas.getContext('2d');
+let index=0, selected=null;
+const images=capture.checkpoints.map(cp=>{const image=new Image();image.onload=render;image.onerror=()=>{$('error').textContent='Reference image missing. Keep the BMP files beside index.html.';};image.src=cp.image;return image;});
+const current=()=>capture.checkpoints[index];
+const code=raw=>(raw>>>8)&0xFE;
+function color(raw){const value=code(raw);if([0,2,4,0x2C].includes(value))return '#56b9a2';if([0x18,0x1C,0x1E,0x32].includes(value))return '#db786d';if(value===0x26)return '#658ec8';return '#bd9e66';}
+function hint(value){if([0,2,4,0x2C].includes(value))return 'Community lead: open / raised / passable terrain. Not a trace-qualified movement rule.';if([0x18,0x1C,0x1E,0x32].includes(value))return 'Community lead: solid terrain or object. Geometry and dynamic behavior still require tracing.';if(value===0x26)return 'Community lead: water. Traversal requirements are unqualified.';if(value&0x80)return 'Dynamic/object marker lead. This is not necessarily a static terrain property.';return 'Unknown or specialized collision code. No passability assumption is made.';}
+for(const [i,cp] of capture.checkpoints.entries()){const option=document.createElement('option');option.value=i;option.textContent=(i===0?'Before movement':'After Right input')+' · frame '+cp.frame;$('checkpoint').append(option);}
+function cross(ctx,x,y){ctx.strokeStyle='#7fffe0';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(x-5,y);ctx.lineTo(x+5,y);ctx.moveTo(x,y-5);ctx.lineTo(x,y+5);ctx.stroke();}
+function drawSelection(ctx,originX,originY){if(!selected)return;ctx.strokeStyle='#ffffff';ctx.lineWidth=1;ctx.strokeRect(selected[0]*16-originX+.5,selected[1]*16-originY+.5,15,15);}
+function render(){
+ const cp=current(),other=capture.checkpoints[1-index],image=images[index];
+ $('frame').textContent='FRAME '+cp.frame;$('map-id').textContent=hex(cp.map_id);$('dimensions').textContent=cp.width+' × '+cp.height+' cells';$('camera').textContent=cp.camera.join(', ');$('player').textContent=cp.player.join(', ');
+ sc.imageSmoothingEnabled=false;sc.fillStyle='#000';sc.fillRect(0,0,256,240);if(image.complete&&image.naturalWidth)sc.drawImage(image,0,0);
+ atlas.width=cp.width*16;atlas.height=cp.height*16;ac.imageSmoothingEnabled=false;
+ const [camX,camY]=cp.camera;
+ // The qualified 240-row capture has an eight-row top border.
+ const originY=camY-8;
+ const changed=cp.cells.reduce((count,raw,i)=>count+Number(raw!==other.cells[i]),0);
+ $('change-count').textContent='Changed cells: '+changed+' / '+cp.cells.length;
+ for(let y=0;y<cp.height;y++)for(let x=0;x<cp.width;x++){
+  const raw=cp.cells[y*cp.width+x];
+  ac.fillStyle=$('atlas-mode').value==='tile'?'hsl('+((raw&511)*137.508%360)+' 35% 40%)':color(raw);ac.fillRect(x*16,y*16,16,16);
+ }
+ if($('place-image').checked&&image.complete&&image.naturalWidth){ac.drawImage(image,0,8,256,224,camX,camY,256,224);}
+ // Overlays must remain visible above the opaque reference image.
+ for(let y=0;y<cp.height;y++)for(let x=0;x<cp.width;x++){
+  const cell=y*cp.width+x,raw=cp.cells[cell],sx=x*16-camX,sy=y*16-originY;
+  if($('collision').checked){sc.globalAlpha=.38;sc.fillStyle=color(raw);sc.fillRect(sx,sy,16,16);sc.globalAlpha=1;}
+  if($('grid').checked){sc.strokeStyle='#ffffff44';sc.strokeRect(sx+.5,sy+.5,16,16);ac.strokeStyle='#00000035';ac.strokeRect(x*16+.5,y*16+.5,16,16);}
+  if($('changes').checked&&raw!==other.cells[cell]){sc.strokeStyle='#ffef73';sc.strokeRect(sx+1,sy+1,14,14);ac.strokeStyle='#ffef73';ac.strokeRect(x*16+1,y*16+1,14,14);}
+ }
+ ac.strokeStyle='#f5eee0';ac.lineWidth=2;ac.strokeRect(camX,camY,256,224);
+ if($('player-marker').checked){cross(sc,cp.player[0]-camX,cp.player[1]-originY);cross(ac,cp.player[0],cp.player[1]);}
+ drawSelection(sc,camX,originY);drawSelection(ac,0,0);
+ const zoom=Number($('zoom').value)/100;atlas.style.width=atlas.width*zoom+'px';atlas.style.height=atlas.height*zoom+'px';$('zoom-value').textContent=$('zoom').value+'%';
+ const {cells,...metadata}=cp;$('provenance').textContent=JSON.stringify({schema_version:capture.schema_version,revision:capture.revision,rom_sha256:capture.rom_sha256,sram_sha256:capture.sram_sha256,scenario:capture.scenario,...metadata},null,2);
+ details();
+}
+function details(){if(!selected)return;const cp=current(),[x,y]=selected,i=y*cp.width+x,raw=cp.cells[i];$('coordinates').textContent='Cell '+x+', '+y+' · pixel '+x*16+', '+y*16;$('raw').textContent=hex(raw);$('tile-index').textContent=hex(raw&511,3);$('collision-code').textContent=hex(code(raw),2);$('address').textContent=hex(0x7EA000+i*2,6);$('other-word').textContent=hex(capture.checkpoints[1-index].cells[i]);$('detail-note').textContent=hint(code(raw));}
+function select(x,y){const cp=current();if(x<0||y<0||x>=cp.width||y>=cp.height)return;selected=[x,y];render();}
+for(const canvas of [screen,atlas]){
+ canvas.addEventListener('click',event=>{const bounds=canvas.getBoundingClientRect();let x=(event.clientX-bounds.left)*canvas.width/bounds.width,y=(event.clientY-bounds.top)*canvas.height/bounds.height;if(canvas===screen){x+=current().camera[0];y+=current().camera[1]-8;}select(Math.floor(x/16),Math.floor(y/16));});
+ canvas.addEventListener('keydown',event=>{const delta={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];if(!delta)return;event.preventDefault();const pos=selected||current().player.map(v=>Math.floor(v/16));select(pos[0]+delta[0],pos[1]+delta[1]);});
+}
+$('checkpoint').addEventListener('change',()=>{index=Number($('checkpoint').value);render();});
+for(const id of ['collision','grid','player-marker','changes','atlas-mode','place-image','zoom'])$(id).addEventListener('input',render);
+$('locate').addEventListener('click',()=>{const cp=current(),zoom=Number($('zoom').value)/100;select(Math.floor(cp.player[0]/16),Math.floor(cp.player[1]/16));$('atlas-scroll').scrollTo({left:cp.player[0]*zoom-$('atlas-scroll').clientWidth/2,top:cp.player[1]*zoom-150,behavior:'smooth'});});
+render();
+</script>
+</body>
+</html>

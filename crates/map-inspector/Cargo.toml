@@ -1,0 +1,16 @@
+[package]
+name = "map-inspector"
+description = "Local reference-map capture and browser inspection tool"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+assets = { path = "../assets" }
+oracle = { path = "../oracle" }
+rom = { path = "../rom" }
+serde_json = "1"
