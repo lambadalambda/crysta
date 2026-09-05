@@ -10,6 +10,7 @@ use std::{
 };
 
 mod qualification;
+mod script_inspection;
 
 const SAVE_SHA256: &str = "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055";
 const VIEWER: &str = include_str!("../web/viewer.html");
@@ -32,45 +33,36 @@ fn invalid(message: &str) -> io::Error {
 }
 
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
-    let [mode, rom_path, save_path] = args else {
+    let [mode, rom_path, parameter] = args else {
         return Err(invalid(
-            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>",
+            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector resolve-map <japanese-rom> <hex-map-id>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("verify" | "qualify-loader" | "decode-layer") => false,
+        Some("verify" | "qualify-loader" | "decode-layer" | "resolve-map") => false,
         _ => {
-            return Err(
-                invalid("mode must be capture, verify, qualify-loader or decode-layer").into(),
+            return Err(invalid(
+                "mode must be capture, verify, qualify-loader, decode-layer or resolve-map",
             )
+            .into())
         }
     };
     let rom = Rom::load(&fs::read(rom_path)?)?;
     if rom.revision() != Revision::Japan {
         return Err(invalid("map capture is qualified only for the Japanese reference").into());
     }
-    if mode == "decode-layer" {
-        let offset = save_path
-            .to_str()
-            .ok_or_else(|| invalid("offset must be hexadecimal text"))?;
-        let offset = usize::from_str_radix(offset.strip_prefix("0x").unwrap_or(offset), 16)?;
-        let layer = StaticLayer::from_rom(rom.image(), offset)?;
-        println!(
-            "{}",
-            json!({
-                "schema_version":1,"kind":"static-layer-before-attributes",
-                "revision":rom.revision().id(),"rom_sha256":sha256(rom.image()),
-                "width":layer.width(),"height":layer.height(),
-                "source_range":[layer.source_range().start,layer.source_range().end],
-                "source_sha256":sha256(layer.source_bytes()),"layer_sha256":sha256(&layer.layer_bytes()),
-                "cells":layer.cells().iter().map(|cell|cell.raw()).collect::<Vec<_>>()
-            })
-        );
+    if mode == "resolve-map" {
+        let map_id = u16::try_from(parse_hex(parameter)?)?;
+        println!("{}", script_inspection::inspect(&rom, map_id)?);
         return Ok(());
     }
-    let save = fs::read(save_path)?;
+    if mode == "decode-layer" {
+        println!("{}", decode_layer(&rom, parse_hex(parameter)?)?);
+        return Ok(());
+    }
+    let save = fs::read(parameter)?;
     if sha256(&save) != SAVE_SHA256 {
         return Err(
             invalid("SRAM must match the qualified three-slot save; see docs/maps.md").into(),
@@ -124,6 +116,28 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
         println!("{}", serde_json::to_string(&manifest)?);
     }
     Ok(())
+}
+
+fn parse_hex(value: &std::ffi::OsStr) -> Result<usize> {
+    let text = value
+        .to_str()
+        .ok_or_else(|| invalid("expected hexadecimal text"))?;
+    Ok(usize::from_str_radix(
+        text.strip_prefix("0x").unwrap_or(text),
+        16,
+    )?)
+}
+
+fn decode_layer(rom: &Rom, offset: usize) -> Result<Value> {
+    let layer = StaticLayer::from_rom(rom.image(), offset)?;
+    Ok(json!({
+        "schema_version":1,"kind":"static-layer-before-attributes",
+        "revision":rom.revision().id(),"rom_sha256":sha256(rom.image()),
+        "width":layer.width(),"height":layer.height(),
+        "source_range":[layer.source_range().start,layer.source_range().end],
+        "source_sha256":sha256(layer.source_bytes()),"layer_sha256":sha256(&layer.layer_bytes()),
+        "cells":layer.cells().iter().map(|cell|cell.raw()).collect::<Vec<_>>()
+    }))
 }
 
 struct Capture {
