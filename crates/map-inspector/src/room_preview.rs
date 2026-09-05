@@ -141,7 +141,7 @@ fn compile(rom: &Rom) -> Result<GameData> {
     for list in &lists {
         content.extend(list.source_bytes());
     }
-    content.extend([1, 1, 0, 1]); // slice/profile/no-RNG/policy versions
+    content.extend([1, room_core::slice::PROFILE_VERSION, 0, 1]); // slice/profile/no-RNG/policy versions
     content.extend(queue.0.to_le_bytes());
     content.extend(queue.1.to_le_bytes());
     let identity = DataIdentity {
@@ -223,7 +223,7 @@ mod tests {
             assert_eq!(
                 sha256(&bytes),
                 hash,
-                "map {id:X} must equal the grids used by all1204 portable reference steps"
+                "map {id:X} must equal the grids used by all1971 portable reference steps"
             );
         }
     }

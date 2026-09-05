@@ -79,7 +79,7 @@ impl Room {
     }
 
     // Old edges only validate types: actual old-edge diversions depend on 6/7,
-    // not an O/S pair dispatch. New edges additionally require a uniform class.
+    // not an O/S pair dispatch. New edges can apply a perpendicular corner nudge.
     #[allow(clippy::verbose_bit_mask)] // Preserve the reference pixel-remainder test.
     fn samples(&self, x: u16, y: u16, direction: Direction) -> Result<(bool, bool), Unqualified> {
         let (u, v) = match direction {
@@ -127,11 +127,33 @@ impl Room {
             .checked_add_signed(dy)
             .ok_or(Unqualified::ArithmeticOverflow)?;
         let (first, second) = self.samples(next_x, next_y, direction)?;
-        if first != second {
-            return Err(Unqualified::MixedPair);
-        }
         let (mut resolved_x, mut resolved_y) = (next_x, next_y);
-        if first {
+        let blocked = first || second;
+        if blocked {
+            // Native special-player tables: O/S may nudge -1 for q<8;
+            // S/O may nudge +1 for q>=8. Blocking still resolves the main axis.
+            let perpendicular = if direction.horizontal() {
+                next_y - 16
+            } else {
+                next_x - 8
+            };
+            let q = perpendicular % 16;
+            let nudge = if first && !second && q >= 8 {
+                1
+            } else if !first && second && q < 8 {
+                -1
+            } else {
+                0
+            };
+            if direction.horizontal() {
+                resolved_y = resolved_y
+                    .checked_add_signed(nudge)
+                    .ok_or(Unqualified::ArithmeticOverflow)?;
+            } else {
+                resolved_x = resolved_x
+                    .checked_add_signed(nudge)
+                    .ok_or(Unqualified::ArithmeticOverflow)?;
+            }
             // Positive samples use edge-1, but correction tests the unmodified edge.
             let edge = match direction {
                 Direction::Left => next_x.checked_sub(8),
@@ -161,6 +183,6 @@ impl Room {
             }
         }
         self.validate_position(resolved_x, resolved_y)?;
-        Ok((resolved_x, resolved_y, first))
+        Ok((resolved_x, resolved_y, blocked))
     }
 }

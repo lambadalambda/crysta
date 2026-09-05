@@ -30,6 +30,8 @@ done
 "$p" local/movement/doorway-approach 1681 Left:1601:1657 Down:1657:1682
 "$p" local/movement/up-central 1780 Left:1601:1657 Up:1657:1770
 "$p" local/movement/up-type12 1780 Left:1601:1712 Up:1712:1770
+"$p" local/movement/corner-positive 1861 Left:1601:1657 Down:1657:1682 Down:1801:1809 Right:1813:1830
+"$p" local/movement/corner-negative 1861 Left:1601:1657 Down:1657:1682 Down:1801:1814 Left:1820:1850
 "$p" local/movement/map10-up-wall 2050 Left:1601:1657 Down:1657:1682 Left:1801:1825 Up:1840:2040
 "$p" local/movement/cadence 1670 Right:1601:1611 Left:1611:1621 Up:1621:1631 Down:1631:1641 Right:1651:1652
 "$p" local/movement/pulses 1665 Left:1601:1602 Left:1605:1607 Left:1610:1613 Left:1616:1620 Left:1621:1625 Right:1625:1629 Right:1631:1635 Up:1635:1638 Down:1638:1642

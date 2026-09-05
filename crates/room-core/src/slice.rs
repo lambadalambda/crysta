@@ -4,6 +4,9 @@ use crate::{Direction, FrameInput, Room, Unqualified, WalkingState};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
+/// Collision/semantic profile version; v2 admits qualified open/solid corner nudges.
+pub const PROFILE_VERSION: u8 = 2;
+
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Policy {
@@ -215,7 +218,7 @@ impl GameState {
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
     #[must_use]
     pub fn snapshot(&self) -> Vec<u8> {
-        let mut bytes = vec![b'R', b'S', b'L', b'C', 1, 1, 0, 1];
+        let mut bytes = vec![b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1];
         bytes.extend(self.identity.rom_sha256);
         bytes.extend(self.identity.content_sha256);
         bytes.extend(self.tick.to_le_bytes());
@@ -229,7 +232,7 @@ impl GameState {
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
         if bytes.len() < 83
-            || bytes[..8] != [b'R', b'S', b'L', b'C', 1, 1, 0, 1]
+            || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
         {

@@ -19,7 +19,7 @@ struct Fixture {
     wram_hash: &'static str,
 }
 
-const FIXTURES: [Fixture; 7] = [
+const FIXTURES: [Fixture; 12] = [
     Fixture {
         name: "wall-Left",
         start: 1601,
@@ -75,6 +75,46 @@ const FIXTURES: [Fixture; 7] = [
         grid_frame: 1601,
         csv_hash: "11df3bd5fe315e41f9f894c7937a93dd23c7b60b3c4e78baaddbf10cffc25614",
         wram_hash: "655ea43073c4a4f7f0f1b8d736125c1a7b62ddbe07af912ee958c3eb162f0dd6",
+    },
+    Fixture {
+        name: "map10-Left",
+        start: 1801,
+        end: 2000,
+        grid_frame: 2000,
+        csv_hash: "e28d45c62f6d909aea34dca67b6acb7014af0aaa28ac3696664873a7860f0cac",
+        wram_hash: "8a9f4b469de87a31cfc3f5e7f904e40555ef5a676f3cb0e3f588c92cb09d3dfb",
+    },
+    Fixture {
+        name: "map10-Right",
+        start: 1801,
+        end: 2000,
+        grid_frame: 2000,
+        csv_hash: "0d4fb4d4abfb076cbcdea41b55445508efcaeb0f3437ee5ec22680ebd3284b81",
+        wram_hash: "94718533060f61fe50e73634dcb5a4857b9c5bdfa66473337c2e5c5431115c01",
+    },
+    Fixture {
+        name: "map10-up-wall",
+        start: 1801,
+        end: 2050,
+        grid_frame: 2050,
+        csv_hash: "9b8b9ff057a72b11302051f298c50b1c1b50e1f95bc7bafb8d6fc2ad8db28d7b",
+        wram_hash: "27a10a4a274aa00db6bba6ab9814e5567f475ac779a128403a211ed99198f319",
+    },
+    Fixture {
+        name: "corner-positive",
+        start: 1801,
+        end: 1861,
+        grid_frame: 1861,
+        csv_hash: "109df44c44689ac15c266b19852f103a3fb40f17d7f9d9df4e7671ea7bee15f8",
+        wram_hash: "112a0602bb001230c6748cd9bdc5ced1becbb0ce0cf71f6d998b3cf53ac5ff0d",
+    },
+    Fixture {
+        name: "corner-negative",
+        start: 1801,
+        end: 1861,
+        grid_frame: 1861,
+        csv_hash: "718e668a4154f594eadd83273966423688362632a0f6d205d081db10973b1665",
+        wram_hash: "613c1b81fbdbbfe81f46f53c99c4f21cfec253d932caf0c3e4821a54c72d1d55",
     },
 ];
 const F_GRID_HASH: &str = "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1";
@@ -209,6 +249,8 @@ fn replay(directory: &Path, fixture: &Fixture) -> usize {
                 i32::from(out.y) - i32::from(before.1)
             )
         );
+        // Fixture-specific property, not an independent native carry/dispatch
+        // oracle: in general solid correction can equal the attempted result.
         assert_eq!(
             out.blocked,
             (out.dx, out.dy) != (out.attempted_dx, out.attempted_dy)
@@ -253,6 +295,6 @@ fn authenticated_reference_positions_streams_and_snapshots() {
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
     let total: usize = FIXTURES.iter().map(|fixture| replay(&root, fixture)).sum();
-    assert_eq!(total, 1204);
+    assert_eq!(total, 1971);
     eprintln!("Matched all {total} reference position/stream steps and restored-snapshot replays");
 }

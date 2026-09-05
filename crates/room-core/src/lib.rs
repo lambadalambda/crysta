@@ -2,7 +2,8 @@
 //! Deterministic, reference-qualified cardinal walking over immutable collision cells.
 //!
 //! Only ordinary walking with fixed (-8,-16), 16×16 bounds is modeled. Unknown
-//! materials, flagged cells, corners and reactivated directions fail closed.
+//! materials, flagged cells and reactivated directions fail closed. Qualified
+//! open/solid corners retain the native perpendicular nudge.
 //! The caller owns mode admission, room identity, actors, exits and transitions;
 //! in particular it must hand off after the qualified doorway movement step.
 //! There are no devices, clocks, filesystem access, original CPU or dependencies.
@@ -71,8 +72,6 @@ pub enum Unqualified {
     FlaggedCell(u16),
     /// A stored material type outside 0, 2, 22, 12 and 14.
     UnsupportedType(u8),
-    /// A new edge straddles open and solid cells; corner responses are unqualified.
-    MixedPair,
     /// A previously activated direction was released/interrupted and activated again.
     ReactivatedDirection(Direction),
     /// Snapshot length, version, encoding or state invariants are invalid.
@@ -181,7 +180,7 @@ impl WalkingState {
     /// 1,2 without that restart. The caller selects exits after a successful step.
     ///
     /// # Errors
-    /// Returns [`Unqualified`] for invalid bounds, cells, corners, arithmetic or
+    /// Returns [`Unqualified`] for invalid bounds, cells, arithmetic or
     /// direction reactivation. Every error leaves all state fields unchanged.
     pub fn step(&mut self, room: &Room, input: FrameInput) -> Result<MovementOutput, Unqualified> {
         room.validate_position(self.x, self.y)?;

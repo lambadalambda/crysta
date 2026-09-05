@@ -1,7 +1,7 @@
 use crate::{Direction, Room, Unqualified, WalkingState};
 
 /// Version of the fixed walking-component encoding (not a game/asset schema).
-pub const SNAPSHOT_VERSION: u16 = 1;
+pub const SNAPSHOT_VERSION: u16 = 2;
 /// Byte length of a walking-component snapshot.
 pub const SNAPSHOT_SIZE: usize = 16;
 

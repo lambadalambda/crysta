@@ -101,17 +101,7 @@ fn errors_are_atomic_including_input_history() {
 }
 
 #[test]
-fn mixed_pairs_and_old_special_edges_are_rejected() {
-    let mut cells = vec![0; 2048];
-    cells[7 * 32 + 7] = 14 << 9;
-    let room = Room::new(32, 64, cells).unwrap();
-    let mut state = WalkingState::new(104, 113);
-    state.step(&room, input(Direction::Right)).unwrap();
-    state.step(&room, input(Direction::Right)).unwrap();
-    assert_eq!(
-        state.step(&room, input(Direction::Right)),
-        Err(Unqualified::MixedPair)
-    );
+fn old_special_edges_are_rejected() {
     let mut cells = vec![0; 2048];
     cells[6 * 32 + 6] = 6 << 9;
     let room = Room::new(32, 64, cells).unwrap();
@@ -210,10 +200,10 @@ fn snapshots_validate_encoding_phase_history_and_room_bounds() {
     let bytes = state.encode_snapshot();
     assert_eq!(
         bytes,
-        [b'R', b'W', b'K', 0, 1, 0, 104, 0, 112, 0, 4, 4, 0, 8, 0, 0]
+        [b'R', b'W', b'K', 0, 2, 0, 104, 0, 112, 0, 4, 4, 0, 8, 0, 0]
     );
     for (offset, value) in [
-        (4, 2),
+        (4, 3),
         (5, 1),
         (10, 5),
         (11, 255),
@@ -274,4 +264,144 @@ fn single_frame_tap_never_moves_and_snapshot_replay_is_repeatable() {
         }
         two = WalkingState::decode_snapshot(&room, &two.encode_snapshot()).unwrap();
     }
+}
+
+#[test]
+fn mixed_open_solid_edges_preserve_reference_corner_nudges() {
+    for direction in [
+        Direction::Left,
+        Direction::Right,
+        Direction::Up,
+        Direction::Down,
+    ] {
+        for q in 1..16_u16 {
+            for open in [0, 2, 22] {
+                for solid in [12, 14] {
+                    for solid_first in [false, true] {
+                        let horizontal = matches!(direction, Direction::Left | Direction::Right);
+                        let (x, y) = if horizontal {
+                            (104, 112 + q)
+                        } else {
+                            (104 + q, 112)
+                        };
+                        let (col, row) = match direction {
+                            Direction::Left => (5, 6),
+                            Direction::Right => (7, 6),
+                            Direction::Up => (6, 5),
+                            Direction::Down => (6, 7),
+                        };
+                        let first = row * 32 + col;
+                        let second = first + if horizontal { 32 } else { 1 };
+                        let mut cells = vec![0; 2048];
+                        cells[first] = (if solid_first { solid } else { open }) << 9;
+                        cells[second] = (if solid_first { open } else { solid }) << 9;
+                        let grid = Room::new(32, 64, cells).unwrap();
+                        let mut state = WalkingState::new(x, y);
+                        for _ in 0..2 {
+                            state.step(&grid, input(direction)).unwrap();
+                        }
+                        let out = state.step(&grid, input(direction)).unwrap();
+                        let nudge = if solid_first && q >= 8 {
+                            1
+                        } else if !solid_first && q < 8 {
+                            -1
+                        } else {
+                            0
+                        };
+                        let expected = if horizontal {
+                            (x, y.checked_add_signed(nudge).unwrap())
+                        } else {
+                            (x.checked_add_signed(nudge).unwrap(), y)
+                        };
+                        assert_eq!(
+                            (out.x, out.y),
+                            expected,
+                            "{direction:?} q={q} solid_first={solid_first}"
+                        );
+                        assert!(out.blocked);
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn old_flat_only_snapshot_version_is_rejected() {
+    let mut bytes = WalkingState::new(104, 112).encode_snapshot();
+    bytes[4..6].copy_from_slice(&1_u16.to_le_bytes());
+    assert_eq!(
+        WalkingState::decode_snapshot(&floor(), &bytes),
+        Err(Unqualified::Snapshot)
+    );
+}
+
+#[test]
+fn mixed_nudges_survive_rollback_and_resume_after_alignment() {
+    for (direction, base_x, base_y, col, row) in [
+        (Direction::Right, 112, 112, 7, 6),
+        (Direction::Left, 96, 112, 5, 6),
+        (Direction::Down, 104, 120, 6, 7),
+        (Direction::Up, 104, 104, 6, 5),
+    ] {
+        for (q, nudge) in [(1, -1), (15, 1)] {
+            let horizontal = matches!(direction, Direction::Left | Direction::Right);
+            let (x, y) = if horizontal {
+                (base_x, base_y + q)
+            } else {
+                (base_x + q, base_y)
+            };
+            let mut cells = vec![0; 2048];
+            let first = row * 32 + col;
+            cells[first] = if nudge > 0 { 12 << 9 } else { 0 };
+            cells[first + if horizontal { 32 } else { 1 }] = if nudge < 0 { 14 << 9 } else { 0 };
+            let grid = Room::new(32, 64, cells).unwrap();
+            let mut state = WalkingState::new(x, y);
+            for _ in 0..2 {
+                state.step(&grid, input(direction)).unwrap();
+            }
+            let one = state.step(&grid, input(direction)).unwrap();
+            let sign = if matches!(direction, Direction::Left | Direction::Up) {
+                -1
+            } else {
+                1
+            };
+            assert!(one.blocked);
+            assert_eq!(
+                (one.dx, one.dy),
+                if horizontal { (0, nudge) } else { (nudge, 0) }
+            );
+            assert_eq!(
+                (one.attempted_dx, one.attempted_dy),
+                if horizontal { (sign, 0) } else { (0, sign) }
+            );
+            let mut restored =
+                WalkingState::decode_snapshot(&grid, &state.encode_snapshot()).unwrap();
+            let two = state.step(&grid, input(direction)).unwrap();
+            assert_eq!(restored.step(&grid, input(direction)).unwrap(), two);
+            assert!(!two.blocked);
+            assert_eq!(
+                (two.dx, two.dy),
+                if horizontal {
+                    (sign * 2, 0)
+                } else {
+                    (0, sign * 2)
+                }
+            );
+        }
+    }
+    let mut cells = vec![0; 2048];
+    cells[7 * 32 + 7] = 14 << 9;
+    let grid = Room::new(32, 64, cells).unwrap();
+    let mut state = WalkingState::new(112, 115);
+    for _ in 0..3 {
+        state.step(&grid, input(Direction::Right)).unwrap();
+    }
+    let two = state.step(&grid, input(Direction::Right)).unwrap();
+    assert!(two.blocked);
+    assert_eq!((two.x, two.y), (112, 113));
+    assert_eq!(
+        (two.dx, two.dy, two.attempted_dx, two.attempted_dy),
+        (0, -1, 2, 0)
+    );
 }

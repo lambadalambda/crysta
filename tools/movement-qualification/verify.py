@@ -92,9 +92,9 @@ def verify(name,start=1601,grid_frame=None,end=None,flat_only=False):
 if __name__=='__main__':
     cases={'wall-Left':(189,0),'wall-Right':(189,0),'wall-Down':(189,0),
            'wall-Up':(11,178),'up-central':(179,0),'up-type12':(179,0),'cadence':(60,9),
-           'map10-Left':(199,0),'map10-Right':(199,0),'map10-Down':(199,0),'map10-up-wall':(249,0)}
+           'map10-Left':(199,0),'map10-Right':(199,0),'map10-Down':(199,0),'map10-up-wall':(249,0),'corner-positive':(60,0),'corner-negative':(60,0)}
     for name,expected in cases.items():
-        assert verify(name,1801 if name.startswith('map10-') else 1601)==expected
+        assert verify(name,1801 if name.startswith(('map10-','corner-')) else 1601)==expected
     # The quick-retap fixture is evidence of an unsupported action, not walking.
     try:
         verify('pulses')
@@ -106,7 +106,7 @@ if __name__=='__main__':
 
     # Smaller production candidate: no mixed-pair/corner handling at all.
     for name in ['wall-Left','wall-Right','wall-Down','up-central','up-type12','map10-Down']:
-        assert verify(name,1801 if name.startswith('map10-') else 1601,flat_only=True)==cases[name]
+        assert verify(name,1801 if name.startswith(('map10-','corner-')) else 1601,flat_only=True)==cases[name]
     assert verify('doorway-approach',grid_frame=1601,flat_only=True)==(80,0)
     # The next frame is already transition-controlled, despite its one-pixel delta.
     try:
