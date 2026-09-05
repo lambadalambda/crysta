@@ -43,8 +43,13 @@ original cavern viewports beside a bounded, lossless 80×32 raw runtime layer.
 The [format record](../../docs/maps.md) distinguishes observed checkpoint data
 from imported collision hints. No static decoder completion is claimed.
 
-This parent remains open. Static map pointers, indoor/outdoor/dungeon/world-map
-coverage, placements/regions/exits, and behavior-qualified collision fixtures
-remain. A probe did not reach the candidate dimension-loading instruction;
-loader tracing is not yet qualified. The current before/after pair has identical
-layer words, so it does not prove dynamic collision updates or wall semantics.
+The [static cavern subissue](static-map-cavern.md) is now complete as well.
+The actual loader supplies a dimension-prefixed ROM packet and a separate
+attribute table; pure static decoding matches both raw and initialized runtime
+bytes exactly. One later cell-bit change is isolated, without claiming its
+gameplay semantics. See [static maps](../../docs/static-maps.md).
+
+This parent remains open. General map-script/pointer resolution, additional
+indoor/outdoor/dungeon/world-map coverage, graphics, placements/regions/exits,
+and behavior-qualified collision fixtures remain. The old dimension-store probe
+was a false lead; the qualified cavern loader uses another path.

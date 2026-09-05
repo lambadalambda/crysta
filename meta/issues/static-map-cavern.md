@@ -36,3 +36,31 @@ the qualified portal-cavern checkpoint.
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
 - This is a bounded subissue; the parent remains open for broader map coverage,
   transitions, placements and behavior-qualified collision semantics.
+
+## Completion record
+
+- Qualified the real loader rather than the unused `$80:F690` candidate. Map
+  `$0128` resolves an initial script pointer through `$86:959C + 3 * map_id`;
+  the traced layer command supplies `$C9:0000` and packet `$C9:0002`.
+- Added `StaticLayer`, a pure bounded dimension-prefixed packet reader preserving
+  source bytes and raw words. Synthetic tests cover malformed dimensions,
+  offsets, truncation, bank/output bounds and noncanonical encoding preservation.
+- Static cavern output (5,120 bytes) exactly matches `$7E:A000` immediately after
+  decompression. A separate 512-byte ROM attribute table and pure lookup exactly
+  reproduce all initialized words at a second loader stop.
+- Of 657 raw-source/gameplay word differences, 656 are attribute initialization.
+  The sole later change is cell 448 `$0007 → $8007`; its writer/gameplay meaning
+  is deferred, not encoded into static content.
+- Added `decode-layer` (authenticated ROM only, no SRAM or emulator boot) and
+  `qualify-loader` (fixed authenticated ROM/SRAM trace experiment). Local tests
+  actually executed with owned inputs and passed; missing inputs skip explicitly.
+- Independent correctness/architecture reviews approved the pure reader,
+  attribute transform and qualification pipeline. Full workspace tests, format,
+  Clippy and rustdoc with warnings denied passed. The full workspace suite also
+  passed in a clean detached worktree with explicit ROM/SRAM test skips.
+- Reproduction, source ranges/hashes, ten trace stops and qualification limits
+  are recorded in [static map layers](../../docs/static-maps.md).
+
+This subissue does not implement a general map-script/pointer resolver, arbitrary
+map coverage, terrain graphics or movement collision semantics. Those remain in
+the parent issue and the event-bytecode work.

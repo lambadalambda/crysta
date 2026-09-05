@@ -24,3 +24,4 @@
 - [x] [Implement and verify the compression codec](issues/compression-codec.md)
 - [x] [Build a local loaded-map inspector](issues/loaded-map-inspector.md)
 - [x] [Preserve oracle framebuffer colors](issues/oracle-framebuffer-colors.md)
+- [x] [Qualify static map loading and decode the cavern layer](issues/static-map-cavern.md)
