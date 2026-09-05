@@ -306,6 +306,13 @@ fn cavern_loads(image: &[u8]) -> Result<Vec<Load>, VisualMapError> {
 // Only packed resource-pointer fields are variable. All control bytes and table
 // pointers are checked, including every conditional audio alternative. No FD
 // predicate is evaluated: each audited alternative reaches shared subscript $10.
+// Reconstructed constraints below are labeled at loader-instruction boundaries;
+// addresses in comments are Japanese runtime addresses (offset fields normalize
+// them to the ROM image). Three zero bytes at each `pointers` offset stand for a
+// masked packed source pointer, NOT literal extracted cartridge pointer bytes.
+// FD predicate bit semantics and the labeled opaque fields are not decoded here.
+// FE/FF descriptions below assume this profile's unflagged, non-call path unless
+// explicitly describing their general flagged-return behavior.
 struct RoomSpan {
     offset: usize,
     bytes: &'static [u8],
@@ -314,35 +321,113 @@ struct RoomSpan {
 const ROOM_ROOT: RoomSpan = RoomSpan {
     offset: 0x18_8496,
     bytes: &[
-        8, 0xfa, 1, 0, 0x80, 0, 0x10, 0, 0, 0, 0, 0x40, 0, 0x40, 0, 0x20, 0x90, 0, 0, 0, 0,
+        // $98:8496 — FA: defer subscript $0001 (common room loads).
+        8, 0xfa, 1, 0,
+        // $98:849A — Graphics: source units $00..$10 ($200 bytes/unit), opaque mode $00;
+        // masked pointer; opaque suffix bytes [$40,$00], qualified VRAM word $4000.
+        0x80, 0, 0x10, 0, 0, 0, 0, 0x40, 0,
+        // $98:84A3 — Palette: source colors $00..$20, CGRAM start $90; masked pointer.
+        0x40, 0, 0x20, 0x90, 0, 0, 0,
+        // $98:84AA — END: follow deferred subscript at root (or return/finish in other contexts).
+        0,
     ],
     pointers: &[8, 17],
 };
 const ROOM_COMMON: RoomSpan = RoomSpan {
     offset: 0x18_8405,
     bytes: &[
-        0x40, 0, 0x60, 0x20, 0, 0, 0, 8, 0xfe, 2, 0, 0x10, 1, 0, 0, 0, 0x10, 2, 0, 0, 0, 8, 0xfe,
-        3, 0, 0x80, 0, 0x30, 3, 0, 0, 0, 0, 0, 0x20, 0, 0x40, 0, 1, 0, 0, 0, 0x20, 0, 8, 0, 0x81,
-        0, 0, 0, 0x20, 0, 0x40, 0, 2, 0, 0, 0, 8, 0xff, 6, 0,
+        // $98:8405 — Palette: source colors $00..$60, CGRAM start $20; masked pointer.
+        0x40, 0, 0x60, 0x20, 0, 0, 0,
+        // $98:840C — FE: flagged return; otherwise skip opaque word $0002.
+        8, 0xfe, 2, 0,
+        // $98:8410 — Layer: selector $01 (BG1); masked dimension-prefixed resource pointer.
+        0x10, 1, 0, 0, 0,
+        // $98:8415 — Layer: selector $02 (BG2, omitted); masked resource pointer.
+        0x10, 2, 0, 0, 0,
+        // $98:841A — FE: flagged return; otherwise skip opaque word $0003.
+        8, 0xfe, 3, 0,
+        // $98:841E — Graphics: source units $00..$30 ($200 bytes/unit), opaque mode $03;
+        // masked pointer; opaque suffix bytes [$00,$00], qualified VRAM word $0000.
+        0x80, 0, 0x30, 3, 0, 0, 0, 0, 0,
+        // $98:8427 — Metatiles: opaque parameters [$00,$40,$00,$01], qualified BG1 definitions; masked pointer.
+        0x20, 0, 0x40, 0, 1, 0, 0, 0,
+        // $98:842F — Metatiles: opaque parameters [$00,$08,$00,$81], qualified attributes; masked pointer.
+        0x20, 0, 8, 0, 0x81, 0, 0, 0,
+        // $98:8437 — Metatiles: opaque parameters [$00,$40,$00,$02], qualified BG2 definitions (omitted); masked pointer.
+        0x20, 0, 0x40, 0, 2, 0, 0, 0,
+        // $98:843F — FF: jump to subscript $0006 (conditional audio tail) when unflagged.
+        8, 0xff, 6, 0,
     ],
     pointers: &[4, 13, 18, 29, 39, 47, 55],
 };
 const ROOM_AUDIO: RoomSpan = RoomSpan {
     offset: 0x18_8390,
     bytes: &[
-        8, 0xfd, 0xac, 0x81, 0xcf, 0, 8, 0xfd, 0x97, 0x81, 0xc5, 0, 8, 0xfd, 0x2c, 0x80, 7, 0, 8,
-        0xfd, 0x2b, 0x80, 0x14, 0, 8, 0xfd, 0x2a, 0x80, 8, 0, 8, 0xfd, 0x23, 0, 7, 0, 8, 0xfd, 1,
-        0x81, 7, 0, 8, 0xfc, 5, 0, 8, 0xff, 0x10, 0, 8, 0xfe, 7, 0, 8, 0xfc, 3, 0, 8, 0xff, 0x10,
-        0, 8, 0xfe, 0x14, 0, 8, 0xfc, 0xd, 0, 8, 0xff, 0x10, 0, 8, 0xfe, 8, 0, 8, 0xfc, 0, 0, 8,
-        0xff, 0x10, 0, 8, 0xfe, 0xc5, 0, 8, 0xfc, 0x14, 0, 8, 0xff, 0x10, 0, 8, 0xfe, 0xcf, 0, 8,
-        0xfc, 0x36, 0, 8, 0xff, 0x10, 0, 0,
+        // $98:8390 — FD: conditional jump to subscript $00CF; opaque predicate word $81AC.
+        8, 0xfd, 0xac, 0x81, 0xcf, 0,
+        // $98:8396 — FD: conditional jump to subscript $00C5; opaque predicate word $8197.
+        8, 0xfd, 0x97, 0x81, 0xc5, 0,
+        // $98:839C — FD: conditional jump to subscript $0007; opaque predicate word $802C.
+        8, 0xfd, 0x2c, 0x80, 7, 0,
+        // $98:83A2 — FD: conditional jump to subscript $0014; opaque predicate word $802B.
+        8, 0xfd, 0x2b, 0x80, 0x14, 0,
+        // $98:83A8 — FD: conditional jump to subscript $0008; opaque predicate word $802A.
+        8, 0xfd, 0x2a, 0x80, 8, 0,
+        // $98:83AE — FD: conditional jump to subscript $0007; opaque predicate word $0023.
+        8, 0xfd, 0x23, 0, 7, 0,
+        // $98:83B4 — FD: conditional jump to subscript $0007; opaque predicate word $8101.
+        8, 0xfd, 1, 0x81, 7, 0,
+        // $98:83BA — FC: select audio-list entry $0005; audio-list execution is outside this projection.
+        8, 0xfc, 5, 0,
+        // $98:83BE — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83C2 — FE: flagged return; otherwise skip opaque word $0007.
+        8, 0xfe, 7, 0,
+        // $98:83C6 — FC: select audio-list entry $0003; branch entry from FD/subscript table.
+        8, 0xfc, 3, 0,
+        // $98:83CA — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83CE — FE: flagged return; otherwise skip opaque word $0014.
+        8, 0xfe, 0x14, 0,
+        // $98:83D2 — FC: select audio-list entry $000D; branch entry from FD/subscript table.
+        8, 0xfc, 0xd, 0,
+        // $98:83D6 — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83DA — FE: flagged return; otherwise skip opaque word $0008.
+        8, 0xfe, 8, 0,
+        // $98:83DE — FC: select audio-list entry $0000; branch entry from FD/subscript table.
+        8, 0xfc, 0, 0,
+        // $98:83E2 — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83E6 — FE: flagged return; otherwise skip opaque word $00C5.
+        8, 0xfe, 0xc5, 0,
+        // $98:83EA — FC: select audio-list entry $0014; branch entry from FD/subscript table.
+        8, 0xfc, 0x14, 0,
+        // $98:83EE — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83F2 — FE: flagged return; otherwise skip opaque word $00CF.
+        8, 0xfe, 0xcf, 0,
+        // $98:83F6 — FC: select audio-list entry $0036; branch entry from FD/subscript table.
+        8, 0xfc, 0x36, 0,
+        // $98:83FA — FF: jump to shared-resource subscript $0010 when unflagged.
+        8, 0xff, 0x10, 0,
+        // $98:83FE — END: return/follow pending/finish; unreachable after the preceding unflagged jump.
+        0,
     ],
     pointers: &[],
 };
 const ROOM_SHARED: RoomSpan = RoomSpan {
     offset: 0x18_819c,
     bytes: &[
-        0x80, 0, 8, 0, 0, 0, 0, 0x70, 0, 0x40, 0, 0x20, 0, 0, 0, 0, 8, 0xfe, 0x3f, 0, 0,
+        // $98:819C — Graphics: source units $00..$08 ($200 bytes/unit), opaque mode $00;
+        // masked pointer; opaque suffix bytes [$70,$00], qualified VRAM word $7000 (omitted).
+        0x80, 0, 8, 0, 0, 0, 0, 0x70, 0,
+        // $98:81A5 — Palette: source colors $00..$20, CGRAM start $00; masked pointer.
+        0x40, 0, 0x20, 0, 0, 0, 0,
+        // $98:81AC — FE: flagged return; otherwise skip opaque word $003F.
+        8, 0xfe, 0x3f, 0,
+        // $98:81B0 — END: return, follow pending stream, or finish; no pending stream on this profile.
+        0,
     ],
     pointers: &[4, 13],
 };
@@ -369,7 +454,14 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             return Err(invalid());
         }
     }
-    if id == 0x10 && image.get(0x18_84ad..0x18_84b2) != Some(&[8, 0xfa, 1, 0, 0]) {
+    // $98:84AD — FA: defer subscript $0001; $98:84B1 — END: follow it at root.
+    if id == 0x10
+        && image.get(0x18_84ad..0x18_84b2)
+            != Some(&[
+                8, 0xfa, 1, 0, // $98:84AD — defer common room loads.
+                0, // $98:84B1 — END.
+            ])
+    {
         return Err(invalid());
     }
     let mut spans = vec![&ROOM_COMMON, &ROOM_AUDIO, &ROOM_SHARED];
