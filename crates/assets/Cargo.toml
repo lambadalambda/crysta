@@ -1,0 +1,13 @@
+[package]
+name = "assets"
+description = "Lossless content codecs for user-provided Terranigma ROMs"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+rom = { path = "../rom" }
