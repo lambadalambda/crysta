@@ -7,6 +7,7 @@
 
 use std::fmt;
 
+pub mod exits;
 pub mod scripts;
 mod static_layer;
 pub mod visual;
