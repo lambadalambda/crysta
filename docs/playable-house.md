@@ -6,8 +6,8 @@ checkpoint, or original CPU execution in its simulation loop.
 
 **This is a limited semantic start, not a complete port of the opening.** It
 uses the default name and explicitly completes/omits intro presentation and
-conversation waits. The player is a cyan bounds marker over static BG1—not an
-original Ark sprite. NPCs, dialogue, inventory/stats, combat and audio are not
+conversation waits. Ark now uses ROM-derived ordinary standing/walking sprites
+over the static first background (hardware BG2). NPCs, dialogue, inventory/stats, combat and audio are not
 implemented. Doorways use endpoint-qualified logical timing, not the native
 loader's video-frame schedule. The frontend still uses a native Rust host;
 the same device-free core builds for Wasm but browser Wasm glue is not yet wired.
@@ -95,11 +95,12 @@ qualified separately:17 departure updates end225 or226, respectively, followed
 by spawn336 and settled353. The reference6968 sample already belongs to the
 transition; it must not be admitted as another walking frame.
 
-Profile6 slice snapshots are100 bytes. A final boolean identifies the fresh
-bedroom overlay; invalid room/transition combinations reject. Transition-owned
+Profile7 slice snapshots are103 bytes. Byte99 identifies the fresh
+bedroom overlay; bytes100–102 retain animation facing, walking ownership and phase; invalid room/transition combinations reject. Transition-owned
 snapshots contain no walking component, preventing marker erasure from creating
 walking ownership. Walking encoding remains16-byte v3. Source/content identity
-includes the startup projection and all three room profiles.
+includes the startup projection and all three room profiles. Animation ownership,
+direction and cadence must be coherent with walking or the doorway policy.
 
 ## Actual browser verification
 
@@ -114,16 +115,49 @@ The harness clicks the actual New Game button, observes the real host's fresh
 state, resumes, then sends keyboard events through the page's bindings. A DOM
 tick observer selects subsequent inputs; it does not send movement API requests
 or substitute a fake host/controller. It checks every tick is sequential, nine
-route checkpoints, the final live state, and absence of scope-error pauses.
+route checkpoints, the final live state, and absence of scope-error pauses. An
+independent pixel compositor checks the actual canvas at all512 states (including
+initial), using the decoded sprite pixels, signed bounds, camera and high-opaque
+background mask. It does not call the page renderer to produce expectations.
 The result is511 real host steps with New Game origin retained.
 
 Raw ROM-derived captures, screenshots and verification logs stay ignored under
 `local/`; only source, selected numeric metadata and hashes are committed.
 
+## Ark rendering boundary
+
+The native adapter compiles21 ordinary ROM frames plus7 exact horizontal mirrors
+once, exposing a fixed `/art.json` route. The state supplies the frame key; the
+browser never derives animation from elapsed wall time or position differences.
+Frames retain source anchors and transparency. Mirrored components have native
+alternate offsets, so they are composed before browser rasterization rather than
+mirroring a cropped normal image. Missing art is a visible paused error, not a
+fallback marker. The old marker exists only in the renderer helper's diagnostic
+no-actor branch; the live page never uses it.
+
+Each ordinary walking record lasts9 ticks; six records make a54-tick cycle.
+The input-delayed active direction drives animation, including blocked holds.
+Turns reset the cycle; delayed release stands in the retained direction. New
+Game chooses ordinary Down standing. Indefinite idle fidgets and native doorway
+animation are not implemented: handoff through arrival uses ordinary standing
+in the doorway direction. This does not reproduce the reference's special
+idle gesture at fresh frame6800.
+
+The selected OBJ components all use priority2. In the qualified house mode1,
+opaque high-priority pixels of the first background cover Ark; Ark covers its
+low-priority pixels, while transparent background pixels never cover him. Both
+rooms share the same decoded full background sheet. Other hardware layers,
+windows, sunlight/color math, shadows and equipment effects remain omitted;
+this is not full-scene native screenshot equality.
+
+See [ROM sprite evidence](ark-sprites.md) and
+[ordinary animation qualification](ark-animation.md) for source ranges, native
+register/tile/palette/composition witnesses and reproducible fresh-boot commands.
+
 ## Verified result
 
-Two actual-browser511-step runs produced byte-identical checkpoint/final JSON,
-ending F392,191 with no errors. The UI also starts cleanly at304,112 at390px
+The earlier marker baseline passed two actual-browser511-step runs with
+byte-identical checkpoint/final JSON, ending F392,191 with no errors. The UI also starts cleanly at304,112 at390px
 width with no horizontal overflow; browser error log is empty. Desktop/mobile
 screenshots and JSON stay under `local/map-research/playable-house-*` and
 `new-game-browser-{green,repeat}.json`.
@@ -134,3 +168,17 @@ repository safety and tracker checks. Independent core, source-compiler, UI and
 integration reviews found no blockers. Fresh bootstrap repeated twice with both
 negative controls rejected and22 source-writer stops authenticated; the separate
 fresh house route also repeated twice with661 identical captured rows.
+
+The sprite milestone repeated the full workspace tests with required walking,
+admission, material and fresh-house fixtures, strict all-target Clippy, the Wasm
+core build, Node controller/renderer tests and safety/tracker checks. Two new
+actual-browser511-step runs produced identical results with **512 full-canvas
+pixel checks per run** and21 distinct rendered keys. The full28-raster transport
+is additionally checked against ROM composition by Rust tests. Browser errors
+were empty;390px width had no horizontal overflow.
+
+Fresh source qualification was rerun independently in the integrated checkout:
+animation `replay-59Ly6n` (827 per-step comparisons per set, twice) and sprites
+`replay-IzVj7x` (two boots, selected hardware/image evidence and28 exports).
+Logs/screenshots stay under ignored `local/map-research/ark-*`. Independent
+core, assets, native transport, frontend and browser-verifier reviews passed.

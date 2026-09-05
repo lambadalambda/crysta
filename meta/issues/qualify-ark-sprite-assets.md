@@ -26,3 +26,8 @@ Locate and decode the ROM-backed graphics, palette and frame composition for Ark
 ## Notes
 
 - Subissue of [render Ark in the portable house](render-ark-house-sprite.md).
+
+- Completed: pure ROM decoding of21 ordinary frames plus7 horizontal mirrors, preserving source anchors, palette, transparency and priority/order. See [evidence and reproduction](../../docs/ark-sprites.md).
+- Synthetic red→green tests,14 authenticated indexed compositions, selected fresh OAM/VRAM/CGRAM/draw-record and opaque-image comparisons, and deterministic28-raster exports pass. Raw artifacts remain ignored.
+- Fresh native BGMODE writers and tilemap priority witnesses qualify opaque high first-background pixels above OBJ2; transparent/low pixels do not occlude. The first background is hardware BG2, correcting prior house terminology.
+- Native transport and actual-browser integration are verified; independent reviews passed.

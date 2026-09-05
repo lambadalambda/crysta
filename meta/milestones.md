@@ -117,9 +117,6 @@ qualification remain open.
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
-- [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
-- [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
-- [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

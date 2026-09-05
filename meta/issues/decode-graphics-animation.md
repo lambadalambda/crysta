@@ -40,6 +40,8 @@ The cavern now has source/VRAM/WRAM/CGRAM equality, 672 tilemap words and a
 This parent remains open: other graphics families/maps, sprites, animation,
 resource caching and final scene effects still need qualification.
 
-## Current bounded milestone
+## Completed bounded milestone
 
 - [Render Ark standing and walking in the portable house](render-ark-house-sprite.md)
+
+ROM-backed ordinary house Ark sprites and deterministic facing/walking animation are complete. This parent remains open for broader graphics/actions and classic scene behavior. See [playable scope](../../docs/playable-house.md).

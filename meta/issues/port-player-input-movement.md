@@ -28,6 +28,8 @@ Reimplement Ark's basic input processing, movement state, direction, and animati
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Advanced combat moves may remain in the actor/combat issue unless required by the opening slice.
 
-## Current bounded milestone
+## Completed bounded milestone
 
 - [Render Ark standing and walking in the portable house](render-ark-house-sprite.md)
+
+ROM-backed ordinary house Ark sprites and deterministic facing/walking animation are complete. This parent remains open for broader graphics/actions and classic scene behavior. See [playable scope](../../docs/playable-house.md).

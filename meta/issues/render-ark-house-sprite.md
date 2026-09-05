@@ -28,4 +28,12 @@ Replace the cyan player marker with ROM-derived Ark sprites, facing and qualifie
 ## Notes
 
 - Child of the graphics/animation and player-input/movement parent issues.
-- Existing BG1-only scene limitations remain unless a small player-specific ordering requirement demands otherwise.
+- Existing first-background-only (hardware BG2) scene limitations remain unless a small player-specific ordering requirement demands otherwise.
+
+## Verified result
+
+- Completed: New Game renders ordinary Down-facing Ark from the ROM; qualified cardinal standing/walking, blocked holds, turns, releases and mirrors are driven by deterministic core state. Both doorways retain the explicit standing/endpoint-timing policy.
+- Twenty-eight exact normal/mirrored rasters are compiled once; high opaque background pixels occlude OBJ2. No copied framebuffer atlas or silent marker fallback.
+- Two real-browser511-step routes agree, with512 full-canvas pixel comparisons and21 distinct keys per run; all28 exported rasters have ROM-backed tests. No scope errors, browser errors or390px overflow.
+- Integrated source/animation fresh replays, full workspace fixture tests, strict Clippy, native/Wasm builds, Node tests and independent reviews pass. See [playable-house boundary](../../docs/playable-house.md).
+- NPC dialogue, outdoor Crysta, direct browser Wasm hosting, idle gestures, shadows, scene effects and native doorway-animation timing remain outside this milestone.

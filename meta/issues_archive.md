@@ -34,3 +34,6 @@
 - [x] [Start a new game and explore Ark's house](issues/start-and-explore-arks-house.md)
 - [x] [Qualify repeatable house movement and collision](issues/qualify-repeatable-house-movement.md)
 - [x] [Inspect read-only sprite hardware state](issues/inspect-sprite-hardware-state.md)
+- [x] [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
+- [x] [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
+- [x] [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
