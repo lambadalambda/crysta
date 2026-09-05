@@ -1,6 +1,13 @@
 use crate::{Direction, Unqualified};
 use alloc::vec::Vec;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Material {
+    Open,
+    Solid,
+    Partial,
+}
+
 /// Immutable row-major raw collision grid. Construction validates shape, not materials.
 ///
 /// Unknown material cells may exist elsewhere in the room; touching one during
@@ -10,6 +17,7 @@ pub struct Room {
     width: u16,
     height: u16,
     cells: Vec<u16>,
+    passive_flags: bool,
 }
 
 impl Room {
@@ -32,8 +40,27 @@ impl Room {
             width,
             height,
             cells,
+            passive_flags: false,
         })
     }
+    /// Constructs a grid admitting bit-15 cells as passive class-3 solids.
+    ///
+    /// The caller must establish ordinary, action-free movement: native collision
+    /// action hooks must be inactive (reference `$0980 & $0050 == 0`). This is a
+    /// collision policy assertion, not a simulation of those hooks. Do not use it
+    /// for interactions, attacks, pushing, or other player/controller modes.
+    /// Stored old-edge slopes 6/7 remain unsupported even when flagged. Raw cells
+    /// are preserved; new flagged samples override their stored type with solid.
+    /// [`Self::new`] keeps rejecting flagged cells when this contract is unavailable.
+    ///
+    /// # Errors
+    /// Returns the same shape/dimension errors as [`Self::new`].
+    pub fn new_passive(width: u16, height: u16, cells: Vec<u16>) -> Result<Self, Unqualified> {
+        let mut room = Self::new(width, height, cells)?;
+        room.passive_flags = true;
+        Ok(room)
+    }
+
     /// Width in 16-pixel cells.
     #[must_use]
     pub const fn width(&self) -> u16 {
@@ -61,19 +88,28 @@ impl Room {
         Ok(())
     }
 
-    fn solid(&self, x: u16, y: u16) -> Result<bool, Unqualified> {
+    fn material(&self, x: u16, y: u16, old_edge: bool) -> Result<Material, Unqualified> {
         let (col, row) = (x / 16, y / 16);
         if col >= self.width || row >= self.height {
             return Err(Unqualified::SampleOutOfBounds);
         }
         let raw = self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)];
-        if raw & 0x8000 != 0 {
-            return Err(Unqualified::FlaggedCell(raw));
-        }
         let kind = ((raw >> 9) & 31) as u8;
+        // Old-edge slope dispatch precedes the new-edge high-bit override.
+        if old_edge && matches!(kind, 6 | 7) {
+            return Err(Unqualified::UnsupportedType(kind));
+        }
+        if raw & 0x8000 != 0 {
+            return if self.passive_flags {
+                Ok(Material::Solid)
+            } else {
+                Err(Unqualified::FlaggedCell(raw))
+            };
+        }
         match kind {
-            0 | 2 | 22 => Ok(false),
-            12 | 14 => Ok(true),
+            0 | 2 | 22 => Ok(Material::Open),
+            12 | 14 => Ok(Material::Solid),
+            16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
         }
     }
@@ -81,7 +117,13 @@ impl Room {
     // Old edges only validate types: actual old-edge diversions depend on 6/7,
     // not an O/S pair dispatch. New edges can apply a perpendicular corner nudge.
     #[allow(clippy::verbose_bit_mask)] // Preserve the reference pixel-remainder test.
-    fn samples(&self, x: u16, y: u16, direction: Direction) -> Result<(bool, bool), Unqualified> {
+    fn samples(
+        &self,
+        x: u16,
+        y: u16,
+        direction: Direction,
+        old_edge: bool,
+    ) -> Result<(Material, Material), Unqualified> {
         let (u, v) = match direction {
             Direction::Right => (x.checked_add(7), y.checked_sub(16)),
             Direction::Left | Direction::Up => (x.checked_sub(8), y.checked_sub(16)),
@@ -91,7 +133,7 @@ impl Room {
             u.ok_or(Unqualified::ArithmeticOverflow)?,
             v.ok_or(Unqualified::ArithmeticOverflow)?,
         );
-        let first = self.solid(u, v)?;
+        let first = self.material(u, v, old_edge)?;
         let perpendicular = if direction.horizontal() { v } else { u };
         let second = if perpendicular & 15 == 0 {
             first
@@ -100,9 +142,9 @@ impl Room {
                 .checked_add(16)
                 .ok_or(Unqualified::ArithmeticOverflow)?;
             if direction.horizontal() {
-                self.solid(u, neighbor)?
+                self.material(u, neighbor, old_edge)?
             } else {
-                self.solid(neighbor, v)?
+                self.material(neighbor, v, old_edge)?
             }
         };
         Ok((first, second))
@@ -116,34 +158,33 @@ impl Room {
         dx: i16,
         dy: i16,
     ) -> Result<(u16, u16, bool), Unqualified> {
+        use Material::{Open, Partial, Solid};
         let Some(direction) = direction.filter(|_| dx != 0 || dy != 0) else {
             return Ok((x, y, false));
         };
-        self.samples(x, y, direction)?;
+        self.samples(x, y, direction, true)?;
         let next_x = x
             .checked_add_signed(dx)
             .ok_or(Unqualified::ArithmeticOverflow)?;
         let next_y = y
             .checked_add_signed(dy)
             .ok_or(Unqualified::ArithmeticOverflow)?;
-        let (first, second) = self.samples(next_x, next_y, direction)?;
+        let (first, second) = self.samples(next_x, next_y, direction, false)?;
         let (mut resolved_x, mut resolved_y) = (next_x, next_y);
-        let blocked = first || second;
+        let blocked = first != Material::Open || second != Material::Open;
         if blocked {
-            // Native special-player tables: O/S may nudge -1 for q<8;
-            // S/O may nudge +1 for q>=8. Blocking still resolves the main axis.
+            // Native special-player tables distinguish P16 from S12/14:
+            // S/P can nudge +1, P/S can nudge -1; P/P only blocks.
             let perpendicular = if direction.horizontal() {
                 next_y - 16
             } else {
                 next_x - 8
             };
             let q = perpendicular % 16;
-            let nudge = if first && !second && q >= 8 {
-                1
-            } else if !first && second && q < 8 {
-                -1
-            } else {
-                0
+            let nudge = match (first, second) {
+                (Solid | Partial, Open) | (Solid, Partial) if q >= 8 => 1,
+                (Open, Solid | Partial) | (Partial, Solid) if q < 8 => -1,
+                _ => 0,
             };
             if direction.horizontal() {
                 resolved_y = resolved_y
