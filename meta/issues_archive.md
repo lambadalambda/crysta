@@ -21,3 +21,4 @@
 - [x] [Load local SRAM in oracle sessions](issues/load-local-sram-oracle.md)
 - [x] [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
 - [x] [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
+- [x] [Implement and verify the compression codec](issues/compression-codec.md)
