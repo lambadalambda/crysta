@@ -4,10 +4,17 @@ Pure, bounded codecs for caller-owned Terranigma content. This crate does not
 read files, authenticate ROMs itself, or expose an extraction CLI. Callers must
 validate a user-provided image with `rom` before passing ROM-backed slices.
 
-Currently implemented: the [compressed packet codec](../../docs/compression.md),
-with a bounded decoder and deterministic greedy encoder. Unknown packet variants
-fail explicitly. Graphics interpretation, map formats, and the local asset pack
-are separate M3 issues.
+Currently implemented:
+
+- [Compressed packet codec](../../docs/compression.md): bounded decoder and
+  deterministic greedy encoder; unknown packet variants fail explicitly.
+- [Loaded-map model](../../docs/maps.md): validated metadata, raw cell words,
+  coordinate lookup, and lossless runtime layer export from caller-owned WRAM.
+  Static ROM map decoding and collision semantics remain unqualified.
+
+Graphics interpretation, static map formats, and the local asset pack remain
+separate M3 work. The [map inspector](../map-inspector/README.md) supplies local
+oracle capture and browser visualization without adding I/O to this library.
 
 ```sh
 cargo test -p assets

@@ -177,6 +177,13 @@ JP/EU dumps match independent community-decoder hashes and re-encode byte-for-
 byte. Arbitrary legal tokenizations normalize canonically; unsupported header
 variants fail explicitly. ROM validation and local file I/O remain caller-owned.
 
+The [`assets::maps` runtime model](maps.md) preserves a bounded loaded layer and
+metadata from caller-owned WRAM. The separate native `map-inspector` tool owns
+ROM/SRAM authentication, deterministic oracle replay, and ignored local exports;
+its browser viewer displays raw structure alongside captured original viewports.
+This is reference-lane research, not static map decoding or portable collision
+semantics. No emulator or filesystem dependency enters the pure model.
+
 Event bytecode is treated as a first-class language with a disassembler,
 readable intermediate representation, and eventually an assembler or compiler.
 

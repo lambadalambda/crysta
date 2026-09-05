@@ -22,7 +22,9 @@ be reconstructed byte-for-byte; boot, interrupts, the main loop, canonical
 memory, sparse ROM regions, and known indirect dispatch are versioned and
 inspectable. Work is now on the content and script pipeline (M3). A bounded
 compression decoder and deterministic encoder reproduce qualified JP/EU graphics
-and map packets byte-for-byte; broader content-format decoding remains.
+and map packets byte-for-byte. A local loaded-map inspector now shows qualified
+portal-cavern captures and raw tile/collision structure; static map decoding and
+collision behavior qualification remain.
 
 No playable portable implementation exists yet.
 
@@ -33,6 +35,7 @@ See:
 - [ROM code, data, and dispatch map](docs/rom-map.md)
 - [Boot, interrupts, and main loop](docs/boot-main-loop.md)
 - [Compression packets](docs/compression.md)
+- [Local map viewer and runtime layout](docs/maps.md)
 - [Milestones](meta/milestones.md)
 - [Open issues](meta/issues.md)
 - [Contributing](CONTRIBUTING.md)
@@ -79,6 +82,7 @@ crates/                 Rust workspace
   disasm/               Matching 65C816 reconstruction tooling
   memory-map/           Typed revision-bound memory symbols
   assets/               Bounded compression and content codecs
+  map-inspector/        Local runtime map captures and browser viewer
   core/                 Deterministic portable game simulation (planned)
   renderer/             Deterministic command consumer/classic renderer (planned)
   audio/                Audio command model and compatibility backend (planned)
