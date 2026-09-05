@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod new_game;
 mod opening_qualification;
 mod qualification;
 mod room_preview;
@@ -40,15 +41,15 @@ fn invalid(message: &str) -> io::Error {
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let [mode, rom_path, parameter] = args else {
         return Err(invalid(
-            "usage: map-inspector <capture|verify|qualify-loader|qualify-opening|trace-opening> <japanese-rom> <qualified-sram>\n       map-inspector serve-room <japanese-rom> <decimal-loopback-port>\n       map-inspector verify-room <japanese-rom> semantic-preview\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
+            "usage: map-inspector <capture|verify|qualify-loader|qualify-opening|trace-opening> <japanese-rom> <qualified-sram>\n       map-inspector serve-room <japanese-rom> <decimal-loopback-port>\n       map-inspector <verify-room|verify-house> <japanese-rom> semantic-preview\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("serve-room" | "verify-room" | "qualify-opening" | "trace-opening" | "verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
+        Some("serve-room" | "verify-room" | "verify-house" | "qualify-opening" | "trace-opening" | "verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
         _ => return Err(invalid(
-            "mode must be serve-room, verify-room, capture, verify, qualify-loader, qualify-opening, trace-opening, decode-layer, resolve-map or render-map",
+            "mode must be serve-room, verify-room, verify-house, capture, verify, qualify-loader, qualify-opening, trace-opening, decode-layer, resolve-map or render-map",
         )
         .into()),
     };
@@ -62,6 +63,13 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
             .ok_or_else(|| invalid("expected decimal loopback port"))?
             .parse::<u16>()?;
         return room_server::serve(&rom, port);
+    }
+    if mode == "verify-house" {
+        if parameter != "semantic-preview" {
+            return Err(invalid("verify-house requires explicit semantic-preview policy").into());
+        }
+        println!("{}", room_preview::verify_house(&rom)?);
+        return Ok(());
     }
     if mode == "verify-room" {
         if parameter != "semantic-preview" {

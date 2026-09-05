@@ -16,6 +16,7 @@ enum Request {
     State,
     Step(u8),
     Reset,
+    NewGame,
 }
 
 struct Head<'a> {
@@ -83,6 +84,7 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
         ("GET", "/map.bmp", "") => Ok(Request::Map),
         ("GET", "/state", "") => Ok(Request::State),
         ("POST", "/reset", "") => Ok(Request::Reset),
+        ("POST", "/new-game", "") => Ok(Request::NewGame),
         ("POST", "/step", value)
             if value.len() == 1 && (b'0'..=b'4').contains(&value.as_bytes()[0]) =>
         {
@@ -153,6 +155,7 @@ pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
                 match request {
                     Request::Step(input) => preview.step(input),
                     Request::Reset => preview.reset(),
+                    Request::NewGame => preview.new_game(),
                     _ => {}
                 }
                 respond(
@@ -184,6 +187,33 @@ mod tests {
     fn request(method: &str, path: &str, headers: &str, body: &str) -> Vec<u8> {
         format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:1234\r\n{headers}\r\n{body}")
             .into_bytes()
+    }
+    #[test]
+    fn new_game_requires_same_origin_empty_post() {
+        let headers = "Content-Length: 0\r\nOrigin: http://127.0.0.1:1234\r\n";
+        assert_eq!(
+            parse_request(&request("POST", "/new-game", headers, ""), ORIGIN).unwrap(),
+            Request::NewGame
+        );
+        for (method, path, headers, body) in [
+            ("GET", "/new-game", "", ""),
+            ("POST", "/new-game", "", ""),
+            ("POST", "/new-game?skip=1", headers, ""),
+            (
+                "POST",
+                "/new-game",
+                "Content-Length: 1\r\nOrigin: http://127.0.0.1:1234\r\n",
+                "0",
+            ),
+            (
+                "POST",
+                "/new-game",
+                "Origin: http://example.invalid\r\n",
+                "",
+            ),
+        ] {
+            assert!(parse_request(&request(method, path, headers, body), ORIGIN).is_err());
+        }
     }
     #[test]
     fn routes_require_exact_bounded_inputs_and_same_origin_mutations() {

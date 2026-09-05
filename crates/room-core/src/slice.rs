@@ -4,8 +4,8 @@ use crate::{FrameInput, Room, Unqualified, WalkingState};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v5 adds partial and passive flagged-cell materials.
-pub const PROFILE_VERSION: u8 = 5;
+/// Semantic profile version; v6 adds ROM-compiled fresh bedroom initialization.
+pub const PROFILE_VERSION: u8 = 6;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,22 +39,35 @@ impl Exit {
     }
 }
 
+/// Source-compiled fresh bedroom profile, distinct from a reloaded bedroom.
+#[derive(Debug)]
+pub struct NewGameData {
+    /// Frozen post-intro runtime overlay, compiled over the static ROM grid.
+    pub bedroom: Room,
+    /// Queue-derived player anchor after explicit semantic intro completion.
+    pub position: (u16, u16),
+}
+
 /// Immutable two-room data. Asset extraction and hashing happen outside the core.
 #[derive(Debug)]
 pub struct GameData {
     rooms: [Room; 2],
     exits: [Vec<Exit>; 2],
     identity: DataIdentity,
+    new_game: NewGameData,
 }
 impl GameData {
     /// Builds this narrow profile. Exit source, adjustment and spawn qualification
-    /// must be checked by the asset adapter; the first exit is validated here too.
+    /// must be checked by the asset adapter; both first exits are validated here too.
+    /// `new_game` must be compiled from the fresh bootstrap source, not
+    /// supplied SRAM or a restored checkpoint. Intro presentation is omitted by policy.
     /// # Errors
     /// Rejects wrong room dimensions or missing/changed doorway metadata.
     pub fn new(
         rooms: [Room; 2],
         exits: [Vec<Exit>; 2],
         identity: DataIdentity,
+        new_game: NewGameData,
     ) -> Result<Self, SliceError> {
         let e = exits[0].first().ok_or(SliceError::Data)?;
         let reverse = Exit([24, 20, 1, 1, 15, 0, 0, 6, 128, 1, 176, 0]);
@@ -62,8 +75,12 @@ impl GameData {
             || e.0[4..8] != [16, 0, 0, 5]
             || u16::from_le_bytes([e.0[8], e.0[9]]) != 384
             || u16::from_le_bytes([e.0[10], e.0[11]]) != 336
+            || new_game.position != (304, 112)
             || exits[1].first() != Some(&reverse)
-            || rooms.iter().any(|r| r.width() != 32 || r.height() != 64)
+            || rooms
+                .iter()
+                .chain(core::iter::once(&new_game.bedroom))
+                .any(|r| r.width() != 32 || r.height() != 64)
         {
             return Err(SliceError::Data);
         }
@@ -71,9 +88,17 @@ impl GameData {
             rooms,
             exits,
             identity,
+            new_game,
         })
     }
-    fn room(&self, id: u16) -> Result<&Room, SliceError> {
+    fn room(&self, id: u16, fresh: bool) -> Result<&Room, SliceError> {
+        if fresh {
+            return if id == 15 {
+                Ok(&self.new_game.bedroom)
+            } else {
+                Err(SliceError::Data)
+            };
+        }
         match id {
             15 => Ok(&self.rooms[0]),
             16 => Ok(&self.rooms[1]),
@@ -144,6 +169,7 @@ pub struct GameState {
     map_id: u16,
     walking: WalkingState,
     transition: Option<Transition>,
+    fresh_bedroom: bool,
 }
 impl GameState {
     /// Starts the authenticated ordinary bedroom checkpoint. Policy opt-in is explicit.
@@ -155,6 +181,22 @@ impl GameState {
             map_id: 15,
             walking: WalkingState::new(472, 176),
             transition: None,
+            fresh_bedroom: false,
+        }
+    }
+    /// Starts the source-compiled fresh bedroom after semantic intro completion.
+    /// Default name only; no menu/dialogue presentation or native intro scheduler.
+    /// No SRAM, snapshot, original CPU, host clock or RNG is consumed.
+    #[must_use]
+    pub fn new_game(data: &GameData, _policy: Policy) -> Self {
+        let (x, y) = data.new_game.position;
+        Self {
+            identity: data.identity,
+            tick: 0,
+            map_id: 15,
+            walking: WalkingState::new(x, y),
+            transition: None,
+            fresh_bedroom: true,
         }
     }
     /// Advances one walking frame or one *logical* doorway update. While the
@@ -173,6 +215,9 @@ impl GameState {
         if let Some(mut transition) = next.transition {
             transition.advance();
             next.map_id = transition.map_id();
+            if next.map_id != transition.source_map() {
+                next.fresh_bedroom = false;
+            }
             if transition.complete() {
                 let (x, y) = transition.position();
                 next.walking = WalkingState::new(x, y);
@@ -182,7 +227,7 @@ impl GameState {
             }
         } else {
             next.walking
-                .step(data.room(next.map_id)?, input)
+                .step(data.room(next.map_id, next.fresh_bedroom)?, input)
                 .map_err(SliceError::Walking)?;
             if let Some((index, _)) = data.exit(next.map_id, next.walking.position()) {
                 let transition = Transition::start(next.map_id, next.walking.position())
@@ -236,13 +281,14 @@ impl GameState {
         } else {
             self.walking.encode_snapshot()
         });
+        bytes.push(u8::from(self.fresh_bedroom));
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
     /// # Errors
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
-        if bytes.len() < 83
+        if bytes.len() != 100
             || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
@@ -251,20 +297,29 @@ impl GameState {
         }
         let tick = u64::from_le_bytes(bytes[72..80].try_into().map_err(|_| SliceError::Snapshot)?);
         let map_id = u16::from_le_bytes([bytes[80], bytes[81]]);
+        let fresh_bedroom = match bytes[99] {
+            0 => false,
+            1 if map_id == 15 => true,
+            _ => return Err(SliceError::Snapshot),
+        };
         let transition = if bytes[82] == 255 {
             None
         } else {
             Some(Transition::restore(bytes[82]).ok_or(SliceError::Snapshot)?)
         };
         let walking = if let Some(t) = transition {
-            if t.map_id() != map_id || bytes[83..] != [0; crate::SNAPSHOT_SIZE] {
+            if t.map_id() != map_id
+                || bytes[83..99] != [0; crate::SNAPSHOT_SIZE]
+                || (fresh_bedroom && t.source_map() != 15)
+            {
                 return Err(SliceError::Snapshot);
             }
             let (x, y) = t.handoff();
             WalkingState::new(x, y)
         } else {
-            let walking = WalkingState::decode_snapshot(data.room(map_id)?, &bytes[83..])
-                .map_err(|_| SliceError::Snapshot)?;
+            let walking =
+                WalkingState::decode_snapshot(data.room(map_id, fresh_bedroom)?, &bytes[83..99])
+                    .map_err(|_| SliceError::Snapshot)?;
             if data.exit(map_id, walking.position()).is_some() {
                 return Err(SliceError::Snapshot);
             }
@@ -276,6 +331,7 @@ impl GameState {
             map_id,
             walking,
             transition,
+            fresh_bedroom,
         })
     }
 }
@@ -297,8 +353,96 @@ mod tests {
                 rom_sha256: [1; 32],
                 content_sha256: [2; 32],
             },
+            NewGameData {
+                bedroom: room(),
+                position: (304, 112),
+            },
         )
         .unwrap()
+    }
+    #[test]
+    fn new_game_uses_compiled_fresh_initialization_not_saved_checkpoint() {
+        let data = synthetic_data();
+        let mut state = GameState::new_game(&data, Policy::SemanticPreview);
+        assert_eq!(
+            state.output(),
+            FrameOutput {
+                tick: 0,
+                map_id: 15,
+                position: (304, 112),
+                phase: Phase::Walking
+            }
+        );
+        assert_ne!(state, GameState::new(&data, Policy::SemanticPreview));
+        assert_eq!(state.walking.last_activation_direction(), None);
+        assert_eq!(state.walking.onset_remaining(), 0);
+        for direction in (0..20)
+            .map(|_| Some(Direction::Right))
+            .chain((0..80).map(|_| None))
+            .chain((0..20).map(|_| Some(Direction::Down)))
+            .chain((0..80).map(|_| None))
+        {
+            let mut restored = GameState::restore(&data, &state.snapshot()).unwrap();
+            let input = FrameInput { direction };
+            assert_eq!(state.step(&data, input), restored.step(&data, input));
+            assert_eq!(state, restored);
+        }
+        assert_eq!(state.output().position, (332, 140));
+        assert_eq!(
+            GameState::new_game(&data, Policy::SemanticPreview)
+                .output()
+                .tick,
+            0
+        );
+    }
+    #[test]
+    fn fresh_grid_is_not_reused_after_loading_and_snapshot_binds_its_phase() {
+        let mut data = synthetic_data();
+        data.new_game.bedroom = Room::new(32, 64, vec![14 << 9; 2048]).unwrap();
+        let mut fresh = GameState::new_game(&data, Policy::SemanticPreview);
+        for _ in 0..3 {
+            fresh
+                .step(
+                    &data,
+                    FrameInput {
+                        direction: Some(Direction::Right),
+                    },
+                )
+                .unwrap();
+        }
+        assert_eq!(fresh.output().position, (304, 112));
+        assert_eq!(fresh.snapshot()[99], 1);
+        assert_eq!(GameState::restore(&data, &fresh.snapshot()).unwrap(), fresh);
+        // Construct a synthetic fresh handoff, then check every logical phase.
+        data.new_game.bedroom = Room::new(32, 64, vec![0; 2048]).unwrap();
+        fresh = GameState::new_game(&data, Policy::SemanticPreview);
+        fresh.walking = WalkingState::new(392, 205);
+        for _ in 0..4 {
+            fresh
+                .step(
+                    &data,
+                    FrameInput {
+                        direction: Some(Direction::Down),
+                    },
+                )
+                .unwrap();
+        }
+        assert_eq!(fresh.output().position, (392, 208));
+        for elapsed in 0..35 {
+            let bytes = fresh.snapshot();
+            assert_eq!(GameState::restore(&data, &bytes).unwrap(), fresh);
+            assert_eq!(bytes[99], u8::from(elapsed <= 17));
+            let mut erased = bytes.clone();
+            erased[82] = 255;
+            assert!(GameState::restore(&data, &erased).is_err());
+            let mut invalid = bytes;
+            invalid[99] = if elapsed <= 17 { 2 } else { 1 };
+            assert!(GameState::restore(&data, &invalid).is_err());
+            fresh.step(&data, FrameInput::default()).unwrap();
+        }
+        assert!(!fresh.fresh_bedroom);
+        fresh.map_id = 15;
+        assert_eq!(data.room(15, fresh.fresh_bedroom).unwrap(), &data.rooms[0]);
     }
     #[test]
     fn synthetic_replay_snapshots_resume_at_every_logical_step() {
@@ -455,17 +599,7 @@ mod tests {
         );
         assert_eq!(state.snapshot(), before);
         data.exits[0].pop();
-        state.walking = WalkingState::new(392, 205);
-        for _ in 0..3 {
-            state
-                .step(
-                    &data,
-                    FrameInput {
-                        direction: Some(Direction::Down),
-                    },
-                )
-                .unwrap();
-        }
+        state.walking = WalkingState::new(392, 210);
         let before = state.snapshot();
         assert_eq!(
             state.step(

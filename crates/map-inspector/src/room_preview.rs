@@ -3,7 +3,7 @@ use crate::{invalid, sha256, Result};
 use assets::maps::{exits::ExitList, visual::StaticBackground};
 use rom::Rom;
 use room_core::{
-    slice::{DataIdentity, Exit, GameData, GameState, Phase, Policy},
+    slice::{DataIdentity, Exit, GameData, GameState, NewGameData, Phase, Policy},
     Direction, FrameInput, Room,
 };
 use serde_json::{json, Value};
@@ -13,6 +13,7 @@ pub(super) struct Preview {
     state: GameState,
     bitmap: Vec<u8>,
     error: Option<String>,
+    fresh_start: bool,
 }
 impl Preview {
     pub(super) fn new(rom: &Rom) -> Result<Self> {
@@ -25,6 +26,7 @@ impl Preview {
             state,
             bitmap,
             error: None,
+            fresh_start: false,
         })
     }
     pub(super) fn bitmap(&self) -> &[u8] {
@@ -49,13 +51,20 @@ impl Preview {
             self.error = Some(error.to_string());
         }
     }
+    pub(super) fn new_game(&mut self) {
+        self.state = GameState::new_game(&self.data, Policy::SemanticPreview);
+        self.fresh_start = true;
+        self.error = None;
+    }
     pub(super) fn reset(&mut self) {
         self.state = GameState::new(&self.data, Policy::SemanticPreview);
+        self.fresh_start = false;
         self.error = None;
     }
     pub(super) fn state(&self) -> Value {
         let output = self.state.output();
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
+            "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
             "phase":match output.phase{Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
             "camera":[256,if output.map_id==15{0}else{256}],"error":self.error,
@@ -63,7 +72,7 @@ impl Preview {
     }
 }
 
-fn compile_room(rom: &Rom, id: u16) -> Result<Room> {
+fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<Room> {
     let background = StaticBackground::from_rom(rom.image(), id)?;
     let attributes: &[u8; 512] = background.resources()[3].decoded().try_into()?;
     let mut cells: Vec<_> = background
@@ -75,7 +84,12 @@ fn compile_room(rom: &Rom, id: u16) -> Result<Room> {
     // Frozen ordinary-house profile: these are the measured runtime flag additions.
     // Passive geometry is qualified; this does NOT simulate the event writers.
     // Only cardinal walking is admitted; no action/interaction hook is executed.
-    let flagged: &[usize] = if id == 15 {
+    let flagged: &[usize] = if fresh {
+        if id != 15 {
+            return Err(invalid("fresh overlay belongs to bedroom only").into());
+        }
+        &[317, 504]
+    } else if id == 15 {
         &[317]
     } else {
         &[731, 732, 826, 827]
@@ -87,7 +101,12 @@ fn compile_room(rom: &Rom, id: u16) -> Result<Room> {
 }
 
 fn compile(rom: &Rom) -> Result<GameData> {
-    let rooms = [compile_room(rom, 15)?, compile_room(rom, 16)?];
+    let rooms = [compile_room(rom, 15, false)?, compile_room(rom, 16, false)?];
+    let startup = crate::new_game::compile(rom)?;
+    let new_game = NewGameData {
+        bedroom: compile_room(rom, 15, true)?,
+        position: startup.position,
+    };
     let lists = [
         ExitList::from_rom(rom.image(), 15)?,
         ExitList::from_rom(rom.image(), 16)?,
@@ -147,7 +166,7 @@ fn compile(rom: &Rom) -> Result<GameData> {
         return Err(invalid("unqualified reverse departure/spawn/arrival profile").into());
     }
     let mut content = Vec::new();
-    for room in &rooms {
+    for room in rooms.iter().chain(std::iter::once(&new_game.bedroom)) {
         content.extend(room.width().to_le_bytes());
         content.extend(room.height().to_le_bytes());
         for &cell in room.cells() {
@@ -157,6 +176,9 @@ fn compile(rom: &Rom) -> Result<GameData> {
     for list in &lists {
         content.extend(list.source_bytes());
     }
+    content.extend(new_game.position.0.to_le_bytes());
+    content.extend(new_game.position.1.to_le_bytes());
+    content.extend(startup.events); // source-derived reset/default/semantic intro completion
     content.push(1); // explicit passive collision policy; Room::new is not equivalent
     content.extend([1, room_core::slice::PROFILE_VERSION, 0, 1]); // slice/profile/no-RNG/policy versions
     content.extend(queue.0.to_le_bytes());
@@ -165,7 +187,7 @@ fn compile(rom: &Rom) -> Result<GameData> {
         rom_sha256: rom::digests(rom.image()).sha256,
         content_sha256: rom::digests(&content).sha256,
     };
-    Ok(GameData::new(rooms, exits, identity)?)
+    Ok(GameData::new(rooms, exits, identity, new_game)?)
 }
 
 pub(super) fn verify(rom: &Rom) -> Result<Value> {
@@ -229,6 +251,65 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     )
 }
 
+/// The fresh reference route, with loader/arrival waits replaced by the named
+/// endpoint policy. Every logical update also runs from its restored snapshot.
+pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
+    fn advance(preview: &mut Preview, button: u8, count: usize) -> Result<Value> {
+        for _ in 0..count {
+            let before = preview.state.snapshot();
+            preview.step(button);
+            if let Some(error) = &preview.error {
+                return Err(invalid(error).into());
+            }
+            let expected = preview.state.clone();
+            preview.state = GameState::restore(&preview.data, &before)?;
+            preview.step(button);
+            if preview.state != expected || preview.error.is_some() {
+                return Err(invalid("fresh house snapshot continuation differs").into());
+            }
+        }
+        Ok(preview.state())
+    }
+    let mut preview = Preview::new(rom)?;
+    preview.new_game();
+    let initial = preview.state();
+    advance(&mut preview, 2, 62)?;
+    advance(&mut preview, 0, 38)?;
+    let outbound_handoff = advance(&mut preview, 4, 67)?;
+    let arrival = advance(&mut preview, 0, 35)?;
+    advance(&mut preview, 0, 50)?;
+    let return_handoff = advance(&mut preview, 3, 14)?;
+    let returned = advance(&mut preview, 0, 35)?;
+    advance(&mut preview, 0, 10)?;
+    for button in [2, 1, 2, 1] {
+        advance(&mut preview, button, 20)?;
+        advance(&mut preview, 0, 30)?;
+    }
+    let revisited = preview.state();
+    if initial["x"] != 304
+        || initial["y"] != 112
+        || outbound_handoff["y"] != 208
+        || outbound_handoff["phase"] != "departing"
+        || arrival["map_id"] != 16
+        || arrival["y"] != 353
+        || return_handoff["y"] != 336
+        || return_handoff["phase"] != "departing"
+        || revisited["map_id"] != 15
+        || revisited["x"] != 392
+        || revisited["y"] != 191
+        || revisited["tick"] != 511
+        || revisited["phase"] != "walking"
+    {
+        return Err(invalid("fresh house route differs").into());
+    }
+    Ok(
+        json!({"kind":"cpu-free-semantic-new-game-house-route", "initial":initial,
+        "outbound_handoff":outbound_handoff,"arrival":arrival,"return_handoff":return_handoff,
+        "returned":returned,"revisited":revisited,
+        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; no native loader timing, NPCs, sprites, combat or audio."}),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -241,17 +322,24 @@ mod tests {
             return;
         }
         let rom = Rom::load(&std::fs::read(path).unwrap()).unwrap();
-        for (id, hash) in [
+        for (id, fresh, hash) in [
             (
                 15,
+                false,
                 "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1",
             ),
             (
                 16,
+                false,
                 "261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed",
             ),
+            (
+                15,
+                true,
+                "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+            ),
         ] {
-            let grid = compile_room(&rom, id).unwrap();
+            let grid = compile_room(&rom, id, fresh).unwrap();
             let bytes: Vec<_> = grid
                 .cells()
                 .iter()
@@ -272,5 +360,175 @@ mod tests {
             (preview.state()["x"].as_u64(), preview.state()["y"].as_u64()),
             (Some(472), Some(176))
         );
+    }
+    #[test]
+    fn new_game_is_distinct_from_checkpoint_and_clears_latched_errors() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        if !path.try_exists().unwrap() {
+            eprintln!("skipping: local Japanese ROM absent");
+            return;
+        }
+        let rom = Rom::load(&std::fs::read(path).unwrap()).unwrap();
+        let mut preview = Preview::new(&rom).unwrap();
+        let checkpoint = preview.state();
+        preview.step(255);
+        assert!(preview.state()["error"].is_string());
+        preview.new_game();
+        let fresh = preview.state();
+        assert_eq!(fresh["start_kind"], "new-game");
+        assert_eq!(fresh["map_id"], 15);
+        assert_eq!(fresh["x"], 304);
+        assert_eq!(fresh["y"], 112);
+        assert_eq!(fresh["tick"], 0);
+        assert_eq!(fresh["phase"], "walking");
+        assert_eq!(fresh["error"], Value::Null);
+        assert_ne!(fresh["snapshot_sha256"], checkpoint["snapshot_sha256"]);
+        preview.step(2);
+        preview.new_game();
+        assert_eq!(preview.state(), fresh);
+        preview.reset();
+        assert_eq!(preview.state(), checkpoint);
+    }
+    fn fresh_route_fixture() -> Option<(Rom, String)> {
+        let explicit = std::env::var_os("HOUSE_ROUTE_FIXTURES");
+        let root = explicit.as_ref().map_or_else(
+            || {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../local/new-game-qualification/fresh-house-route")
+            },
+            std::path::PathBuf::from,
+        );
+        if !root.exists() && explicit.is_none() {
+            eprintln!(
+                "SKIP: optional fresh house route absent; set HOUSE_ROUTE_FIXTURES to require it"
+            );
+            return None;
+        }
+        let pins: Value = serde_json::from_str(include_str!(
+            "../../../tools/new-game-qualification/route-reference.json"
+        ))
+        .unwrap();
+        let mut reference = Vec::new();
+        for run in ["a", "b"] {
+            let csv = std::fs::read(root.join(run).join("frames.csv")).unwrap();
+            assert_eq!(sha256(&csv), pins["frames_sha256"]);
+            if reference.is_empty() {
+                reference = csv;
+            } else {
+                assert_eq!(reference, csv);
+            }
+            for pin in pins["checkpoints"].as_array().unwrap() {
+                let wram =
+                    std::fs::read(root.join(run).join(format!("f{}.wram", pin["frame"]))).unwrap();
+                assert_eq!(sha256(&wram), pin["wram_sha256"]);
+                assert_eq!(sha256(&wram[0xa000..0xb000]), pin["grid_sha256"]);
+            }
+        }
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        let rom = Rom::load(&std::fs::read(path).unwrap()).unwrap();
+        assert_eq!(sha256(rom.image()), pins["rom_sha256"]);
+        Some((rom, String::from_utf8(reference).unwrap()))
+    }
+
+    #[test]
+    fn authenticated_fresh_route_matches_compiled_core_across_both_doorways() {
+        let Some((rom, text)) = fresh_route_fixture() else {
+            return;
+        };
+        let mut preview = Preview::new(&rom).unwrap();
+        preview.new_game();
+        let rows: Vec<Vec<_>> = text
+            .lines()
+            .skip(1)
+            .map(|l| l.split(',').collect())
+            .collect();
+        assert_eq!(rows.len(), 661);
+        let mut total = 0;
+        for (start, end, id, fresh) in [
+            (6800, 6967, 15, true),
+            (7050, 7114, 16, false),
+            (7250, 7460, 15, false),
+        ] {
+            let grid = compile_room(&rom, id, fresh).unwrap();
+            let segment: Vec<_> = rows
+                .iter()
+                .filter(|r| {
+                    let frame = r[0].parse::<u16>().unwrap();
+                    frame >= start && frame <= end
+                })
+                .collect();
+            assert_eq!(segment.len(), usize::from(end - start) + 1);
+            let position = preview.state.output().position;
+            assert_eq!(
+                position,
+                (
+                    segment[0][3].parse().unwrap(),
+                    segment[0][4].parse().unwrap()
+                )
+            );
+            let mut walking = room_core::WalkingState::new(position.0, position.1);
+            for (index, row) in segment.iter().enumerate().skip(1) {
+                assert_eq!(
+                    row[0].parse::<u16>().unwrap(),
+                    start + u16::try_from(index).unwrap()
+                );
+                let (button, direction) = match row[1] {
+                    "" => (0, None),
+                    "Left" => (1, Some(Direction::Left)),
+                    "Right" => (2, Some(Direction::Right)),
+                    "Up" => (3, Some(Direction::Up)),
+                    "Down" => (4, Some(Direction::Down)),
+                    _ => panic!("unqualified input"),
+                };
+                assert_eq!(u16::from_str_radix(row[5], 16).unwrap() & 0x1406, 0x0404);
+                let input = FrameInput { direction };
+                let component = walking.step(&grid, input).unwrap();
+                assert_eq!(
+                    (component.attempted_dx, component.attempted_dy),
+                    (row[14].parse().unwrap(), row[15].parse().unwrap()),
+                    "streams at {}",
+                    row[0]
+                );
+                let mut restored =
+                    GameState::restore(&preview.data, &preview.state.snapshot()).unwrap();
+                preview.step(button);
+                assert!(
+                    preview.error.is_none(),
+                    "frame {}: {:?}",
+                    row[0],
+                    preview.error
+                );
+                assert_eq!(
+                    preview.state.output(),
+                    restored.step(&preview.data, input).unwrap()
+                );
+                assert_eq!(preview.state, restored);
+                assert_eq!(preview.state.output().position, (component.x, component.y));
+                assert_eq!(
+                    preview.state.output().position,
+                    (row[3].parse().unwrap(), row[4].parse().unwrap()),
+                    "position at {}",
+                    row[0]
+                );
+                assert_eq!(
+                    preview.state.output().map_id,
+                    u16::from_str_radix(row[2], 16).unwrap()
+                );
+                total += 1;
+            }
+            if end != 7460 {
+                assert_eq!(preview.state.output().phase, Phase::Departing);
+                for _ in 0..35 {
+                    preview.step(0);
+                    assert!(preview.error.is_none());
+                }
+            }
+        }
+        assert_eq!(total, 441);
+        assert_eq!(preview.state.output().tick, 511);
+        assert_eq!(preview.state.output().position, (392, 191));
+        eprintln!("Matched441 authenticated fresh-start walking/stream steps across both semantic doorways, including per-step restored snapshots");
     }
 }

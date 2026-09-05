@@ -7,32 +7,33 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Transition {
     elapsed: u8,
-    returning: bool,
+    handoff_y: u16,
 }
 impl Transition {
     pub(crate) fn start(map_id: u16, position: (u16, u16)) -> Option<Self> {
-        let returning = match (map_id, position) {
-            (15, (392, 209)) => false,
-            (16, (392, 336)) => true,
-            _ => return None,
-        };
+        if !matches!(
+            (map_id, position),
+            (15, (392, 208 | 209)) | (16, (392, 336))
+        ) {
+            return None;
+        }
         Some(Self {
             elapsed: 0,
-            returning,
+            handoff_y: position.1,
         })
     }
     pub(crate) fn source_map(self) -> u16 {
-        if self.returning {
+        if self.handoff_y == 336 {
             16
         } else {
             15
         }
     }
     pub(crate) fn handoff(self) -> (u16, u16) {
-        (392, if self.returning { 336 } else { 209 })
+        (392, self.handoff_y)
     }
     pub(crate) fn direction(self) -> crate::Direction {
-        if self.returning {
+        if self.handoff_y == 336 {
             crate::Direction::Up
         } else {
             crate::Direction::Down
@@ -43,8 +44,8 @@ impl Transition {
     }
     pub(crate) fn position(self) -> (u16, u16) {
         let elapsed = u16::from(self.elapsed);
-        let y = match (self.returning, self.elapsed) {
-            (false, 0..=17) => 209 + elapsed,
+        let y = match (self.handoff_y == 336, self.elapsed) {
+            (false, 0..=17) => self.handoff_y + elapsed,
             (false, _) => 336 + elapsed - 18,
             (true, 0..=17) => 336 - elapsed,
             (true, _) => 208 - (elapsed - 18),
@@ -65,17 +66,26 @@ impl Transition {
         self.elapsed
     }
     pub(crate) fn encoded(self) -> u8 {
-        self.elapsed + if self.returning { 64 } else { 0 }
+        self.elapsed
+            + match self.handoff_y {
+                336 => 64,
+                208 => 128,
+                _ => 0,
+            }
     }
     pub(crate) fn restore(encoded: u8) -> Option<Self> {
         match encoded {
             0..=34 => Some(Self {
                 elapsed: encoded,
-                returning: false,
+                handoff_y: 209,
             }),
             64..=98 => Some(Self {
                 elapsed: encoded - 64,
-                returning: true,
+                handoff_y: 336,
+            }),
+            128..=162 => Some(Self {
+                elapsed: encoded - 128,
+                handoff_y: 208,
             }),
             _ => None,
         }
@@ -126,7 +136,7 @@ mod tests {
         for byte in 35..64 {
             assert!(Transition::restore(byte).is_none());
         }
-        for byte in 99..=255 {
+        for byte in (99..128).chain(163..=255) {
             assert!(Transition::restore(byte).is_none());
         }
         assert!(Transition::start(15, (392, 336)).is_none());
@@ -134,8 +144,24 @@ mod tests {
         assert!(Transition::start(17, (392, 336)).is_none());
     }
     #[test]
+    fn fresh_route_hands_off_at_208_without_inventing_a_walking_frame() {
+        let mut t = Transition::start(15, (392, 208)).unwrap();
+        assert_eq!(Transition::restore(t.encoded()), Some(t));
+        for _ in 0..17 {
+            t.advance();
+        }
+        assert_eq!((t.map_id(), t.position()), (15, (392, 225)));
+        t.advance();
+        assert_eq!((t.map_id(), t.position()), (16, (392, 336)));
+        for _ in 0..17 {
+            t.advance();
+        }
+        assert_eq!(t.position(), (392, 353));
+        assert!(t.complete());
+    }
+    #[test]
     fn unrelated_handoff_is_not_accepted() {
         assert!(Transition::start(15, (391, 209)).is_none());
-        assert!(Transition::start(15, (392, 208)).is_none());
+        assert!(Transition::start(15, (392, 207)).is_none());
     }
 }
