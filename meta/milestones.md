@@ -91,6 +91,7 @@ qualification remain open.
 - [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)
+- [Qualify an opening room transition](issues/qualify-opening-room-transition.md)
 - [Reverse the event script bytecode](issues/reverse-event-bytecode.md)
 - [Reverse the CPU-to-SPC audio protocol](issues/reverse-audio-protocol.md)
 - [Build the reproducible local asset pack](issues/local-asset-pack.md)
@@ -112,6 +113,7 @@ qualification remain open.
 
 - [Define the deterministic portable core model](issues/deterministic-core-model.md)
 - [Validate extraction and the core boundary in WebAssembly](issues/validate-web-extraction-spike.md)
+- [Implement a reference-qualified portable room slice](issues/portable-room-slice.md)
 - [Port input, player movement, and animation](issues/port-player-input-movement.md)
 - [Port map loading, transitions, and collision](issues/port-map-loading-collision.md)
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
