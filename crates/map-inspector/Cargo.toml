@@ -14,3 +14,4 @@ assets = { path = "../assets" }
 oracle = { path = "../oracle" }
 rom = { path = "../rom" }
 serde_json = "1"
+room-core = { path = "../room-core" }

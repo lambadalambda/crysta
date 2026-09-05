@@ -11,6 +11,8 @@ use std::{
 
 mod opening_qualification;
 mod qualification;
+mod room_preview;
+mod room_server;
 mod script_inspection;
 mod visual_export;
 mod visual_qualification;
@@ -38,21 +40,35 @@ fn invalid(message: &str) -> io::Error {
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let [mode, rom_path, parameter] = args else {
         return Err(invalid(
-            "usage: map-inspector <capture|verify|qualify-loader|qualify-opening|trace-opening> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
+            "usage: map-inspector <capture|verify|qualify-loader|qualify-opening|trace-opening> <japanese-rom> <qualified-sram>\n       map-inspector serve-room <japanese-rom> <decimal-loopback-port>\n       map-inspector verify-room <japanese-rom> semantic-preview\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("qualify-opening" | "trace-opening" | "verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
+        Some("serve-room" | "verify-room" | "qualify-opening" | "trace-opening" | "verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
         _ => return Err(invalid(
-            "mode must be capture, verify, qualify-loader, qualify-opening, trace-opening, decode-layer, resolve-map or render-map",
+            "mode must be serve-room, verify-room, capture, verify, qualify-loader, qualify-opening, trace-opening, decode-layer, resolve-map or render-map",
         )
         .into()),
     };
     let rom = Rom::load(&fs::read(rom_path)?)?;
     if rom.revision() != Revision::Japan {
         return Err(invalid("map inspection is qualified only for the Japanese reference").into());
+    }
+    if mode == "serve-room" {
+        let port = parameter
+            .to_str()
+            .ok_or_else(|| invalid("expected decimal loopback port"))?
+            .parse::<u16>()?;
+        return room_server::serve(&rom, port);
+    }
+    if mode == "verify-room" {
+        if parameter != "semantic-preview" {
+            return Err(invalid("verify-room requires explicit semantic-preview policy").into());
+        }
+        println!("{}", room_preview::verify(&rom)?);
+        return Ok(());
     }
     if mode == "render-map" {
         let map_id = u16::try_from(parse_hex(parameter)?)?;
@@ -89,6 +105,10 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
         );
         return Ok(());
     }
+    capture_or_verify(&mut session, &rom, export)
+}
+
+fn capture_or_verify(session: &mut Session, rom: &Rom, export: bool) -> Result<()> {
     let mut captures = Vec::new();
     for label in 0..=1840 {
         session.set_button(Button::Start, (400..408).contains(&label));
@@ -96,7 +116,7 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
         session.set_button(Button::Right, (1800..1840).contains(&label));
         session.run_frame();
         if label == 1600 || label == 1840 {
-            captures.push(checkpoint(&session, label)?);
+            captures.push(checkpoint(session, label)?);
         }
     }
     let manifest = json!({

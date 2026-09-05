@@ -117,6 +117,7 @@ dependencies = [
  "assets",
  "oracle",
  "rom",
+ "room-core",
  "serde_json",
 ]
 
