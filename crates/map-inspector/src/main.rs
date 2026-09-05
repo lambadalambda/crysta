@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod opening_qualification;
 mod qualification;
 mod script_inspection;
 mod visual_export;
@@ -37,15 +38,15 @@ fn invalid(message: &str) -> io::Error {
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let [mode, rom_path, parameter] = args else {
         return Err(invalid(
-            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
+            "usage: map-inspector <capture|verify|qualify-loader|qualify-opening|trace-opening> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>\n       map-inspector <resolve-map|render-map> <japanese-rom> <hex-map-id>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
+        Some("qualify-opening" | "trace-opening" | "verify" | "qualify-loader" | "decode-layer" | "resolve-map" | "render-map") => false,
         _ => return Err(invalid(
-            "mode must be capture, verify, qualify-loader, decode-layer, resolve-map or render-map",
+            "mode must be capture, verify, qualify-loader, qualify-opening, trace-opening, decode-layer, resolve-map or render-map",
         )
         .into()),
     };
@@ -79,6 +80,13 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let mut session = Session::new_with_sram(&rom, &save)?;
     if mode == "qualify-loader" {
         println!("{}", qualification::run(&mut session, &rom)?);
+        return Ok(());
+    }
+    if mode == "qualify-opening" || mode == "trace-opening" {
+        println!(
+            "{}",
+            opening_qualification::run(&mut session, &rom, mode == "trace-opening")?
+        );
         return Ok(());
     }
     let mut captures = Vec::new();
