@@ -169,6 +169,14 @@ the format permits. Decoded representations should remain lossless and typed;
 PNG, JSON, or other convenient exports are views, not necessarily canonical
 sources.
 
+The first implemented codec is [`assets::compression`](compression.md), a pure,
+dependency-free packet decoder and deterministic greedy encoder. The decoder
+checks input bounds, a caller-provided output limit, backward-copy validity, and
+exact termination. Six representative graphics/map packets across authenticated
+JP/EU dumps match independent community-decoder hashes and re-encode byte-for-
+byte. Arbitrary legal tokenizations normalize canonically; unsupported header
+variants fail explicitly. ROM validation and local file I/O remain caller-owned.
+
 Event bytecode is treated as a first-class language with a disassembler,
 readable intermediate representation, and eventually an assembler or compiler.
 
