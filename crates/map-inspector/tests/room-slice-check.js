@@ -13,6 +13,7 @@ vm.runInNewContext(scripts[0][1], sandbox);
 const {createController, bindInputs, drawScene} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0]});
+const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 function harness() {
   let nextId = 0, active = 0, maximum = 0, clock = 0;
@@ -100,6 +101,86 @@ async function main() {
   await h.reply({...initial(), tick: 1}); assert.equal(h.calls.at(-1).url, '/reset');
   await h.reply(); assert.equal(h.maximum(), 1); assert.equal(h.timers.size, 0);
 
+  // New Game is an explicit empty-body POST, clears errors/inputs and stays paused.
+  const game = harness(); await game.start(); game.controller.resume();
+  game.controller.press('held-before-start', 1); await game.fire();
+  await game.reply({...initial(), error: 'unsupported action'});
+  game.controller.newGame();
+  assert.equal(game.calls.at(-1).url, '/new-game'); assert.equal(game.calls.at(-1).body, '');
+  assert.equal(game.views.at(-1).error, null, 'starting clears the previous error');
+  game.controller.press('held-during-start', 2); game.controller.resume();
+  await game.reply(newGameState());
+  assert.equal(game.views.at(-1).state.x, 304); assert.equal(game.views.at(-1).state.y, 112);
+  assert.equal(game.views.at(-1).canDrive, true); assert.equal(game.views.at(-1).paused, true);
+  assert.equal(game.views.at(-1).mode, 'live'); assert.equal(game.timers.size, 0);
+  game.controller.resume(); await game.fire();
+  assert.equal(game.calls.at(-1).body, '0', 'New Game cannot retain old or mid-request controls');
+  await game.reply({...newGameState(), tick: 1}); game.controller.pause();
+  game.controller.stepOnce(); game.controller.newGame();
+  assert.equal(game.timers.size, 0, 'New Game cancels an undispatched single-step');
+  await game.reply(newGameState()); assert.equal(game.timers.size, 0);
+
+  // Latest pending start intent wins; in-flight ticks never race reset/new-game/demo.
+  for (const first of ['reset', 'newGame', 'demo']) {
+    for (const last of ['reset', 'newGame', 'demo']) {
+      const queued = harness(); await queued.start(); queued.controller.resume();
+      queued.controller.press('held', 1); await queued.fire();
+      queued.controller[first](); queued.controller[last]();
+      assert.equal(queued.calls.at(-1).url, '/step');
+      queued.controller.resume(); queued.controller.stepOnce();
+      await queued.fail(); // Obsolete failure must not cancel the newer demo intent.
+      assert.equal(queued.calls.at(-1).url, last === 'newGame' ? '/new-game' : '/reset');
+      assert.equal(queued.calls.at(-1).body, ''); assert.equal(queued.views.at(-1).error, null);
+      await queued.reply(last === 'newGame' ? newGameState() : initial());
+      assert.equal(queued.views.at(-1).paused, last !== 'demo');
+      assert.equal(queued.views.at(-1).mode, last === 'demo' ? 'demo' : 'live');
+      assert.equal(queued.maximum(), 1);
+      if (last !== 'demo') queued.controller.resume();
+      await queued.fire(); assert.equal(queued.calls.at(-1).body, last === 'demo' ? '1' : '0');
+      await queued.reply(); queued.controller.pause();
+    }
+  }
+
+  // A start response cannot borrow the autoplay intent of a newer queued start.
+  for (const [first, last] of [['demo', 'newGame'], ['newGame', 'demo'], ['newGame', 'reset'], ['reset', 'newGame']]) {
+    const queued = harness(); await queued.start(); queued.controller[first](); queued.controller[last]();
+    await queued.reply(first === 'newGame' ? newGameState() : initial());
+    assert.equal(queued.calls.at(-1).url, last === 'newGame' ? '/new-game' : '/reset');
+    assert.equal(queued.timers.size, 0, 'no stale autoplay between start requests');
+    await queued.reply(last === 'newGame' ? newGameState() : initial());
+    assert.equal(queued.views.at(-1).paused, last !== 'demo');
+    assert.equal(queued.maximum(), 1); queued.controller.pause();
+  }
+  const pausedStart = harness(); await pausedStart.start(); pausedStart.controller.newGame();
+  pausedStart.controller.demo(); pausedStart.controller.pause(); await pausedStart.reply(newGameState());
+  await pausedStart.reply(); assert.equal(pausedStart.timers.size, 0, 'pause cancels queued demo autoplay');
+
+  // Learn the normal phase only at known starts, with optional provenance metadata.
+  for (const start of [newGameState(), {...newGameState(), start_kind: undefined}, initial()]) {
+    const known = harness(); known.controller.init(); await known.reply(start);
+    assert.equal(known.views.at(-1).canDrive, true); assert.equal(known.views.at(-1).paused, true);
+  }
+  const unknown = harness(); unknown.controller.init();
+  await unknown.reply({...newGameState(), x: 305}); unknown.controller.resume();
+  assert.equal(unknown.views.at(-1).canDrive, false); assert.equal(unknown.timers.size, 0);
+  assert.match(unknown.views.at(-1).note, /New Game/);
+  unknown.controller.newGame(); await unknown.reply({...newGameState(), tick: 1});
+  assert.match(unknown.views.at(-1).error, /start|checkpoint/i);
+  assert.equal(unknown.timers.size, 0);
+  unknown.controller.newGame(); await unknown.reply({...newGameState(), start_kind: 7});
+  assert.match(unknown.views.at(-1).error, /state|policy/i);
+  unknown.controller.newGame(); await unknown.reply({...newGameState(), start_kind: undefined});
+  assert.equal(unknown.views.at(-1).error, null); assert.equal(unknown.views.at(-1).canDrive, true);
+
+  const duringInit = harness(); duringInit.controller.init(); duringInit.controller.newGame();
+  assert.equal(duringInit.calls.length, 1, 'New Game waits for the initial GET too');
+  await duringInit.reply({...initial(), tick: 81, phase: 'FadeOut'});
+  assert.equal(duringInit.calls.at(-1).url, '/new-game');
+  await duringInit.reply(newGameState()); assert.equal(duringInit.views.at(-1).paused, true);
+  duringInit.controller.newGame(); await duringInit.fail();
+  assert.match(duringInit.views.at(-1).error, /offline/); assert.equal(duringInit.timers.size, 0);
+  assert.equal(duringInit.calls.filter(call => call.url === '/reset').length, 0, 'failed New Game never falls back to a checkpoint');
+
   // Demo always resets first; exactly 56 Left + 24 Down + 35 neutral requests.
   const d = harness(); await d.start(); d.controller.demo();
   assert.equal(d.calls.at(-1).url, '/reset'); await d.reply();
@@ -179,7 +260,11 @@ async function main() {
   assert.deepEqual(draws[1], [128, 81, 16, 16]); assert.equal(ctx.strokeStyle, '#58f5ff');
   assert.equal(ctx.imageSmoothingEnabled, false);
   assert(html.includes('Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU'));
+  assert(/id="new-game"[^>]*>New Game<\/button>/.test(html));
+  assert(html.includes("$('new-game').addEventListener('click', () => controller.newGame())"));
+  assert(html.includes('Checkpoint Reset')); assert(html.includes('Checkpoint doorway demo'));
+  assert(html.includes('default name')); assert(html.includes('intro'));
   assert(html.includes('/map.bmp')); assert(!/https?:\/\/|<script[^>]+src=/i.test(html));
-  console.log('PASS: serialized ticks, release/blur/touch cleanup, neutral handoff, reset, demo, errors, and drawing');
+  console.log('PASS: New Game, serialized start precedence, paused input cleanup, checkpoint reset/demo, pacing, bindings, errors, and drawing');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });

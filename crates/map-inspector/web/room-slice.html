@@ -27,15 +27,19 @@ dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0}d
 <main>
 <h1>Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU</h1>
 <p class="warning"><strong>This is a bounded canvas preview, not a playable full game.</strong>
-Ordinary direction reuse and open/solid corners are supported. Rapid same-direction double taps trigger an unsupported dash error. Partial furniture and passive flagged walls are supported. Actions and other exits remain unsupported — use Reset after an error.
+Choose <strong>New Game</strong>, then <strong>Resume</strong> to explore the supported house paths.
+This semantic start uses the default name and skips the intro and dialogue; it does not play the original opening.
+Ordinary walking, partial furniture and passive flagged walls are supported; rapid same-direction double taps trigger an unsupported dash error.
+Actions and other exits remain unsupported.
 No combat, sprites or audio. The background is static BG1 only, without BG2, animation, windows or scene effects.</p>
 <div class="layout">
 <section class="panel" aria-label="Room preview">
 <canvas id="room" width="256" height="224" aria-label="Static room background with a cyan player bounding box">Canvas is required for the preview.</canvas>
 <p class="legend">Cyan box = player position, not an original sprite. Bottom center marks the feet.</p>
 <div class="actions">
+<button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
-<button id="reset" disabled>Reset</button><button id="demo" disabled>Doorway demonstration</button>
+<button id="reset" disabled>Checkpoint Reset</button><button id="demo" disabled>Checkpoint doorway demo</button>
 </div>
 <div class="pad" aria-label="Touch cardinal controls">
 <button class="up" data-direction="3" aria-label="Up" disabled>↑</button>
@@ -54,13 +58,14 @@ Release before changing direction. Escape pauses. Touch and hold a cardinal butt
 <p id="status">Connecting to the local host…</p>
 <p id="announcement" class="sr-only" role="status" aria-live="polite"></p>
 <p id="error" role="alert"></p>
-<h2>Doorway demonstration</h2>
-<p>Resets first, then sends <strong>56 Left + 24 Down</strong> steps to the handoff,
+<h2>Checkpoint doorway demo</h2>
+<p><strong>Checkpoint Reset and this demo use the saved checkpoint, not New Game.</strong>
+The demo resets to that checkpoint first, then sends <strong>56 Left + 24 Down</strong> steps to the handoff,
 followed by <strong>35 neutral transition steps</strong>, then pauses. Live controls are ignored during the sequence.</p>
 <p>These are logical host steps, <strong>not reference-video timing</strong>.
 The client sends at most one step at a time, at up to 60 Hz; a slow connection slows the preview without a catch-up queue.</p>
 <ul><li>Transition input is neutral; held input is discarded at handoff.</li>
-<li>Errors pause input. Reset to try a fresh supported path.</li>
+<li>Errors pause input. Choose New Game or Checkpoint Reset to try again.</li>
 <li>Blur or a hidden tab pauses and releases all controls. Resume explicitly when you return.</li></ul>
 <small>All simulation belongs to the Rust host. This page only sends input and draws its state over <code>/map.bmp</code>.</small>
 </section>
@@ -73,30 +78,43 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   function validateState(state) {
     if (!state || state.policy !== 'semantic-preview' || !Number.isInteger(state.map_id) ||
         !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
+        !(state.start_kind === undefined || typeof state.start_kind === 'string') ||
         typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
         !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
-      throw new Error('Invalid host state or policy. Pause and reset; no input was queued.');
+      throw new Error('Invalid host state or policy. Choose New Game or Checkpoint Reset; no input was queued.');
     }
     return state;
   }
+  // Admission only: initialization and all movement remain the host's responsibility.
+  function knownStart(state) {
+    if (state.map_id !== 15 || state.tick !== 0) return null;
+    if (state.x === 304 && state.y === 112 &&
+        (state.start_kind === undefined || state.start_kind === 'new-game')) return 'new-game';
+    if (state.x === 472 && state.y === 176 && state.start_kind !== 'new-game') return 'checkpoint';
+    return null;
+  }
   function createController({request, render, schedule, cancel, now}) {
     let state = null, error = null, paused = true, busy = false, hidden = false, timer = null;
-    let initialized = false, pendingReset = false, demoAfterReset = false, mode = 'live', demoIndex = 0;
-    let note = 'Paused. Resume to use cardinal controls.', walkingPhase = null;
+    let initialized = false, pendingStart = null, activeStart = null, mode = 'live', demoIndex = 0;
+    let note = 'Choose New Game, then Resume to explore.', walkingPhase = null;
     let lastStepAt = -Infinity, singlePending = false;
     const interval = 1000 / 60;
     const held = new Map();
     // The protocol leaves phase names open. Learn the normal phase only at a
-    // known reset checkpoint; a reloaded mid-session page must Reset first.
+    // known new-game start or saved checkpoint, never a mid-session response.
     const transition = () => state && state.phase !== walkingPhase;
     const view = () => ({state, error, paused, busy: busy || singlePending, mode, demoIndex, note,
       canDrive: walkingPhase !== null, walking: !!state && !transition()});
     const notify = () => render(view());
     function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
     function stop(message) { paused = true; singlePending = false; held.clear(); clearTimer(); if (message) note = message; }
-    function reject(message) { error = message; demoAfterReset = false; stop('Input paused — use Reset.'); notify(); }
+    function reject(message) { error = message; cancelAutoplay(); stop('Input paused — choose New Game or Checkpoint Reset.'); notify(); }
+    function cancelAutoplay() {
+      if (activeStart) activeStart.demo = false;
+      if (pendingStart) pendingStart.demo = false;
+    }
     function arm() {
-      if (timer !== null || busy || (paused && !singlePending) || hidden || error || !state || pendingReset) return;
+      if (timer !== null || busy || (paused && !singlePending) || hidden || error || !state || pendingStart) return;
       const remaining = Math.max(0, interval - (now() - lastStepAt));
       timer = schedule(() => {
         timer = null;
@@ -105,59 +123,74 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         singlePending = false; lastStepAt = now(); transact('/step', String(direction));
       }, Math.ceil(singlePending ? remaining : Math.max(interval, remaining)));
     }
-    async function transact(url, body) {
+    async function transact(url, body, start = null) {
       if (busy) return;
-      clearTimer(); busy = true; notify();
+      clearTimer(); busy = true; activeStart = start; notify();
       try {
         const next = validateState(await request(url, body));
+        // A newer start supersedes this response, including its errors/autoplay.
+        if (pendingStart) return;
+        const kind = knownStart(next);
+        if (start && kind !== (url === '/new-game' ? 'new-game' : 'checkpoint')) {
+          throw new Error('Host did not return the requested known start checkpoint.');
+        }
         if (state && (next.phase !== state.phase || next.map_id !== state.map_id)) held.clear();
         state = next;
         if (url === '/state') {
-          if (state.map_id === 15 && state.x === 472 && state.y === 176 && state.tick === 0) walkingPhase = state.phase;
-          else note = 'Existing host session — Reset before driving this preview.';
+          if (kind) walkingPhase = state.phase;
+          note = kind === 'new-game' ? 'New Game ready — paused. Resume when ready.' :
+            kind === 'checkpoint' ? 'Saved checkpoint loaded. Choose New Game to begin; Checkpoint Reset and demo are diagnostics.' :
+            'Existing host session — choose New Game or Checkpoint Reset before driving this preview.';
         }
-        if (url === '/reset') {
-          walkingPhase = state.phase; error = null; held.clear(); demoIndex = 0; mode = demoAfterReset ? 'demo' : 'live';
-          paused = !demoAfterReset || hidden;
-          note = mode === 'demo' ? 'Doorway demonstration: 0 / 115 logical steps.' : 'Reset complete. Resume when ready.';
+        if (start) {
+          walkingPhase = state.phase; error = null; held.clear(); demoIndex = 0; mode = start.demo ? 'demo' : 'live';
+          paused = !start.demo || hidden;
+          note = mode === 'demo' ? 'Checkpoint doorway demo: 0 / 115 logical steps.' :
+            url === '/new-game' ? 'New Game ready — paused. Resume when ready.' : 'Checkpoint Reset complete — paused. Resume when ready.';
         } else if (url === '/step' && mode === 'demo') {
           demoIndex++;
-          if (!paused) note = `Doorway demonstration: ${demoIndex} / 115 logical steps.`;
-          if (demoIndex === 115) { mode = 'live'; stop('Doorway demonstration complete — paused.'); }
+          if (!paused) note = `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.`;
+          if (demoIndex === 115) { mode = 'live'; stop('Checkpoint doorway demo complete — paused.'); }
         }
         if (state.error !== null) reject(state.error || 'Unsupported host step.');
-      } catch (failure) { reject(`Host request failed: ${failure.message || failure}`); }
+      } catch (failure) { if (!pendingStart) reject(`Host request failed: ${failure.message || failure}`); }
       finally {
-        busy = false; notify();
-        if (pendingReset) { pendingReset = false; transact('/reset', ''); }
+        busy = false; activeStart = null; notify();
+        if (pendingStart) dispatchStart();
         else arm();
       }
     }
-    function reset(demo = false) {
-      demoAfterReset = demo; pendingReset = true; stop('Resetting the host…'); notify();
-      if (!busy) { pendingReset = false; transact('/reset', ''); }
+    function dispatchStart() {
+      const start = pendingStart; pendingStart = null;
+      transact(start.url, '', start);
+    }
+    function startSession(url, demo = false) {
+      // Coalesce only undispatched intents: the latest explicit start wins.
+      pendingStart = {url, demo}; error = null; walkingPhase = null; mode = 'live'; demoIndex = 0;
+      stop(url === '/new-game' ? 'Starting New Game…' : 'Resetting the saved checkpoint…'); notify();
+      if (!busy) dispatchStart();
     }
     return {
       init() { if (!initialized) { initialized = true; transact('/state'); } },
       press(token, direction) {
-        if (paused || mode === 'demo' || transition() || error || pendingReset || hidden) return;
+        if (paused || mode === 'demo' || transition() || error || pendingStart || hidden) return;
         if (![1, 2, 3, 4].includes(direction)) { reject('Unsupported input. Use one cardinal direction.'); return; }
         held.set(token, direction);
-        if (new Set(held.values()).size > 1) reject('Only one direction at a time is supported. Reset to continue.');
+        if (new Set(held.values()).size > 1) reject('Only one direction at a time is supported. Choose New Game or Checkpoint Reset to continue.');
       },
       release(token) { held.delete(token); },
-      pause(message = 'Paused — controls released.') { demoAfterReset = false; stop(message); notify(); },
+      pause(message = 'Paused — controls released.') { cancelAutoplay(); stop(message); notify(); },
       resume() {
-        if (!state || walkingPhase === null || error || hidden || pendingReset) return;
-        singlePending = false; clearTimer(); paused = false; note = mode === 'demo' ? `Doorway demonstration: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
+        if (!state || walkingPhase === null || error || hidden || pendingStart) return;
+        singlePending = false; clearTimer(); paused = false; note = mode === 'demo' ? `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
         notify(); arm();
       },
       setHidden(value) { hidden = value; if (hidden) this.pause('Tab hidden — paused and controls released.'); },
       stepOnce() {
-        if (busy || singlePending || !state || walkingPhase === null || error || hidden || pendingReset) return;
-        demoAfterReset = false; mode = 'live'; stop('Single neutral logical step — paused.'); singlePending = true; notify(); arm();
+        if (busy || singlePending || !state || walkingPhase === null || error || hidden || pendingStart) return;
+        cancelAutoplay(); mode = 'live'; stop('Single neutral logical step — paused.'); singlePending = true; notify(); arm();
       },
-      reset() { reset(false); }, demo() { reset(true); }, reject,
+      newGame() { startSession('/new-game'); }, reset() { startSession('/reset'); }, demo() { startSession('/reset', true); }, reject,
     };
   }
   function bindInputs(controller, doc, win, buttons) {
@@ -213,12 +246,12 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     }
     $('error').textContent = error || '';
     $('status').textContent = note + (busy ? ' Waiting for host…' : '');
-    const announcement = error ? 'Input paused — use Reset.' : paused ? note : mode === 'demo' ? 'Doorway demonstration running.' : 'Preview running.';
+    const announcement = error ? 'Input paused — choose New Game or Checkpoint Reset.' : paused ? note : mode === 'demo' ? 'Checkpoint doorway demo running.' : 'Preview running.';
     if (announcement !== lastAnnouncement) { $('announcement').textContent = announcement; lastAnnouncement = announcement; }
     $('pause').textContent = paused ? 'Resume' : 'Pause';
     $('pause').disabled = !ready || !canDrive || !!error;
     $('step').disabled = !ready || !canDrive || !!error || busy || !paused;
-    $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
+    $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     drawScene(ctx, ready ? image : null, state);
   }
@@ -235,6 +268,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   });
   $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
   $('step').addEventListener('click', () => controller.stepOnce());
+  $('new-game').addEventListener('click', () => controller.newGame());
   $('reset').addEventListener('click', () => controller.reset());
   $('demo').addEventListener('click', () => controller.demo());
   bindInputs(controller, document, window, buttons);
