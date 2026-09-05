@@ -39,7 +39,7 @@ not an implementation of the save menu or new game.
 
 [Movement qualification](movement-qualification.md) describes the exact
 supported reference trajectories and source witnesses. Unflagged types 0/2/22
-are open and 12/14 are solid. Profile v3 retains resolution of open/solid corner pairs
+are open and 12/14 are solid. Profile v4 retains resolution of open/solid corner pairs
 with the decoded perpendicular nudge and main-axis snap/rollback. Unknown
 materials, bit-15 cells, map-edge samples and coordinate overflow return explicit errors.
 A failed update leaves state unchanged. Blocking does not stop movement cadence.
@@ -54,11 +54,11 @@ diagonals/actions remain unsupported.
 Use Reset after a scope error; the automatic doorway demonstration gives a
 reproducible route without needing frame-perfect key release.
 
-### Doorway: endpoint-qualified, not frame-qualified
+### Doorways: endpoint-qualified, not frame-qualified
 
 The exact supported handoff is `(392,209)` after 56 Left and 24 Down updates.
 The selected exit is direct map `$0010`, mode 0, selector 5. Other exits or
-handoff positions fail explicitly. The asset adapter validates the departure
+handoff positions outside the qualified pair fail explicitly. The asset adapter validates the departure
 pointer, signed arrival adjustment, destination FD/player header and arrival
 selector pointer against the authenticated ROM.
 
@@ -80,6 +80,13 @@ particular, COP C1's counter 16 is **not** proof of 17 video frames or 17 player
 updates. Do not compare logical preview tick 115 with a reference video-frame
 number. [Doorway research](opening-doorway.md) retains the real-frame evidence.
 
+The reverse doorway is now supported: 14 Up updates from the settled room10
+endpoint reach392,336 (the final attempted −2 step clamps to −1), then the
+same semantic17/load/17 policy translates to392,319, spawns392,208 in F,
+and settles392,191. `verify-room` checks the whole164-update round trip.
+[Return evidence](house-return-doorway.md) pins two fresh replays,14 walking
+comparisons and five native dispatch stops. Other map10 exits remain unsupported.
+
 This distinction is why the API requires a named policy opt-in and the frontend
 labels itself a semantic preview. No classic-fidelity claim is made for its
 transition pacing, animation, flags VM or actor scheduler.
@@ -96,7 +103,9 @@ transition pacing, animation, flags VM or actor scheduler.
   ROM, asset/profile schema and compiled data; it does not embed immutable assets.
   The RNG policy is version 0 (**no RNG used in this subset**), not a fabricated
   replacement for the game's RNG. Unknown versions/fields or incompatible data
-  are rejected. No deterministic host-service responses are needed yet; reset
+  are rejected. Profile v4 uses a zero walking payload while a doorway owns
+  control, so erasing the transition marker cannot restore a walking component.
+  No deterministic host-service responses are needed yet; reset
   is an explicit lifecycle operation, not a hidden input.
 
 The adapter initializes collision attributes directly from decoded ROM data.
@@ -123,14 +132,14 @@ one accepted step always performs one deterministic core update.
 
 ## Verification
 
-- Thirteen ROM-free walking tests, eight semantic/snapshot tests and a portable-boundary
+- Thirteen ROM-free walking tests, ten semantic/snapshot tests and a portable-boundary
   architecture guard pass. Repeated synthetic snapshots resume identically at
   every logical update, including transition ownership.
 - Five admission tests plus 42 authenticated fixture pairs match 3,994 ordinary
   transitions and 19 atomic accelerated-trigger rejections, with per-step
   snapshot replay. A 209-step route revisits directions and positions. Walking
   snapshots are version 3; older versions are rejected.
-- Twelve authenticated private trajectories match **all 1,971 walking steps**,
+- Thirteen authenticated private trajectories match **all 1,985 walking steps**,
   attempted stream outputs, positions, blocking and restored continuations.
   Compiled ROM grids (with explicit exclusions above) match those fixture grids:
   F SHA-256 `c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1`;

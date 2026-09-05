@@ -130,6 +130,22 @@ fn compile(rom: &Rom) -> Result<GameData> {
     {
         return Err(invalid("unqualified departure/spawn/arrival profile").into());
     }
+    let reverse = lists[1]
+        .select(384, 320)
+        .ok_or_else(|| invalid("missing reverse semantic doorway"))?;
+    if reverse.direct_destination() != Ok(15)
+        || reverse.transition_mode() != 0
+        || reverse.selector() != 6
+        || reverse.destination_position() != (384, 176)
+        || (word(0x0d_899d), word(0x0d_899f)) != (0, 16)
+        || pointer(0x0d_896a) != 0x84_b979
+        || word(0x04_880a) != 0xbb74
+        || word(0x03_801e) != 0x8d1e
+        || rom.image()[0x03_8d20] != 0xfd
+        || pointer(0x03_8d24) != 0x84_a129
+    {
+        return Err(invalid("unqualified reverse departure/spawn/arrival profile").into());
+    }
     let mut content = Vec::new();
     for room in &rooms {
         content.extend(room.width().to_le_bytes());
@@ -186,9 +202,29 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     if restored != preview.state {
         return Err(invalid("preview snapshot roundtrip differs").into());
     }
+    for _ in 0..14 {
+        preview.step(3);
+    }
+    let return_handoff = preview.state();
+    if return_handoff["y"] != 336 || return_handoff["phase"] != "departing" {
+        return Err(invalid("semantic return approach differs").into());
+    }
+    for _ in 0..35 {
+        let mut restored = GameState::restore(&preview.data, &preview.state.snapshot())?;
+        preview.step(0);
+        restored.step(&preview.data, FrameInput::default())?;
+        if restored != preview.state {
+            return Err(invalid("return snapshot continuation differs").into());
+        }
+    }
+    let returned = preview.state();
+    if returned["map_id"] != 15 || returned["y"] != 191 || returned["phase"] != "walking" {
+        return Err(invalid("semantic return endpoint differs").into());
+    }
     Ok(
         json!({"kind":"cpu-free-semantic-room-preview","initial":initial,"handoff":handoff,"departure":departure,"spawn":spawn,"arrival":arrival,
-        "limits":"Walking frames reference-qualified on bounded flat paths. Doorway is opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Marker only; no actors, sprites, combat, audio or events."}),
+        "return_handoff":return_handoff,"returned":returned,
+        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Marker only; no actors, sprites, combat, audio or events."}),
     )
 }
 

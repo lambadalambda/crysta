@@ -19,7 +19,7 @@ struct Fixture {
     wram_hash: &'static str,
 }
 
-const FIXTURES: [Fixture; 12] = [
+const FIXTURES: [Fixture; 13] = [
     Fixture {
         name: "wall-Left",
         start: 1601,
@@ -115,6 +115,14 @@ const FIXTURES: [Fixture; 12] = [
         grid_frame: 1861,
         csv_hash: "718e668a4154f594eadd83273966423688362632a0f6d205d081db10973b1665",
         wram_hash: "613c1b81fbdbbfe81f46f53c99c4f21cfec253d932caf0c3e4821a54c72d1d55",
+    },
+    Fixture {
+        name: "return-bedroom-a",
+        start: 1801,
+        end: 1815,
+        grid_frame: 1815,
+        csv_hash: "f2c2c1379903db6e93db4299e0bf2fa7f648c4e7f4633a278ef4c3dfca54d8c7",
+        wram_hash: "46e8d83d3c80a6abca3b5b9bea06e267ea149c195b6414b3a2b5000e5297d763",
     },
 ];
 const F_GRID_HASH: &str = "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1";
@@ -293,6 +301,6 @@ fn authenticated_reference_positions_streams_and_snapshots() {
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     );
     let total: usize = FIXTURES.iter().map(|fixture| replay(&root, fixture)).sum();
-    assert_eq!(total, 1971);
+    assert_eq!(total, 1985);
     eprintln!("Matched all {total} reference position/stream steps and restored-snapshot replays");
 }

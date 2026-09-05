@@ -1,11 +1,11 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
 use crate::transition::Transition;
-use crate::{Direction, FrameInput, Room, Unqualified, WalkingState};
+use crate::{FrameInput, Room, Unqualified, WalkingState};
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v3 admits qualified repeatable ordinary input.
-pub const PROFILE_VERSION: u8 = 3;
+/// Semantic profile version; v4 adds the qualified reverse doorway.
+pub const PROFILE_VERSION: u8 = 4;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -57,10 +57,12 @@ impl GameData {
         identity: DataIdentity,
     ) -> Result<Self, SliceError> {
         let e = exits[0].first().ok_or(SliceError::Data)?;
+        let reverse = Exit([24, 20, 1, 1, 15, 0, 0, 6, 128, 1, 176, 0]);
         if e.0[..4] != [24, 12, 1, 2]
             || e.0[4..8] != [16, 0, 0, 5]
             || u16::from_le_bytes([e.0[8], e.0[9]]) != 384
             || u16::from_le_bytes([e.0[10], e.0[11]]) != 336
+            || exits[1].first() != Some(&reverse)
             || rooms.iter().any(|r| r.width() != 32 || r.height() != 64)
         {
             return Err(SliceError::Data);
@@ -96,7 +98,7 @@ pub enum SliceError {
     Data,
     /// Walking component left its qualified scope.
     Walking(Unqualified),
-    /// An exit or handoff is outside the single supported semantic doorway.
+    /// An exit or handoff is outside the supported semantic doorway pair.
     Exit,
     /// Snapshot version, source identity, fields or consistency were invalid.
     Snapshot,
@@ -183,14 +185,16 @@ impl GameState {
                 .step(data.room(next.map_id)?, input)
                 .map_err(SliceError::Walking)?;
             if let Some((index, _)) = data.exit(next.map_id, next.walking.position()) {
-                if next.map_id != 15
-                    || index != 0
-                    || next.walking.active_direction() != Some(Direction::Down)
-                {
+                let transition = Transition::start(next.map_id, next.walking.position())
+                    .ok_or(SliceError::Exit)?;
+                if index != 0 || next.walking.active_direction() != Some(transition.direction()) {
                     return Err(SliceError::Exit);
                 }
-                next.transition =
-                    Some(Transition::start(next.walking.position()).ok_or(SliceError::Exit)?);
+                // Walking no longer owns control; discard its unused history.
+                // A canonical anchor keeps the private representation stable.
+                let (x, y) = transition.handoff();
+                next.walking = WalkingState::new(x, y);
+                next.transition = Some(transition);
             }
         }
         let output = next.output();
@@ -224,8 +228,14 @@ impl GameState {
         bytes.extend(self.identity.content_sha256);
         bytes.extend(self.tick.to_le_bytes());
         bytes.extend(self.map_id.to_le_bytes());
-        bytes.push(self.transition.map_or(255, Transition::elapsed));
-        bytes.extend(self.walking.encode_snapshot());
+        bytes.push(self.transition.map_or(255, Transition::encoded));
+        // No walking component is serialized while a doorway owns control.
+        // Erasing its marker cannot turn a transition into a valid walking state.
+        bytes.extend(if self.transition.is_some() {
+            [0; crate::SNAPSHOT_SIZE]
+        } else {
+            self.walking.encode_snapshot()
+        });
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
@@ -246,22 +256,20 @@ impl GameState {
         } else {
             Some(Transition::restore(bytes[82]).ok_or(SliceError::Snapshot)?)
         };
-        let walking = WalkingState::decode_snapshot(
-            data.room(if transition.is_some() { 15 } else { map_id })?,
-            &bytes[83..],
-        )
-        .map_err(|_| SliceError::Snapshot)?;
-        if transition.is_none() && data.exit(map_id, walking.position()).is_some() {
-            return Err(SliceError::Snapshot);
-        }
-        if let Some(t) = transition {
-            if walking.position() != (392, 209)
-                || walking.active_direction() != Some(Direction::Down)
-                || t.map_id() != map_id
-            {
+        let walking = if let Some(t) = transition {
+            if t.map_id() != map_id || bytes[83..] != [0; crate::SNAPSHOT_SIZE] {
                 return Err(SliceError::Snapshot);
             }
-        }
+            let (x, y) = t.handoff();
+            WalkingState::new(x, y)
+        } else {
+            let walking = WalkingState::decode_snapshot(data.room(map_id)?, &bytes[83..])
+                .map_err(|_| SliceError::Snapshot)?;
+            if data.exit(map_id, walking.position()).is_some() {
+                return Err(SliceError::Snapshot);
+            }
+            walking
+        };
         Ok(Self {
             identity: data.identity,
             tick,
@@ -275,12 +283,16 @@ impl GameState {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Direction;
     fn synthetic_data() -> GameData {
         let room = || Room::new(32, 64, vec![0; 2048]).unwrap();
         let e = Exit([24, 12, 1, 2, 16, 0, 0, 5, 128, 1, 80, 1]);
         GameData::new(
             [room(), room()],
-            [vec![e], vec![]],
+            [
+                vec![e],
+                vec![Exit([24, 20, 1, 1, 15, 0, 0, 6, 128, 1, 176, 0])],
+            ],
             DataIdentity {
                 rom_sha256: [1; 32],
                 content_sha256: [2; 32],
@@ -313,6 +325,58 @@ mod tests {
                 phase: Phase::Walking
             }
         );
+    }
+    #[test]
+    fn reverse_route_restores_ownership_and_replays_every_snapshot() {
+        let mut data = synthetic_data();
+        let mut cells = vec![0; 2048];
+        cells[19 * 32 + 24] = 14 << 9; // clamps the last Up step onto Y336
+        data.rooms[1] = Room::new(32, 64, cells).unwrap();
+        let mut state = GameState::new(&data, Policy::SemanticPreview);
+        let inputs = (0..56)
+            .map(|_| Some(Direction::Left))
+            .chain((0..24).map(|_| Some(Direction::Down)))
+            .chain((0..35).map(|_| None))
+            .chain((0..14).map(|_| Some(Direction::Up)))
+            .chain((0..35).map(|_| None));
+        for direction in inputs {
+            let mut restored = GameState::restore(&data, &state.snapshot()).unwrap();
+            let input = FrameInput { direction };
+            assert_eq!(state.step(&data, input), restored.step(&data, input));
+            assert_eq!(state, restored);
+            if state.transition.is_some() {
+                let mut erased = state.snapshot();
+                erased[82] = 255;
+                assert!(GameState::restore(&data, &erased).is_err());
+            }
+        }
+        assert_eq!(
+            state.output(),
+            FrameOutput {
+                tick: 164,
+                map_id: 15,
+                position: (392, 191),
+                phase: Phase::Walking
+            }
+        );
+        assert_eq!(state.walking.last_activation_direction(), None);
+        // Wrong source map/direction cannot be smuggled into a return snapshot.
+        state.map_id = 16;
+        state.walking = WalkingState::new(392, 339);
+        for _ in 0..4 {
+            state
+                .step(
+                    &data,
+                    FrameInput {
+                        direction: Some(Direction::Up),
+                    },
+                )
+                .unwrap();
+        }
+        assert!(state.transition.is_some());
+        let mut wrong_route = state.snapshot();
+        wrong_route[82] = 0;
+        assert!(GameState::restore(&data, &wrong_route).is_err());
     }
     #[test]
     fn failure_is_atomic_and_snapshots_bind_versions_and_data() {

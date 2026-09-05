@@ -3,29 +3,59 @@
 //! The 17+load+17 logical-update policy preserves measured endpoints. It does
 //! not reproduce loading stalls, COP scheduling or reference video-frame timing.
 
-/// One explicitly opted-in semantic doorway, accepted only at its qualified handoff.
+/// An explicitly opted-in semantic doorway pair, accepted only at its qualified handoff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Transition {
     elapsed: u8,
+    returning: bool,
 }
 impl Transition {
-    pub(crate) fn start(position: (u16, u16)) -> Option<Self> {
-        (position == (392, 209)).then_some(Self { elapsed: 0 })
+    pub(crate) fn start(map_id: u16, position: (u16, u16)) -> Option<Self> {
+        let returning = match (map_id, position) {
+            (15, (392, 209)) => false,
+            (16, (392, 336)) => true,
+            _ => return None,
+        };
+        Some(Self {
+            elapsed: 0,
+            returning,
+        })
+    }
+    pub(crate) fn source_map(self) -> u16 {
+        if self.returning {
+            16
+        } else {
+            15
+        }
+    }
+    pub(crate) fn handoff(self) -> (u16, u16) {
+        (392, if self.returning { 336 } else { 209 })
+    }
+    pub(crate) fn direction(self) -> crate::Direction {
+        if self.returning {
+            crate::Direction::Up
+        } else {
+            crate::Direction::Down
+        }
     }
     pub(crate) fn advance(&mut self) {
         self.elapsed = self.elapsed.saturating_add(1).min(35);
     }
     pub(crate) fn position(self) -> (u16, u16) {
-        match self.elapsed {
-            0..=17 => (392, 209 + u16::from(self.elapsed)),
-            n => (392, 336 + u16::from(n - 18)),
-        }
+        let elapsed = u16::from(self.elapsed);
+        let y = match (self.returning, self.elapsed) {
+            (false, 0..=17) => 209 + elapsed,
+            (false, _) => 336 + elapsed - 18,
+            (true, 0..=17) => 336 - elapsed,
+            (true, _) => 208 - (elapsed - 18),
+        };
+        (392, y)
     }
     pub(crate) fn map_id(self) -> u16 {
         if self.elapsed <= 17 {
-            15
+            self.source_map()
         } else {
-            16
+            31 - self.source_map()
         }
     }
     pub(crate) fn complete(self) -> bool {
@@ -34,8 +64,21 @@ impl Transition {
     pub(crate) fn elapsed(self) -> u8 {
         self.elapsed
     }
-    pub(crate) fn restore(elapsed: u8) -> Option<Self> {
-        (elapsed < 35).then_some(Self { elapsed })
+    pub(crate) fn encoded(self) -> u8 {
+        self.elapsed + if self.returning { 64 } else { 0 }
+    }
+    pub(crate) fn restore(encoded: u8) -> Option<Self> {
+        match encoded {
+            0..=34 => Some(Self {
+                elapsed: encoded,
+                returning: false,
+            }),
+            64..=98 => Some(Self {
+                elapsed: encoded - 64,
+                returning: true,
+            }),
+            _ => None,
+        }
     }
 }
 
@@ -44,7 +87,7 @@ mod tests {
     use super::*;
     #[test]
     fn explicit_preview_preserves_endpoints_not_video_cadence() {
-        let mut t = Transition::start((392, 209)).unwrap();
+        let mut t = Transition::start(15, (392, 209)).unwrap();
         for _ in 0..17 {
             t.advance();
         }
@@ -63,8 +106,36 @@ mod tests {
         assert_eq!(Transition::restore(18).unwrap().position(), (392, 336));
     }
     #[test]
+    fn reverse_doorway_preserves_qualified_endpoints_and_encoding() {
+        let mut t = Transition::start(16, (392, 336)).unwrap();
+        assert_eq!(t.source_map(), 16);
+        assert_eq!(t.handoff(), (392, 336));
+        assert_eq!(t.direction(), crate::Direction::Up);
+        for elapsed in 0..35 {
+            assert_eq!(Transition::restore(t.encoded()), Some(t));
+            assert_eq!(t.elapsed(), elapsed);
+            t.advance();
+            match elapsed + 1 {
+                17 => assert_eq!((t.map_id(), t.position()), (16, (392, 319))),
+                18 => assert_eq!((t.map_id(), t.position()), (15, (392, 208))),
+                35 => assert_eq!((t.map_id(), t.position()), (15, (392, 191))),
+                _ => (),
+            }
+        }
+        assert!(t.complete());
+        for byte in 35..64 {
+            assert!(Transition::restore(byte).is_none());
+        }
+        for byte in 99..=255 {
+            assert!(Transition::restore(byte).is_none());
+        }
+        assert!(Transition::start(15, (392, 336)).is_none());
+        assert!(Transition::start(16, (392, 209)).is_none());
+        assert!(Transition::start(17, (392, 336)).is_none());
+    }
+    #[test]
     fn unrelated_handoff_is_not_accepted() {
-        assert!(Transition::start((391, 209)).is_none());
-        assert!(Transition::start((392, 208)).is_none());
+        assert!(Transition::start(15, (391, 209)).is_none());
+        assert!(Transition::start(15, (392, 208)).is_none());
     }
 }

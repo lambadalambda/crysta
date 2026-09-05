@@ -31,4 +31,11 @@ fn semantic_preview_matches_approach_and_transition_endpoints() {
     assert_eq!(value["arrival"]["y"], 353);
     // This is a logical policy, not an assertion of reference video timing.
     assert_eq!(value["arrival"]["tick"], 115);
+    assert_eq!(value["return_handoff"]["y"], 336);
+    assert_eq!(value["return_handoff"]["phase"], "departing");
+    assert_eq!(value["returned"]["map_id"], 15);
+    assert_eq!(value["returned"]["x"], 392);
+    assert_eq!(value["returned"]["y"], 191);
+    assert_eq!(value["returned"]["tick"], 164);
+    assert_eq!(value["returned"]["error"], serde_json::Value::Null);
 }

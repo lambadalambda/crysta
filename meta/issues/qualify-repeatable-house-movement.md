@@ -50,3 +50,15 @@ Replace the preview's permanent used-direction guard and narrow flat-only collis
 - [Admission evidence](../../docs/input-admission.md) records two fresh boots,
   native gate traces and boundary mutations. Additional materials and the
   fresh-start exploration integration remain open.
+
+## Progress: return doorway
+
+- Two cold saved-game replays qualify map10→F selector6, last walking anchor
+  392,336; departure392,319, spawn392,208 and settled392,191.
+- Five native dispatch stops support the decoded selector/negative-Y source
+  path. Fourteen additional authenticated walking steps match the core.
+- Semantic profile4 supports both internal handoffs, retaining explicit17/load/17
+  logical timing. CPU-free two-process verifier returns to F at tick164;
+  per-step snapshots preserve both route ownerships, including map switches.
+- [Return evidence](../../docs/house-return-doorway.md). Fresh startup integration,
+  additional materials and an actual browser exploration test remain outstanding.
