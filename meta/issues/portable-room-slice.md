@@ -42,3 +42,8 @@ in a minimal deterministic portable simulation over decoded assets.
   steps; flagged cells, type16 and dash diagnostics are explicitly not promoted
   to support. No production implementation in that work item; raw traces and
   per-frame reference fixtures remain ignored under `local/movement/`.
+- A smaller fail-closed floor/full-wall profile now matches 1,204 steps,
+  including all 80 walking steps to the parent's doorway handoff at completed
+  1681 `(392,209)`. It rejects mixed open/solid pairs and repeated directional
+  activations; corner nudges and dash cooldown reconstruction are not required.
+  Completed 1682 is explicitly rejected as transition-controlled, not walking.

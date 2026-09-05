@@ -6,6 +6,96 @@ on selected interior floor/full-wall paths in maps `$000F` and `$0010`. No claim
 that an arbitrary room, input sequence, material, or player mode is supported.
 PCs/addresses are hexadecimal; collision type numbers and coordinates are decimal.
 
+## Recommended smallest profile: floor, full wall, doorway handoff
+
+**Corner handling is not required to reach the doorway.** The `flat_only`
+experiment narrows the rules below: accept only unflagged O={0,2,22} and
+S={12,14}; sample the old/new edges as specified; **stop on a mixed O/S pair**.
+O/O passes, S/S performs the directional snap/rollback, with no perpendicular
+nudge code. An aligned edge has just one sample. Keep the bit-3 correction;
+replacing it with a general AABB implementation is still unnecessary and unproven.
+Unknown cells stop the operation rather than returning a blocked result.
+
+This strict profile matches **1,204 steps** across six retained ordinary-walking
+segments plus the new 80-step doorway approach. These are `wall-Left`,
+`wall-Right`, `wall-Down`, `up-central`, `up-type12`, `map10-Down`, and
+`doorway-approach`. The first five establish all four cardinal flat-wall paths
+in F. The unaligned `map10-Left`, `map10-Right`, and `map10-up-wall` routes meet
+mixed pairs: their earlier position matches do **not** admit them to this smaller
+profile. They can simply stop until corner responses are separately wanted.
+
+### Immutable data and snapshot state for the parent core
+
+No emulator addresses or stream pointers are needed in portable state:
+
+- **Room data:** integer grid width/height and row-major collision cells retaining
+  stored type plus the high-bit override flag (raw u16 is sufficient). Both rooms
+  are 32×64; reject boundary samples rather than emulate coordinate masking.
+  Bounds `offset=(-8,-16), extent=(16,16)` can be constants for this profile.
+- **Exit data:** the parent's independently qualified ordered exit records and
+  runtime admission rules. Type 2 remains open floor; its presence alone is **not**
+  an exit trigger. Evaluate the qualified exit selector after resolved movement.
+- **Mutable walking state:** `(x,y)`, one-frame delayed input, active direction,
+  cadence phase, and input-admission history. Horizontal phase `0..53` suffices
+  (0=setup/gap). Vertical phase can be `0=setup,1=odd,2=even`, advancing
+  `0→1→2→1…`; a direction change resets phase to 0. Retain facing if the parent
+  transition interface needs it. There is no persistent pending delta after a step.
+- **Mode/status:** Walking, transition handoff, or Unqualified, rather than using
+  a zero velocity to conceal an unsupported action or tile. Rendering/camera and
+  the transition controller are separate consumers, not movement dependencies.
+
+A conservative input-admission guard records a four-bit **used-directions mask**.
+The existing delayed-input field also identifies the previous submitted input;
+no second copy is needed. Allow a direction's first contiguous activation interval;
+reject any later
+reactivation of it, even after release or an intervening direction. This is a
+small **scope restriction**, not a claim about the game's actual dash cooldown.
+It rejects `Left,neutral,Left` and `Left,Right,Left`, while admitting the doorway's
+single Left→Down change. Reject diagonals/actions. It does not by itself qualify
+arbitrary idle durations, mode histories, event/actor encounters, or all possible
+unique-direction permutations. Start from the authenticated ordinary checkpoints
+and keep these remaining boundaries explicit.
+
+### Exact doorway ownership boundary
+
+From completed 1601 `(472,176)`, apply Left `[1601,1657)` then Down
+`[1657,1682)`. Every step through completed **1681 `(392,209)`** passes the strict
+profile, with no rejected material or corner response:
+
+| Completed frame | Position | Walking result |
+|---:|---|---|
+| 1657 | (393,176) | Horizontal phase 0 gap |
+| 1658 | (392,176) | Residual Left step after submitted Down |
+| 1659 | (392,176) | Down setup, vertical phase 0 |
+| 1660 | (392,177) | First Down step, phase 1 |
+| 1680 | (392,207) | Down phase 1 |
+| **1681** | **(392,209)** | **Down phase 2; exit has matched** |
+
+At the handoff: delayed input=Down, active=Down, full vertical age=22 (compact
+phase 2), used directions={Left,Down}, pending displacement zero. Bounding
+origin `(384,193)` matches the parent's first exit record `(24,12,1,2)`.
+**Transfer ownership after this resolved movement step**, not after another
+ordinary-walking tick. The next completed frame, 1682, has player flags `$1411`
+and resume `$84B975`; it is already transition-controlled. Its one-pixel delta
+happens to equal the next walking magnitude and is therefore a dangerous false
+positive if only coordinates are checked. The strict verifier rejects that frame
+on the player collision-mode flags before attempting movement.
+
+The new `doorway-approach/frames.csv`, snapshots, and `flat-qualification.json`
+are reproducible ignored fixtures, authenticated like the existing captures.
+The strict verifier fails immediately on unqualified input, cells, mixed pairs,
+or changed collision-mode flags; the older diagnostic profile can still enumerate
+rejected frames for research. Five ROM-free synthetic tests cover four-wall
+blocking, floor steps, mixed/unknown/flagged rejection, and input admission:
+
+```sh
+python3 tools/movement-qualification/test_flat.py
+```
+
+This remains experimental qualification only. Native/Wasm production boundary
+implementation and target validation belong to the parent core work; no target
+support claim is inferred from this Python hypothesis checker or native oracle.
+
 ## Reproduction and provenance
 
 Run from the repository root:

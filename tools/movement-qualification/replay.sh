@@ -1,6 +1,8 @@
 #!/bin/sh
 # Run from repository root. Every invocation below is a fresh process/boot.
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+python3 tools/movement-qualification/test_flat.py
 python3 - <<'PY'
 from pathlib import Path
 from hashlib import sha256
@@ -25,6 +27,7 @@ for d in Left Right Up Down; do
   "$p" local/movement/wall-$d 1790 "$d:1601:1780"
   "$p" local/movement/map10-$d 2000 Left:1601:1657 Down:1657:1682 "$d:1801:1990"
 done
+"$p" local/movement/doorway-approach 1681 Left:1601:1657 Down:1657:1682
 "$p" local/movement/up-central 1780 Left:1601:1657 Up:1657:1770
 "$p" local/movement/up-type12 1780 Left:1601:1712 Up:1712:1770
 "$p" local/movement/map10-up-wall 2050 Left:1601:1657 Down:1657:1682 Left:1801:1825 Up:1840:2040
