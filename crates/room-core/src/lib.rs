@@ -10,7 +10,9 @@
 extern crate alloc;
 
 mod room;
+pub mod slice;
 mod snapshot;
+mod transition;
 
 pub use room::Room;
 pub use snapshot::{SNAPSHOT_SIZE, SNAPSHOT_VERSION};
