@@ -1,6 +1,6 @@
 //! Local-only capture driver. Emulator sessions deliberately exit with the process.
 
-use assets::maps::LoadedMap;
+use assets::maps::{LoadedMap, StaticLayer};
 use oracle::{Button, Session};
 use rom::{Revision, Rom};
 use serde_json::{json, Value};
@@ -8,6 +8,8 @@ use std::{
     env, fs, io,
     path::{Path, PathBuf},
 };
+
+mod qualification;
 
 const SAVE_SHA256: &str = "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055";
 const VIEWER: &str = include_str!("../web/viewer.html");
@@ -32,18 +34,41 @@ fn invalid(message: &str) -> io::Error {
 fn run(args: &[std::ffi::OsString]) -> Result<()> {
     let [mode, rom_path, save_path] = args else {
         return Err(invalid(
-            "usage: cargo run -p map-inspector -- <capture|verify> <japanese-rom> <qualified-sram>",
+            "usage: map-inspector <capture|verify|qualify-loader> <japanese-rom> <qualified-sram>\n       map-inspector decode-layer <japanese-rom> <hex-normalized-offset>",
         )
         .into());
     };
     let export = match mode.to_str() {
         Some("capture") => true,
-        Some("verify") => false,
-        _ => return Err(invalid("mode must be capture or verify").into()),
+        Some("verify" | "qualify-loader" | "decode-layer") => false,
+        _ => {
+            return Err(
+                invalid("mode must be capture, verify, qualify-loader or decode-layer").into(),
+            )
+        }
     };
     let rom = Rom::load(&fs::read(rom_path)?)?;
     if rom.revision() != Revision::Japan {
         return Err(invalid("map capture is qualified only for the Japanese reference").into());
+    }
+    if mode == "decode-layer" {
+        let offset = save_path
+            .to_str()
+            .ok_or_else(|| invalid("offset must be hexadecimal text"))?;
+        let offset = usize::from_str_radix(offset.strip_prefix("0x").unwrap_or(offset), 16)?;
+        let layer = StaticLayer::from_rom(rom.image(), offset)?;
+        println!(
+            "{}",
+            json!({
+                "schema_version":1,"kind":"static-layer-before-attributes",
+                "revision":rom.revision().id(),"rom_sha256":sha256(rom.image()),
+                "width":layer.width(),"height":layer.height(),
+                "source_range":[layer.source_range().start,layer.source_range().end],
+                "source_sha256":sha256(layer.source_bytes()),"layer_sha256":sha256(&layer.layer_bytes()),
+                "cells":layer.cells().iter().map(|cell|cell.raw()).collect::<Vec<_>>()
+            })
+        );
+        return Ok(());
     }
     let save = fs::read(save_path)?;
     if sha256(&save) != SAVE_SHA256 {
@@ -52,6 +77,10 @@ fn run(args: &[std::ffi::OsString]) -> Result<()> {
         );
     }
     let mut session = Session::new_with_sram(&rom, &save)?;
+    if mode == "qualify-loader" {
+        println!("{}", qualification::run(&mut session, &rom)?);
+        return Ok(());
+    }
     let mut captures = Vec::new();
     for label in 0..=1840 {
         session.set_button(Button::Start, (400..408).contains(&label));
