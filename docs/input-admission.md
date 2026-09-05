@@ -3,8 +3,67 @@
 Research for [repeatable house movement](../meta/issues/qualify-repeatable-house-movement.md).
 This supersedes **only the proposed permanent used-directions scope restriction**
 in [movement qualification](movement-qualification.md), not its collision limits.
-No `room-core`, collider, snapshot format, transition policy, or tracker changes
-are made here. Parent owns implementation and terrain qualification.
+The original research made no production changes. The production follow-up below
+replaces admission in `room-core` on top of corner collision profile 2. The parent
+continues to own collision, transitions, combined slice profile version, and tracker.
+
+## Production follow-up
+
+`WalkingState` now implements the submitted-input rule below, without a used mask
+or dash movement engine. Read-only accessors are `last_activation_direction()` and
+`onset_remaining()`. The rejection is `Unqualified::AcceleratedTrigger(direction)`;
+all errors—including collision errors—leave position, cadence, delayed input and
+both admission fields unchanged.
+
+Walking snapshots remain **16 bytes**, now **version 3**:
+
+| Bytes | Encoding |
+|---|---|
+| 0..4 | `RWK\0` |
+| 4..6 | version u16 LE = 3 |
+| 6..8, 8..10 | x, y u16 LE |
+| 10, 11, 12 | active direction, delayed input, cadence phase |
+| 13 | last activation direction |
+| 14 | remaining onset window 0..11 |
+| 15 | reserved zero |
+
+Direction encoding stays None=0, Down=1, Up=2, Left=3, Right=4. Versions 1/2 are
+rejected, not silently reinterpreted. Decoding validates phases and structural
+history relationships: no history requires no active/delayed direction and a zero
+window; submitted direction must match the last activation; a direction unlike
+active must have a freshly armed window=11, while a continuous input has <11.
+A residual active direction on release must match history with <11 remaining;
+fully idle remembered history has <10 remaining. This checks structural state,
+not provenance or arbitrary mode admission.
+
+Five dedicated synthetic Rust tests cover all-cardinal 10/11 boundaries,
+reversals, long hold/idle, transactionality on both acceleration and collision
+errors, snapshot replay across the boundary, old versions and malformed history.
+The new native private-reference test authenticates **all 42 CSVs and initial
+WRAM snapshots from both boots**, matching **3,994 successful ordinary frame
+transitions and 19 atomic accelerated-trigger rejections**, with per-step snapshot
+restore/equality. Its ordinary count is 19 below the diagnostic Python count:
+production rejects on submission, before resolving that tick's residual old-input
+movement; the diagnostic also measures that last pre-dash transition. The repeated
+209-step route is fully accepted.
+
+```sh
+cargo test -p room-core --test admission
+ROOM_CORE_ADMISSION_FIXTURES=/path/to/local/input-admission \
+  cargo test -p room-core --test local_input_admission -- --nocapture
+```
+
+The evidence was copied to the parent's ignored `local/input-admission/first`
+and `second` directories for shared use. No private data is committed.
+The parent's existing v2 snapshot/used-mask tests require coordinated updates;
+this work deliberately leaves `walking.rs`, `local_trajectories.rs`, `slice.rs`
+and slice `PROFILE_VERSION` untouched. In particular, the old Left→Right→Left
+rejection must become success, not merely be renamed. Parent integration must
+combine the slice profile bump with its collision/input changes before release.
+Scoped Clippy (`--lib --test admission --test local_input_admission`, `-D warnings`)
+and the `wasm32-unknown-unknown` crate build pass. Independent read-only production
+review found no blockers; it explicitly confirmed that decoding is structural
+validation, not complete historical reachability checking.
 
 ## Finding and practical port state
 
@@ -219,7 +278,8 @@ first direction instead of replacing it. The tests explicitly distinguish the wr
 from the measured rule, and cover the inclusive/exclusive boundary, long idle,
 actions/diagonals, and transactional rejection. The native corpus independently
 falsifies applying ordinary cadence to dash and validates accepted reactivations.
-This is research evidence, **not native/Wasm production implementation coverage**.
+These original research results do not themselves establish native/Wasm production
+coverage; the separately tested production admission follow-up is described above.
 Independent read-only precommit review of the harness, sampled private evidence,
 and report found no blockers. Its artifact-completeness finding was addressed
 with an expected filename set for both boots; minor report wording was corrected.
