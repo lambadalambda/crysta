@@ -289,6 +289,7 @@ impl Cursor {
                 [bytes[pointer], bytes[pointer + 1], bytes[pointer + 2]],
                 self.base.bank(),
             )?;
+            slice(image, source.normalized().value() as usize, 1)?;
             (length, Command::Resource { kind, source })
         };
         let bytes = get(length)?.to_vec();

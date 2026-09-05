@@ -354,3 +354,16 @@ fn last_table_entries_are_accepted_but_truncated_tables_are_not() {
         Err(ScriptError::Truncated { needed: 3, .. })
     ));
 }
+
+#[test]
+fn resource_pointer_must_refer_to_bytes_present_in_the_input_image() {
+    use assets::maps::scripts::ScriptError;
+    let bytes = image(&[0x10, 1, 0, 0, 0x10, 0], &[]);
+    assert!(matches!(
+        resolve_map(&bytes, 0, Limits::default()),
+        Err(ScriptError::Truncated {
+            offset: 0x20_0000,
+            needed: 1
+        })
+    ));
+}
