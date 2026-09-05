@@ -66,3 +66,12 @@ with fixtures present is an error, not an unauthenticated fallback. This avoids
 adding even dev dependencies; it is not part of the native/Wasm library boundary.
 Artifacts can be regenerated with `tools/movement-qualification/replay.sh` using
 the independently authenticated private ROM/SRAM inputs.
+
+## Semantic slice integration
+
+`slice::{GameData, GameState, FrameOutput, Policy}` adds source-bound snapshots,
+ordered exit selection and an explicitly opted-in `SemanticPreview` doorway.
+Its 17/load/17 logical-update policy preserves qualified endpoints, not native
+video-frame timing. It does not execute COP services or a CPU. See
+[the complete preview boundary](../../docs/portable-room.md); the native local
+host and browser frontend live in `map-inspector`, never in this crate.

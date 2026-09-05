@@ -1,7 +1,27 @@
 # Local map inspector
 
 A native capture/extraction CLI plus dependency-free browser viewers. This is a
-**map research tool**, not a general map loader or a playable port.
+**map research tool**, with an explicitly limited CPU-free semantic room preview,
+not a general map loader or a complete playable port.
+
+## CPU-free room preview
+
+```sh
+cargo run -p map-inspector -- serve-room \
+  'local/Tenchi Souzou (Japan).sfc' 8765
+```
+
+Open `http://127.0.0.1:8765/` and choose **Doorway demonstration**, or Resume and
+walk with Arrow/WASD/touch. No SRAM or original CPU execution is required.
+The Rust core runs natively behind the local browser UI; its Wasm build is
+validated but not wired into this frontend yet. Port `0` selects an unused port.
+
+**Limited semantic preview:** reference-qualified flat walking and an
+endpoint-qualified doorway policy, not native video-frame transition timing.
+Mixed corners, unknown/flagged cells and direction reactivation stop explicitly;
+use Reset. The player is a bounds marker; no sprites, actors, combat or audio.
+See [portable boundary, evidence and limits](../../docs/portable-room.md).
+`verify-room ROM semantic-preview` repeats the same CPU-free route as JSON.
 
 ## ROM-only full-map viewer
 
@@ -107,6 +127,6 @@ It is a separate browser check, not part of `cargo test`.
 
 ## Dependencies
 
-Workspace crates `assets`, `oracle`, and `rom`, plus `serde_json` (MIT/Apache-2.0).
+Workspace crates `assets`, `oracle`, `rom`, and `room-core`, plus `serde_json` (MIT/Apache-2.0).
 The viewer has no third-party JavaScript or styles. Community format leads were
 studied without copying an unlicensed implementation; see the format document.

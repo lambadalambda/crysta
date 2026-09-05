@@ -6,6 +6,14 @@ on selected interior floor/full-wall paths in maps `$000F` and `$0010`. No claim
 that an arbitrary room, input sequence, material, or player mode is supported.
 PCs/addresses are hexadecimal; collision type numbers and coordinates are decimal.
 
+## Production follow-up
+
+The [portable room preview](portable-room.md) now implements the **smaller
+flat-only profile** below in `room-core`, with 1,204 authenticated Rust replay
+steps. The larger Python diagnostic profile remains research, not broader
+production support. Doorway pacing is a separately labelled semantic policy,
+not reconstructed video scheduling.
+
 ## Recommended smallest profile: floor, full wall, doorway handoff
 
 **Corner handling is not required to reach the doorway.** The `flat_only`

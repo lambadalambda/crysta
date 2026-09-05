@@ -20,7 +20,8 @@ The safe repository foundation (M0), deterministic reference oracle (M1), and
 matching-disassembly foundation (M2) are complete. The Japanese reference can
 be reconstructed byte-for-byte; boot, interrupts, the main loop, canonical
 memory, sparse ROM regions, and known indirect dispatch are versioned and
-inspectable. Work is now on the content and script pipeline (M3). A bounded
+inspectable. Work spans the content/script pipeline (M3) and a bounded portable
+room preview (M4). A bounded
 compression decoder and deterministic encoder reproduce qualified JP/EU graphics
 and map packets byte-for-byte. A local loaded-map inspector now shows qualified
 portal-cavern captures and raw tile/collision structure. The cavern layer can
@@ -32,7 +33,11 @@ palettes and metatiles, with runtime resource and representative pixel equality.
 It shows natural-palette terrain, not sprites or final scene effects.
 Broader map behavior and collision qualification remain.
 
-No playable portable implementation exists yet.
+A genuine Crysta bedroom doorway is now qualified, both room backgrounds can
+be decoded, and a CPU-free native-hosted browser preview demonstrates bounded
+walking and a semantic doorway transition. The core also builds for Wasm.
+There is no **complete playable port** yet; transition pacing is explicitly
+endpoint-qualified preview behavior, not classic frame fidelity.
 
 See:
 
@@ -92,7 +97,7 @@ crates/                 Rust workspace
   memory-map/           Typed revision-bound memory symbols
   assets/               Bounded compression and content codecs
   map-inspector/        Local runtime captures and ROM-only static map viewers
-  core/                 Deterministic portable game simulation (planned)
+  room-core/            Bounded deterministic walking and semantic doorway preview
   renderer/             Deterministic command consumer/classic renderer (planned)
   audio/                Audio command model and compatibility backend (planned)
   desktop/              Native frontend (planned)
@@ -104,6 +109,19 @@ tools/                  Developer-facing inspection and conversion tools
 ```
 
 Directories are added only when their first implementation issue begins.
+
+## Try the bounded room preview
+
+With your own Japanese ROM in `local/`:
+
+```sh
+cargo run -p map-inspector -- serve-room 'local/Tenchi Souzou (Japan).sfc' 8765
+```
+
+Open the printed loopback URL and choose **Doorway demonstration**. Walking is
+reference-qualified on bounded flat paths; doorway pacing is an explicit semantic
+preview, not native frame fidelity. No original CPU runs in the simulation loop.
+See [portable room scope and controls](docs/portable-room.md).
 
 ## License
 

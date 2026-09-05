@@ -29,3 +29,12 @@ Create the platform-independent simulation API, state ownership, fixed-width num
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Prefer simple data-oriented structures that mirror verified behavior before considering a generalized engine or ECS.
+
+## Bounded groundwork
+
+`room-core::slice` now supplies source/data-bound snapshots, deterministic
+GameData/GameState/input/output, explicit SemanticPreview policy and a no-std
+native/Wasm boundary for the small [room preview](../../docs/portable-room.md).
+Snapshot RNG-policy version 0 means no RNG is used in that subset. A general
+reference RNG/state model, broader commands and future host services are not
+implemented; this parent issue remains open.

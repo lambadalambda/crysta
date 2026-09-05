@@ -47,3 +47,24 @@ in a minimal deterministic portable simulation over decoded assets.
   1681 `(392,209)`. It rejects mixed open/solid pairs and repeated directional
   activations; corner nudges and dash cooldown reconstruction are not required.
   Completed 1682 is explicitly rejected as transition-controlled, not walking.
+
+## Implemented bounded profile and verification
+
+- Added dependency-free `no_std` + `alloc` room-core, immutable grids/data,
+  deterministic input/output, atomic errors and versioned source-bound snapshots.
+- 1,204 authenticated walking steps match reference cadence, positions, blocking
+  and restored replays. Unknown/flagged cells, mixed pairs, boundary arithmetic
+  and conservative direction-reactivation admission fail explicitly.
+- The exact selected doorway handoff and decoded queue/spawn path are used by
+  an **opt-in endpoint-qualified SemanticPreview policy**. Its 17/load/17 logical
+  pacing does not reproduce native video-frame scheduling or loader stalls.
+  This is the completed minimal preview profile, not classic transition fidelity.
+- Native loopback browser host demonstrates walking and leaving room F for 10
+  without original CPU execution. Static BG1 plus a bounds marker; no sprites,
+  actors, audio, combat or events beyond the single semantic doorway.
+- Synthetic/core/HTTP/UI tests, authenticated replay/ROM-grid equality, repeated
+  CPU-free CLI results, desktop/mobile browser QA, native and Wasm builds,
+  workspace gates and independent reviews passed.
+- See [portable room documentation](../../docs/portable-room.md). General
+  controller cadence, dash, corner/event behavior and direct Wasm browser hosting
+  remain outside this completed slice; the parent issues remain open.
