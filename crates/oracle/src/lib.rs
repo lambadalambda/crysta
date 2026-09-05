@@ -42,6 +42,34 @@ mod ffi {
     const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, data_bank) == 7);
     const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, emulation) == 8);
 
+    #[repr(C)]
+    #[derive(Default)]
+    pub struct SnesCpuRegisters {
+        pub address: u32,
+        pub accumulator: u16,
+        pub x: u16,
+        pub y: u16,
+        pub stack: u16,
+        pub direct_page: u16,
+        pub status: u8,
+        pub data_bank: u8,
+        pub emulation: u8,
+        pub reserved: [u8; 3],
+    }
+
+    const _: () = assert!(std::mem::size_of::<SnesCpuRegisters>() == 20);
+    const _: () = assert!(std::mem::align_of::<SnesCpuRegisters>() == 4);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, address) == 0);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, accumulator) == 4);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, x) == 6);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, y) == 8);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, stack) == 10);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, direct_page) == 12);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, status) == 14);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, data_bank) == 15);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, emulation) == 16);
+    const _: () = assert!(std::mem::offset_of!(SnesCpuRegisters, reserved) == 17);
+
     pub const TRACE_TARGET_REACHED: c_int = 0;
     pub const TRACE_INSTRUCTION_LIMIT: c_int = 1;
     pub const TRACE_FRAME_LIMIT: c_int = 2;
@@ -92,6 +120,7 @@ mod ffi {
         pub fn snes_cycles(snes: *const Snes) -> u64;
         pub fn snes_vram(snes: *const Snes) -> *const u16;
         pub fn snes_cgram(snes: *const Snes) -> *const u16;
+        pub fn snes_cpu_registers(snes: *const Snes, registers: *mut SnesCpuRegisters);
         pub fn snes_cpu_pc(snes: *const Snes) -> u16;
         pub fn snes_cpu_bank(snes: *const Snes) -> u8;
         pub fn snes_apu_ram(snes: *const Snes) -> *const u8;
@@ -227,6 +256,31 @@ pub struct FrameState {
     pub cycles: u64,
     /// SHA-256 over the current 128 KiB WRAM image.
     pub wram_sha256: [u8; 32],
+}
+
+/// Read-only snapshot of the reference CPU's current registers.
+///
+/// A, X, Y and S retain their full 16-bit register contents, regardless of mode.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CpuRegisters {
+    /// Actual 24-bit execution address (`PBR:PC`), without mirror normalization.
+    pub address: u32,
+    /// Full accumulator (including the hidden high byte in 8-bit mode).
+    pub accumulator: u16,
+    /// X index register.
+    pub x: u16,
+    /// Y index register.
+    pub y: u16,
+    /// Stack pointer.
+    pub stack: u16,
+    /// Direct-page register.
+    pub direct_page: u16,
+    /// Processor status register.
+    pub status: u8,
+    /// Data-bank register.
+    pub data_bank: u8,
+    /// Whether the CPU is in emulation mode.
+    pub emulation: bool,
 }
 
 /// CPU state captured immediately before one instruction executes.
@@ -535,6 +589,30 @@ impl Session {
         out
     }
 
+    /// Reads the current CPU registers without advancing execution or changing memory.
+    ///
+    /// After [`Self::trace_until_pc`] reaches its target, this describes the CPU
+    /// before that instruction executes. This snapshot is separate from the
+    /// stable trace record ABI and digest format.
+    #[must_use]
+    pub fn cpu_registers(&self) -> CpuRegisters {
+        let mut raw = ffi::SnesCpuRegisters::default();
+        // SAFETY: this session owns the initialized core on its creating thread;
+        // the shim only reads registers and fills the layout-checked output.
+        unsafe { ffi::snes_cpu_registers(self.snes, &raw mut raw) };
+        CpuRegisters {
+            address: raw.address,
+            accumulator: raw.accumulator,
+            x: raw.x,
+            y: raw.y,
+            stack: raw.stack,
+            direct_page: raw.direct_page,
+            status: raw.status,
+            data_bank: raw.data_bank,
+            emulation: raw.emulation != 0,
+        }
+    }
+
     /// The program counter the core's CPU is currently at.
     #[must_use]
     pub fn cpu_pc(&self) -> u16 {
@@ -757,6 +835,103 @@ mod tests {
         );
 
         eprintln!("synthetic SRAM check passed");
+        std::process::exit(0);
+    }
+
+    #[test]
+    fn cpu_registers_at_instruction_stop_are_read_only() {
+        if std::env::var("ORACLE_REGISTERS_CHILD").is_ok() {
+            run_registers_child();
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tests::cpu_registers_at_instruction_stop_are_read_only",
+                "--nocapture",
+            ])
+            .env("ORACLE_REGISTERS_CHILD", "1")
+            .output()
+            .expect("spawn isolated register test");
+        assert!(
+            output.status.success(),
+            "register child failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(
+            String::from_utf8_lossy(&output.stderr).contains("synthetic register checks passed")
+        );
+    }
+
+    fn run_registers_child() -> ! {
+        let mut image = synthetic_rom().image().to_vec();
+        // The reset prefix already enters native mode and jumps to $80:8000.
+        let program = [
+            0xC2, 0x30, // REP #$30: 16-bit A/X/Y
+            0xA9, 0x34, 0x12, 0x5B, // LDA #$1234; TCD
+            0xA9, 0xED, 0x1F, 0x1B, // LDA #$1FED; TCS
+            0xE2, 0x20, 0xA9, 0x7E, 0x48, 0xAB, // SEP #$20; LDA #$7E; PHA; PLB
+            0xC2, 0x20, 0xA9, 0x5B, 0xA6, // REP #$20; LDA #$A65B
+            0xA2, 0x78, 0xC3, // LDX #$C378
+            0xA0, 0xBC, 0x9A, // LDY #$9ABC
+            0xE2, 0xC9, // SEP #$C9: N/V/D/C set, I remains set, M/X clear
+        ];
+        image[0x8000..0x8000 + program.len()].copy_from_slice(&program);
+        // Stop BEFORE this store, then resume to prove it had not executed.
+        image[0x8000 + program.len()..0x8000 + program.len() + 6]
+            .copy_from_slice(&[0x8F, 0x00, 0x00, 0x7E, 0x80, 0xFE]);
+        let digest = rom::digests(&image);
+        let rom = Rom::load_with_known(
+            &image,
+            &[rom::KnownRom {
+                revision: rom::Revision::Japan,
+                sha256: digest.sha256,
+                crc32: digest.crc32,
+            }],
+        )
+        .expect("synthetic register ROM loads");
+        let mut session = Session::new(&rom).expect("core accepts image");
+        let target = 0x80_8000 + u32::try_from(program.len()).unwrap();
+        let trace = session.trace_until_pc(target, 64, 1).unwrap();
+        assert_eq!(trace.stop, CpuTraceStop::TargetReached);
+        let frame = session.frame_state();
+        let memory = session.wram_image();
+        let pc = (session.cpu_bank(), session.cpu_pc());
+        let expected = CpuRegisters {
+            address: target,
+            accumulator: 0xA65B,
+            x: 0xC378,
+            y: 0x9ABC,
+            stack: 0x1FED,
+            direct_page: 0x1234,
+            status: 0xCD,
+            data_bank: 0x7E,
+            emulation: false,
+        };
+        for _ in 0..3 {
+            let registers = session.cpu_registers();
+            assert_eq!(registers, expected);
+            assert_eq!(session.frame_state(), frame);
+            assert_eq!(session.wram_image(), memory);
+            assert_eq!((session.cpu_bank(), session.cpu_pc()), pc);
+            assert_eq!(registers.address, (u32::from(pc.0) << 16) | u32::from(pc.1));
+            assert_eq!(
+                trace.entries.last(),
+                Some(&CpuTraceEntry {
+                    address: registers.address,
+                    status: registers.status,
+                    emulation: registers.emulation,
+                    direct_page: registers.direct_page,
+                    data_bank: registers.data_bank,
+                })
+            );
+        }
+        assert_ne!(&memory[..2], &[0x5B, 0xA6]);
+        let resumed = session.trace_until_pc(target + 4, 2, 1).unwrap();
+        assert_eq!(resumed.stop, CpuTraceStop::TargetReached);
+        assert_eq!(&session.wram_image()[..2], &[0x5B, 0xA6]);
+        eprintln!("synthetic register checks passed");
+        // Avoid the vendored core's static destructors, as in other child tests.
         std::process::exit(0);
     }
 

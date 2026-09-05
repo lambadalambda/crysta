@@ -34,6 +34,32 @@ static_assert(offsetof(SnesCpuTraceEntry, directPage) == 4);
 static_assert(offsetof(SnesCpuTraceEntry, status) == 6);
 static_assert(offsetof(SnesCpuTraceEntry, dataBank) == 7);
 static_assert(offsetof(SnesCpuTraceEntry, emulation) == 8);
+
+struct SnesCpuRegisters {
+  uint32_t address;
+  uint16_t accumulator;
+  uint16_t x;
+  uint16_t y;
+  uint16_t stack;
+  uint16_t directPage;
+  uint8_t status;
+  uint8_t dataBank;
+  uint8_t emulation;
+  uint8_t reserved[3];
+};
+static_assert(sizeof(SnesCpuRegisters) == 20);
+static_assert(alignof(SnesCpuRegisters) == 4);
+static_assert(offsetof(SnesCpuRegisters, address) == 0);
+static_assert(offsetof(SnesCpuRegisters, accumulator) == 4);
+static_assert(offsetof(SnesCpuRegisters, x) == 6);
+static_assert(offsetof(SnesCpuRegisters, y) == 8);
+static_assert(offsetof(SnesCpuRegisters, stack) == 10);
+static_assert(offsetof(SnesCpuRegisters, directPage) == 12);
+static_assert(offsetof(SnesCpuRegisters, status) == 14);
+static_assert(offsetof(SnesCpuRegisters, dataBank) == 15);
+static_assert(offsetof(SnesCpuRegisters, emulation) == 16);
+static_assert(offsetof(SnesCpuRegisters, reserved) == 17);
+
 static constexpr uint32_t CpuTraceInstructionLimit = 2'000'000;
 static constexpr int SramSize = 8 * 1024;
 static_assert(SramSize == 8192);
@@ -381,6 +407,23 @@ const uint16_t* snes_vram(const Snes* snes) {
 const uint16_t* snes_cgram(const Snes* snes) {
   (void)snes;
   return (const uint16_t*)SuperFamicom::ppuImpl.cgram;
+}
+
+void snes_cpu_registers(const Snes* snes, SnesCpuRegisters* output) {
+  (void)snes;
+  const auto& registers = SuperFamicom::cpu.r;
+  *output = {
+    (uint32_t)registers.pc.d,
+    (uint16_t)registers.a.w,
+    (uint16_t)registers.x.w,
+    (uint16_t)registers.y.w,
+    (uint16_t)registers.s.w,
+    (uint16_t)registers.d.w,
+    (uint8_t)(uint32_t)registers.p,
+    (uint8_t)registers.b,
+    (uint8_t)registers.e,
+    {},
+  };
 }
 
 uint16_t snes_cpu_pc(const Snes* snes) {
