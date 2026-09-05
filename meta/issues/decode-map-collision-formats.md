@@ -24,6 +24,9 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
 
 ## Subissues
 
+- [Qualify static map loading and decode the cavern layer](static-map-cavern.md):
+  trace pointer provenance and compare static output to the loaded checkpoint.
+
 - [Build a local loaded-map inspector](loaded-map-inspector.md): first visual
   deliverable using a qualified runtime checkpoint, without claiming complete
   static map decoding.
