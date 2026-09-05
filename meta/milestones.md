@@ -117,6 +117,9 @@ qualification remain open.
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
+- [Start a new game and explore Ark's house](issues/start-and-explore-arks-house.md)
+- [Qualify a fresh new-game house bootstrap](issues/qualify-new-game-house-bootstrap.md)
+- [Qualify repeatable house movement and collision](issues/qualify-repeatable-house-movement.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
