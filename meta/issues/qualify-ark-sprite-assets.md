@@ -9,6 +9,8 @@ Locate and decode the ROM-backed graphics, palette and frame composition for Ark
 - [Decode graphics, palettes, sprites, and animation](decode-graphics-animation.md)
 - [Qualify a fresh new-game house bootstrap](qualify-new-game-house-bootstrap.md)
 
+- [Inspect read-only sprite hardware state](inspect-sprite-hardware-state.md)
+
 ## Requirements
 
 - Trace resource loading and sprite composition to authenticated ROM sources; use runtime VRAM/CGRAM/OAM or draw-record evidence to validate, not as distributed assets.

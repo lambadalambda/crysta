@@ -120,6 +120,7 @@ mod ffi {
         pub fn snes_cycles(snes: *const Snes) -> u64;
         pub fn snes_vram(snes: *const Snes) -> *const u16;
         pub fn snes_cgram(snes: *const Snes) -> *const u16;
+        pub fn snes_sprite_state(snes: *const Snes, output: *mut u8);
         pub fn snes_cpu_registers(snes: *const Snes, registers: *mut SnesCpuRegisters);
         pub fn snes_cpu_pc(snes: *const Snes) -> u16;
         pub fn snes_cpu_bank(snes: *const Snes) -> u8;
@@ -137,6 +138,20 @@ pub const SAMPLES_PER_FRAME: usize = 534;
 pub const SRAM_SIZE: usize = 8 * 1024;
 /// Maximum records accepted by one bounded CPU trace.
 pub const MAX_CPU_TRACE_INSTRUCTIONS: usize = 2_000_000;
+
+/// Current read-only OBJ hardware state for reference inspection.
+///
+/// This is not a claim about the latches that produced a completed framebuffer.
+/// It is deliberately separate from the stable frame/trace digest schemas.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpriteState {
+    /// All 544 physical OAM bytes: 512 low-table bytes followed by 32 high-table bytes.
+    pub oam: [u8; 544],
+    /// Reconstructed `$2101` OBJSEL: tile base, name gap and small/large size mode.
+    pub obsel: u8,
+    /// Current first-sprite priority index, in 0..128; not the scanline latch.
+    pub first_sprite: u8,
+}
 
 /// A controller button for [`Session::set_button`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -587,6 +602,23 @@ impl Session {
             std::ptr::copy_nonoverlapping(ffi::snes_cgram(self.snes), out.as_mut_ptr(), 0x100);
         }
         out
+    }
+
+    /// Reads physical OAM and current OBJ configuration without advancing the
+    /// CPU, mutating memory, or reading side-effecting PPU I/O registers.
+    #[must_use]
+    pub fn sprite_state(&self) -> SpriteState {
+        let mut bytes = [0; 546];
+        // SAFETY: the initialized singleton is owned by this session. The shim
+        // fills exactly 544 OAM bytes plus two registers in this 546-byte buffer.
+        unsafe { ffi::snes_sprite_state(self.snes, bytes.as_mut_ptr()) };
+        let mut oam = [0; 544];
+        oam.copy_from_slice(&bytes[..544]);
+        SpriteState {
+            oam,
+            obsel: bytes[544],
+            first_sprite: bytes[545],
+        }
     }
 
     /// Reads the current CPU registers without advancing execution or changing memory.

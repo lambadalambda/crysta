@@ -409,6 +409,23 @@ const uint16_t* snes_cgram(const Snes* snes) {
   return (const uint16_t*)SuperFamicom::ppuImpl.cgram;
 }
 
+// Physical OAM reconstruction is a pure memory accessor, not $2138 (which
+// advances PPU I/O state). These describe current registers, not output latches.
+constexpr uint8_t packObsel(uint16_t tiledataAddress, uint8_t nameselect, uint8_t baseSize) {
+  return uint8_t((tiledataAddress >> 13) | (nameselect << 3) | (baseSize << 5));
+}
+static_assert(packObsel(0, 0, 0) == 0);
+static_assert(packObsel(0x6000, 1, 5) == 0xab);
+static_assert(packObsel(0xe000, 3, 7) == 0xff);
+
+void snes_sprite_state(const Snes* snes, uint8_t* output) {
+  (void)snes;
+  auto& ppu = SuperFamicom::ppuImpl;
+  for(unsigned address = 0; address < 544; ++address) output[address] = ppu.oam.read(address);
+  output[544] = packObsel(ppu.obj.io.tiledataAddress, ppu.obj.io.nameselect, ppu.obj.io.baseSize);
+  output[545] = ppu.obj.io.firstSprite;
+}
+
 void snes_cpu_registers(const Snes* snes, SnesCpuRegisters* output) {
   (void)snes;
   const auto& registers = SuperFamicom::cpu.r;

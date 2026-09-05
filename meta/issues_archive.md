@@ -33,3 +33,4 @@
 - [x] [Qualify a fresh new-game house bootstrap](issues/qualify-new-game-house-bootstrap.md)
 - [x] [Start a new game and explore Ark's house](issues/start-and-explore-arks-house.md)
 - [x] [Qualify repeatable house movement and collision](issues/qualify-repeatable-house-movement.md)
+- [x] [Inspect read-only sprite hardware state](issues/inspect-sprite-hardware-state.md)
