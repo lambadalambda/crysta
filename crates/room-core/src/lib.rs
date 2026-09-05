@@ -2,7 +2,7 @@
 //! Deterministic, reference-qualified cardinal walking over immutable collision cells.
 //!
 //! Only ordinary walking with fixed (-8,-16), 16×16 bounds is modeled. Unknown
-//! materials, flagged cells and reactivated directions fail closed. Qualified
+//! materials, flagged cells and accelerated input triggers fail closed. Qualified
 //! open/solid corners retain the native perpendicular nudge.
 //! The caller owns mode admission, room identity, actors, exits and transitions;
 //! in particular it must hand off after the qualified doorway movement step.
@@ -18,7 +18,7 @@ mod transition;
 pub use room::Room;
 pub use snapshot::{SNAPSHOT_SIZE, SNAPSHOT_VERSION};
 
-/// Cardinal directions; discriminants also define the used-direction mask bits.
+/// Cardinal directions with stable discriminants.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Direction {
@@ -33,7 +33,7 @@ pub enum Direction {
 }
 
 impl Direction {
-    /// Bit used by [`WalkingState::used_direction_mask`].
+    /// Bit corresponding to this cardinal for caller-defined direction sets.
     #[must_use]
     pub const fn mask(self) -> u8 {
         1 << self as u8
@@ -72,8 +72,8 @@ pub enum Unqualified {
     FlaggedCell(u16),
     /// A stored material type outside 0, 2, 22, 12 and 14.
     UnsupportedType(u8),
-    /// A previously activated direction was released/interrupted and activated again.
-    ReactivatedDirection(Direction),
+    /// Same-direction reactivation inside the measured onset window would accelerate.
+    AcceleratedTrigger(Direction),
     /// Snapshot length, version, encoding or state invariants are invalid.
     Snapshot,
 }
@@ -106,8 +106,8 @@ pub struct MovementOutput {
 
 /// Small walking component, not a top-level game state.
 ///
-/// Input history restricts each direction to its first uninterrupted activation.
-/// This conservatively excludes dash; it does not reconstruct dash cooldowns.
+/// Ordinary directions may reactivate after the 11-tick onset window or an
+/// intervening direction. Accelerated triggers fail closed; dash is not modeled.
 /// Room and mode identity belong to the caller, including after snapshot restore.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct WalkingState {
@@ -116,7 +116,8 @@ pub struct WalkingState {
     active: Option<Direction>,
     delayed: Option<Direction>,
     phase: u8,
-    used: u8,
+    last_activation: Option<Direction>,
+    onset_remaining: u8,
 }
 
 impl WalkingState {
@@ -133,7 +134,8 @@ impl WalkingState {
             active: None,
             delayed: None,
             phase: 0,
-            used: 0,
+            last_activation: None,
+            onset_remaining: 0,
         }
     }
 
@@ -167,13 +169,18 @@ impl WalkingState {
     pub const fn phase(&self) -> u8 {
         self.phase
     }
-    /// Directions already activated, using [`Direction::mask`].
+    /// Most recently activated direction; neutral and timer expiry retain it.
     #[must_use]
-    pub const fn used_direction_mask(&self) -> u8 {
-        self.used
+    pub const fn last_activation_direction(&self) -> Option<Direction> {
+        self.last_activation
+    }
+    /// Remaining onset-window ticks (0..11), decremented before each input test.
+    #[must_use]
+    pub const fn onset_remaining(&self) -> u8 {
+        self.onset_remaining
     }
 
-    /// Resolves one input/frame atomically, with measured latency and flat-wall collision.
+    /// Resolves one input/frame atomically, with measured latency and qualified collision.
     ///
     /// New input takes effect after one old-input step and one zero/setup step.
     /// Horizontal walking repeats a 54-phase cycle; vertical walking alternates
@@ -181,16 +188,18 @@ impl WalkingState {
     ///
     /// # Errors
     /// Returns [`Unqualified`] for invalid bounds, cells, arithmetic or
-    /// direction reactivation. Every error leaves all state fields unchanged.
+    /// accelerated input triggers. Every error leaves all state fields unchanged.
     pub fn step(&mut self, room: &Room, input: FrameInput) -> Result<MovementOutput, Unqualified> {
         room.validate_position(self.x, self.y)?;
         let mut next = *self;
+        next.onset_remaining = self.onset_remaining.saturating_sub(1);
         if let Some(direction) = input.direction {
             if input.direction != self.delayed {
-                if self.used & direction.mask() != 0 {
-                    return Err(Unqualified::ReactivatedDirection(direction));
+                if self.last_activation == Some(direction) && next.onset_remaining != 0 {
+                    return Err(Unqualified::AcceleratedTrigger(direction));
                 }
-                next.used |= direction.mask();
+                next.last_activation = Some(direction);
+                next.onset_remaining = 11;
             }
         }
         if self.delayed == self.active {
