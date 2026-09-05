@@ -36,3 +36,9 @@ in a minimal deterministic portable simulation over decoded assets.
 - Parents: [player movement](port-player-input-movement.md),
   [map loading and collision](port-map-loading-collision.md).
 - This is a bounded room slice, not the full opening or an early general engine.
+- [Experimental movement qualification](../../docs/movement-qualification.md)
+  measures fresh-bootstrap directional latency/cadence and all four actual-player
+  flat collision paths. Nine complete movement segments match 1,771 position
+  steps; flagged cells, type16 and dash diagnostics are explicitly not promoted
+  to support. No production implementation in that work item; raw traces and
+  per-frame reference fixtures remain ignored under `local/movement/`.
