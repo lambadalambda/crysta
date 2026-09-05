@@ -33,3 +33,28 @@ from unproved static ROM formats and collision semantics.
 - This first deliverable does not close the parent: ROM pointers, representative
   indoor/outdoor/dungeon/world formats, transitions, and trace-qualified collision
   semantics remain parent requirements.
+
+## Completion record
+
+- Added pure `assets::maps` with WRAM/dimension/capacity validation, coordinate
+  lookup, raw-word preservation and lossless layer export. Synthetic tests used
+  red→green development.
+- Added `map-inspector capture|verify` with authenticated JP ROM and pinned SRAM,
+  two deterministic map `$0128` portal-cavern checkpoints, local BMP/JSON/raw
+  memory exports, and a dependency-free browser viewer.
+- Qualified frames 1601/1841, 80×32 cells, selected words, layer and RGB hashes in
+  a fresh-process local integration test. There are zero changed layer words;
+  player/camera movement is separate.
+- Browser QA passed at desktop/mobile sizes, including checkpoint switching,
+  overlays, 25–200% zoom, click/keyboard inspection and locate-player. A synthetic
+  in-browser difference caught then verified the atlas overlay-order fix.
+- Independent correctness/architecture review approved the model, capture tool
+  and viewer after the draw-order correction. Workspace format, Clippy (warnings
+  denied), tests and rustdoc (warnings denied) passed. A clean detached worktree
+  also passed the full workspace suite with explicit ROM/SRAM-backed test skips.
+- See [runtime layout and qualification](../../docs/maps.md) for the command,
+  provenance, boundaries and unresolved parent scope.
+
+Optional review follow-up: the eight-row framebuffer borders still accept
+map-coordinate clicks and can receive overlays. Restricting them to active
+terrain rows is deferred; no general display-geometry API is claimed.

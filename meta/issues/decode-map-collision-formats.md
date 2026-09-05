@@ -32,3 +32,16 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
 
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
 - Convenience images are views; typed decoded structures remain canonical.
+
+## Progress and remaining qualification
+
+The loaded-map inspector subissue is complete: a local browser artifact shows
+original cavern viewports beside a bounded, lossless 80×32 raw runtime layer.
+The [format record](../../docs/maps.md) distinguishes observed checkpoint data
+from imported collision hints. No static decoder completion is claimed.
+
+This parent remains open. Static map pointers, indoor/outdoor/dungeon/world-map
+coverage, placements/regions/exits, and behavior-qualified collision fixtures
+remain. A probe did not reach the candidate dimension-loading instruction;
+loader tracing is not yet qualified. The current before/after pair has identical
+layer words, so it does not prove dynamic collision updates or wall semantics.

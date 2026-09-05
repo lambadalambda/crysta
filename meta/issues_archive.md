@@ -22,3 +22,5 @@
 - [x] [Build canonical RAM and hardware symbol maps](issues/canonical-memory-symbols.md)
 - [x] [Classify ROM code, data, and indirect dispatch](issues/classify-rom-code-data.md)
 - [x] [Implement and verify the compression codec](issues/compression-codec.md)
+- [x] [Build a local loaded-map inspector](issues/loaded-map-inspector.md)
+- [x] [Preserve oracle framebuffer colors](issues/oracle-framebuffer-colors.md)

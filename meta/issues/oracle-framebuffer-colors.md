@@ -24,3 +24,13 @@ producing corrupted colors in local captures. This blocks useful map visuals.
 
 - Parent: [Build a local loaded-map inspector](loaded-map-inspector.md)
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
+
+## Completion record
+
+- `1473b92` corrects the shim to remove ARGB8888 alpha without shifting RGB
+  channels, matching vendored `Screen::refreshPalette`.
+- ROM-free compile-time assertions failed with the old RGB30 conversion and
+  pass with the corrected conversion. Public framebuffer geometry is unchanged.
+- Independent review approved; workspace oracle tests pass, and local cavern
+  captures were visually inspected with correct colors. The map-inspector
+  integration test now pins both qualified RGB hashes.
