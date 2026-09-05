@@ -12,6 +12,7 @@ pub(super) struct Preview {
     data: GameData,
     state: GameState,
     bitmap: Vec<u8>,
+    art: Vec<u8>,
     error: Option<String>,
     fresh_start: bool,
 }
@@ -19,15 +20,20 @@ impl Preview {
     pub(super) fn new(rom: &Rom) -> Result<Self> {
         let data = compile(rom)?;
         let state = GameState::new(&data, Policy::SemanticPreview);
+        let art = crate::room_art::compile(rom)?;
         let viewer = crate::visual_export::export(rom, 15)?;
         let bitmap = std::fs::read(viewer.with_file_name("map.bmp"))?;
         Ok(Self {
             data,
             state,
             bitmap,
+            art,
             error: None,
             fresh_start: false,
         })
+    }
+    pub(super) fn art(&self) -> &[u8] {
+        &self.art
     }
     pub(super) fn bitmap(&self) -> &[u8] {
         &self.bitmap
@@ -65,6 +71,10 @@ impl Preview {
         let output = self.state.output();
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
+            "actor_key":crate::room_art::frame_key(output.animation),
+            "animation":{"set":match output.animation.set {
+                room_core::AnimationSet::Standing=>"standing",room_core::AnimationSet::Walking=>"walking"},
+                "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
             "phase":match output.phase{Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
             "camera":[256,if output.map_id==15{0}else{256}],"error":self.error,
@@ -247,7 +257,7 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     Ok(
         json!({"kind":"cpu-free-semantic-room-preview","initial":initial,"handoff":handoff,"departure":departure,"spawn":spawn,"arrival":arrival,
         "return_handoff":return_handoff,"returned":returned,
-        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Marker only; no actors, sprites, combat, audio or events."}),
+        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites with static house BG2 priority only; no NPCs, shadows, effects, combat, audio or events."}),
     )
 }
 
@@ -306,7 +316,7 @@ pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
         json!({"kind":"cpu-free-semantic-new-game-house-route", "initial":initial,
         "outbound_handoff":outbound_handoff,"arrival":arrival,"return_handoff":return_handoff,
         "returned":returned,"revisited":revisited,
-        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; no native loader timing, NPCs, sprites, combat or audio."}),
+        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites with static house BG2 priority only; no native loader timing, NPCs, shadows, effects, combat or audio."}),
     )
 }
 
@@ -372,6 +382,12 @@ mod tests {
         let rom = Rom::load(&std::fs::read(path).unwrap()).unwrap();
         let mut preview = Preview::new(&rom).unwrap();
         let checkpoint = preview.state();
+        let art = preview.art().to_vec();
+        assert_eq!(checkpoint["actor_key"], "0:0");
+        assert_eq!(
+            checkpoint["animation"],
+            json!({"set":"standing", "sequence":0, "record":0, "mirror_x":false})
+        );
         preview.step(255);
         assert!(preview.state()["error"].is_string());
         preview.new_game();
@@ -389,6 +405,17 @@ mod tests {
         assert_eq!(preview.state(), fresh);
         preview.reset();
         assert_eq!(preview.state(), checkpoint);
+        assert_eq!(preview.art(), art);
+    }
+    fn assert_actor(preview: &Preview, art: &Value) {
+        let output = preview.state.output();
+        let state = preview.state();
+        let key = crate::room_art::frame_key(output.animation);
+        assert_eq!(state["actor_key"], key);
+        assert!(art["frames"].get(&key).is_some(), "missing {key}");
+        assert_eq!(state["animation"]["sequence"], output.animation.sequence);
+        assert_eq!(state["animation"]["record"], output.animation.record);
+        assert_eq!(state["animation"]["mirror_x"], output.animation.mirror_x);
     }
     fn fresh_route_fixture() -> Option<(Rom, String)> {
         let explicit = std::env::var_os("HOUSE_ROUTE_FIXTURES");
@@ -433,6 +460,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)] // Authenticated walking, doorway, snapshot and art checks along one route.
     fn authenticated_fresh_route_matches_compiled_core_across_both_doorways() {
         let Some((rom, text)) = fresh_route_fixture() else {
             return;
@@ -445,6 +473,8 @@ mod tests {
             .map(|l| l.split(',').collect())
             .collect();
         assert_eq!(rows.len(), 661);
+        let art: Value = serde_json::from_slice(preview.art()).unwrap();
+        let art_hash = sha256(preview.art());
         let mut total = 0;
         for (start, end, id, fresh) in [
             (6800, 6967, 15, true),
@@ -494,6 +524,7 @@ mod tests {
                 let mut restored =
                     GameState::restore(&preview.data, &preview.state.snapshot()).unwrap();
                 preview.step(button);
+                assert_actor(&preview, &art);
                 assert!(
                     preview.error.is_none(),
                     "frame {}: {:?}",
@@ -522,11 +553,13 @@ mod tests {
                 assert_eq!(preview.state.output().phase, Phase::Departing);
                 for _ in 0..35 {
                     preview.step(0);
+                    assert_actor(&preview, &art);
                     assert!(preview.error.is_none());
                 }
             }
         }
         assert_eq!(total, 441);
+        assert_eq!(sha256(preview.art()), art_hash);
         assert_eq!(preview.state.output().tick, 511);
         assert_eq!(preview.state.output().position, (392, 191));
         eprintln!("Matched441 authenticated fresh-start walking/stream steps across both semantic doorways, including per-step restored snapshots");
