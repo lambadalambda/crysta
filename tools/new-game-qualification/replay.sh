@@ -3,8 +3,10 @@
 set -eu
 export PYTHONDONTWRITEBYTECODE=1
 python3 tools/new-game-qualification/test_verify.py
+python3 tools/new-game-qualification/test_startup.py
 mkdir -p local/new-game-qualification/probe/src
 cp tools/new-game-qualification/probe.rs local/new-game-qualification/probe/src/main.rs
+cp tools/new-game-qualification/native_trace.rs local/new-game-qualification/probe/src/
 cat >local/new-game-qualification/probe/Cargo.toml <<'TOML'
 [package]
 name = "new-game-qualification"
@@ -36,4 +38,8 @@ for mode in no-confirm no-movement; do
         exit 1
     fi
 done
+for mode in trace-reset trace-default trace-map trace-spawn trace-release; do
+    "$p" "$rom" "$out/$mode" "$mode"
+done
+python3 tools/new-game-qualification/semantic_check.py "$rom" "$out/a" "$out"
 printf 'Two matching exit-0 fresh boots; both negative controls rejected. Captures: %s\n' "$out"

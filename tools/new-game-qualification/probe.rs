@@ -2,6 +2,7 @@
 //! Exactly one Session::new, default empty SRAM, no restores or mutations.
 use oracle::{export::digest_hex, Button, Session};
 use serde_json::json;
+mod native_trace;
 use std::io::Write;
 
 const INPUTS: &[(Button, u32, u32)] = &[
@@ -43,10 +44,11 @@ fn main() {
     let args: Vec<_> = std::env::args().collect();
     assert!(
         args.len() == 3 || args.len() == 4,
-        "usage: probe ROM OUT [no-confirm|no-movement]"
+        "usage: probe ROM OUT [no-confirm|no-movement|trace-reset|trace-default|trace-map|trace-spawn|trace-release]"
     );
     let mode = args.get(3).map_or("normal", String::as_str);
-    assert!(["normal", "no-confirm", "no-movement"].contains(&mode));
+    let trace_plan = native_trace::plan(mode);
+    assert!(["normal", "no-confirm", "no-movement"].contains(&mode) || trace_plan.is_some());
     let out = std::path::Path::new(&args[2]);
     // Do not overwrite prior evidence, or allow accidental non-local asset export.
     assert!(
@@ -63,7 +65,7 @@ fn main() {
     let mut csv = std::io::BufWriter::new(std::fs::File::create(out.join("frames.csv")).unwrap());
     writeln!(csv, "frame,map,x,y,flags,flags8,resume,timer,joy,edge,state,intro,gate,input_filter,gate2,aux,player_index,controller_index").unwrap();
     let mut checkpoints = Vec::new();
-    for label in 0..7100 {
+    for label in 0..trace_plan.map_or(7100, |(end, _)| end) {
         for button in [Button::Start, Button::Down, Button::A, Button::Right] {
             let pressed = INPUTS.iter().any(|&(b, start, end)| {
                 b == button
@@ -125,6 +127,10 @@ fn main() {
         }
     }
     csv.flush().unwrap();
+    if trace_plan.is_some() {
+        native_trace::capture(&mut session, out, mode);
+        std::process::exit(0);
+    }
     let report = json!({
         "version": 1, "rom_sha256": digest_hex(rom.image()),
         "boot": "Session::new / default zero SRAM / one session per process",

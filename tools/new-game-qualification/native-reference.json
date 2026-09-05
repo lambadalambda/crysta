@@ -1,0 +1,27 @@
+{
+  "trace-default": {
+    "report_sha256": "e6b6cbaba6630d04b4b87534eb84ed42baed99f2886bc9674013ca6ff0b33f07",
+    "stops": 4,
+    "completed_frames": 964
+  },
+  "trace-map": {
+    "report_sha256": "f067811b6b76cb0e96211bb7ca2ee84741fd8b5891a4ebf9cfe2401e93b75aca",
+    "stops": 4,
+    "completed_frames": 2264
+  },
+  "trace-release": {
+    "report_sha256": "bf80bd2337a000469b04ffc2cd3f8b65f924a60fb8008b522d88976e42c8872b",
+    "stops": 5,
+    "completed_frames": 5902
+  },
+  "trace-reset": {
+    "report_sha256": "3d02ba558479bc80da8097c90c527858a7ad4a843f6f17c394b55f3fd7548f19",
+    "stops": 3,
+    "completed_frames": 901
+  },
+  "trace-spawn": {
+    "report_sha256": "8668dd59ea72f679bf31cb0283b75d05dc34ed29f7218ec21d1d65bca407a726",
+    "stops": 6,
+    "completed_frames": 2422
+  }
+}

@@ -199,11 +199,118 @@ and inline masks against `$097E/$097C`. This observed path passes with player
 flags `$0414`, auxiliary zero, both gates zero. It complements, rather than
 replaces, the normal run's movement/release proof.
 
-**Still opaque / bounded follow-up leads only:** exact bank-87 default/name
-confirmation writers; event `$06DF` bit `$08` initialization between 800 and
-1100; prologue transition from `$90:87A6/$87B2`; and the dialogue-release writer
-of `$06C4` bit 0 near completed 5903. To investigate scheduling, compare the two
-native call sites `$8D:8C1B/$8C2E → $80:C6F0` and player countdown decrement
-`$80:C72C` across 5902–5904. Current evidence does **not** establish that all
-actors pause, or decode the entire dialogue/intro scheduler. None of these
-remaining leads blocks the qualified actual-startup replay.
+## Source-backed room-only semantic NewGame
+
+The follow-up resolves the initial map/spawn and two event writers. The CPU-free
+`startup.py` authenticates the owned ROM and every annotated `sources.json`
+extent, then derives the room projection **without reading SRAM, WRAM captures,
+or checkpoint coordinates**:
+
+```sh
+python3 -B tools/new-game-qualification/startup.py 'local/Tenchi Souzou (Japan).sfc'
+python3 -B tools/new-game-qualification/test_startup.py
+```
+
+This projection explicitly treats opening-dialogue completion as a semantic
+operation: **omit intro timing/rendering, run its known event assignment, admit
+room walking**. It is not a byte-identical SNES state initializer. Inventory,
+statistics, NPC simulation and emulator animation/scheduler state are outside
+this room-only profile. In particular, it reports the source header's initial
+`$4414` flags; it does not relabel those as the later `$0414` control flags.
+The earlier live movement witness establishes that the projected room state is
+usable after the actual intro. A production caller can honestly expose a
+**semantic New Game (opening presentation omitted)**, but not claim that this
+module simulates the whole intro or initializes all game subsystems.
+
+### Exact spawn producer → consumer
+
+All CPU/source ranges below are half-open and separately hash-pinned in
+`sources.json`. Headerless normalization is `CPU & $3FFFFF` for these ROM banks.
+
+| Source | Decoded bounded operation |
+| --- | --- |
+| `$90:87A6..87B0` | `COP $14`: map `$000F`, mode 1, selector 0, queued X `$0128` (296), Y `$0060` (96) |
+| `$80:8A23..8A58` | COP handler stores map to `$047C`, mode to `$0484`, selector to `$0490`, X/Y to `$0492/$0494`; advances over eight operand bytes |
+| `$82:801E..8020` | Map-F first actor-table slot is zero; select the second bank |
+| `$83:801E..8020` | Map-F bank-$83 table slot points to `$83:8D1E` |
+| `$83:8D1E..8D20` | Two-byte list prefix, followed by first record |
+| `$83:8D20..8D27` | Seven-byte FD record: tile `(19,7)`, byte-3 operand 0, header pointer `$84:A129` |
+| `$84:A129..A12E` | Five-byte player header: auxiliary selector 0, flags `$4414/$8441`, executable entry header+5 = `$84:A12E` |
+| `$80:F5F9..F689` | FD actor creation yields default position `(19*16+8, 7*16)` = **(312,112)** |
+| `$80:F7F3..F815` | If queued X OR Y is nonzero, replace position with `(X+8,Y+16)` (u16 arithmetic), then clear both queue words |
+| `$80:F8C6..F8E1` | Establish player index `$0DEA`; transfer `$0490` to temporary `$7F:0008,X` and clear it |
+
+Thus fresh `(304,112)` comes from the **explicit prologue request `(296,96)`**,
+not a hard-coded checkpoint and not the FD record's default `(312,112)`.
+The player loader chooses `$1000` in this run; CPU-free walking does not need
+that emulator slot number. Selector 0 is a separately consumed startup field,
+not inferred from zeroed memory or the later animation reuse of that address.
+
+Live instruction stops confirm the producer and consumer independently:
+
+- At frame count **2264**, `$90:87A6 → $80:8A23 → $80:8A53 → $90:87B0`.
+  Before the handler, queue `(0,0)`; after its stores, pending map F and queue
+  `(296,96)`, selector 0. This precedes the current-map switch at completed 2346.
+- At frame count **2422**, `$80:F42F/$F5F9` identify first-record pointer
+  `$83:8D20`. At `$F7F3`, player default `(312,112)`, queued `(296,96)`;
+  at `$F80F`, player **(304,112)**; at `$F815`, queue `(0,0)`;
+  at `$F8E1`, player ownership `$1000` and selector zero are established.
+  Completed **2423** already contains the spawned player; its own native init
+  script first runs at frame count 2431. These are distinct stages.
+
+### Exact default and intro-release event writers
+
+1. Selecting `はじめから` runs the branch at `$87:820E..8232`, calling
+   `$87:CCA7..CCCE`. That clears **`$000600..000800`** (including the 64-byte
+   event projection `$06C0..0700`) and `$7F:8000..8300`, then invokes the default
+   table loader `$86:B900..B93F`. The table `$86:B93F..B9C9` consists of 34
+   `(address,value)` word pairs and a negative-address terminator; none writes
+   the event projection. The second table at `$86:B9C9` is immediately terminated.
+   This is an actual New Game reset routine, not adoption of SRAM contents.
+2. **`$87:80EC..80F0`: `COP $07 $80FB`** sets event index `$00FB`.
+   Fresh stops at frame count **964** show `$80:BB77` receiving A=`$80FB`,
+   `$80:BB9F` about to write A=`$08`, Y=31, then `$06DF=$08` afterward.
+   It is set during name-entry setup, **before** Start confirmation at 1200.
+3. **`$88:9791..9795`: `COP $07 $8020`** sets event index `$0020` after the final
+   opening dialogue. Fresh stops at frame count **5902** show A=`$8020` at
+   `$80:BB77`, A=1/Y=4 at `$80:BB9F`, then `$06C4=1` at `$88:9795`.
+   Completed frame 5903 exposes the change. The default `$06DF=$08` is preserved.
+4. Both calls use handler `$80:8669..8678` and shared writer `$80:BB77..BBA6`:
+   byte offset `(operand & $0FFF) >> 3`, bit `operand & 7`; operand bit 15
+   selects **set**, otherwise **clear**, preserving other bits. The eight masks
+   at `$80:BBD3..BBDB` are pinned too. This is a decoded bit operation, not a VM.
+
+The semantic event block starts zero, sets `$00FB`, then explicitly completes
+the intro by setting `$0020`. Result: offsets 4=`$01`, 31=`$08`, SHA-256
+`6c9f094ecf92d1e5c904aa8d4c2e301ba7c0b195adb86158722a62d530a6797b`,
+matching the live control boundary exactly. `test_startup.py` covers set/clear,
+preservation, idempotence, bounds, queue override/default and wrapping arithmetic;
+its first run failed against unimplemented operations before implementation.
+
+**Why dialogue completion is not merely flipping a control flag:** the final
+continuation `$88:9775..9795` contains dialogue request/waits (`COP $1B/$1F`),
+then `COP $19` resume-record metadata and the event assignment. The `$1F` handler
+`$80:8C4A..8C9A` temporarily saves/clears `$045E`, calls the dialogue engine in a
+wait loop, and restores the mask and actor flags on return. Only then does the
+actor continue to the event write. The `$19` handler `$80:8B35..8B85` writes
+`$0600..060F` resume metadata; it is **not** the player-spawn writer and does not
+move Ark. The semantic shortcut models completion of these presentation waits,
+not an unsupported claim that event `$0020` alone unblocks a live emulator.
+
+### Automatic source and native evidence checks
+
+`replay.sh` now also executes five **separate fresh boots**, named `trace-reset`,
+`trace-default`, `trace-map`, `trace-spawn`, `trace-release`. Their 22 target stops
+are pre-instruction, bounded to 2,000,000 instructions/two frames per call, and
+all must remain within their initial completed-frame interval. No input edge or
+release boundary is crossed while tracing. Raw traces and stopped WRAM stay
+local; `native-reference.json` pins the five complete selected-metadata reports.
+`semantic_check.py` authenticates those reports and raw WRAM, derives startup
+from ROM sources, and compares the derived map, spawn and events against the
+independently authenticated normal-run control checkpoint. There is no path
+from captured coordinates back into the semantic initializer.
+
+The exact name character encoding, inventory/stat effects of the reset table,
+rendering, dialogue text processing and later actor lifecycle remain outside
+this projection. No full intro VM, save reconstruction, core or frontend change
+is part of this qualification.

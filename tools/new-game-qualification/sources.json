@@ -49,6 +49,167 @@
       "cpu_end_exclusive": "80a05a",
       "normalized_start": 40982,
       "sha256": "3a9495eaea88e32cb67b674502650110186c4a4d929de1a1da73b2a456b2c2fe"
+    },
+    {
+      "name": "new-game-menu-branch",
+      "cpu_start": "87820e",
+      "cpu_end_exclusive": "878232",
+      "normalized_start": 492046,
+      "sha256": "02264c269eb3abecbd1f437893402893c9a2eb6d34541dcced6ac068d40d2bab"
+    },
+    {
+      "name": "new-game-clear",
+      "cpu_start": "87cca7",
+      "cpu_end_exclusive": "87ccce",
+      "normalized_start": 511143,
+      "sha256": "a5a2ab2311a33df93a9218ca6c62c7c164b451da5441d162f1b6d289b1bb6b9d"
+    },
+    {
+      "name": "reset-default-loader",
+      "cpu_start": "86b900",
+      "cpu_end_exclusive": "86b93f",
+      "normalized_start": 440576,
+      "sha256": "9d2722771304f7cb07adc31c997876730deadf20f071badc7af3ac8ea36e9449"
+    },
+    {
+      "name": "reset-default-table",
+      "cpu_start": "86b93f",
+      "cpu_end_exclusive": "86b9c9",
+      "normalized_start": 440639,
+      "sha256": "887d00349a924defdaac47bd60bcba1a89989ee8349c00a5ca6dc5de72d0de2c"
+    },
+    {
+      "name": "new-game-default-event",
+      "cpu_start": "8780ec",
+      "cpu_end_exclusive": "8780f0",
+      "normalized_start": 491756,
+      "sha256": "57663bf0b6ac3a3a244793abc36252924b74e544118301300a912b7e38a1dbb1"
+    },
+    {
+      "name": "event-cop-handler",
+      "cpu_start": "808669",
+      "cpu_end_exclusive": "808678",
+      "normalized_start": 34409,
+      "sha256": "17d9bef30c58d36a0c47acb69cf44cc7454903e58586a5fbc6759b7aed53572f"
+    },
+    {
+      "name": "event-writer",
+      "cpu_start": "80bb77",
+      "cpu_end_exclusive": "80bba6",
+      "normalized_start": 47991,
+      "sha256": "64d6491460c447de3dbfddd01cdcc5b9ea94143564081eb5a0326163d1663faa"
+    },
+    {
+      "name": "event-mask-table",
+      "cpu_start": "80bbd3",
+      "cpu_end_exclusive": "80bbdb",
+      "normalized_start": 48083,
+      "sha256": "5ac9831b2e30eb285ef34f8501620f878432d5c04331ad1ae47f977a83ba41a5"
+    },
+    {
+      "name": "prologue-house-request",
+      "cpu_start": "9087a6",
+      "cpu_end_exclusive": "9087b0",
+      "normalized_start": 1083302,
+      "sha256": "6c15ba17f45d59710837b0d529838439074483b04ab8d41c506dab2c49a927b8"
+    },
+    {
+      "name": "map-request-handler",
+      "cpu_start": "808a23",
+      "cpu_end_exclusive": "808a58",
+      "normalized_start": 35363,
+      "sha256": "b2caa8215865f0dd9a8a2705d3c9c5205e32636d9591837536c68d7f053120d1"
+    },
+    {
+      "name": "map-f-actor-bank82",
+      "cpu_start": "82801e",
+      "cpu_end_exclusive": "828020",
+      "normalized_start": 163870,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "name": "map-f-actor-bank83",
+      "cpu_start": "83801e",
+      "cpu_end_exclusive": "838020",
+      "normalized_start": 229406,
+      "sha256": "714c03dea483c08c6cd3fc4363d31bcda5b820daf7e432294b6c801c10354943"
+    },
+    {
+      "name": "map-f-actor-list-prefix",
+      "cpu_start": "838d1e",
+      "cpu_end_exclusive": "838d20",
+      "normalized_start": 232734,
+      "sha256": "40d88127d4d31a3891f41598eeed41174e5bc89b1eb9bbd66a8cbfc09956a3fd"
+    },
+    {
+      "name": "map-f-first-actor",
+      "cpu_start": "838d20",
+      "cpu_end_exclusive": "838d27",
+      "normalized_start": 232736,
+      "sha256": "d5ef28fc520a77743668f6e12d2e49566ffbbce9ddf67039be91e468b5f00c29"
+    },
+    {
+      "name": "player-header",
+      "cpu_start": "84a129",
+      "cpu_end_exclusive": "84a12e",
+      "normalized_start": 303401,
+      "sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d"
+    },
+    {
+      "name": "actor-list-loader",
+      "cpu_start": "80f3f1",
+      "cpu_end_exclusive": "80f42f",
+      "normalized_start": 62449,
+      "sha256": "9d85fff0804a28db7533852a2d91763b3024f125e90f6b4def5857336f39bee7"
+    },
+    {
+      "name": "fd-actor-initializer",
+      "cpu_start": "80f5f9",
+      "cpu_end_exclusive": "80f689",
+      "normalized_start": 62969,
+      "sha256": "37ea8ef933cdcd715aed5ac6f14958dc0729e051451aa198ef9cce43b628ceb9"
+    },
+    {
+      "name": "spawn-queue-override",
+      "cpu_start": "80f7f3",
+      "cpu_end_exclusive": "80f815",
+      "normalized_start": 63475,
+      "sha256": "72ed4d18c509c06bb775048f91840405ce53e468b1fd4097f6d84719279eda44"
+    },
+    {
+      "name": "player-selector-transfer",
+      "cpu_start": "80f8c6",
+      "cpu_end_exclusive": "80f8e1",
+      "normalized_start": 63686,
+      "sha256": "0677ab1d704573d538f677f46f2870c676eb2f790cba12a655161ec7a67510b0"
+    },
+    {
+      "name": "intro-final-continuation",
+      "cpu_start": "889775",
+      "cpu_end_exclusive": "889795",
+      "normalized_start": 563061,
+      "sha256": "82a14f8381276c3483c289ebb86043be973a111424e9155d653cb4bcfb511662"
+    },
+    {
+      "name": "intro-release-event",
+      "cpu_start": "889791",
+      "cpu_end_exclusive": "889795",
+      "normalized_start": 563089,
+      "sha256": "742dd7c662e7c0f6a9e4179b853316c9c11fbc5062ef38d0ad2d4b205c0cacd1"
+    },
+    {
+      "name": "dialogue-return-handler",
+      "cpu_start": "808c4a",
+      "cpu_end_exclusive": "808c9a",
+      "normalized_start": 35914,
+      "sha256": "2783c0ad33664e78bf20c830ee13281c92c9a668e9a44c209ef06fb2044ca136"
+    },
+    {
+      "name": "intro-resume-record-handler",
+      "cpu_start": "808b35",
+      "cpu_end_exclusive": "808b85",
+      "normalized_start": 35637,
+      "sha256": "36fedb3a6175c32d74a44d902ea9206e8184f85c9bf171e3d595de8042f6245b"
     }
   ]
 }
