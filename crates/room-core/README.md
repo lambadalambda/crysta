@@ -241,3 +241,19 @@ repeat cancel, D reload, A landing `(504,769)`, Down-settled `(504,815)` and
 Right-settled `(538,815)`. This used no additional oracle boot. Generated adapter,
 route and logs remain ignored under `local/core-progression/`; parent host
 integration supplies the permanent source compiler and UI reproduction path.
+
+## Explicit wider event projection (not yet live slice integration)
+
+`events::EventFlags` / `EventSequence` retain their64-byte/512-bit house contract.
+The qualified Pandora source additionally uses `$243`, `$244` and `$292`;
+`StoryFlags` / `StorySequence` provide a separately selected128-byte/1024-bit
+semantic projection. Both aliases share the same bounded runner implementation,
+and the type system requires matching sequence/flag extents. The old constructor
+still rejects flags512 and above; it is not silently widened.
+
+These are low-bit-first semantic bytes, **not a complete canonical native global
+flag memory map or captured-WRAM initializer**. Room-local resets, stage-specific
+valid combinations, source identity and progression order remain the owning game
+state's responsibility. The component tests use synthetic sequences, not a new
+Pandora story script. No live `GameState`, profile9 snapshot, house capability or
+preview behavior changes until the separately qualified runtime is integrated.

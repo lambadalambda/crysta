@@ -121,7 +121,6 @@ qualification remain open.
 - [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
 - [Qualify the native Pandora route and state changes](issues/qualify-pandora-route.md)
 - [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
-- [Support the bounded Pandora event flag projection](issues/pandora-event-flag-projection.md)
 - [Decode the required Pandora route backgrounds](issues/decode-pandora-backgrounds.md)
 - [Decode the required Pandora progression dialogue](issues/decode-pandora-dialogue.md)
 - [Qualify and implement bounded cellar pot actions](issues/qualify-pandora-pot-actions.md)

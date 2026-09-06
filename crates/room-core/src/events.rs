@@ -8,7 +8,7 @@ use alloc::vec::Vec;
 pub enum EventOp {
     /// Expose one immutable page key and wait for a deliberate acknowledgement.
     ShowPage(u32),
-    /// Set a bit in the source-compatible 512-bit event block.
+    /// Set a bit within the owning sequence’s explicit semantic projection.
     SetFlag(u16),
     /// Terminal choice; return a continuation key without executing its sequence.
     Choose {
@@ -33,29 +33,49 @@ pub enum EventWait {
     },
 }
 
-/// Immutable sequence; bounded linear execution cannot loop or wait on a device.
+/// Existing house projection: 512 bits. Its admission and bytes remain unchanged.
+pub type EventFlags = FlagBlock<64>;
+/// Existing house sequence, accepting only the 512-bit flag block.
+pub type EventSequence = FlagSequence<64>;
+/// Bounded Pandora projection, including source events $243, $244 and $292.
+/// This is semantic storage, not a complete native global-event memory map.
+/// Room-local reset and stage-specific validity belong to the owning game state.
+pub type StoryFlags = FlagBlock<128>;
+/// Pandora sequence; the type requires the matching wider projection.
+///
+/// ```compile_fail
+/// use room_core::events::{EventFlags, EventOp, StorySequence};
+/// let sequence = StorySequence::new(vec![EventOp::ShowPage(1)]).unwrap();
+/// let mut house_flags = EventFlags::new([0; 64]);
+/// sequence.start(&mut house_flags); // A wider sequence cannot run on house storage.
+/// ```
+pub type StorySequence = FlagSequence<128>;
+
+/// Shared immutable sequence implementation for explicitly sized flag projections.
+/// Bounded linear execution cannot loop or wait on a device. Use the house/story
+/// aliases to select the admitted storage; a sequence cannot run with a smaller block.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventSequence {
+pub struct FlagSequence<const BYTES: usize> {
     ops: Vec<EventOp>,
 }
 
 /// Canonical event bits, initialized by the caller's source-qualified bootstrap.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EventFlags([u8; 64]);
-impl EventFlags {
+pub struct FlagBlock<const BYTES: usize>([u8; BYTES]);
+impl<const BYTES: usize> FlagBlock<BYTES> {
     /// Construct from semantic startup or snapshot bytes, not reference WRAM.
     #[must_use]
-    pub const fn new(bytes: [u8; 64]) -> Self {
+    pub const fn new(bytes: [u8; BYTES]) -> Self {
         Self(bytes)
     }
     /// Canonical snapshot bytes; bit numbering is low-bit-first within each byte.
     #[must_use]
-    pub const fn bytes(&self) -> &[u8; 64] {
+    pub const fn bytes(&self) -> &[u8; BYTES] {
         &self.0
     }
     /// Query an admitted event index.
     /// # Errors
-    /// Rejects indices outside the 512-bit event block.
+    /// Rejects indices outside the explicitly sized semantic flag block.
     pub fn contains(&self, flag: u16) -> Result<bool, EventError> {
         let byte = self.0.get(usize::from(flag / 8)).ok_or(EventError::Flag)?;
         Ok(byte & (1 << (flag & 7)) != 0)
@@ -79,7 +99,7 @@ impl EventCursor {
 pub enum EventError {
     /// Empty/oversized sequence, no wait, or a nonterminal choice.
     Sequence,
-    /// Event index outside 0..512.
+    /// Event index outside the selected projection.
     Flag,
     /// Cursor is neither a page/choice wait nor the canonical completed offset.
     Cursor,
@@ -95,7 +115,7 @@ impl core::fmt::Display for EventError {
 }
 impl core::error::Error for EventError {}
 
-impl EventSequence {
+impl<const BYTES: usize> FlagSequence<BYTES> {
     /// Validate at most 256 operations with at least one page or choice wait.
     /// A choice must be last; catalog and continuation keys are caller-validated.
     /// # Errors
@@ -116,7 +136,7 @@ impl EventSequence {
         }
         if ops
             .iter()
-            .any(|op| matches!(op, EventOp::SetFlag(flag) if *flag >= 512))
+            .any(|op| matches!(op, EventOp::SetFlag(flag) if usize::from(*flag / 8) >= BYTES))
         {
             return Err(EventError::Flag);
         }
@@ -129,7 +149,7 @@ impl EventSequence {
     }
     /// Run immediate effects up to the first wait. This takes no game tick by
     /// itself; the caller owns interaction admission, tick and movement locking.
-    pub fn start(&self, flags: &mut EventFlags) -> EventCursor {
+    pub fn start(&self, flags: &mut FlagBlock<BYTES>) -> EventCursor {
         self.run(0, flags)
     }
     /// Current wait, or none at completion or an invalid cursor.
@@ -174,7 +194,7 @@ impl EventSequence {
     pub fn acknowledge(
         &self,
         cursor: &mut EventCursor,
-        flags: &mut EventFlags,
+        flags: &mut FlagBlock<BYTES>,
     ) -> Result<(), EventError> {
         if self.page(*cursor).is_none() {
             return Err(EventError::NotWaiting);
@@ -194,7 +214,7 @@ impl EventSequence {
             Err(EventError::Cursor)
         }
     }
-    fn run(&self, mut position: u16, flags: &mut EventFlags) -> EventCursor {
+    fn run(&self, mut position: u16, flags: &mut FlagBlock<BYTES>) -> EventCursor {
         while let Some(EventOp::SetFlag(flag)) = self.ops.get(usize::from(position)) {
             // Validated at construction; no mid-sequence failure can leak effects.
             flags.0[usize::from(flag / 8)] |= 1 << (flag & 7);

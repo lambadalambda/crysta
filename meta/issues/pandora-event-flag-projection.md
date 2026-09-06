@@ -25,3 +25,12 @@ The qualified Pandora route writes `$243`, `$244` and `$292`, beyond the existin
 
 - Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
 - Room-local reset and stage-specific valid flag combinations remain the owning game state’s responsibility. No original CPU execution is added.
+
+
+## Accepted component result
+
+- Existing64-byte aliases now share a typed implementation with explicit128-byte story aliases. No GameState/profile9/snapshot/preview behavior is changed.
+- Red: new story-API imports failed before implementation. Green: four focused projection/acknowledgement/choice/boundary tests and one compile-fail mismatched-storage test pass. Existing house512-bit tests are unchanged.
+- Required core fixture suite, strict core Clippy, Wasm build, native/Wasm shared-probe Rust tests and owned-ROM house-identity/conversation-through-exterior regressions pass. Independent correctness/architecture review found no blockers.
+- The generic zero/one-byte extent test suggested by review is optional and outside the two admitted aliases; deferred rather than expanding this component task.
+- This closes only the reusable storage/runner component. The independent Pandora source replay discrepancy and live story integration remain separate open gates.
