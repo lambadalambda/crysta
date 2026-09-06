@@ -10,10 +10,31 @@ pub enum EventOp {
     ShowPage(u32),
     /// Set a bit in the source-compatible 512-bit event block.
     SetFlag(u16),
+    /// Terminal choice; return a continuation key without executing its sequence.
+    Choose {
+        /// Immutable choice catalog key, validated by the caller.
+        catalog: u16,
+        /// Continuation sequence keys for selections 0, 1 and 2.
+        branches: [u32; 3],
+    },
+}
+
+/// Current semantic wait; presentation and continuation lookup belong to the caller.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EventWait {
+    /// Immutable page key awaiting acknowledgement.
+    Page(u32),
+    /// Terminal choice awaiting one of three selections.
+    Choice {
+        /// Immutable choice catalog key.
+        catalog: u16,
+        /// Continuation sequence keys for selections 0, 1 and 2.
+        branches: [u32; 3],
+    },
 }
 
 /// Immutable sequence; bounded linear execution cannot loop or wait on a device.
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EventSequence {
     ops: Vec<EventOp>,
 }
@@ -41,7 +62,7 @@ impl EventFlags {
     }
 }
 
-/// Cursor at a page wait or completion. Program identity is owned by the game
+/// Cursor at a page/choice wait or completion. Program identity is owned by the game
 /// snapshot's immutable data identity and active sequence ID, not this offset.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EventCursor(u16);
@@ -56,14 +77,16 @@ impl EventCursor {
 /// Invalid data or acknowledgement; failed operations do not modify state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EventError {
-    /// Empty/oversized sequence or a sequence with no dialogue wait.
+    /// Empty/oversized sequence, no wait, or a nonterminal choice.
     Sequence,
     /// Event index outside 0..512.
     Flag,
-    /// Cursor is neither a dialogue wait nor the canonical completed offset.
+    /// Cursor is neither a page/choice wait nor the canonical completed offset.
     Cursor,
-    /// No page is waiting for acknowledgement.
+    /// The requested operation has no matching page or choice wait.
     NotWaiting,
+    /// Choice selection outside 0..3.
+    Selection,
 }
 impl core::fmt::Display for EventError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -73,13 +96,21 @@ impl core::fmt::Display for EventError {
 impl core::error::Error for EventError {}
 
 impl EventSequence {
-    /// Validate a sequence with at most 256 operations and at least one page.
+    /// Validate at most 256 operations with at least one page or choice wait.
+    /// A choice must be last; catalog and continuation keys are caller-validated.
     /// # Errors
-    /// Rejects oversized/empty sequences, absent page waits or invalid flag IDs.
+    /// Rejects oversized/empty sequences, absent waits, nonterminal choices or
+    /// invalid flag IDs.
     pub fn new(ops: Vec<EventOp>) -> Result<Self, EventError> {
         if ops.is_empty()
             || ops.len() > 256
-            || !ops.iter().any(|op| matches!(op, EventOp::ShowPage(_)))
+            || !ops
+                .iter()
+                .any(|op| matches!(op, EventOp::ShowPage(_) | EventOp::Choose { .. }))
+            || ops
+                .iter()
+                .enumerate()
+                .any(|(index, op)| matches!(op, EventOp::Choose { .. }) && index + 1 != ops.len())
         {
             return Err(EventError::Sequence);
         }
@@ -91,18 +122,51 @@ impl EventSequence {
         }
         Ok(Self { ops })
     }
-    /// Run immediate effects up to the first page. This takes no game tick by
+    /// Immutable operations for caller-owned structural validation.
+    #[must_use]
+    pub fn ops(&self) -> &[EventOp] {
+        &self.ops
+    }
+    /// Run immediate effects up to the first wait. This takes no game tick by
     /// itself; the caller owns interaction admission, tick and movement locking.
     pub fn start(&self, flags: &mut EventFlags) -> EventCursor {
         self.run(0, flags)
     }
+    /// Current wait, or none at completion or an invalid cursor.
+    #[must_use]
+    pub fn wait(&self, cursor: EventCursor) -> Option<EventWait> {
+        match self.ops.get(usize::from(cursor.0)) {
+            Some(EventOp::ShowPage(key)) => Some(EventWait::Page(*key)),
+            Some(EventOp::Choose { catalog, branches }) => Some(EventWait::Choice {
+                catalog: *catalog,
+                branches: *branches,
+            }),
+            _ => None,
+        }
+    }
     /// Current page key; no font, timer or rendering state enters this runner.
     #[must_use]
     pub fn page(&self, cursor: EventCursor) -> Option<u32> {
-        match self.ops.get(usize::from(cursor.0)) {
-            Some(EventOp::ShowPage(key)) => Some(*key),
+        match self.wait(cursor) {
+            Some(EventWait::Page(key)) => Some(key),
             _ => None,
         }
+    }
+    /// Complete a terminal choice and return its continuation key, not an offset.
+    /// The caller decides whether and when to start the continuation sequence.
+    /// # Errors
+    /// Rejects a cursor with no waiting choice, then selections outside 0..3.
+    /// Failures leave the cursor unchanged.
+    pub fn choose(&self, cursor: &mut EventCursor, selection: u8) -> Result<u32, EventError> {
+        let Some(EventWait::Choice { branches, .. }) = self.wait(*cursor) else {
+            return Err(EventError::NotWaiting);
+        };
+        let key = *branches
+            .get(usize::from(selection))
+            .ok_or(EventError::Selection)?;
+        // Construction guarantees that a choice is last and the length is <= 256.
+        cursor.0 += 1;
+        Ok(key)
     }
     /// Acknowledge exactly one page, then execute effects up to the next wait.
     /// # Errors
@@ -118,13 +182,13 @@ impl EventSequence {
         *cursor = self.run(cursor.0 + 1, flags);
         Ok(())
     }
-    /// Decode only a page wait or completion. The owning game additionally
+    /// Decode only a page/choice wait or completion. The owning game additionally
     /// validates source identity, active sequence, flags and control ownership.
     /// # Errors
     /// Rejects internal effect offsets and out-of-range offsets.
     pub fn restore_cursor(&self, position: u16) -> Result<EventCursor, EventError> {
         let cursor = EventCursor(position);
-        if usize::from(position) == self.ops.len() || self.page(cursor).is_some() {
+        if usize::from(position) == self.ops.len() || self.wait(cursor).is_some() {
             Ok(cursor)
         } else {
             Err(EventError::Cursor)
@@ -144,6 +208,138 @@ impl EventSequence {
 mod tests {
     use super::*;
     use alloc::vec;
+
+    const CHOICE: EventOp = EventOp::Choose {
+        catalog: 42,
+        branches: [10, 20, 30],
+    };
+
+    #[test]
+    fn choice_only_returns_each_continuation_and_completes_without_acknowledgement() {
+        let sequence = EventSequence::new(vec![CHOICE]).unwrap();
+        assert_eq!(sequence.ops(), &[CHOICE]);
+        assert_eq!(sequence.clone(), sequence);
+        for selection in 0..3 {
+            let mut flags = EventFlags::new([0x80; 64]);
+            let mut cursor = sequence.start(&mut flags);
+            assert_eq!(cursor.position(), 0);
+            assert_eq!(sequence.page(cursor), None);
+            assert_eq!(
+                sequence.wait(cursor),
+                Some(EventWait::Choice {
+                    catalog: 42,
+                    branches: [10, 20, 30],
+                })
+            );
+            assert_eq!(
+                sequence.choose(&mut cursor, selection),
+                Ok(10 * (u32::from(selection) + 1))
+            );
+            assert_eq!(cursor, sequence.restore_cursor(1).unwrap());
+            assert_eq!(sequence.wait(cursor), None);
+            assert_eq!(flags.bytes(), &[0x80; 64]);
+            assert_eq!(
+                sequence.choose(&mut cursor, selection),
+                Err(EventError::NotWaiting)
+            );
+            assert_eq!(cursor.position(), 1);
+        }
+    }
+
+    #[test]
+    fn choices_must_be_terminal_and_keep_existing_validation_bounds() {
+        for suffix in [EventOp::ShowPage(1), EventOp::SetFlag(0), CHOICE] {
+            assert_eq!(
+                EventSequence::new(vec![CHOICE, suffix]),
+                Err(EventError::Sequence)
+            );
+        }
+        assert_eq!(
+            EventSequence::new(vec![EventOp::SetFlag(512), CHOICE]),
+            Err(EventError::Flag)
+        );
+        let mut ops = vec![EventOp::SetFlag(0); 256];
+        ops.push(CHOICE);
+        assert_eq!(EventSequence::new(ops), Err(EventError::Sequence));
+    }
+
+    #[test]
+    fn page_to_choice_applies_only_reached_flags_and_restores_waits() {
+        let sequence = EventSequence::new(vec![
+            EventOp::SetFlag(0),
+            EventOp::ShowPage(7),
+            EventOp::SetFlag(511),
+            CHOICE,
+        ])
+        .unwrap();
+        let mut flags = EventFlags::new([0; 64]);
+        let mut cursor = sequence.start(&mut flags);
+        assert_eq!(sequence.wait(cursor), Some(EventWait::Page(7)));
+        assert!(flags.contains(0).unwrap());
+        assert!(!flags.contains(511).unwrap());
+        sequence.acknowledge(&mut cursor, &mut flags).unwrap();
+        assert_eq!(cursor.position(), 3);
+        assert!(flags.contains(511).unwrap());
+        let mut restored = sequence.restore_cursor(3).unwrap();
+        let before = flags.clone();
+        assert_eq!(sequence.choose(&mut cursor, 2), Ok(30));
+        assert_eq!(sequence.choose(&mut restored, 2), Ok(30));
+        assert_eq!(cursor, restored);
+        assert_eq!(cursor, sequence.restore_cursor(4).unwrap());
+        assert_eq!(flags, before);
+        for position in [0, 2, 5, u16::MAX] {
+            assert_eq!(sequence.restore_cursor(position), Err(EventError::Cursor));
+        }
+        assert_eq!(sequence.restore_cursor(1).unwrap().position(), 1);
+    }
+
+    #[test]
+    fn wrong_waits_invalid_selections_and_invalid_cursors_fail_atomically() {
+        let sequence =
+            EventSequence::new(vec![EventOp::SetFlag(0), EventOp::ShowPage(7), CHOICE]).unwrap();
+        let mut flags = EventFlags::new([0x80; 64]);
+        for position in [0, 1, 3, 4, u16::MAX] {
+            let mut cursor = EventCursor(position);
+            let before = (cursor, flags.clone());
+            assert_eq!(sequence.choose(&mut cursor, 0), Err(EventError::NotWaiting));
+            assert_eq!((cursor, flags.clone()), before);
+            if position != 1 {
+                assert_eq!(sequence.wait(cursor), None);
+                assert_eq!(
+                    sequence.acknowledge(&mut cursor, &mut flags),
+                    Err(EventError::NotWaiting)
+                );
+                assert_eq!((cursor, flags.clone()), before);
+            }
+        }
+        let mut cursor = sequence.restore_cursor(2).unwrap();
+        let before = (cursor, flags.clone());
+        assert_eq!(
+            sequence.acknowledge(&mut cursor, &mut flags),
+            Err(EventError::NotWaiting)
+        );
+        assert_eq!((cursor, flags.clone()), before);
+        for selection in 3..=u8::MAX {
+            assert_eq!(
+                sequence.choose(&mut cursor, selection),
+                Err(EventError::Selection)
+            );
+            assert_eq!((cursor, flags.clone()), before);
+        }
+    }
+
+    #[test]
+    fn maximum_choice_sequence_completes_at_256() {
+        let mut ops = vec![EventOp::SetFlag(511); 255];
+        ops.push(CHOICE);
+        let sequence = EventSequence::new(ops).unwrap();
+        let mut flags = EventFlags::new([0; 64]);
+        let mut cursor = sequence.start(&mut flags);
+        assert_eq!(cursor.position(), 255);
+        assert!(flags.contains(511).unwrap());
+        assert_eq!(sequence.choose(&mut cursor, 0), Ok(10));
+        assert_eq!(cursor, sequence.restore_cursor(256).unwrap());
+    }
 
     #[test]
     fn acknowledgements_expose_one_page_and_apply_only_reached_effects() {
