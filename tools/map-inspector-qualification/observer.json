@@ -1,0 +1,19 @@
+{
+  "epoch": "headless-sync-video-v1",
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "source_hashes": {
+    "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+    "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+    "crates/map-inspector/src/main.rs": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3",
+    "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+    "crates/oracle/build.rs": "185ea978cea84300ecc0ce5386535a0f05f912d78543a4b8dc38cf19a237c7c9",
+    "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+    "vendor/ares/ares-unity.cpp": "eae0abc62ba8ca0212e0ccd97c0719025e375a015fe8f8877d0ef515a256148c",
+    "vendor/ares/ares/ares/ares.hpp": "472466ef95fce2c0e8f8b4b862f333c049093ced617e8f62a84e749f07d4bb96",
+    "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+    "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+    "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+    "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+    "vendor/ares/shims.cpp": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+  }
+}

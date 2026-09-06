@@ -1,0 +1,295 @@
+{
+  "changed": {
+    "reference-1840.bmp": {
+      "fixed": {
+        "bytes": 184374,
+        "sha256": "e2a5892872fbf2297941b8c22bd56b46d20fd0ea837e42ee3bad5b45320407e6"
+      },
+      "old": {
+        "bytes": 184374,
+        "sha256": "6320b0b40c356449365077214f59115c0ecf475635280acdd16fa9a30d3ac9f1"
+      }
+    }
+  },
+  "checkpoints": [
+    {
+      "cgram_sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0",
+      "frame": 1601,
+      "label": 1600,
+      "layer_sha256": "c3c7af3a0ef3c6c53e641b058ccaccad8a9b5ea42dca79c28e41c41ecaa450c5",
+      "rgb_sha256": "78c20d6a5dca2a006815c13f6577b33bcdc1ddb788ddad9949bdf889eaa7b0ea",
+      "vram_sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a",
+      "wram_sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    {
+      "cgram_sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0",
+      "frame": 1841,
+      "label": 1840,
+      "layer_sha256": "c3c7af3a0ef3c6c53e641b058ccaccad8a9b5ea42dca79c28e41c41ecaa450c5",
+      "rgb_sha256": "3833dbdf403939dc5836dca4a49b49e36424360597e5acfc6eddb714372da432",
+      "vram_sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd",
+      "wram_sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  ],
+  "epoch": "headless-sync-video-v1",
+  "fixed": {
+    "capture.json": {
+      "bytes": 62568,
+      "sha256": "a7f23508b13727e8ab26df65e153f7788fc37182111446a68e37c61dc83c664a"
+    },
+    "cgram-1600.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "cgram-1840.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "index.html": {
+      "bytes": 29651,
+      "sha256": "4f00920666d3dafa825a72262b4a94e99b21e331159777bceb43ea1967683cbf"
+    },
+    "reference-1600.bmp": {
+      "bytes": 184374,
+      "sha256": "1d46048a906051bdd3e0dc480fd15a05f77aa0c93239d22d18cb22bbb37c3a18"
+    },
+    "reference-1840.bmp": {
+      "bytes": 184374,
+      "sha256": "e2a5892872fbf2297941b8c22bd56b46d20fd0ea837e42ee3bad5b45320407e6"
+    },
+    "vram-1600.bin": {
+      "bytes": 65536,
+      "sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a"
+    },
+    "vram-1840.bin": {
+      "bytes": 65536,
+      "sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd"
+    },
+    "wram-1600.bin": {
+      "bytes": 131072,
+      "sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    "wram-1840.bin": {
+      "bytes": 131072,
+      "sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  },
+  "nonpixel_manifest_sha256": "7998be259cce4218983f03bb81e3bf189577958dc9f190ba38880036d680cb22",
+  "old": {
+    "capture.json": {
+      "bytes": 62568,
+      "sha256": "55801357fabe6637f1062bb443bde8e230d3db88625e3f4af506f5d4723dc8ed"
+    },
+    "cgram-1600.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "cgram-1840.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "index.html": {
+      "bytes": 29651,
+      "sha256": "807183ae419953b79e5b7d162f51b5408a8260aecd9b040b3c6b9c4f49d8d670"
+    },
+    "reference-1600.bmp": {
+      "bytes": 184374,
+      "sha256": "1d46048a906051bdd3e0dc480fd15a05f77aa0c93239d22d18cb22bbb37c3a18"
+    },
+    "reference-1840.bmp": {
+      "bytes": 184374,
+      "sha256": "6320b0b40c356449365077214f59115c0ecf475635280acdd16fa9a30d3ac9f1"
+    },
+    "vram-1600.bin": {
+      "bytes": 65536,
+      "sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a"
+    },
+    "vram-1840.bin": {
+      "bytes": 65536,
+      "sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd"
+    },
+    "wram-1600.bin": {
+      "bytes": 131072,
+      "sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    "wram-1840.bin": {
+      "bytes": 131072,
+      "sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  },
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "producers": [
+    {
+      "binary_sha256": "93ee86f214f7161a937769e915864b59aaff40079b4ead452aa9e145e23027d6",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "map-inspector"
+      ],
+      "build_env": {
+        "CARGO_TARGET_DIR": "/Users/lainsoykaf/repos/ilar-task-capture-old/local/map-inspector-build"
+      },
+      "build_log_sha256": "f6cf4dc5b220faf14876695769f1df1171186ebf85625b53c2d9f20f7d7e0d0b",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)\n",
+      "commit": "8034889f6dbc78181d2458e6f2e05881f48f5e5c",
+      "cxx": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "invocation": [
+        "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-renewal/old/map-inspector",
+        "capture",
+        "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+        "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm"
+      ],
+      "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: aarch64-apple-darwin\nrelease: 1.97.0\nLLVM version: 22.1.6\n",
+      "schema_version": 1,
+      "source_hashes": {
+        "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+        "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+        "crates/map-inspector/src/main.rs": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3",
+        "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+        "crates/oracle/build.rs": "3aa498ab4ac0eba9237d0026ec5441047946998e183ef468e1e30c8d4961226c",
+        "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+        "vendor/ares/ares-unity.cpp": "052c088a37debc4ba2710b5f1569fb2bf1880d6dbdb24e6be59551a1547524b7",
+        "vendor/ares/ares/ares/ares.hpp": "b11947c252b503ae1d9d8b5d7dbe75f5b53b9af28f35f8f469d0ff7d76db8c18",
+        "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+        "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+        "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+        "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+        "vendor/ares/shims.cpp": "0f7abb6af4f7aaa08519aa7ae0f821bab98794c33a96c74c7455847053e0f82c"
+      },
+      "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+      "target_dir": "/Users/lainsoykaf/repos/ilar-task-capture-old/local/map-inspector-build"
+    },
+    {
+      "binary_sha256": "3ffa56e4b6b223833ce2aa4842b12700fb848bf63e206f30198b7a40cf36d2e6",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "map-inspector"
+      ],
+      "build_env": {
+        "CARGO_TARGET_DIR": "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-build"
+      },
+      "build_log_sha256": "a8e7cf8996a759ec893a8a20f1293998e371324591ba6f07b908e5abd7326ee0",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)\n",
+      "commit": "7c5c90be43c4952995b4c4ab24b62aa71ceb6e56",
+      "cxx": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "invocation": [
+        "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-renewal/fixed-a/map-inspector",
+        "capture",
+        "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+        "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm"
+      ],
+      "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: aarch64-apple-darwin\nrelease: 1.97.0\nLLVM version: 22.1.6\n",
+      "schema_version": 1,
+      "source_hashes": {
+        "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+        "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+        "crates/map-inspector/src/main.rs": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3",
+        "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+        "crates/oracle/build.rs": "185ea978cea84300ecc0ce5386535a0f05f912d78543a4b8dc38cf19a237c7c9",
+        "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+        "vendor/ares/ares-unity.cpp": "eae0abc62ba8ca0212e0ccd97c0719025e375a015fe8f8877d0ef515a256148c",
+        "vendor/ares/ares/ares/ares.hpp": "472466ef95fce2c0e8f8b4b862f333c049093ced617e8f62a84e749f07d4bb96",
+        "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+        "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+        "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+        "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+        "vendor/ares/shims.cpp": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+      },
+      "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+      "target_dir": "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-build"
+    },
+    {
+      "binary_sha256": "3ffa56e4b6b223833ce2aa4842b12700fb848bf63e206f30198b7a40cf36d2e6",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "map-inspector"
+      ],
+      "build_env": {
+        "CARGO_TARGET_DIR": "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-build"
+      },
+      "build_log_sha256": "02db5a66fa0c60ca8618bd08aac556eac4f3ec863e8630a0d353dba6a0f6e126",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)\n",
+      "commit": "7c5c90be43c4952995b4c4ab24b62aa71ceb6e56",
+      "cxx": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "invocation": [
+        "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-renewal/fixed-b/map-inspector",
+        "capture",
+        "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+        "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm"
+      ],
+      "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: aarch64-apple-darwin\nrelease: 1.97.0\nLLVM version: 22.1.6\n",
+      "schema_version": 1,
+      "source_hashes": {
+        "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+        "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+        "crates/map-inspector/src/main.rs": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3",
+        "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+        "crates/oracle/build.rs": "185ea978cea84300ecc0ce5386535a0f05f912d78543a4b8dc38cf19a237c7c9",
+        "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+        "vendor/ares/ares-unity.cpp": "eae0abc62ba8ca0212e0ccd97c0719025e375a015fe8f8877d0ef515a256148c",
+        "vendor/ares/ares/ares/ares.hpp": "472466ef95fce2c0e8f8b4b862f333c049093ced617e8f62a84e749f07d4bb96",
+        "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+        "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+        "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+        "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+        "vendor/ares/shims.cpp": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+      },
+      "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+      "target_dir": "/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-build"
+    }
+  ],
+  "schema_version": 1,
+  "twin": {
+    "capture.json": {
+      "bytes": 62568,
+      "sha256": "a7f23508b13727e8ab26df65e153f7788fc37182111446a68e37c61dc83c664a"
+    },
+    "cgram-1600.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "cgram-1840.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "index.html": {
+      "bytes": 29651,
+      "sha256": "4f00920666d3dafa825a72262b4a94e99b21e331159777bceb43ea1967683cbf"
+    },
+    "reference-1600.bmp": {
+      "bytes": 184374,
+      "sha256": "1d46048a906051bdd3e0dc480fd15a05f77aa0c93239d22d18cb22bbb37c3a18"
+    },
+    "reference-1840.bmp": {
+      "bytes": 184374,
+      "sha256": "e2a5892872fbf2297941b8c22bd56b46d20fd0ea837e42ee3bad5b45320407e6"
+    },
+    "vram-1600.bin": {
+      "bytes": 65536,
+      "sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a"
+    },
+    "vram-1840.bin": {
+      "bytes": 65536,
+      "sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd"
+    },
+    "wram-1600.bin": {
+      "bytes": 131072,
+      "sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    "wram-1840.bin": {
+      "bytes": 131072,
+      "sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  }
+}

@@ -1,6 +1,79 @@
 //! Optional end-to-end capture qualification, using a fresh oracle process.
 use std::{path::Path, process::Command};
 
+const OBSERVER: &str = include_str!("../../../tools/map-inspector-qualification/observer.json");
+const ARCHIVE: &str = include_str!(
+    "../../../tools/map-inspector-qualification/epochs/threaded-video-v0/reference.json"
+);
+const SOURCE_FILES: &[&str] = &[
+    "Cargo.lock",
+    "crates/map-inspector/Cargo.toml",
+    "crates/map-inspector/src/main.rs",
+    "crates/map-inspector/web/viewer.html",
+    "crates/oracle/build.rs",
+    "crates/oracle/src/lib.rs",
+    "vendor/ares/ares-unity.cpp",
+    "vendor/ares/shims.cpp",
+    "vendor/ares/ares/ares/ares.hpp",
+    "vendor/ares/ares/ares/node/video/screen.cpp",
+    "vendor/ares/ares/sfc/ppu/main.cpp",
+    "vendor/ares/ares/sfc/ppu/color.cpp",
+    "vendor/ares/ares/sfc/system/serialization.cpp",
+];
+
+fn sha256(bytes: &[u8]) -> String {
+    rom::digests(bytes)
+        .sha256
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
+}
+
+fn check_source_inventory(observer: &serde_json::Value) {
+    use std::collections::BTreeSet;
+    assert_eq!(
+        observer["source_hashes"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        SOURCE_FILES.iter().copied().collect::<BTreeSet<_>>(),
+        "observer source inventory"
+    );
+}
+
+#[test]
+fn incomplete_observer_sources_are_rejected() {
+    let observer: serde_json::Value = serde_json::from_str(OBSERVER).unwrap();
+    for name in SOURCE_FILES {
+        let mut changed = observer.clone();
+        changed["source_hashes"]
+            .as_object_mut()
+            .unwrap()
+            .remove(*name);
+        assert!(std::panic::catch_unwind(|| check_source_inventory(&changed)).is_err());
+    }
+    let mut empty = observer;
+    empty["source_hashes"] = serde_json::json!({});
+    assert!(std::panic::catch_unwind(|| check_source_inventory(&empty)).is_err());
+}
+
+#[test]
+fn fixture_observer_sources_match() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let observer: serde_json::Value = serde_json::from_str(OBSERVER).unwrap();
+    assert_eq!(observer["epoch"], "headless-sync-video-v1");
+    check_source_inventory(&observer);
+    for (name, expected) in observer["source_hashes"].as_object().unwrap() {
+        assert_eq!(
+            sha256(&std::fs::read(root.join(name)).expect("read observer source")),
+            expected.as_str().unwrap(),
+            "observer source changed: {name}; review fixture policy before renewal"
+        );
+    }
+}
+
 #[test]
 fn loaded_map_matches_qualified_runtime_checkpoint() {
     let local = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../local");
@@ -27,6 +100,17 @@ fn loaded_map_matches_qualified_runtime_checkpoint() {
         serde_json::from_slice(&output.stdout).expect("capture manifest");
     assert_eq!(manifest["schema_version"], 1);
     assert_eq!(manifest["revision"], "japan");
+    // The archived complete manifest (including every cell and non-pixel surface
+    // hash) is invariant across epochs, not just the selected assertions below.
+    let archive: serde_json::Value = serde_json::from_str(ARCHIVE).unwrap();
+    let mut nonpixels = manifest.clone();
+    for cp in nonpixels["checkpoints"].as_array_mut().unwrap() {
+        cp.as_object_mut().unwrap().remove("rgb_sha256");
+    }
+    assert_eq!(
+        sha256(&serde_json::to_vec(&nonpixels).unwrap()),
+        archive["nonpixel_manifest_sha256"].as_str().unwrap()
+    );
     let checkpoints = manifest["checkpoints"].as_array().unwrap();
     assert_eq!(checkpoints.len(), 2);
     for (index, cp) in checkpoints.iter().enumerate() {
@@ -64,7 +148,8 @@ fn loaded_map_matches_qualified_runtime_checkpoint() {
             if index == 0 {
                 "78c20d6a5dca2a006815c13f6577b33bcdc1ddb788ddad9949bdf889eaa7b0ea"
             } else {
-                "93a224b980b538bf5bbed26c7d7052a6c14777608e6d02162eb55cfb2ef74c8a"
+                // Reviewed slot3/no-save epoch renewal; see tools/map-inspector-qualification.
+                "3833dbdf403939dc5836dca4a49b49e36424360597e5acfc6eddb714372da432"
             }
         );
     }

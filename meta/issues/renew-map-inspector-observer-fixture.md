@@ -22,7 +22,7 @@ The existing SRAM-based local capture integration test has an old threaded-obser
 
 ## Notes
 
-- Parent audit: `tools/pandora-qualification/OBSERVER-MIGRATION.md`, map-inspector integration section. Current test fails old `93a224...` versus observed `3833db...` at its second RGB checkpoint; one failure message alone is not renewal evidence.
+- Parent audit: `tools/pandora-qualification/OBSERVER-MIGRATION.md`, map-inspector integration section. Pre-renewal test failed old `93a224...` versus observed `3833db...` at its second RGB checkpoint; one failure message alone was not renewal evidence.
 
 ## Bounded renewal evidence
 
@@ -37,4 +37,11 @@ The existing SRAM-based local capture integration test has an old threaded-obser
   execution-capable reviewer recomputed all inventories, decoded all six BMPs,
   compared all 394,240 nonpixel surface bytes per run, and reran all three retained
   producers. Only the second RGB changes; complete fixed captures agree.
+- Reviewed renewal and reproducible commands:
+  [`tools/map-inspector-qualification/README.md`](../../tools/map-inspector-qualification/README.md).
+  Active frame1841 RGB is now `3833db...`; all original assertions remain, with
+  whole-nonpixel-manifest and complete observer-source gates added.
+- Validation: full owned-input `cargo test --locked -p map-inspector` passes
+  (49 unit + 10 integration); Python gates pass 13 tests in each mode; all ten
+  targeted mutations are detected normally and under `-O` (20/20).
 - Parent owns index closure/integration. Other legacy wrappers remain unrenewed.
