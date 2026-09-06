@@ -32,3 +32,4 @@
 - [ ] [Decode the required Pandora progression dialogue](issues/decode-pandora-dialogue.md)
 - [ ] [Qualify and implement bounded cellar pot actions](issues/qualify-pandora-pot-actions.md)
 - [ ] [Decode the required Pandora actors and carrying poses](issues/decode-pandora-scene-art.md)
+- [ ] [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)

@@ -120,6 +120,7 @@ qualification remain open.
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
 - [Qualify the native Pandora route and state changes](issues/qualify-pandora-route.md)
+- [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)
 - [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
 - [Decode the required Pandora route backgrounds](issues/decode-pandora-backgrounds.md)
 - [Decode the required Pandora progression dialogue](issues/decode-pandora-dialogue.md)

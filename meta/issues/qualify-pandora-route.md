@@ -9,6 +9,8 @@ Identify and reproduce the minimum original-game path from the accepted fresh ho
 - [Qualify the room B conversation and exterior progression](qualify-house-conversation-progression.md)
 - [Qualify the first exterior landing profile](qualify-house-exterior-profile.md)
 
+- [Make oracle video publication deterministic and race-free](fix-oracle-video-publication.md)
+
 ## Requirements
 
 - Audit existing opening scenarios and any historical desync before treating their later state as evidence.
