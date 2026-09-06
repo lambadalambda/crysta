@@ -18,6 +18,7 @@ pub struct Room {
     height: u16,
     cells: Vec<u16>,
     passive_flags: bool,
+    sample_halo: Option<[u16; 4]>,
 }
 
 impl Room {
@@ -41,6 +42,7 @@ impl Room {
             height,
             cells,
             passive_flags: false,
+            sample_halo: None,
         })
     }
     /// Constructs a grid admitting bit-15 cells as passive class-3 solids.
@@ -59,6 +61,27 @@ impl Room {
         let mut room = Self::new(width, height, cells)?;
         room.passive_flags = true;
         Ok(room)
+    }
+
+    /// Restrict actual collision samples to half-open cell bounds
+    /// `[left, top, right, bottom]`, replacing any previous sample halo.
+    /// Position bounds remain the full grid; this does not add bounding-box samples.
+    ///
+    /// # Errors
+    /// Returns [`Unqualified::RoomDimensions`] for empty, reversed or out-of-grid bounds.
+    pub fn with_sample_halo(mut self, bounds: [u16; 4]) -> Result<Self, Unqualified> {
+        let [left, top, right, bottom] = bounds;
+        if left >= right || top >= bottom || right > self.width || bottom > self.height {
+            return Err(Unqualified::RoomDimensions);
+        }
+        self.sample_halo = Some(bounds);
+        Ok(self)
+    }
+
+    /// Optional half-open collision sample bounds in cells: `[left, top, right, bottom]`.
+    #[must_use]
+    pub const fn sample_halo(&self) -> Option<[u16; 4]> {
+        self.sample_halo
     }
 
     /// Width in 16-pixel cells.
@@ -95,6 +118,11 @@ impl Room {
 
     fn material(&self, x: u16, y: u16, old_edge: bool) -> Result<Material, Unqualified> {
         let (col, row) = (x / 16, y / 16);
+        if self.sample_halo.is_some_and(|[left, top, right, bottom]| {
+            col < left || col >= right || row < top || row >= bottom
+        }) {
+            return Err(Unqualified::SampleOutsideAdmission);
+        }
         if col >= self.width || row >= self.height {
             return Err(Unqualified::SampleOutOfBounds);
         }

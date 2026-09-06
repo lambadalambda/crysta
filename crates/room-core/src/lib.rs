@@ -70,6 +70,8 @@ pub enum Unqualified {
     PositionOutOfBounds,
     /// A collision sample is outside the grid; map-edge wrapping is unqualified.
     SampleOutOfBounds,
+    /// A collision sample is outside the room's admitted half-open cell halo.
+    SampleOutsideAdmission,
     /// Coordinate arithmetic would overflow or underflow u16.
     ArithmeticOverflow,
     /// The raw cell has the special dispatch override bit set.
