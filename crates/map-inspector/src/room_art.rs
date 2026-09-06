@@ -182,6 +182,7 @@ fn ark_frames(rom: &rom::Rom) -> Result<serde_json::Map<String, Value>> {
 
 pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     let mut frames = ark_frames(rom)?;
+    let dialogue = crate::room_dialogue::compile(rom)?;
     let scenes = HouseScenes::from_rom(rom.image())?;
     let mut rooms = crate::house_profiles::MAPS
         .into_iter()
@@ -257,7 +258,8 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
             "scene_ids":membership(&rooms),"actors":actors,"foreground":masks,
-            "door_patches":door::compile(rom.image(), &bedroom)?}))?,
+            "door_patches":door::compile(rom.image(), &bedroom)?,
+            "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests}))?,
         rooms,
     })
 }

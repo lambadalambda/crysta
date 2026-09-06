@@ -15,6 +15,7 @@ mod new_game;
 mod opening_qualification;
 mod qualification;
 mod room_art;
+mod room_dialogue;
 mod room_preview;
 mod room_server;
 mod script_inspection;
