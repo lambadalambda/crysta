@@ -8,6 +8,10 @@ Implement only the maps, source assets and semantic state transitions required b
 
 - [Qualify the native Pandora route and state changes](qualify-pandora-route.md)
 - [Talk to the room B resident and leave the house](talk-and-leave-house.md)
+- [Decode the required Pandora route backgrounds](decode-pandora-backgrounds.md)
+- [Decode the required Pandora progression dialogue](decode-pandora-dialogue.md)
+- [Qualify and implement bounded cellar pot actions](qualify-pandora-pot-actions.md)
+- [Decode the required Pandora actors and carrying poses](decode-pandora-scene-art.md)
 
 ## Requirements
 
