@@ -8,30 +8,62 @@ use assets::{
 };
 use room_core::{AnimationFrame, AnimationSet};
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 const NPC_KEY: &str = "npc:house";
+
+/// Ordinary world-space presentation; tie ranks come from the source draw list.
+struct PlacedActor {
+    id: String,
+    key: String,
+    position: [u16; 2],
+    tie_rank: u16,
+}
+struct RoomActors {
+    actors: Vec<PlacedActor>,
+    ark_tie_rank: u16,
+}
 
 /// Immutable presentation metadata, not simulated NPC state or snapshot data.
 pub(super) struct Art {
     pub(super) bytes: Vec<u8>,
-    npc_map: u16,
-    npc_position: [u16; 2],
+    rooms: BTreeMap<u16, RoomActors>,
 }
 impl Art {
     pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
-        let ark = json!({"id":"ark","key":key,"position":[position.0,position.1]});
-        if map != self.npc_map {
-            return json!([ark]);
-        }
-        let npc = json!({"id":NPC_KEY,"key":NPC_KEY,"position":self.npc_position});
-        // Ordinary native depth buckets use world Y before sprite anchors.
-        // Linked-list insertion gives Ark precedence at equal Y; see house-npc.md.
-        if position.1 < self.npc_position[1] {
-            json!([ark, npc])
-        } else {
-            json!([npc, ark])
-        }
+        let room = self.rooms.get(&map).expect("game map has a compiled scene");
+        let mut entries: Vec<_> = room
+            .actors
+            .iter()
+            .map(|actor| {
+                (
+                    actor.position[1],
+                    actor.tie_rank,
+                    json!({"id":actor.id,"key":actor.key,"position":actor.position}),
+                )
+            })
+            .collect();
+        entries.push((
+            position.1,
+            room.ark_tie_rank,
+            json!({"id":"ark","key":key,"position":[position.0,position.1]}),
+        ));
+        // Ordinary depth uses world Y before anchor subtraction. Neither IDs,
+        // resource reuse nor source-spawn order defines equal-Y precedence.
+        entries.sort_by_key(|(y, tie, _)| (*y, *tie));
+        Value::Array(entries.into_iter().map(|(_, _, entry)| entry).collect())
     }
+}
+fn membership(rooms: &BTreeMap<u16, RoomActors>) -> Value {
+    json!(rooms
+        .iter()
+        .map(|(id, room)| (
+            *id,
+            std::iter::once("ark")
+                .chain(room.actors.iter().map(|a| a.id.as_str()))
+                .collect::<Vec<_>>()
+        ))
+        .collect::<BTreeMap<_, _>>())
 }
 
 /// Shared by atlas compilation and state selection; only core ordinary frames enter here.
@@ -166,13 +198,33 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     {
         return Err(invalid("house backgrounds differ: fixed /map.bmp cannot be reused").into());
     }
+    let rooms = BTreeMap::from([
+        (
+            15,
+            RoomActors {
+                actors: vec![],
+                ark_tie_rank: 0,
+            },
+        ),
+        (
+            npc.map_id(),
+            RoomActors {
+                actors: vec![PlacedActor {
+                    id: NPC_KEY.into(),
+                    key: NPC_KEY.into(),
+                    position: npc.position(),
+                    tie_rank: 0,
+                }],
+                ark_tie_rank: 1,
+            },
+        ),
+    ]);
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
-            "scene_ids":{"15":["ark"],"16":["ark",NPC_KEY]},
+            "scene_ids":membership(&rooms),
             "npc":{"key":NPC_KEY,"map_id":npc.map_id(),"position":npc.position(),"policy":"frozen-ordinary-pose"},
             "foreground":{"15":foreground(&bedroom)?,"16":foreground(&house)?}}))?,
-        npc_map: npc.map_id(),
-        npc_position: npc.position(),
+        rooms,
     })
 }
 
@@ -183,11 +235,96 @@ mod tests {
     use room_core::{AnimationState, Direction};
 
     #[test]
+    fn multiple_actors_use_source_tie_ranks_not_ids_or_shared_art() {
+        let actor = |id: &str, x, y, tie_rank| PlacedActor {
+            id: id.into(),
+            key: "shared".into(),
+            position: [x, y],
+            tie_rank,
+        };
+        let art = Art {
+            bytes: Vec::new(),
+            rooms: BTreeMap::from([
+                (
+                    15,
+                    RoomActors {
+                        actors: vec![],
+                        ark_tie_rank: 0,
+                    },
+                ),
+                (
+                    16,
+                    RoomActors {
+                        actors: vec![
+                            actor("a", 10, 100, 2),
+                            actor("b", 20, 100, 0),
+                            actor("c", 30, 99, 3),
+                        ],
+                        ark_tie_rank: 1,
+                    },
+                ),
+            ]),
+        };
+        for (y, expected) in [
+            (98, vec!["ark", "c", "b", "a"]),
+            (100, vec!["c", "b", "ark", "a"]),
+            (101, vec!["c", "b", "a", "ark"]),
+        ] {
+            let scene = art.scene(16, "player-frame", (40, y));
+            assert_eq!(
+                scene
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|e| e["id"].as_str().unwrap())
+                    .collect::<Vec<_>>(),
+                expected
+            );
+        }
+        assert_eq!(
+            art.scene(16, "player-frame", (40, 100)),
+            json!([
+                {"id":"c","key":"shared","position":[30,99]},
+                {"id":"b","key":"shared","position":[20,100]},
+                {"id":"ark","key":"player-frame","position":[40,100]},
+                {"id":"a","key":"shared","position":[10,100]},
+            ])
+        );
+        assert_eq!(
+            art.scene(15, "player-frame", (40, 100)),
+            json!([{"id":"ark","key":"player-frame","position":[40,100]}])
+        );
+        assert_eq!(
+            membership(&art.rooms),
+            json!({"15":["ark"],"16":["ark","a","b","c"]})
+        );
+    }
+
+    #[test]
     fn frozen_npc_membership_and_native_depth_tie() {
         let art = Art {
             bytes: Vec::new(),
-            npc_map: 16,
-            npc_position: [424, 416],
+            rooms: BTreeMap::from([
+                (
+                    15,
+                    RoomActors {
+                        actors: vec![],
+                        ark_tie_rank: 0,
+                    },
+                ),
+                (
+                    16,
+                    RoomActors {
+                        actors: vec![PlacedActor {
+                            id: NPC_KEY.into(),
+                            key: NPC_KEY.into(),
+                            position: [424, 416],
+                            tie_rank: 0,
+                        }],
+                        ark_tie_rank: 1,
+                    },
+                ),
+            ]),
         };
         for (map, y, keys) in [
             (15, 416, vec!["ark"]),
