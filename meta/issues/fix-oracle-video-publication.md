@@ -61,3 +61,11 @@ owner must independently repeat, then review/version observer provenance (includ
 build/unity/config header) and requalify affected prefix/selected pixel fixtures.
 Stable observer reproducibility here is not an accepted portable RGB fidelity
 claim. Shared indices/milestones, game assets/core/host and preview were untouched.
+
+## Parent acceptance — supersedes the migration handoff above
+
+- Independently rebuilt the fixed producer and ran two fresh full Pandora processes at `local/oracle-video-qualification/replay-WKFf0d/{a,b}/journey`. All 2682 artifacts/full logs agree with one another and the sibling fixed capture. The old-parent report has exactly 174 pixel-only changes, zero non-pixel changes, no missing/extra files and the same complete frame log.
+- Accepted separately reviewed epoch migration (`3476d6e` archive plus its synchronous renewal): parent reran strict Pandora checks on both own roots normally and under `-O` (four passes). Source/checker/epoch suites 6/13/11 pass in both modes; publication stress/policy checks, oracle tests, assets/core fixtures, Wasm and strict workspace Clippy pass. Explicit limits/skips remain in the underlying logs/contracts.
+- `headless-sync-video-v1` now replaces the pending observer gate for this route. This accepts only the supported one-boot, thread-confined lifecycle and completed last explicit-frame pixels before save synchronization. It does not grant portable RGB parity or historical pixel equality.
+- The separate SRAM map-inspector fixture remains red and is tracked by [its renewal issue](renew-map-inspector-observer-fixture.md). Legacy wrappers are audited but unrenewed; see `OBSERVER-MIGRATION.md`. These are not silently accepted by the renewed Pandora embedded prefix.
+- Independent parent acceptance audit found no remaining blocker at this bounded fix scope; issue archived. Portable Pandora runtime remains open.

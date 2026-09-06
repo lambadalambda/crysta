@@ -50,3 +50,6 @@
 - [x] [Talk to the room B resident and leave the house](issues/talk-and-leave-house.md)
 - [x] [Validate extraction and the core boundary in WebAssembly](issues/validate-web-extraction-spike.md)
 - [x] [Support the bounded Pandora event flag projection](issues/pandora-event-flag-projection.md)
+
+- [x] [Qualify the native Pandora route and state changes](issues/qualify-pandora-route.md)
+- [x] [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)

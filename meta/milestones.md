@@ -41,7 +41,6 @@ None remaining; M0 is complete. Verification record:
 None remaining; M1 is complete. The boot-to-name-entry and cursor scenarios
 run for both JP and EU. The earlier claimed ares game-script desync was not
 qualified. A fresh Japanese input-only journey now reaches the house conversation
-and exterior; [Pandora qualification](issues/qualify-pandora-route.md) remains an
 M4 evidence gate, not a demonstrated emulator or game-script failure.
 Core swap: ares (ISC) replaced LakeSnes per
 [ADR 0002](../docs/adr/0002-reference-emulator.md).
@@ -119,8 +118,6 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
-- [Qualify the native Pandora route and state changes](issues/qualify-pandora-route.md)
-- [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)
 - [Renew map-inspector fixture for completed video publication](issues/renew-map-inspector-observer-fixture.md)
 - [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
 - [Decode the required Pandora route backgrounds](issues/decode-pandora-backgrounds.md)

@@ -196,3 +196,20 @@ as passing on these new runs. Exhaustive unchanged machine evidence is reported
 separately and honestly. No checker masks, reference repins, source operand
 changes or Pandora reference edits belong in this fix. The issue stays open
 until independent parent acceptance and reviewed migration.
+
+## Parent acceptance and reviewed migration
+
+The preceding “migration remains” handoff describes the original fix commit and
+is now superseded for the Pandora route. Parent independently rebuilt and ran
+fresh twins at `local/oracle-video-qualification/replay-WKFf0d/{a,b}/journey`:
+all 2682 artifacts and full logs match each other and the sibling fixed run.
+Comparison to the old parent has 174 pixel-only differences and no non-pixel,
+log, recipe or inventory differences. The independently reviewed
+[epoch migration](../tools/pandora-qualification/OBSERVER-MIGRATION.md) preserves
+old metadata and adds complete producer-policy provenance. Parent reran both
+strict gates normally/optimized (four passes), plus source/checker/epoch and
+oracle regressions. The observer fix and direct source-route issues are accepted.
+
+This does **not** renew discovery, standalone older wrappers, or the separate
+SRAM map-inspector RGB fixture. The latter has its own tracked renewal. Nor does
+it enable portable Pandora gameplay or broaden the lifecycle/RGB fidelity scope.
