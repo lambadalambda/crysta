@@ -37,22 +37,27 @@ pub struct Profile {
 }
 impl Profile {
     /// Stable source-phase profile name.
+    #[must_use]
     pub fn name(&self) -> &str {
         self.name
     }
     /// Source map ID for this profile.
+    #[must_use]
     pub fn map(&self) -> u16 {
         self.map
     }
     /// Immutable raw collision words and admitted sample halo.
+    #[must_use]
     pub fn room(&self) -> &Room {
         &self.room
     }
     /// Complete source-ordered exit list, including unsupported destinations.
+    #[must_use]
     pub fn exits(&self) -> &ExitList {
         &self.exits
     }
     /// Source actor IDs and positions in source phase order; no live actor AI.
+    #[must_use]
     pub fn actors(&self) -> &[(u32, [u16; 2])] {
         &self.actors
     }
@@ -111,7 +116,7 @@ impl Profile {
                 .with_sample_halo(halo)
                 .unwrap(),
             actors: vec![],
-            exits: ExitList::from_rom(&vec![0; 0x18000 + 2 * usize::from(map) + 2], map).unwrap(),
+            exits: ExitList::from_rom(&vec![0; 0x1_8000 + 2 * usize::from(map) + 2], map).unwrap(),
         }
     }
 }
@@ -124,28 +129,32 @@ pub struct ContactSpec {
 }
 impl ContactSpec {
     /// Inclusive raw Ark first-contact bounds `[left, top, right, bottom]`.
+    #[must_use]
     pub fn first_bounds(&self) -> [u16; 4] {
         self.first
     }
     /// Inclusive raw Ark polling bounds, independent of first-contact geometry.
+    #[must_use]
     pub fn opening_bounds(&self) -> [u16; 4] {
         self.opening
     }
     /// Raw anchor predicate, polled after local1/local2; not an input edge.
+    #[must_use]
     pub fn opening_ready(&self, (x, y): (u16, u16), local1: bool, local2: bool) -> bool {
-        let [l, t, r, b] = self.opening;
-        local1 && local2 && (l..=r).contains(&x) && (t..=b).contains(&y)
+        let [left, top, right, bottom] = self.opening;
+        local1 && local2 && (left..=right).contains(&x) && (top..=bottom).contains(&y)
     }
     /// Geometry only. Caller must enforce grounded ordinary Down participant policy;
     /// native recoil is qualified only for the northern centerline approach.
+    #[must_use]
     pub fn first_geometry(&self, (x, y): (u16, u16)) -> bool {
-        let [l, t, r, b] = self.first;
-        (l..=r).contains(&x) && (t..=b).contains(&y)
+        let [left, top, right, bottom] = self.first;
+        (left..=right).contains(&x) && (top..=bottom).contains(&y)
     }
 }
 fn contact_spec(image: &[u8], sprites: &assets::sprites::PandoraSprites) -> Result<ContactSpec> {
     let frames = sprites
-        .get(0x83f984)
+        .get(0x83_f984)
         .ok_or("box art")?
         .list(3)
         .ok_or("box list")?
@@ -157,26 +166,28 @@ fn contact_spec(image: &[u8], sprites: &assets::sprites::PandoraSprites) -> Resu
             "changing box contact geometry",
         )?;
     }
-    let inner = bytes(image, 0xa4a556, 4)?;
-    for at in [0x9ad492, 0x9ad4cd, 0x9ad50f, 0x9ad551, 0x9ad58c, 0x9ad5ce] {
+    let inner = bytes(image, 0xa4_a556, 4)?;
+    for at in [
+        0x9a_d492, 0x9a_d4cd, 0x9a_d50f, 0x9a_d551, 0x9a_d58c, 0x9a_d5ce,
+    ] {
         ensure(
             bytes(image, at, 4)? == inner,
             "changing Down receiving geometry",
         )?;
     }
-    let spawn = bytes(image, 0x83928f, 4)?;
+    let spawn = bytes(image, 0x83_928f, 4)?;
     let (x, y) = (i32::from(spawn[1]) * 16 + 8, i32::from(spawn[2]) * 16);
-    let signed = |v: u8| i32::from(v as i8);
+    let signed = |v: u8| i32::from(v.cast_signed());
     let first = [
         x + signed(outer[0]) - signed(inner[0]) - signed(inner[1]),
         y + signed(outer[2]) - signed(inner[2]) - signed(inner[3]),
         x + signed(outer[0]) + signed(outer[1]) - signed(inner[0]),
         y + signed(outer[2]) + signed(outer[3]) - signed(inner[2]),
     ];
-    expect(image, 0x88ad35, &[2, 13, 255])?;
-    let operands = bytes(image, 0x88ad38, 4)?;
-    expect(image, 0x8791c2, &[0xe9])?;
-    let projection = i32::from(word(image, 0x8791c3)?);
+    expect(image, 0x88_ad35, &[2, 13, 255])?;
+    let operands = bytes(image, 0x88_ad38, 4)?;
+    expect(image, 0x87_91c2, &[0xe9])?;
+    let projection = i32::from(word(image, 0x87_91c3)?);
     ensure(projection == 8, "ordinary anchor projection")?;
     let opening = [
         x + signed(operands[0]) * 16,
@@ -207,18 +218,22 @@ pub struct Navigation {
 }
 impl Navigation {
     /// All immutable profiles in compiler recipe order.
+    #[must_use]
     pub fn profiles(&self) -> &[Profile] {
         &self.profiles
     }
     /// Look up an exact source-phase profile name; no fallback profile.
+    #[must_use]
     pub fn profile(&self, name: &str) -> Option<&Profile> {
         self.profiles.iter().find(|p| p.name == name)
     }
     /// Source hashes, complete exits, transfer/contact provenance and policy.
+    #[must_use]
     pub fn metadata(&self) -> &Value {
         &self.metadata
     }
     /// Shared source-derived first-contact and opening-polling geometry.
+    #[must_use]
     pub fn contact(&self) -> &ContactSpec {
         &self.contact
     }
@@ -233,12 +248,12 @@ impl Navigation {
 /// empty catalog. Does not scan outside the halo or initialize consumed objects.
 pub fn source_objects(image: &[u8], nav: &Navigation) -> Result<Vec<SourceObject>> {
     ensure(
-        bytes(image, 0x8796d7, 1)? == [0xa9]
-            && word(image, 0x96e1a6)? == 0
-            && word(image, 0x96e1ab)? == 0,
+        bytes(image, 0x87_96d7, 1)? == [0xa9]
+            && word(image, 0x96_e1a6)? == 0
+            && word(image, 0x96_e1ab)? == 0,
         "FA/FB source fallback",
     )?;
-    let replacement = word(image, 0x8796d8)?;
+    let replacement = word(image, 0x87_96d8)?;
     ensure(replacement == 0xf8, "qualified pot replacement")?;
     let room = nav.profile("c-direct").ok_or("C profile")?.room();
     let [l, t, r, b] = room.sample_halo().ok_or("C source halo")?;
@@ -261,7 +276,7 @@ pub fn source_objects(image: &[u8], nav: &Navigation) -> Result<Vec<SourceObject
 }
 
 fn bytes(image: &[u8], address: usize, length: usize) -> Result<&[u8]> {
-    let start = address & 0x3fffff;
+    let start = address & 0x3f_ffff;
     image
         .get(start..start.checked_add(length).ok_or("source overflow")?)
         .ok_or_else(|| "truncated navigation source".into())
@@ -276,14 +291,17 @@ fn expect(image: &[u8], address: usize, want: &[u8]) -> Result<()> {
     )
 }
 fn hash(bytes: &[u8]) -> String {
+    use std::fmt::Write as _;
     rom::digests(bytes)
         .sha256
         .iter()
-        .map(|b| format!("{b:02x}"))
-        .collect()
+        .fold(String::with_capacity(64), |mut hex, byte| {
+            write!(hex, "{byte:02x}").expect("writing to a String cannot fail");
+            hex
+        })
 }
 fn validate_dispatch(image: &[u8]) -> Result<()> {
-    for base in [0x80d542, 0x80d8e8, 0x80dc60, 0x80dfdc] {
+    for base in [0x80_d542, 0x80_d8e8, 0x80_dc60, 0x80_dfdc] {
         for offset in [0, 64, 128, 192] {
             let t = base + offset;
             ensure(
@@ -295,7 +313,7 @@ fn validate_dispatch(image: &[u8]) -> Result<()> {
                 "type5 partial dispatch",
             )?;
             ensure(
-                (word(image, t + 58)? == word(image, t)?) == (t != 0x80e09c),
+                (word(image, t + 58)? == word(image, t)?) == (t != 0x80_e09c),
                 "directional type29 dispatch",
             )?;
         }
@@ -307,8 +325,8 @@ fn validate_dispatch(image: &[u8]) -> Result<()> {
 ///
 /// # Errors
 /// Rejects coordinate underflow or overflow when deriving the collision edge.
-pub fn sample_cells((x, y): (u16, u16), d: Direction) -> Result<Vec<(u16, u16)>> {
-    let (u, v) = match d {
+pub fn sample_cells((x, y): (u16, u16), direction: Direction) -> Result<Vec<(u16, u16)>> {
+    let (u, v) = match direction {
         Direction::Left | Direction::Up => (x.checked_sub(8), y.checked_sub(16)),
         Direction::Right => (x.checked_add(7), y.checked_sub(16)),
         Direction::Down => (x.checked_sub(8), y.checked_sub(1)),
@@ -317,7 +335,7 @@ pub fn sample_cells((x, y): (u16, u16), d: Direction) -> Result<Vec<(u16, u16)>>
         u.ok_or("sample X arithmetic")?,
         v.ok_or("sample Y arithmetic")?,
     );
-    let horizontal = matches!(d, Direction::Left | Direction::Right);
+    let horizontal = matches!(direction, Direction::Left | Direction::Right);
     let mut result = vec![(u / 16, v / 16)];
     if (if horizontal { v } else { u }) & 15 != 0 {
         result.push(if horizontal {
@@ -350,6 +368,7 @@ pub fn interaction_samples((x, y): (u16, u16), d: Direction) -> Result<[(u16, u1
     Ok([p(16)?, p(8)?])
 }
 /// Bounded fresh map13 witness, not generic callback/policy dispatch.
+#[must_use]
 pub fn resident13_witness(p: (u16, u16), d: Direction) -> bool {
     d == Direction::Up && p == (360, 144)
 }
@@ -374,15 +393,17 @@ fn patched_word(attributes: &[u8], tile: u16) -> Result<u16> {
 ///
 /// # Errors
 /// Rejects any other ROM, changed source operands or unsupported asset/geometry data.
+// Keep the ordered RE recipe tables beside their source validation and metadata.
+#[allow(clippy::too_many_lines)]
 pub fn compile(image: &[u8]) -> Result<Navigation> {
     ensure(
         hash(image) == "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
         "navigation ROM authentication",
     )?;
     validate_dispatch(image)?;
-    expect(image, 0x8d89bd, &[0xf2, 0xff, 0xe9, 0xff])?;
-    expect(image, 0x88ad35, &[2, 13, 255, 255, 255, 1, 1, 0x2a, 0xad])?;
-    expect(image, 0x88ad3e, &[2, 9, 1, 0x20, 2, 0x80, 0x2a, 0xad])?;
+    expect(image, 0x8d_89bd, &[0xf2, 0xff, 0xe9, 0xff])?;
+    expect(image, 0x88_ad35, &[2, 13, 255, 255, 255, 1, 1, 0x2a, 0xad])?;
+    expect(image, 0x88_ad3e, &[2, 9, 1, 0x20, 2, 0x80, 0x2a, 0xad])?;
     let sprites = assets::sprites::PandoraSprites::from_rom(image)?;
     let contact = contact_spec(image, &sprites)?;
     let recipes = [
@@ -447,15 +468,15 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
             }
         }
         if map == 13 {
-            let spawn = bytes(image, 0x838cb4, 4)?;
+            let spawn = bytes(image, 0x83_8cb4, 4)?;
             let p = [u16::from(spawn[1]) * 16 + 8, u16::from(spawn[2]) * 16];
             stamp(&mut cells, width, p)?;
-            actors.push((0x838cb4, p));
-            actor_sources.push(json!({"source":0x838cb4,"position":p,"position_source":0x838cb4,
+            actors.push((0x83_8cb4, p));
+            actor_sources.push(json!({"source":0x83_8cb4,"position":p,"position_source":0x83_8cb4,
                 "geometry":[-8,16,-16,16],"qualification":"existing house-backgrounds D source stamp; no AI"}));
         }
         if name == "21-contact" {
-            let record = bytes(image, 0x83928f, 4)?;
+            let record = bytes(image, 0x83_928f, 4)?;
             stamp(
                 &mut cells,
                 width,
@@ -469,7 +490,7 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
                 (31, 46)
             };
             // Same wooden-door source COP44 final selectors; location is source exit.
-            for (site, y) in [(0x879819, row), (0x879829, row - 1)] {
+            for (site, y) in [(0x87_9819, row), (0x87_9829, row - 1)] {
                 expect(image, site, &[2, 0x44, 0, 0])?;
                 cells[y * usize::from(width) + col] =
                     patched_word(attributes, word(image, site + 4)? & 511)?;
@@ -482,9 +503,9 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
             _ => &[],
         };
         if !removed.is_empty() {
-            expect(image, 0x8796d7, &[0xa9])?;
+            expect(image, 0x87_96d7, &[0xa9])?;
             ensure(
-                word(image, 0x96e1a6)? == 0 && word(image, 0x96e1ab)? == 0,
+                word(image, 0x96_e1a6)? == 0 && word(image, 0x96_e1ab)? == 0,
                 "source pot fallback records",
             )?;
             for &col in removed {
@@ -492,7 +513,7 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
                     matches!(cells[21 * 32 + col], 0x18fa | 0x18fb),
                     "source route pot cell",
                 )?;
-                cells[21 * 32 + col] = patched_word(attributes, word(image, 0x8796d8)?)?;
+                cells[21 * 32 + col] = patched_word(attributes, word(image, 0x87_96d8)?)?;
             }
         }
         if matches!(
@@ -500,16 +521,16 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
             "c-first-hit" | "c-held-fb" | "c-departed" | "e" | "20"
         ) {
             let sites = if matches!(name, "c-first-hit" | "c-held-fb") {
-                [0x88aba6, 0x88abac]
+                [0x88_aba6, 0x88_abac]
             } else {
-                [0x88abd8, 0x88abde]
+                [0x88_abd8, 0x88_abde]
             };
-            let origin = bytes(image, 0x838c32, 4)?;
+            let origin = bytes(image, 0x83_8c32, 4)?;
             for site in sites {
                 expect(image, site, &[2, 0x44])?;
                 let op = bytes(image, site + 2, 4)?;
-                let x = i16::from(origin[1]) * 16 + i16::from(op[0] as i8) * 16;
-                let y = (i16::from(origin[2]) - 1) * 16 + i16::from(op[1] as i8) * 16;
+                let x = i16::from(origin[1]) * 16 + i16::from(op[0].cast_signed()) * 16;
+                let y = (i16::from(origin[2]) - 1) * 16 + i16::from(op[1].cast_signed()) * 16;
                 let idx = usize::try_from(y / 16)? * usize::from(width) + usize::try_from(x / 16)?;
                 cells[idx] = patched_word(attributes, word(image, site + 4)? & 511)?;
             }
@@ -517,7 +538,7 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
                 let departure = sprites
                     .motions()
                     .iter()
-                    .find(|m| m.actor == 0x838c1e && m.removes_actor)
+                    .find(|m| m.actor == 0x83_8c1e && m.removes_actor)
                     .ok_or("source C final departure")?;
                 stamp(&mut cells, width, departure.to)?;
             }
@@ -527,7 +548,7 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
         entries.push(json!({"name":name,"map":map,"width":width,"height":height,"halo":halo,
             "grid_sha256":hash(&raw),"actors":actor_sources,
             "layer_source":bg.layer().source_range().start,
-            "exits":exits.records().iter().map(|e|json!({"source":0x800000|e.source_range().start,"raw":e.bytes()})).collect::<Vec<_>>() }));
+            "exits":exits.records().iter().map(|e|json!({"source":0x80_0000|e.source_range().start,"raw":e.bytes()})).collect::<Vec<_>>() }));
         profiles.push(Profile {
             name,
             map,
@@ -539,26 +560,26 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
     // Native settled anchors are evidence for the separately tagged source selectors.
     let mut transfers = Vec::new();
     for (map, source, settled) in [
-        (10, 0x818d6b, [120, 719]),
-        (10, 0x818d8f, [392, 207]),
-        (19, 0x818eac, [472, 305]),
-        (13, 0x818dfe, [504, 769]),
-        (13, 0x818e0a, [120, 447]),
-        (12, 0x818df1, [152, 880]),
-        (14, 0x818e2f, [408, 880]),
-        (32, 0x818fc1, [136, 128]),
+        (10, 0x81_8d6b, [120, 719]),
+        (10, 0x81_8d8f, [392, 207]),
+        (19, 0x81_8eac, [472, 305]),
+        (13, 0x81_8dfe, [504, 769]),
+        (13, 0x81_8e0a, [120, 447]),
+        (12, 0x81_8df1, [152, 880]),
+        (14, 0x81_8e2f, [408, 880]),
+        (32, 0x81_8fc1, [136, 128]),
     ] {
         let list = ExitList::from_rom(image, map)?;
         let e = list
             .records()
             .iter()
-            .find(|r| r.source_range().start == (source & 0x3fffff))
+            .find(|r| r.source_range().start == (source & 0x3f_ffff))
             .ok_or("required ordered exit absent")?;
         let raw = e.destination_position();
-        let adjustment = 0x8d8985 + usize::from(e.selector()) * 4;
+        let adjustment = 0x8d_8985 + usize::from(e.selector()) * 4;
         let initial = [
-            i32::from(raw.0) + i32::from(word(image, adjustment)? as i16) + 8,
-            i32::from(raw.1) + i32::from(word(image, adjustment + 2)? as i16) + 16,
+            i32::from(raw.0) + i32::from(word(image, adjustment)?.cast_signed()) + 8,
+            i32::from(raw.1) + i32::from(word(image, adjustment + 2)?.cast_signed()) + 16,
         ];
         let expected = match e.selector() {
             5 => [initial[0], initial[1] + 17],
@@ -571,47 +592,49 @@ pub fn compile(image: &[u8]) -> Result<Navigation> {
             "raw_position":[raw.0,raw.1],"settled":settled,"policy":if e.selector()==14 {"stair-forced-no-native-pacing"}else{"ordinary-17-load-17"}}));
     }
     let mut forced = Vec::new();
-    for source in [0x88ad53, 0x88aeab, 0x89d476, 0x89d4b4, 0x89d4d9, 0x89d4fe] {
+    for source in [
+        0x88_ad53, 0x88_aeab, 0x89_d476, 0x89_d4b4, 0x89_d4d9, 0x89_d4fe,
+    ] {
         expect(image, source, &[2, 0x14])?;
         forced.push(json!({"source":source,"map":word(image,source+2)?,"mode":bytes(image,source+4,1)?[0],
             "selector":bytes(image,source+5,1)?[0],"raw_position":[word(image,source+6)?,word(image,source+8)?]}));
     }
     let mut ranges = Vec::new();
     for (start, end) in [
-        (0x80d542, 0x80d642),
-        (0x80d8e8, 0x80d9e8),
-        (0x80dc60, 0x80dd60),
-        (0x80dfdc, 0x80e0dc),
-        (0x80e1df, 0x80e32e),
-        (0x868a7d, 0x868ad8),
-        (0x869145, 0x86916e),
-        (0x8d8aed, 0x8d8b14),
-        (0x8791a2, 0x8791ca),
-        (0x87c783, 0x87c7f1),
-        (0x87923f, 0x87941c),
-        (0x88acfa, 0x88adcb),
-        (0x8087c2, 0x808820),
-        (0x85d30c, 0x85d399),
-        (0x85d648, 0x85d757),
-        (0x85f63e, 0x85f680),
-        (0x85f78e, 0x85f856),
-        (0x85f8d1, 0x85f925),
-        (0x80c8d0, 0x80ca55),
-        (0x80cad4, 0x80caf0),
-        (0xa4a556, 0xa4a55a),
-        (0x9ad48a, 0x9ad5d2),
-        (0x8796bf, 0x87973d),
-        (0x88aba6, 0x88abe4),
-        (0x80bc2f, 0x80bc43),
-        (0x80be8e, 0x80bf0e),
-        (0x86baef, 0x86bb49),
-        (0x8d8797, 0x8d89c9),
+        (0x80_d542, 0x80_d642),
+        (0x80_d8e8, 0x80_d9e8),
+        (0x80_dc60, 0x80_dd60),
+        (0x80_dfdc, 0x80_e0dc),
+        (0x80_e1df, 0x80_e32e),
+        (0x86_8a7d, 0x86_8ad8),
+        (0x86_9145, 0x86_916e),
+        (0x8d_8aed, 0x8d_8b14),
+        (0x87_91a2, 0x87_91ca),
+        (0x87_c783, 0x87_c7f1),
+        (0x87_923f, 0x87_941c),
+        (0x88_acfa, 0x88_adcb),
+        (0x80_87c2, 0x80_8820),
+        (0x85_d30c, 0x85_d399),
+        (0x85_d648, 0x85_d757),
+        (0x85_f63e, 0x85_f680),
+        (0x85_f78e, 0x85_f856),
+        (0x85_f8d1, 0x85_f925),
+        (0x80_c8d0, 0x80_ca55),
+        (0x80_cad4, 0x80_caf0),
+        (0xa4_a556, 0xa4_a55a),
+        (0x9a_d48a, 0x9a_d5d2),
+        (0x87_96bf, 0x87_973d),
+        (0x88_aba6, 0x88_abe4),
+        (0x80_bc2f, 0x80_bc43),
+        (0x80_be8e, 0x80_bf0e),
+        (0x86_baef, 0x86_bb49),
+        (0x8d_8797, 0x8d_89c9),
     ] {
         ranges.push(json!({"start":start,"end":end,"sha256":hash(bytes(image,start,end-start)?)}));
     }
     let metadata = json!({"schema":1,"rom_sha256":hash(image),"policy":"pandora-navigation-v1:source-frozen,passive,cell-scoped-up-stairs,no-vm,no-native-pacing",
         "profiles":entries,"transfers":transfers,"forced":forced,"source_ranges":ranges,
-        "first_contact":{"bounds":contact.first,"inclusive":true,"callback":0x88ad69,"geometry_policy":"ordinary grounded Down; centerline north recoil endpoint only; queued callback before recoil"},
+        "first_contact":{"bounds":contact.first,"inclusive":true,"callback":0x88_ad69,"geometry_policy":"ordinary grounded Down; centerline north recoil endpoint only; queued callback before recoil"},
         "box_opening":{"bounds":contact.opening,"inclusive":true,"requires":[1,2],"input_edge":false},
         "lifecycle":"same first-layer pointer retains patches/pots; scene occupancy rebuilt; different pointer reconstructs; local0..31/counter reset"});
     Ok(Navigation {
@@ -803,12 +826,14 @@ mod tests {
             .iter()
             .all(|o| o.cell != outside && o.replacement == 0xf8));
         let mut changed = image;
-        changed[0x8796d8 & 0x3fffff] ^= 1;
+        changed[0x87_96d8 & 0x3f_ffff] ^= 1;
         assert!(source_objects(&changed, &nav).is_err());
     }
 
     #[test]
     #[ignore = "requires PANDORA_ROM, run by the standalone qualification harness"]
+    // Keep the source-grid delta table and mutation controls in one qualification.
+    #[allow(clippy::too_many_lines)]
     fn owned_source_compile_and_mutation_controls() {
         let path = std::env::var("PANDORA_ROM").expect("test harness supplies owned ROM");
         let image = std::fs::read(path).unwrap();
@@ -909,7 +934,7 @@ mod tests {
         operands = image.clone();
         operands[0x1a_d492] ^= 1; // one receiving frame differs
         assert!(contact_spec(&operands, &sprites).is_err());
-        assert!(bytes(&[0; 3], 0x800002, 2).is_err());
+        assert!(bytes(&[0; 3], 0x80_0002, 2).is_err());
         assert_eq!(patched_word(&[0, 14, 128], 1).unwrap(), 0x1c01);
         assert_eq!(patched_word(&[0, 14, 128], 2).unwrap(), 2);
 
