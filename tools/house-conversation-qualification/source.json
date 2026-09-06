@@ -1,0 +1,175 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "resident": {
+    "source": 8620950,
+    "position": [
+      120,
+      112
+    ],
+    "callback": 8949470,
+    "entry_request": 8949722
+  },
+  "first": {
+    "request": 8949744,
+    "set_flag_source": 8949512,
+    "flag": 38,
+    "choice": {
+      "source": 8949516,
+      "catalog": 0,
+      "table": 8949521,
+      "cancel_then_options": [
+        8949527,
+        8949533,
+        8949527
+      ]
+    },
+    "first_option_followup": 8949977,
+    "second_or_cancel_followup": 8949850
+  },
+  "repeat": {
+    "request": 8950102,
+    "choice": {
+      "source": 8949545,
+      "catalog": 1,
+      "table": 8949550,
+      "cancel_then_options": [
+        8949563,
+        8949556,
+        8949563
+      ]
+    },
+    "first_option_followup": 8950156,
+    "second_or_cancel_followup": 8950230
+  },
+  "gate": {
+    "source": 8621256,
+    "position": [
+      120,
+      720
+    ],
+    "entry": 8956340,
+    "flag": 38,
+    "occupancy_cell": 1415,
+    "saved_continuation": 8956348,
+    "policy": "reject-if-set-at-load; otherwise stamp-and-return-forever"
+  },
+  "exit": {
+    "source": 8490494,
+    "rectangle": [
+      7,
+      44,
+      1,
+      4
+    ],
+    "destination": 10,
+    "mode": 0,
+    "selector": 5,
+    "raw_position": [
+      496,
+      752
+    ],
+    "destination_player_record": 8620472
+  },
+  "ranges": [
+    {
+      "start": 8620950,
+      "end": 8620960,
+      "sha256": "1eadc15999baddc19e2064a0a9cd9f751ebd9525fee88482844fe82c3d5e8ab8"
+    },
+    {
+      "start": 8949323,
+      "end": 8949466,
+      "sha256": "7df53946f966ded44207c17bdbc294e0a54ae641fdd8b61e0b01f106563d2303"
+    },
+    {
+      "start": 8949470,
+      "end": 8949570,
+      "sha256": "e96dcd4e144440a854ff3164b40841959803427afc372dfeaa72bd84b3e98a28"
+    },
+    {
+      "start": 8621256,
+      "end": 8621263,
+      "sha256": "66c65c838e24057b985b3a8d53bf2f15246583ff0b124a6341ca09d7e7aa5476"
+    },
+    {
+      "start": 8956335,
+      "end": 8956349,
+      "sha256": "da492d28b2b23b921f8f811bb03cda6ac6c6c28fef3b3ea25144b619175243ab"
+    },
+    {
+      "start": 8424325,
+      "end": 8424648,
+      "sha256": "567801e5d08366fe5a81db4a679d722854adbe78e666c027face62a38959dab1"
+    },
+    {
+      "start": 8424648,
+      "end": 8424664,
+      "sha256": "986acd60262e71401276e7f7d19d0e6bc8c77c475d43bd6d7f65df0cb1176fb9"
+    },
+    {
+      "start": 8427211,
+      "end": 8427238,
+      "sha256": "cccd85beeb2f8a68d9808ad18dfec224ed3bf4477c2ce453075cc3baf2d13684"
+    },
+    {
+      "start": 8432293,
+      "end": 8432307,
+      "sha256": "4881376d77f1fead9ee01de9181c2217cbdadfb625c1713bd3716662fd41d23a"
+    },
+    {
+      "start": 8425583,
+      "end": 8425645,
+      "sha256": "422952e1bd49351ce00191cb0cc8a677e16a06bcc76a9680fd6d18e6945d5799"
+    },
+    {
+      "start": 8884799,
+      "end": 8885276,
+      "sha256": "695c57821ea8d7fb8241d47ce63eb1f8e3c2800d17b2bd115bd590685c053cd3"
+    },
+    {
+      "start": 8898435,
+      "end": 8898545,
+      "sha256": "b39c3b5325b9c0a7b43e9d2cd7276bab44bfe2af2ee41707f6a2d56a7b7a26a6"
+    },
+    {
+      "start": 8757032,
+      "end": 8757223,
+      "sha256": "5d9f975c097f3dadd2126d9871e64f999e98730ed00077239e422e39e3fd6f95"
+    },
+    {
+      "start": 9618009,
+      "end": 9618013,
+      "sha256": "88787adaf368227b764fbad650344857f2028213f6d83f337966d066265ec617"
+    },
+    {
+      "start": 9618033,
+      "end": 9618073,
+      "sha256": "d641058f5741e3f139db53318a342281c2c2c8d78395d3eca1b7c0c692084944"
+    },
+    {
+      "start": 8490494,
+      "end": 8490506,
+      "sha256": "af682fcfd417f0880f8695694a84d31d40e8df3cc434700b63583598ce5ebc26"
+    },
+    {
+      "start": 8620472,
+      "end": 8620479,
+      "sha256": "2db5adbd1bb1b5f268ff375aceca6300817f316439b4591b7b822b051cca2290"
+    },
+    {
+      "start": 9275287,
+      "end": 9275468,
+      "sha256": "53a79a4a8bca483f1cafb6e19ac9e01860e06516916fcda12e1b3fdcd0a8eb49"
+    },
+    {
+      "start": 9275565,
+      "end": 9275817,
+      "sha256": "65e4e7c840ea0fb977cbcd1ce1b26c0621c07bedbba595daabc50691156832f4"
+    },
+    {
+      "start": 8698189,
+      "end": 8698277,
+      "sha256": "8b92540d04c7cf4a37c4e51c888b20ae90a4dde25a8798e8ff27c95acad7b1c2"
+    }
+  ]
+}
