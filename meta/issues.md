@@ -29,4 +29,3 @@
 - [ ] [Complete the fresh house scene with all residents](issues/complete-house-scene-setup.md)
 - [ ] [Decode the complete ordinary house actor set](issues/decode-house-scene-actors.md)
 - [ ] [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)
-- [ ] [Qualify complete house background profiles](issues/qualify-house-background-profiles.md)

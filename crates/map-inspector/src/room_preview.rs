@@ -1,18 +1,20 @@
 //! Authenticated ROM-to-preview adapter. No oracle session is constructed here.
 use crate::{invalid, sha256, Result};
-use assets::maps::{exits::ExitList, visual::StaticBackground};
+use assets::maps::exits::ExitList;
 use rom::Rom;
 use room_core::{
     slice::{DataIdentity, Exit, GameData, GameState, NewGameData, Phase, Policy},
     Direction, FrameInput, Room,
 };
 use serde_json::{json, Value};
+use std::collections::BTreeMap;
 
 pub(super) struct Preview {
     data: GameData,
     state: GameState,
     bitmap: Vec<u8>,
     art: crate::room_art::Art,
+    cameras: BTreeMap<u16, [u16; 2]>,
     error: Option<String>,
     fresh_start: bool,
 }
@@ -21,6 +23,10 @@ impl Preview {
         let data = compile(rom)?;
         let state = GameState::new(&data, Policy::SemanticPreview);
         let art = crate::room_art::compile(rom)?;
+        let cameras = crate::house_profiles::MAPS
+            .into_iter()
+            .map(|id| crate::house_profiles::camera(rom.image(), id).map(|camera| (id, camera)))
+            .collect::<Result<BTreeMap<_, _>>>()?;
         let viewer = crate::visual_export::export(rom, 15)?;
         let bitmap = std::fs::read(viewer.with_file_name("map.bmp"))?;
         Ok(Self {
@@ -28,6 +34,7 @@ impl Preview {
             state,
             bitmap,
             art,
+            cameras,
             error: None,
             fresh_start: false,
         })
@@ -79,37 +86,13 @@ impl Preview {
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
             "phase":match output.phase{Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
-            "camera":[256,if output.map_id==15{0}else{256}],"error":self.error,
+            "camera":self.cameras[&output.map_id],"error":self.error,
             "snapshot_sha256":sha256(&self.state.snapshot())})
     }
 }
 
 fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<Room> {
-    let background = StaticBackground::from_rom(rom.image(), id)?;
-    let attributes: &[u8; 512] = background.resources()[3].decoded().try_into()?;
-    let mut cells: Vec<_> = background
-        .layer()
-        .attributed_cells(attributes)
-        .iter()
-        .map(|c| c.raw())
-        .collect();
-    // Frozen ordinary-house profile: these are the measured runtime flag additions.
-    // Passive geometry is qualified; this does NOT simulate the event writers.
-    // Only cardinal walking is admitted; no action/interaction hook is executed.
-    let flagged: &[usize] = if fresh {
-        if id != 15 {
-            return Err(invalid("fresh overlay belongs to bedroom only").into());
-        }
-        &[317, 504]
-    } else if id == 15 {
-        &[317]
-    } else {
-        &[731, 732, 826, 827]
-    };
-    for &index in flagged {
-        cells[index] |= 0x8000;
-    }
-    Ok(Room::new_passive(32, 64, cells)?)
+    crate::house_profiles::compile(rom, id, fresh)
 }
 
 fn compile(rom: &Rom) -> Result<GameData> {

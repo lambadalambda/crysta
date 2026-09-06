@@ -23,3 +23,10 @@ Decode and authenticate the static first-background/collision profiles for all s
 ## Notes
 
 - Subissue of [complete fresh house setup](complete-house-scene-setup.md).
+
+## Completion
+
+- Six ROM-only loading recipes and source-derived camera/occupancy projection are implemented; F/10 retain their prior grids and graphics. D uses the frozen source-origin stamp and preserves the independent exterior gate.
+- Source/native qualification, including selected pixels, hardware BG2 priority and explained runtime deltas, is recorded in `docs/house-backgrounds.md` and the metadata-only qualification profiles. Parent independently repeated the driver successfully at ignored `local/house-background-qualification/run-a76GGH`.
+- Synthetic/source-mutation tests, owned-ROM complete grid/camera hashes, existing two-room host regression and strict host Clippy pass. Independent compiler correctness/architecture review found no blockers.
+- C/B door mutation remains owned by the navigation subissue; these are explicitly baseclosed profiles, not an unexplained copy of post-door captures.

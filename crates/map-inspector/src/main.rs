@@ -9,6 +9,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
+mod house_profiles;
 mod new_game;
 mod opening_qualification;
 mod qualification;
