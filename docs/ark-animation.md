@@ -203,8 +203,13 @@ composition, facing/mirroring, walking cursor and countdown on every step:
 | 10 after arrival 7050→7410 | 360 | 190 |
 | **Total per fresh replay set** | **827** | **223** |
 
-The first idle-fidget frame after 6800 is checked for movement but deliberately
-excluded from ordinary-pose comparison. Transition intervals are not compared.
+Only completed6801 in the span starting6800 is exempt from ordinary-pose
+comparison: fresh mapF at304,112, delayed Right still inactive, semantic Down
+standing, native unmirrored Down fidget `$A5:DCA6/$21`, cursor0, composition
+`$F839`, countdown140. Movement is still checked. Any changed initial pose or
+later fidget must fail ordinary selection, not bypass it. Nine mutation controls
+in `test_compare.py` cover that boundary and run after replay authentication.
+Transition intervals are not compared.
 Captured initial/final room grids are observational data for the local comparator,
 not snapshot restore or a native patch.
 

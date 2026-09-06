@@ -6,6 +6,7 @@ import subprocess
 import sys
 
 from verify import verify
+from test_compare import check as check_compare
 
 rom, out = sys.argv[1], Path(sys.argv[2])
 plans = json.loads(Path('tools/player-animation-qualification/plans.json').read_text())
@@ -30,3 +31,5 @@ result = subprocess.run([str(compare), rom, str(out/'house-a'), '6800:6967'],
 (out/'red-two-frame.log').write_text(result.stdout + result.stderr)
 assert result.returncode != 0 and 'selection frame 6820' in result.stderr
 verify(Path(rom), out)
+
+check_compare(compare, Path(rom), out / "house-a")

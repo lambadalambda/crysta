@@ -26,5 +26,4 @@
 - [ ] [Add enhanced and widescreen rendering](issues/enhanced-widescreen-rendering.md)
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
-- [ ] [Bound the animation comparator's initial idle exemption](issues/bound-initial-animation-exemption.md)
 - [ ] [Render the first NPC in the adjoining house room](issues/render-first-house-npc.md)

@@ -70,8 +70,18 @@ fn main() {
                 blocked_ticks += 1;
             }
             let frame = animation.advance(walking.active_direction());
-            // Before the first walk, fresh native idle-fidget is intentionally not standing policy.
-            if row[9] == 0xa5dca6 {
+            // Only the measured first delayed-input tick differs from ordinary
+            // standing policy. A later fidget (or altered initial pose) must fail
+            // selection below, not silently bypass pose and facing comparisons.
+            if bounds[0] == 6800
+                && row[0] == 6801
+                && row[1..4] == [15, 304, 112]
+                && direction == Some(Direction::Right)
+                && walking.active_direction().is_none()
+                && animation == AnimationState::standing(Direction::Down)
+                && row[5] & 0x4000 == 0
+                && row[7..13] == [140, 0, 0xa5dca6, 0x21, 0, 0xf839]
+            {
                 continue;
             }
             let base = match frame.set {

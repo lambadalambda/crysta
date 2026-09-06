@@ -19,3 +19,10 @@ The ordinary-animation comparator currently skips pose/facing checks for any row
 - Red-to-green regressions reject mutated later/initial fidget rows.
 - Existing authenticated ordinary animation comparisons and the two-frame negative control still pass.
 - Independent review and repository safety/tracker checks pass.
+
+## Verified result
+
+- Exemption now admits only the observed6801 delayed-input context and exact pose metadata, leaving movement checks intact.
+- Nine later/initial fidget mutations fail at their intended selection check (red before the change, green after). The baseline passes and source captures are never modified.
+- Both existing authenticated replay sets pass827 movement/animation steps each; the naive two-frame negative control still fails at6820. No new capture or gameplay change was needed.
+- Independent correctness/architecture review found no blockers; safety/tracker checks pass.

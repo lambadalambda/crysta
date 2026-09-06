@@ -37,3 +37,4 @@
 - [x] [Render Ark standing and walking in the portable house](issues/render-ark-house-sprite.md)
 - [x] [Qualify Ark's house sprite assets](issues/qualify-ark-sprite-assets.md)
 - [x] [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
+- [x] [Bound the animation comparator's initial idle exemption](issues/bound-initial-animation-exemption.md)
