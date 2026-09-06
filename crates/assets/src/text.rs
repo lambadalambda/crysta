@@ -1,9 +1,10 @@
 //! Bounded Japanese house dialogue; no CPU, Unicode transcription or window engine.
 //!
-//! Pages retain the native font's two-bit pixels (3 = background). The caller
+//! Pages retain native two-bit pixels (house background 3; Pandora may use 0). The caller
 //! owns presentation and acknowledgement/progression. See `docs/house-dialogue.md`.
 use std::fmt;
 
+pub mod pandora;
 #[cfg(test)]
 mod tests;
 
@@ -23,8 +24,6 @@ pub const TEXT_SOURCES: [u32; 7] = [
     0x88_918c,
     0x88_91d6,
 ];
-const WIDTH: usize = 224;
-const HEIGHT: usize = 48;
 
 /// Invalid or explicitly unsupported dialogue source.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -72,6 +71,8 @@ pub struct DialogueGlyph {
 #[derive(Debug, Clone)]
 pub struct DialoguePage {
     pixels: Vec<u8>,
+    background_index: u8,
+    dimensions: [u16; 2],
     glyphs: Vec<DialogueGlyph>,
     boundary_source: u32,
     acknowledgement: Acknowledgement,
@@ -80,18 +81,24 @@ impl DialoguePage {
     /// Content width, without native frame/window effects.
     #[must_use]
     pub const fn width(&self) -> u16 {
-        224
+        self.dimensions[0]
     }
-    /// Three native 16-pixel text rows.
+    /// Content height, without native frame/window effects.
     #[must_use]
     pub const fn height(&self) -> u16 {
-        48
+        self.dimensions[1]
     }
-    /// Row-major native 2bpp color indices: 0..3, with 3 the background.
+    /// Row-major native 2bpp color indices: 0..3; see `background_index()`.
     /// No color/font bytes or transcribed text are embedded in the library.
     #[must_use]
     pub fn indexed(&self) -> &[u8] {
         &self.pixels
+    }
+    /// Clear/background color index: 3 for house/raw font, 0 for Pandora's
+    /// source-qualified transparent font mode. No palette/RGBA is implied.
+    #[must_use]
+    pub const fn background_index(&self) -> u8 {
+        self.background_index
     }
     /// Per-glyph source metadata, also useful for independent qualification.
     #[must_use]
@@ -242,6 +249,9 @@ fn glyph_pixels(source: &[u8]) -> Result<[u8; 256], TextError> {
 
 struct Decoder<'a> {
     image: &'a [u8],
+    pandora: bool,
+    transparent: bool,
+    dimensions: [u16; 2],
     pc: u32,
     stack: Vec<u32>,
     kana: bool,
@@ -274,18 +284,27 @@ impl Decoder<'_> {
         Ok(u16::from_le_bytes([self.next()?, self.next()?]))
     }
     fn clear(&mut self) {
-        self.page = empty_page();
+        self.page = blank_page(self.dimensions, self.transparent);
         self.position = [0, 0];
         self.kana = false;
     }
     fn glyph(&mut self, text_source: u32, font_source: u32) -> Result<(), TextError> {
         let [x, y] = self.position.map(usize::from);
-        if x + 16 > WIDTH || y + 16 > HEIGHT {
+        let [width, height] = self.dimensions.map(usize::from);
+        if x + 16 > width || y + 16 > height {
             return Err(invalid(text_source, "text exceeds qualified page geometry"));
         }
-        let pixels = glyph_pixels(bytes(self.image, font_source, 64)?)?;
+        let mut pixels = glyph_pixels(bytes(self.image, font_source, 64)?)?;
+        if self.transparent {
+            // $85947F: a' = a XOR (a AND b), b' = b XOR (a AND b).
+            for pixel in &mut pixels {
+                if *pixel == 3 {
+                    *pixel = 0;
+                }
+            }
+        }
         for row in 0..16 {
-            self.page.pixels[(y + row) * WIDTH + x..(y + row) * WIDTH + x + 16]
+            self.page.pixels[(y + row) * width + x..(y + row) * width + x + 16]
                 .copy_from_slice(&pixels[row * 16..row * 16 + 16]);
         }
         self.page.glyphs.push(DialogueGlyph {
@@ -305,14 +324,52 @@ impl Decoder<'_> {
         }
         self.page.boundary_source = source;
         self.page.acknowledgement = action;
-        self.pages
-            .push(std::mem::replace(&mut self.page, empty_page()));
+        self.pages.push(std::mem::replace(
+            &mut self.page,
+            blank_page(self.dimensions, self.transparent),
+        ));
         self.position = [0, 0];
         self.kana = false;
         Ok(())
     }
+    fn custom_window(&mut self, at: u32) -> Result<(), TextError> {
+        let layout = [self.next()?, self.next()?, self.next()?, self.next()?];
+        // $85982D: column, tile row, tile width, tile height. Only this
+        // 24x6-tile window is required; other geometry is not silently padded.
+        if layout != [6, 6, 24, 6] {
+            return Err(invalid(at, "unsupported Pandora window layout"));
+        }
+        if !self.page.glyphs.is_empty() {
+            return Err(invalid(at, "unacknowledged page clear"));
+        }
+        self.dimensions = [u16::from(layout[2]) * 8, u16::from(layout[3] / 2) * 16];
+        self.clear();
+        Ok(())
+    }
+    fn label_call(&mut self, at: u32) -> Result<(), TextError> {
+        let index = self.next()?;
+        if ![0x06, 0x25].contains(&index) {
+            return Err(invalid(at, "unsupported Pandora label call"));
+        }
+        let pointer = bytes(self.image, 0x92_c5e7 + u32::from(index) * 2, 2)?;
+        self.enter(0x92_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
+    }
+    fn enter(&mut self, destination: u32) -> Result<(), TextError> {
+        if self.stack.len() >= 8 {
+            return Err(invalid(
+                self.pc - 1,
+                "unsupported or recursive text subroutine",
+            ));
+        }
+        if destination != 0x610 {
+            bytes(self.image, destination, 1)?;
+        }
+        self.stack.push(self.pc);
+        self.pc = destination;
+        Ok(())
+    }
     fn call(&mut self, index: u8) -> Result<(), TextError> {
-        if ![0, 1, 7].contains(&index) || self.stack.len() >= 8 {
+        if !([0, 1, 7].contains(&index) || (self.pandora && index == 3)) {
             return Err(invalid(
                 self.pc - 1,
                 "unsupported or recursive text subroutine",
@@ -325,22 +382,36 @@ impl Decoder<'_> {
         } else {
             0x92_0000 | address
         };
-        self.stack.push(self.pc);
-        self.pc = destination;
-        Ok(())
+        self.enter(destination)
     }
 }
 fn empty_page() -> DialoguePage {
+    blank_page([224, 48], false)
+}
+fn blank_page(dimensions: [u16; 2], transparent: bool) -> DialoguePage {
+    let background_index = if transparent { 0 } else { 3 };
     DialoguePage {
-        pixels: vec![3; WIDTH * HEIGHT],
+        pixels: vec![background_index; usize::from(dimensions[0]) * usize::from(dimensions[1])],
+        background_index,
+        dimensions,
         glyphs: Vec::new(),
         boundary_source: 0,
         acknowledgement: Acknowledgement::End,
     }
 }
 fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
+    decode_profile(image, source, false)
+}
+fn decode_profile(
+    image: &[u8],
+    source: u32,
+    pandora: bool,
+) -> Result<Vec<DialoguePage>, TextError> {
     let mut d = Decoder {
         image,
+        pandora,
+        transparent: false,
+        dimensions: [224, 48],
         pc: source,
         stack: Vec::new(),
         kana: false,
@@ -362,17 +433,21 @@ fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
                     ((0xb5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64),
                 )?;
             }
-            0xc0 | 0xc1 => {
+            c if matches!(c, 0xc0 | 0xc1) || (c == 0xda && d.pandora) => {
                 if !d.page.glyphs.is_empty() {
                     return Err(invalid(at, "unacknowledged page clear"));
                 }
+                if c != 0xc0 {
+                    d.dimensions = [224, 48];
+                }
                 d.clear();
             }
-            0xc4 => {
-                if d.next()? != 1 {
-                    return Err(invalid(at, "unsupported font transformation"));
-                }
-            }
+            0xc2 if d.pandora => d.custom_window(at)?,
+            0xc4 => match d.next()? {
+                1 => d.transparent = false,
+                0 if d.pandora => d.transparent = true,
+                _ => return Err(invalid(at, "unsupported font transformation")),
+            },
             // Timing/sound controls do not change content or acknowledgements.
             0xc5 | 0xc7 | 0xc8 => {
                 d.next()?;
@@ -389,8 +464,14 @@ fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
                 }
                 d.word()?; // qualified speaker color at $7F060A, not event/progression RAM
             }
+            // $859A13/$859ECA save the banked return after a three-byte pointer.
+            0xcc if d.pandora => {
+                let address = u32::from(d.word()?);
+                let destination = address | (u32::from(d.next()?) << 16);
+                d.enter(destination)?;
+            }
             0xcf => {
-                if d.position[1] >= 32 {
+                if d.position[1] + 16 >= d.dimensions[1] {
                     return Err(invalid(at, "unsupported text scrolling"));
                 }
                 d.position = [0, d.position[1] + 16];
@@ -415,6 +496,13 @@ fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
                 }
             }
             0xd5 => d.boundary(at, Acknowledgement::Next)?,
+            0xe3 if d.pandora => {
+                let mask = d.word()?;
+                let destination = pandora::default_button_source(d.image, mask)?;
+                d.enter(destination)?;
+            }
+            // $859725 calls the bank-$92 item-label pointer table, returning via D4.
+            0xe4 if d.pandora => d.label_call(at)?,
             // Palette changes flush a pending half-tile even without color effects.
             0xdc => d.position[0] = d.position[0].next_multiple_of(8),
             _ => return Err(invalid(at, "unsupported text command (including choices)")),
