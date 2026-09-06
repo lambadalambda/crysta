@@ -267,3 +267,56 @@ strict direct Pandora source route under `headless-sync-video-v1`. This
 supersedes earlier pending observer/parent handoff statements, **not** the
 source-only coverage or fidelity/admission limits in this contract. Portable
 Pandora integration remains open and the live host stays on the house profile.
+
+## Bounded opt-in canvas consumer
+
+The inline `RoomSlice` renderer now accepts the separate opt-in artifact without
+changing the live host's `compile_profile(..., false)` choice. The four additional
+sheet URLs/dimensions, eight map mappings, opaque-high masks and mode09/BG1-or-BG2
+camera contracts are validated before preparation. The cellar sheet remains
+separate from house art; wooden-door patches apply only to `house`.
+
+The only added core state field is optional **`scene_phase`**. When supplied it
+must name a manifest phase on exactly the current map. `state.scene` must match
+that phase's instance IDs, record0 keys, source positions and priorities, including
+Ark's current key/position and priority2. Source world-Y/tie order is checked, not
+repaired. Additional maps require a phase; old house/exterior scenes without this
+field remain compatible. No story flags, animation clock or moving/departing/carry
+membership are inferred. Parent integration must explicitly revise this fixed
+endpoint contract before supplying interpolated positions or dynamic overlays.
+
+Prepared sprites retain their RGBA bytes, source offsets and precomposed mirrors;
+prepared backgrounds retain opaque-high RGBA masks alongside canvases. For source
+phases a small pure software compositor first resolves the last opaque OBJ in the
+supplied order **without sorting by priority**, then hides that winner if it is
+OBJ2 under opaque-high first BG. OBJ3 stays above high BG. A hidden front OBJ2
+never exposes a rear OBJ3, and transparent BG never occludes. Only the resulting
+opaque OBJ pixels replace the already-painted natural background. Ordinary house
+scenes keep the existing canvas path. Unsupported phase/map/roster/priority or
+missing art produces the existing visible paused error, not a fallback sprite.
+
+This is **not** a full SNES renderer or native whole-RGB qualification. The
+manifest's omission labels remain intact: C window/color math, opening-white
+palette, secondary backgrounds, scripted timing and animation remain omitted.
+Carry/world-patch integration and runtime enablement are parent-owned.
+
+### Frontend verification
+
+```sh
+node crates/map-inspector/tests/room-slice-check.js
+node crates/map-inspector/tests/pandora-render-check.js
+node tools/verify-house-browser.test.js
+node tools/verify-conversation-browser.test.js
+# On a separately launched house-only host/browser session (not the parent's):
+node crates/map-inspector/tests/pandora-render-check.js --browser-script \
+  | agent-browser --session pandora-renderer eval --stdin
+```
+
+The focused checker uses synthetic, nonuniform overlapping RGBA, not ROM/capture
+pixels. Its independent front-to-back destination-pixel oracle checks 48 cases
+covering priority2/3, both orders, transparent holes, clipped/negative camera
+coordinates and diagnostic flips. The real-browser script runs against the actual
+inline helpers and compares all 57,344 pixels in each of 16 canvas cases, then
+checks a distinct precomposed mirror/anchor. It does not change live host state.
+The existing inline initialization harness also tests additive image loading,
+phase/roster rejection and visible pause, while retaining the old house tests.

@@ -22,3 +22,41 @@ Consume the opt-in source atlas/phase/background artifact in the existing canvas
 - Red → green tests cover exact manifest/phase admission and actual nonvacuous overlapping pixel outcomes, including transparent BG, OBJ2/3 ordering and map mismatch.
 - Existing house/dialogue browser harness/verifier suites pass and an independent correctness/architecture review approves the component.
 - Runtime timing, carry overlay/pose selection and full Pandora browser acceptance remain explicitly parent-owned until integrated.
+
+## Frontend component complete; parent integration pending
+
+Alice changed only the inline renderer, its focused JS/browser tests and the
+appended frontend section in `docs/pandora-scene.md`. The state contract adds
+only optional `scene_phase`; source scene entries keep the adapter's
+`id/key/position/priority`. Prepared rasters retain RGBA and opaque-high masks
+for winner-first OBJ composition. No host enablement, inferred story phase,
+record scheduler, carry membership or shared index edits.
+
+### Verification
+
+- TDD: the new focused check first failed on the missing admission/compositor
+  API; it now passes. The original inline harness remains green and additionally
+  checks all six sheet loads and visible phase/roster/priority rejection.
+- Independent full-RGBA Node oracle: **48** cases, **348** opaque output samples
+  and **612** absent/occluded samples, covering priorities2/3, both orders,
+  transparent holes, anchors, diagnostic flips and camera clipping.
+- Actual inline browser helpers: **16 × 57,344** exact RGBA pixel checks plus
+  two distinct precomposed-mirror/anchor pixels. This includes a front OBJ2
+  hidden by opaque-high BG with rear OBJ3 present; neither priority sorting nor
+  masking each actor independently can satisfy that case.
+- Built the unchanged house-only host from this worktree. Separate local port
+  **8876**, browser session **pandora-renderer**: real UI house `default511`
+  passed **512** full-canvas checks; real UI conversation passed **1671** steps
+  and **1683** visual checks, ending in A at `(538,815)`, dialogue closed.
+- House/conversation verifier unit suites pass (**8 + 7** tests). `git diff
+  --check` passes. Private logs are under `local/pandora-renderer/`.
+- Independent read-only reviewer **d97d684d-2f20-4077-8c5a-34dd6016e6ea** approved
+  correctness, architecture/compactness and the nonvacuous pixel evidence with
+  no blockers, conditional on the now-passed dialogue run. Reviewer inspected
+  source/evidence logic but could not execute tools/tests independently.
+
+This is presentation-component acceptance, **not live Pandora route acceptance**
+or a whole-native-RGB claim. C windows/color math, opening-white palette,
+secondary backgrounds, scripted timing, animation and carry/world-patch
+integration remain omitted/parent-owned. Shared issue indexing/archival is left
+to the parent, as requested.
