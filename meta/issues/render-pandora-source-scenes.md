@@ -60,3 +60,10 @@ or a whole-native-RGB claim. C windows/color math, opening-white palette,
 secondary backgrounds, scripted timing, animation and carry/world-patch
 integration remain omitted/parent-owned. Shared issue indexing/archival is left
 to the parent, as requested.
+
+## Parent component acceptance
+
+- Cherry-picked the reviewed renderer and contract; independently reran 48 RGBA oracle cases, the inline controller harness and all 15 house/conversation verifier tests.
+- On the rebuilt parent host, actual canvas checks pass: `local/map-research/pandora-render-parent-browser.json` records 16 full 256×224 comparisons and two distinct precomposed mirror/anchor pixels. These are synthetic composition controls, not native whole RGB.
+- Real input-only house dialogue/exterior regression passes again: `local/map-research/pandora-render-parent-house.json`, 1671 ticks / 1683 visual checks. Host 51 unit tests and strict workspace Clippy pass; the full host's separate SRAM observer fixture is still tracked independently.
+- Component archived. The host remains `compile_profile(false)`; dynamic carrying/world patches, script timing, core-driven phase selection and the complete Pandora browser route remain parent integration work. No runtime enablement is inferred from this acceptance.

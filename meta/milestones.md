@@ -122,7 +122,6 @@ qualification remain open.
 - [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
 - [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
 - [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
-- [Render bounded Pandora source scenes in the preview](issues/render-pandora-source-scenes.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
