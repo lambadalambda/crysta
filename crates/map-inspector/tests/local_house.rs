@@ -42,5 +42,18 @@ fn new_game_explores_both_rooms_and_revisits_without_scope_errors() {
         assert_eq!(state["y"], y, "{key}");
         assert_eq!(state["phase"], phase, "{key}");
         assert_eq!(state["error"], serde_json::Value::Null, "{key}");
+        let scene = state["scene"].as_array().unwrap();
+        assert_eq!(scene.len(), if map == 16 { 2 } else { 1 });
+        let residents: Vec<_> = scene
+            .iter()
+            .filter(|entry| entry["key"] == "npc:house")
+            .collect();
+        if map == 16 {
+            assert_eq!(residents.len(), 1);
+            assert_eq!(residents[0]["position"], serde_json::json!([424, 416]));
+            assert_eq!(scene[0]["key"], state["actor_key"]);
+        } else {
+            assert!(residents.is_empty(), "NPC must not leak into bedroom");
+        }
     }
 }

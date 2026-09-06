@@ -4,10 +4,35 @@ use crate::{invalid, Result};
 use assets::{
     graphics::{Bgr555, IndexedPixel, Tile4bpp},
     maps::visual::{StaticBackground, VisualResource},
-    sprites::{ArkSprites, SpriteFrame, SpritePixel},
+    sprites::{ArkSprites, HouseNpc, SpriteFrame, SpritePixel},
 };
 use room_core::{AnimationFrame, AnimationSet};
 use serde_json::{json, Value};
+
+const NPC_KEY: &str = "npc:house";
+
+/// Immutable presentation metadata, not simulated NPC state or snapshot data.
+pub(super) struct Art {
+    pub(super) bytes: Vec<u8>,
+    npc_map: u16,
+    npc_position: [u16; 2],
+}
+impl Art {
+    pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
+        let ark = json!({"key":key,"position":[position.0,position.1]});
+        if map != self.npc_map {
+            return json!([ark]);
+        }
+        let npc = json!({"key":NPC_KEY,"position":self.npc_position});
+        // Ordinary native depth buckets use world Y before sprite anchors.
+        // Linked-list insertion gives Ark precedence at equal Y; see house-npc.md.
+        if position.1 < self.npc_position[1] {
+            json!([ark, npc])
+        } else {
+            json!([npc, ark])
+        }
+    }
+}
 
 /// Shared by atlas compilation and state selection; only core ordinary frames enter here.
 fn frame_index(frame: AnimationFrame) -> usize {
@@ -24,6 +49,7 @@ fn raster(
     frame: &SpriteFrame,
     tiles: &[Tile4bpp],
     palette: &[Bgr555; 16],
+    palette_base: u8,
     mirror: bool,
 ) -> Result<Value> {
     let (left, top, right, bottom) = frame.bounds(mirror, false);
@@ -43,7 +69,7 @@ fn raster(
                         return Err(invalid("unqualified ordinary sprite priority").into());
                     }
                     let color = palette_index
-                        .checked_sub(128)
+                        .checked_sub(palette_base)
                         .and_then(|index| palette.get(usize::from(index)))
                         .ok_or_else(|| invalid("unqualified ordinary sprite palette"))?;
                     rgba.extend(color.rgb8());
@@ -84,7 +110,7 @@ fn foreground(background: &StaticBackground) -> Result<Value> {
     Ok(json!({"width":width,"height":height,"runs":runs(pixels)}))
 }
 
-pub(super) fn compile(rom: &rom::Rom) -> Result<Vec<u8>> {
+pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     let sprites = ArkSprites::from_rom(rom.image())?;
     let mut frames = serde_json::Map::new();
     for set in [AnimationSet::Standing, AnimationSet::Walking] {
@@ -108,6 +134,7 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Vec<u8>> {
                             .graphics(frame.resource())
                             .ok_or_else(|| invalid("missing ordinary graphics"))?,
                         sprites.palette(),
+                        128,
                         mirror_x,
                     )?;
                     frames.insert(frame_key(key), pixels);
@@ -115,6 +142,17 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Vec<u8>> {
             }
         }
     }
+    let npc = HouseNpc::from_rom(rom.image())?;
+    frames.insert(
+        NPC_KEY.into(),
+        raster(
+            npc.composition(),
+            npc.graphics(),
+            npc.palette(),
+            npc.palette_base(),
+            npc.hflip(),
+        )?,
+    );
     let bedroom = StaticBackground::from_rom(rom.image(), 15)?;
     let house = StaticBackground::from_rom(rom.image(), 16)?;
     // /map.bmp is fixed to map15. Require full decoded source identity, not an
@@ -128,10 +166,13 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Vec<u8>> {
     {
         return Err(invalid("house backgrounds differ: fixed /map.bmp cannot be reused").into());
     }
-    Ok(serde_json::to_vec(
-        &json!({"schema_version":1,"frames":frames,
-        "foreground":{"15":foreground(&bedroom)?,"16":foreground(&house)?}}),
-    )?)
+    Ok(Art {
+        bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
+            "npc":{"key":NPC_KEY,"map_id":npc.map_id(),"position":npc.position(),"policy":"frozen-ordinary-pose"},
+            "foreground":{"15":foreground(&bedroom)?,"16":foreground(&house)?}}))?,
+        npc_map: npc.map_id(),
+        npc_position: npc.position(),
+    })
 }
 
 #[cfg(test)]
@@ -139,6 +180,41 @@ mod tests {
     use super::*;
     use assets::{graphics::decode_tiles_4bpp, sprites::SpriteFrame};
     use room_core::{AnimationState, Direction};
+
+    #[test]
+    fn frozen_npc_membership_and_native_depth_tie() {
+        let art = Art {
+            bytes: Vec::new(),
+            npc_map: 16,
+            npc_position: [424, 416],
+        };
+        for (map, y, keys) in [
+            (15, 416, vec!["ark"]),
+            (16, 415, vec!["ark", NPC_KEY]),
+            (16, 416, vec![NPC_KEY, "ark"]),
+            (16, 417, vec![NPC_KEY, "ark"]),
+        ] {
+            let scene = art.scene(map, "ark", (400, y));
+            let entries = scene.as_array().unwrap();
+            assert_eq!(
+                entries
+                    .iter()
+                    .map(|e| e["key"].as_str().unwrap())
+                    .collect::<Vec<_>>(),
+                keys
+            );
+            for entry in entries {
+                assert_eq!(
+                    entry["position"],
+                    if entry["key"] == NPC_KEY {
+                        json!([424, 416])
+                    } else {
+                        json!([400, y])
+                    }
+                );
+            }
+        }
+    }
 
     #[test]
     fn all_ordinary_animation_keys_cover_exactly_28_frames() {
@@ -196,8 +272,8 @@ mod tests {
         let tiles = decode_tiles_4bpp(&planar).unwrap();
         let palette = [assets::graphics::Bgr555::new(31); 16];
         let frame = SpriteFrame::decode(&source).unwrap();
-        let normal = raster(&frame, &tiles, &palette, false).unwrap();
-        let mirror = raster(&frame, &tiles, &palette, true).unwrap();
+        let normal = raster(&frame, &tiles, &palette, 128, false).unwrap();
+        let mirror = raster(&frame, &tiles, &palette, 128, true).unwrap();
         assert_eq!(normal["offset"], json!([-2, -8]));
         assert_eq!(mirror["offset"], json!([10, -8]));
         assert_eq!(
@@ -210,11 +286,19 @@ mod tests {
         );
         assert_eq!(mirror["rgba"][3], 0);
         assert_eq!(mirror["rgba"][7 * 4 + 3], 255);
+        source[23] = 0x2a; // OBJ palette5, unlike Ark's palette0.
+        let resident = SpriteFrame::decode(&source).unwrap();
+        assert_eq!(
+            raster(&resident, &tiles, &palette, 208, false).unwrap(),
+            normal
+        );
+        assert!(raster(&resident, &tiles, &palette, 128, false).is_err());
         source[23] = 0x10;
         assert!(raster(
             &SpriteFrame::decode(&source).unwrap(),
             &tiles,
             &palette,
+            128,
             false
         )
         .is_err());
@@ -223,10 +307,36 @@ mod tests {
             &SpriteFrame::decode(&source).unwrap(),
             &transparent_tiles,
             &palette,
+            128,
             false,
         )
         .unwrap();
         assert_eq!(transparent["rgba"], json!(vec![0; 8 * 8 * 4]));
+    }
+
+    fn assert_npc_raster(art: &Value) {
+        let reference: Value = serde_json::from_str(include_str!(
+            "../../../tools/house-npc-qualification/reference.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            art["npc"],
+            json!({"key":NPC_KEY,"map_id":16,"position":[424,416],"policy":"frozen-ordinary-pose"})
+        );
+        let resident = &art["frames"][NPC_KEY];
+        assert_eq!(resident["offset"], json!([-8, -33]));
+        assert_eq!(
+            (resident["width"].as_u64(), resident["height"].as_u64()),
+            (Some(16), Some(33))
+        );
+        let rgba: Vec<u8> = resident["rgba"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| u8::try_from(v.as_u64().unwrap()).unwrap())
+            .collect();
+        assert_eq!(crate::sha256(&rgba), reference["export"]["rgba_sha256"]);
+        assert_eq!(rgba.chunks_exact(4).filter(|p| p[3] == 255).count(), 313);
     }
 
     #[test]
@@ -238,9 +348,10 @@ mod tests {
             return;
         }
         let rom = rom::Rom::load(&std::fs::read(path).unwrap()).unwrap();
-        let art: Value = serde_json::from_slice(&compile(&rom).unwrap()).unwrap();
+        let art: Value = serde_json::from_slice(&compile(&rom).unwrap().bytes).unwrap();
         assert_eq!(art["schema_version"], 1);
-        assert_eq!(art["frames"].as_object().unwrap().len(), 28);
+        assert_npc_raster(&art);
+        assert_eq!(art["frames"].as_object().unwrap().len(), 29);
         let sprites = ArkSprites::from_rom(rom.image()).unwrap();
         for (index, frame) in sprites.frames().iter().enumerate() {
             for mirror in [false, true] {

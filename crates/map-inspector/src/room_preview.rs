@@ -12,7 +12,7 @@ pub(super) struct Preview {
     data: GameData,
     state: GameState,
     bitmap: Vec<u8>,
-    art: Vec<u8>,
+    art: crate::room_art::Art,
     error: Option<String>,
     fresh_start: bool,
 }
@@ -33,7 +33,7 @@ impl Preview {
         })
     }
     pub(super) fn art(&self) -> &[u8] {
-        &self.art
+        &self.art.bytes
     }
     pub(super) fn bitmap(&self) -> &[u8] {
         &self.bitmap
@@ -73,7 +73,7 @@ impl Preview {
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
             "actor_key":actor_key,
-            "scene":[{"key":actor_key,"position":[output.position.0,output.position.1]}],
+            "scene":self.art.scene(output.map_id, &actor_key, output.position),
             "animation":{"set":match output.animation.set {
                 room_core::AnimationSet::Standing=>"standing",room_core::AnimationSet::Walking=>"walking"},
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
@@ -259,7 +259,7 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     Ok(
         json!({"kind":"cpu-free-semantic-room-preview","initial":initial,"handoff":handoff,"departure":departure,"spawn":spawn,"arrival":arrival,
         "return_handoff":return_handoff,"returned":returned,
-        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites with static house BG2 priority only; no NPCs, shadows, effects, combat, audio or events."}),
+        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites and one frozen room10 resident with static house BG2 priority only; no NPC behavior/dialogue, shadows, effects, combat, audio or events."}),
     )
 }
 
@@ -318,7 +318,7 @@ pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
         json!({"kind":"cpu-free-semantic-new-game-house-route", "initial":initial,
         "outbound_handoff":outbound_handoff,"arrival":arrival,"return_handoff":return_handoff,
         "returned":returned,"revisited":revisited,
-        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites with static house BG2 priority only; no native loader timing, NPCs, shadows, effects, combat or audio."}),
+        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites and one frozen room10 resident with static house BG2 priority only; no native loader timing, NPC behavior/dialogue, shadows, effects, combat or audio."}),
     )
 }
 
@@ -414,9 +414,13 @@ mod tests {
         let state = preview.state();
         let key = crate::room_art::frame_key(output.animation);
         assert_eq!(state["actor_key"], key);
-        assert_eq!(
-            state["scene"],
-            json!([{ "key":key, "position":[output.position.0,output.position.1] }])
+        let scene = state["scene"].as_array().unwrap();
+        assert_eq!(scene.len(), if output.map_id == 16 { 2 } else { 1 });
+        for entry in scene {
+            assert!(art["frames"].get(entry["key"].as_str().unwrap()).is_some());
+        }
+        assert!(
+            scene.contains(&json!({ "key":key, "position":[output.position.0,output.position.1] }))
         );
         assert!(art["frames"].get(&key).is_some(), "missing {key}");
         assert_eq!(state["animation"]["sequence"], output.animation.sequence);

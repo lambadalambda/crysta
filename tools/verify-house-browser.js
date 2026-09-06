@@ -20,6 +20,8 @@
   }
   // Independent pixel composition verifies the actual canvas, not just state.
   const art = await (await fetch('/art.json')).json();
+  const npc=art.npc;
+  if(!npc || npc.map_id!==16 || npc.key!=='npc:house' || JSON.stringify(npc.position)!=='[424,416]') throw new Error('Unqualified house NPC metadata');
   const image = new Image();
   await new Promise((resolve,reject) => { image.onload=resolve; image.onerror=reject; image.src='/map.bmp'; });
   const sheet = document.createElement('canvas'); sheet.width=image.width; sheet.height=image.height;
@@ -30,7 +32,7 @@
     for(let i=0;i<mask.runs.length;i+=2) bytes.fill(1,mask.runs[i],mask.runs[i]+mask.runs[i+1]);
     return [id,bytes];
   }));
-  const visualKeys=new Set(); let visualChecks=0;
+  const visualKeys=new Set(); let visualChecks=0, npcVisibleChecks=0, npcPixels=0;
   function checkPixels() {
     const actorKey=$('actor-key').textContent, actor=art.frames[actorKey];
     if(!actor) throw new Error(`Missing actual sprite ${actorKey}`);
@@ -39,6 +41,11 @@
     const map=parseInt($('map').textContent.slice(1),16), mask=masks[map];
     const actual=$('room').getContext('2d').getImageData(0,0,256,224).data;
     const scene=JSON.parse($('room').dataset.scene);
+    const resident=scene.filter(entry=>entry.key===npc.key);
+    const inHouse=map===npc.map_id;
+    if(scene.length!==(inHouse?2:1) || resident.length!==(inHouse?1:0) ||
+        (inHouse && JSON.stringify(resident[0].position)!==JSON.stringify(npc.position))) throw new Error('NPC scene membership/position differs');
+    if(inHouse && scene[py<npc.position[1]?1:0].key!==npc.key) throw new Error('NPC painter order differs');
     if(!scene.some(entry=>entry.key===actorKey && entry.position[0]===px && entry.position[1]===py)) {
       throw new Error('Scene omitted or misplaced Ark');
     }
@@ -47,19 +54,25 @@
       if(!sprite.frame) throw new Error(`Missing scene sprite ${sprite.key}`);
       visualKeys.add(sprite.key);
     }
+    let visibleNpcPixels=0;
     for(let y=0;y<224;y++) for(let x=0;x<256;x++) {
       const world=(y+cy)*sheet.width+x+cx;
-      let pixels=background, at=world*4;
-      if(!mask[world]) for(const {frame,position} of sprites) {
+      let pixels=background, at=world*4, topKey=null;
+      if(!mask[world]) for(const {frame,position,key} of sprites) {
         const sx=x+cx-position[0]-frame.offset[0], sy=y+cy-position[1]-frame.offset[1];
         const src=(sy*frame.width+sx)*4;
         if(sx>=0 && sy>=0 && sx<frame.width && sy<frame.height && frame.rgba[src+3]===255) {
-          pixels=frame.rgba; at=src;
+          pixels=frame.rgba; at=src; topKey=key;
         }
       }
+      if(topKey===npc.key) visibleNpcPixels++;
       for(let c=0;c<4;c++) {
         if(actual[(y*256+x)*4+c]!==pixels[at+c]) throw new Error(`Canvas mismatch tick ${$('tick').textContent}, pixel ${x},${y}, channel ${c}`);
       }
+    }
+    if(inHouse) {
+      if(visibleNpcPixels===0) throw new Error('NPC pixel comparison is vacuous');
+      npcVisibleChecks++; npcPixels+=visibleNpcPixels;
     }
     visualChecks++;
   }
@@ -129,6 +142,6 @@
     throw new Error(`Final host state differs: ${JSON.stringify(final)}`);
   }
   return {kind:'real-browser-new-game-house-exploration', initial, checkpoints:evidence, final,
-    visualChecks, spriteKeys:[...visualKeys].sort(),
-    limits:'Default-name semantic start; intro/dialogue presentation omitted. ROM-derived ordinary Ark poses, static first background with high-pixel occlusion, passive cardinal walking and two endpoint-timed doorways only.'};
+    visualChecks, npcVisibleChecks, npcPixels, spriteKeys:[...visualKeys].sort(),
+    limits:'Default-name semantic start; intro/dialogue presentation omitted. ROM-derived ordinary Ark poses and one frozen room10 resident (no NPC behavior/dialogue), static first background with high-pixel occlusion, passive cardinal walking and two endpoint-timed doorways only.'};
 })()
