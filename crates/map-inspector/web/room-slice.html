@@ -262,12 +262,44 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       });
     }
   }
-  function drawScene(ctx, image, state, actor = null, foreground = null) {
+  // Bounded mode09 first-BG compositor. Later opaque OBJs win regardless of
+  // priority; only that winner is compared to opaque-high BG. In particular a
+  // hidden front OBJ2 never reveals a rear OBJ3. No blending/windows/color math.
+  function composeObjects(width, height, sprites, camera, high) {
+    const rgba = new Uint8ClampedArray(width*height*4), priorities = new Uint8Array(width*height);
+    for (const sprite of sprites) {
+      if (![2,3].includes(sprite.priority)) throw new Error('Unsupported OBJ priority');
+      const [,,w,h] = sprite.source, [ox,oy] = sprite.offset, [px,py] = sprite.position;
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+        const from = (y*w+x)*4;
+        if (!sprite.rgba[from+3]) continue;
+        const dx = px-camera[0]+(sprite.flipX ? -ox-x-1 : ox+x), dy = py-camera[1]+oy+y;
+        if (dx < 0 || dy < 0 || dx >= width || dy >= height) continue;
+        const at = dy*width+dx;
+        rgba.set(sprite.rgba.slice(from,from+4),at*4); priorities[at] = sprite.priority;
+      }
+    }
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+      const at = y*width+x, bx = x+camera[0], by = y+camera[1];
+      if (priorities[at] === 2 && bx >= 0 && by >= 0 && bx < high.width && by < high.height && high.data[(by*high.width+bx)*4+3]) {
+        rgba.fill(0,at*4,at*4+4);
+      }
+    }
+    return rgba;
+  }
+  function drawScene(ctx, image, state, actor = null, foreground = null, high = null) {
     ctx.imageSmoothingEnabled = false; ctx.fillStyle = '#10151d'; ctx.fillRect(0, 0, 256, 224);
     if (!state) return;
     const [cx, cy] = state.camera;
     if (image) ctx.drawImage(image, cx, cy, 256, 224, 0, 0, 256, 224);
     if (actor) {
+      if (high) {
+        const overlay = composeObjects(256,224,actor,state.camera,high);
+        const pixels = ctx.getImageData(0,0,256,224);
+        for (let i = 0; i < overlay.length; i += 4) if (overlay[i+3]) pixels.data.set(overlay.subarray(i,i+4),i);
+        ctx.putImageData(pixels,0,0);
+        return;
+      }
       // The adapter supplies ordered, composed rasters and world anchors.
       // Native mirrors are precomposed; diagnostic flipX is anchor-relative.
       for (const sprite of Array.isArray(actor) ? actor : [actor]) {
@@ -328,12 +360,62 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         throw new Error('Invalid background key');
       }
     }
-    return backgrounds;
+    const extra = bundle.pandora_backgrounds;
+    if (extra === undefined) return backgrounds;
+    const sheets = {town13:{url:'/town13.bmp',width:1024,height:512},cellars:{url:'/cellars.bmp',width:512,height:1024},box:{url:'/box.bmp',width:256,height:512},tour:{url:'/tour.bmp',width:512,height:512}};
+    const extraMaps = {19:'town13',14:'cellars',32:'cellars',33:'box',65:'tour',66:'tour',67:'tour',68:'tour'};
+    const bounds = {19:[256,0,512,256],14:[0,768,256,1024],32:[256,768,512,1024],33:[0,0,256,512],65:[0,0,256,256],66:[0,256,256,512],67:[256,0,512,256],68:[256,256,512,512]};
+    const exactKeys = (value, expected) => value && !Array.isArray(value) && Object.keys(value).length === Object.keys(expected).length && Object.keys(expected).every(key=>Object.hasOwn(value,key));
+    if (!extra || extra.policy !== 'natural-palette-first-background-checker-transparency-no-phase-patches' ||
+        !exactKeys(extra.backgrounds,sheets) || !exactKeys(extra.background_keys,extraMaps) ||
+        !exactKeys(extra.foreground,extraMaps) || !exactKeys(extra.cameras,extraMaps)) throw new Error('Invalid Pandora background manifest');
+    for (const [key, expected] of Object.entries(sheets)) {
+      const sheet = extra.backgrounds[key];
+      if (!sheet || sheet.url !== expected.url || sheet.width !== expected.width || sheet.height !== expected.height) throw new Error('Invalid Pandora background sheet');
+    }
+    for (const [id,key] of Object.entries(extraMaps)) {
+      const camera = extra.cameras[id];
+      if (extra.background_keys[id] !== key || !camera || camera.bgmode !== 9 || camera.hardware_background !== (id === '19' ? 2 : 1) ||
+          camera.vertical_extent !== 256 || camera.policy !== 'settled-source-clamp-not-transition-pan' ||
+          !Array.isArray(camera.bounds) || camera.bounds.length !== 4 || !camera.bounds.every((v,i)=>v === bounds[id][i])) throw new Error('Invalid Pandora background map/camera');
+    }
+    return {...backgrounds,...extra.backgrounds};
+  }
+  function prepareScenes(source, actors, backgroundKeys) {
+    if (source === undefined) return null;
+    if (!source || typeof source !== 'object' || Array.isArray(source) || !Object.keys(source).length) throw new Error('Invalid Pandora scenes');
+    const scenes = Object.create(null);
+    for (const [key, phase] of Object.entries(source)) {
+      if (!phase || ![10,12,14,19,32,33,65,66,67,68].includes(phase.map_id) || !backgroundKeys[phase.map_id] ||
+          phase.policy !== 'source-endpoints-not-script-timing' || !Array.isArray(phase.limits) || !phase.limits.every(v=>typeof v === 'string') ||
+          !Number.isInteger(phase.ark_tie_rank) || phase.ark_tie_rank < 0 || !Array.isArray(phase.actors) || phase.actors.length > 128) throw new Error('Invalid Pandora scene phase');
+      const ids = new Set(['ark']), ranks = new Set([phase.ark_tie_rank]);
+      for (const actor of phase.actors) {
+        if (!actor || typeof actor.id !== 'string' || !/^pandora:[0-9a-f]{6}$/.test(actor.id) || ids.has(actor.id) ||
+            !Number.isInteger(actor.art_id) || actor.art_id < 0 || actor.art_id > 0xffffff || !Number.isInteger(actor.selector) || actor.selector < 0 || actor.selector > 255 ||
+            typeof actor.hflip !== 'boolean' || actor.key !== `pandora:${actor.art_id.toString(16).padStart(6,'0')}:${actor.selector}:0:${Number(actor.hflip)}` ||
+            !actors[actor.key] || ![2,3].includes(actor.priority) || !Number.isInteger(actor.tie_rank) || actor.tie_rank < 0 || ranks.has(actor.tie_rank) ||
+            !Array.isArray(actor.position) || actor.position.length !== 2 || !actor.position.every(v=>Number.isInteger(v) && v >= 0 && v <= 65535)) throw new Error('Invalid Pandora scene art/priority');
+        ids.add(actor.id); ranks.add(actor.tie_rank);
+      }
+      scenes[key] = phase;
+    }
+    return scenes;
+  }
+  function selectedPhase(art, state) {
+    if (state.scene_phase === undefined) {
+      if (!art.sceneIds[state.map_id]) throw new Error('Missing source scene phase');
+      return null;
+    }
+    const phase = typeof state.scene_phase === 'string' && art.pandoraScenes?.[state.scene_phase];
+    if (!phase || phase.map_id !== state.map_id) throw new Error('Unsupported source scene phase/map');
+    return phase;
   }
   // New bundles take {house:ImageData, exterior:ImageData}; legacy helper fixtures
   // may still pass one ImageData and supply the closed image to selectBackground.
   function prepareArt(bundle, background, makeRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
+    const highMasks = Object.create(null), openHighMasks = Object.create(null);
     const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null), choiceCatalogs = Object.create(null);
     const backgrounds = Object.create(null), backgroundKeys = Object.create(null);
     const manifest = bundle.backgrounds === undefined ? null : backgroundManifest(bundle);
@@ -347,7 +429,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         backgrounds[key] = makeRaster(data.width,data.height,data.data);
       }
     }
+    if (!manifest && bundle.pandora_backgrounds !== undefined) throw new Error('Missing base background manifest');
+    const masks = {...bundle.foreground,...bundle.pandora_backgrounds?.foreground};
     for (const id of Object.keys(bundle.foreground)) backgroundKeys[id] = manifest ? bundle.background_keys[id] : 'house';
+    Object.assign(backgroundKeys,bundle.pandora_backgrounds?.background_keys);
     const doorBackground = 'house', house = pixels[doorBackground];
     const door = prepareDoor(bundle.door_patches, house);
     const openBackground = door ? makeRaster(house.width, house.height, door.pixels) : null;
@@ -356,7 +441,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (!validPixels(width,height,rgba,64,64) || !Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger)) {
         throw new Error('Invalid sprite raster');
       }
-      actors[key] = {image:makeRaster(width, height, rgba), source:[0,0,width,height], offset, flipX:false};
+      if (bundle.pandora_scenes !== undefined && rgba.some((v,i)=>i%4 === 3 && v !== 0 && v !== 255)) throw new Error('Unsupported sprite alpha');
+      actors[key] = {rgba:new Uint8ClampedArray(rgba), image:makeRaster(width, height, rgba), source:[0,0,width,height], offset, flipX:false};
     }
     for (const [key,page] of Object.entries(bundle.dialogue_pages || {})) {
       const {width,height,rgba} = page || {};
@@ -378,9 +464,9 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         choiceContexts[key] = {catalog:context.catalog,options:context.options.map(key=>({...dialoguePages[key],key}))};
       }
     }
-    for (const [id, mask] of Object.entries(bundle.foreground)) {
+    for (const [id, mask] of Object.entries(masks)) {
       const background = pixels[backgroundKeys[id]];
-      if (mask.width !== background.width || mask.height !== background.height ||
+      if (!mask || mask.width !== background.width || mask.height !== background.height ||
           !Array.isArray(mask.runs) || mask.runs.length % 2) throw new Error('Invalid foreground mask');
       const rgba = new Uint8ClampedArray(background.data.length);
       let end = 0;
@@ -393,33 +479,37 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         for (let at = start * 4; at < end * 4; at++) rgba[at] = background.data[at];
       }
       foreground[id] = makeRaster(mask.width, mask.height, rgba);
+      highMasks[id] = {width:mask.width,height:mask.height,data:rgba};
       if (door && backgroundKeys[id] === doorBackground) {
         const opened = new Uint8ClampedArray(rgba);
         for (const [at, high] of door.writes) {
           opened.set(high ? door.pixels.subarray(at*4,at*4+4) : [0,0,0,0],at*4);
         }
         openForeground[id] = makeRaster(mask.width, mask.height, opened);
+        openHighMasks[id] = {width:mask.width,height:mask.height,data:opened};
       }
     }
     const sceneIds = Object.create(null);
-    for (const id of Object.keys(foreground)) {
+    for (const id of Object.keys(bundle.foreground)) {
       const ids = bundle.scene_ids && bundle.scene_ids[id];
       if (!Array.isArray(ids) || ids.length < 1 || ids.length > 128 || !ids.includes('ark') ||
           !ids.every(value => typeof value === 'string' && value.length > 0 && value.length <= 64) ||
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
+    const pandoraScenes = prepareScenes(bundle.pandora_scenes,actors,backgroundKeys);
+    return {actors, foreground, sceneIds, pandoraScenes, highMasks, openHighMasks, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
     const key = art.backgroundKeys[state.map_id];
     if (!key || !art.foreground[state.map_id]) throw new Error('Unsupported background key');
+    const phase = selectedPhase(art,state);
     if (state.wooden_door_open && key === art.doorBackground) {
       if (!art.openBackground || !art.openForeground[state.map_id]) throw new Error('Missing open door art');
-      return {image:art.openBackground,foreground:art.openForeground[state.map_id]};
+      return {image:art.openBackground,foreground:art.openForeground[state.map_id],high:phase ? art.openHighMasks[state.map_id] : null};
     }
-    return {image:art.backgrounds[key] || image,foreground:art.foreground[state.map_id]};
+    return {image:art.backgrounds[key] || image,foreground:art.foreground[state.map_id],high:phase ? art.highMasks[state.map_id] : null};
   }
   function selectDialogue(art, state) {
     if (!state.dialogue) return null;
@@ -445,7 +535,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   function selectActors(art, state) {
     selectActor(art, state); // Player and background remain mandatory.
-    const scene = state.scene, ids = art.sceneIds[state.map_id];
+    const phase = selectedPhase(art,state);
+    const scene = state.scene, ids = phase ? ['ark',...phase.actors.map(actor=>actor.id)] : art.sceneIds[state.map_id];
     if (!Array.isArray(ids) || !Array.isArray(scene) || scene.length !== ids.length ||
         scene.some(entry => !entry || !ids.includes(entry.id) || typeof entry.key !== 'string' || !art.actors[entry.key] || !Array.isArray(entry.position) ||
           entry.position.length !== 2 || !entry.position.every(v => Number.isInteger(v) && v >= 0 && v <= 65535)) ||
@@ -453,11 +544,17 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         !scene.some(entry => entry.id === 'ark' && entry.key === state.actor_key && entry.position[0] === state.x && entry.position[1] === state.y)) {
       throw new Error('Unsupported sprite scene');
     }
-    // Native adapter owns scene membership and painter order, not the client.
-    return scene.map(entry => ({...art.actors[entry.key], position:entry.position}));
+    if (phase) {
+      const expected = [...phase.actors,{id:'ark',key:state.actor_key,position:[state.x,state.y],priority:2,tie_rank:phase.ark_tie_rank}]
+        .sort((a,b)=>a.position[1]-b.position[1] || a.tie_rank-b.tie_rank);
+      if (scene.some((entry,i)=>entry.id !== expected[i].id || entry.key !== expected[i].key || entry.priority !== expected[i].priority ||
+          entry.position.some((v,j)=>v !== expected[i].position[j]))) throw new Error('Unsupported source scene roster/order/priority');
+    } else if (scene.some(entry=>entry.priority !== undefined && entry.priority !== 2)) throw new Error('Unsupported legacy scene priority');
+    // Validate source order, never sort by OBJ priority. Mirrors are precomposed.
+    return scene.map(entry => ({...art.actors[entry.key], position:entry.position,...(phase ? {priority:entry.priority} : {})}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};
+  globalThis.RoomSlice = {composeObjects, backgroundManifest, createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')];
@@ -501,7 +598,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         if (page) paintPage($('dialogue-page'),page,state.dialogue.key);
         if (choices) choices.forEach((option,index)=>paintPage($(`choice${index+1}-label`),option,option.key));
         const background = selectBackground(art, state);
-        drawScene(ctx, background.image, state, selectActors(art, state), background.foreground);
+        drawScene(ctx, background.image, state, selectActors(art, state), background.foreground, background.high);
         assetError = null; $('error').textContent = error || '';
       }
       catch (failure) {

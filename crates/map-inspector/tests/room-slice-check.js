@@ -48,7 +48,7 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null, mutateBundle = () => {}, badDimensions = false, failBitmap = false} = {}) {
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null, mutateBundle = () => {}, mutateState = state => state, badDimensions = false, failBitmap = false} = {}) {
   const elements = new Map(), timers = new Map(), requests = [], images = [], draws = []; let timerId = 0, key = actorKey, clock = 0;
   const context = {fillRect(){},drawImage(...args){draws.push(args);},save(){},restore(){},translate(){},putImageData(){},
     getImageData(x,y,width,height){return {width,height,data:new Uint8ClampedArray(width*height*4)};}};
@@ -71,19 +71,38 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
   const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {set src(value){
-      this.url=value;images.push(this);this.naturalWidth=value==='/exterior.bmp'?1024:512;
-      this.naturalHeight=value==='/exterior.bmp'?1280:1024;if(badDimensions)this.naturalWidth=1;
+      this.url=value;images.push(this);
+      const sheet=Object.values({...bundle.backgrounds,...bundle.pandora_backgrounds?.backgrounds}).find(sheet=>sheet.url===value);
+      this.naturalWidth=sheet.width;this.naturalHeight=sheet.height;if(badDimensions)this.naturalWidth=1;
       if(stallBitmap!==true && stallBitmap!==value) Promise.resolve().then(()=>failBitmap===true || failBitmap===value?this.onerror():this.onload());
     }},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
-    async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
+    async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:mutateState({...(url==='/reset'?initial():newGameState()),actor_key:key,
       ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey,...(dialogueChoice===null?{}:{choice:dialogueChoice})},dialogue_acknowledgement:true,choice_interaction:true}:{}),
-      scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
+      scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]});}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
   return {element,timers,requests,images,draws,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
+  const {fixture,check}=require('./pandora-render-check.js');
+  check(sandbox.RoomSlice);
+  const source=fixture();
+  const optin=browserHarness({mutateBundle:b=>Object.assign(b,source.bundle),mutateState:s=>({...s,...source.state})});
+  await flush();await flush();
+  assert.equal(optin.element('error').textContent,'');
+  assert.deepEqual(optin.images.map(i=>i.url).sort(),['/box.bmp','/cellars.bmp','/exterior.bmp','/map.bmp','/tour.bmp','/town13.bmp']);
+  for(const change of [{scene_phase:'missing'},{scene_phase:undefined},{map_id:66},{scene:source.state.scene.map(e=>({...e,priority:1}))}]) {
+    const bad=browserHarness({mutateBundle:b=>Object.assign(b,source.bundle),mutateState:s=>({...s,...source.state,...change})});
+    await flush();await flush();
+    assert.match(bad.element('error').textContent,/scene|phase|priority/);
+    assert.equal(bad.element('pause').disabled,true,'invalid source scene visibly pauses inline page');
+  }
+  const badManifest=browserHarness({mutateBundle:b=>{Object.assign(b,structuredClone(source.bundle));b.pandora_backgrounds.backgrounds.tour.url='/tour.bmp?bad';}});
+  await flush();await flush();
+  assert.match(badManifest.element('error').textContent,/background/);
+  assert.equal(badManifest.images.length,0,'reject additive URLs before loading even the old sheets');
+
   const loaded = browserHarness(); await flush(); await flush();
   assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);
   assert.equal(loaded.element('error').textContent,'');
