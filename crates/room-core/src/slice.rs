@@ -1,4 +1,6 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
+use crate::conversation::{self, Active, ConversationSpec, DialogueOutput};
+use crate::events::EventFlags;
 use crate::transition::Transition;
 use crate::{
     AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
@@ -6,8 +8,8 @@ use crate::{
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v8 adds the six-room shared sheet and atomic wooden door.
-pub const PROFILE_VERSION: u8 = 8;
+/// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
+pub const PROFILE_VERSION: u8 = 9;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,6 +71,13 @@ pub struct GameData {
     identity: DataIdentity,
     new_game: NewGameData,
     open_corridor: Option<Room>,
+    progression: Option<ProgressionData>,
+}
+#[derive(Debug)]
+struct ProgressionData {
+    conversation: ConversationSpec,
+    open_d: Room,
+    exterior: Room,
 }
 impl GameData {
     /// Compatible F/10-only constructor. Does not enable door interaction.
@@ -155,7 +164,61 @@ impl GameData {
             identity,
             new_game,
             open_corridor,
+            progression: None,
         })
+    }
+    /// Extend a six-room house with the source-qualified B conversation and A landing.
+    ///
+    /// `identity` must authenticate the ordered conversation keys, full A grid,
+    /// fixed sample admission policy and existing house data together. The ROM
+    /// identity must remain unchanged. No A exits or actors are admitted.
+    /// The source D cell $8592 is privately cloned to $0592 for post-grant reloads.
+    /// A is 64x80 cells; every ordinary collision sample is restricted to the
+    /// half-open source-qualified halo [29,47,36,53], independently of map bounds.
+    /// # Errors
+    /// Rejects legacy/twice-extended data, changed gate/dimensions/ROM, or non-open
+    /// material/occupancy in the 42-cell admitted exterior halo.
+    pub fn with_progression(
+        mut self,
+        conversation: ConversationSpec,
+        exterior: Room,
+        identity: DataIdentity,
+    ) -> Result<Self, SliceError> {
+        if self.rooms.len() != 6
+            || !self.door_interaction()
+            || self.progression.is_some()
+            || identity.rom_sha256 != self.identity.rom_sha256
+            || exterior.width() != 64
+            || exterior.height() != 80
+            || self.room(13, false, false)?.cells()[1415] != 0x8592
+        {
+            return Err(SliceError::Data);
+        }
+        for y in 47..53 {
+            for x in 29..36 {
+                let raw = exterior.cells()[y * 64 + x];
+                if raw & 0x8000 != 0 || !matches!((raw >> 9) & 31, 0 | 22) {
+                    return Err(SliceError::Data);
+                }
+            }
+        }
+        let exterior = exterior
+            .with_sample_halo([29, 47, 36, 53])
+            .map_err(|_| SliceError::Data)?;
+        let mut open_d = self.room(13, false, false)?.clone();
+        open_d.replace_cell(1415, 0x592);
+        self.progression = Some(ProgressionData {
+            conversation,
+            open_d,
+            exterior,
+        });
+        self.identity = identity;
+        Ok(self)
+    }
+    /// Capability, not current target availability.
+    #[must_use]
+    pub fn conversation_progression(&self) -> bool {
+        self.progression.is_some()
     }
     /// Capability, not current target availability. False for the legacy wrapper.
     #[must_use]
@@ -172,6 +235,13 @@ impl GameData {
         }
         if id == 12 && door_open {
             return self.open_corridor.as_ref().ok_or(SliceError::Data);
+        }
+        if id == 10 {
+            return self
+                .progression
+                .as_ref()
+                .map(|p| &p.exterior)
+                .ok_or(SliceError::Data);
         }
         self.rooms
             .iter()
@@ -202,7 +272,7 @@ pub enum SliceError {
     Walking(Unqualified),
     /// An exit or handoff is outside the supported semantic doorways.
     Exit,
-    /// No admitted closed wooden-door target; no NPC/action fallback is attempted.
+    /// No admitted target/wait, wrong dialogue action, or choice outside 0..2.
     Interaction,
     /// Snapshot version, source identity, fields or consistency were invalid.
     Snapshot,
@@ -219,6 +289,8 @@ impl fmt::Display for SliceError {
 /// Semantic output phase, explicitly distinct from the native scheduler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
+    /// The B conversation owns control; movement input is discarded.
+    Dialogue,
     /// Ordinary qualified walking owns control.
     Walking,
     /// Logical unchecked departure translation owns control.
@@ -244,6 +316,7 @@ pub struct FrameOutput {
 
 /// Minimal mutable slice state. No clock, filesystem, original CPU or RNG usage.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // Independent source/capability/load-time predicates, not mutually exclusive phases.
 pub struct GameState {
     identity: DataIdentity,
     tick: u64,
@@ -253,6 +326,10 @@ pub struct GameState {
     transition: Option<Transition>,
     fresh_bedroom: bool,
     wooden_door_open: bool,
+    flags: EventFlags,
+    dialogue: Option<Active>,
+    d_open_loaded: bool,
+    progression_enabled: bool,
 }
 impl GameState {
     /// Starts the authenticated ordinary bedroom checkpoint. Policy opt-in is explicit.
@@ -267,6 +344,10 @@ impl GameState {
             transition: None,
             fresh_bedroom: false,
             wooden_door_open: false,
+            flags: conversation::initial_flags(false),
+            dialogue: None,
+            d_open_loaded: false,
+            progression_enabled: data.conversation_progression(),
         }
     }
     /// Starts the source-compiled fresh bedroom after semantic intro completion.
@@ -284,6 +365,10 @@ impl GameState {
             transition: None,
             fresh_bedroom: true,
             wooden_door_open: false,
+            flags: conversation::initial_flags(false),
+            dialogue: None,
+            d_open_loaded: false,
+            progression_enabled: data.conversation_progression(),
         }
     }
     /// Advances one walking frame or one *logical* doorway update. While the
@@ -294,14 +379,23 @@ impl GameState {
     /// Rejects incompatible data, unsupported walking/exit behavior, or overflow;
     /// failure is atomic and the caller decides how to report/pause it.
     pub fn step(&mut self, data: &GameData, input: FrameInput) -> Result<FrameOutput, SliceError> {
-        if self.identity != data.identity {
+        if self.identity != data.identity
+            || self.progression_enabled != data.conversation_progression()
+        {
             return Err(SliceError::Data);
         }
         let mut next = self.clone();
         next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
-        if let Some(mut transition) = next.transition {
+        if next.dialogue.is_some() {
+            // Explicit semantic policy: keep standing pose/history, discard inputs.
+        } else if let Some(mut transition) = next.transition {
             transition.advance();
             next.animation = AnimationState::standing(transition.direction());
+            if next.map_id != transition.map_id() {
+                // Membership is selected only at reconstruction, never on a live flag write.
+                next.d_open_loaded =
+                    transition.map_id() == 13 && (next.flags.contains(0x26) == Ok(true));
+            }
             next.map_id = transition.map_id();
             if next.map_id != transition.source_map() {
                 next.fresh_bedroom = false;
@@ -314,11 +408,9 @@ impl GameState {
                 next.transition = Some(transition);
             }
         } else {
+            let room = next.current_room(data)?;
             next.walking
-                .step(
-                    data.room(next.map_id, next.fresh_bedroom, next.wooden_door_open)?,
-                    input,
-                )
+                .step(room, input)
                 .map_err(SliceError::Walking)?;
             next.animation.advance(next.walking.active_direction());
             if let Some((index, _)) = data.exit(next.map_id, next.walking.position()) {
@@ -328,6 +420,8 @@ impl GameState {
                     .room(transition.source_map(), false, next.wooden_door_open)
                     .is_err()
                     || (!data.door_interaction() && transition.route() > 1)
+                    || (transition.exterior()
+                        && (!next.d_open_loaded || !data.conversation_progression()))
                     || (next.map_id == 12 && index == 2 && !next.wooden_door_open)
                     || next.walking.active_direction() != Some(transition.direction())
                 {
@@ -358,12 +452,38 @@ impl GameState {
     /// Native A takes control and schedules intermediate tiles/waits; this policy
     /// commits only final $F6/$F7 and cancels delayed walking without requiring an
     /// extra release tick. The input-history reset is semantic, not native timing.
-    /// Entry dialogue and all NPC interactions are omitted; event0026 is never set.
+    /// In progression-enabled data, B at (120,128), facing Up starts the fixed
+    /// resident conversation instead. Entry text is not a progression action.
     /// # Errors
     /// Wrong data, overflow, already-open door or any other target reject atomically.
     pub fn interact(&mut self, data: &GameData) -> Result<FrameOutput, SliceError> {
-        if self.identity != data.identity {
+        if self.identity != data.identity
+            || self.progression_enabled != data.conversation_progression()
+        {
             return Err(SliceError::Data);
+        }
+        if self.dialogue.is_some() {
+            return Err(SliceError::Interaction);
+        }
+        if self.map_id == 11
+            && self.walking.position() == (120, 128)
+            && self.animation.facing() == Direction::Up
+            && self.transition.is_none()
+            && !self.fresh_bedroom
+            && self.wooden_door_open
+        {
+            let spec = &data
+                .progression
+                .as_ref()
+                .ok_or(SliceError::Interaction)?
+                .conversation;
+            let mut next = self.clone();
+            next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
+            next.dialogue = Some(spec.begin(&mut next.flags));
+            next.walking = WalkingState::new(120, 128);
+            next.animation = AnimationState::standing(Direction::Up);
+            *self = next;
+            return Ok(self.output());
         }
         if !data.door_interaction()
             || self.map_id != 12
@@ -382,6 +502,87 @@ impl GameState {
         self.animation = AnimationState::standing(Direction::Up);
         Ok(self.output())
     }
+    /// Canonical source flags: initial $0020/$00FB, with only $0026 mutable here.
+    #[must_use]
+    pub const fn event_flags(&self) -> &EventFlags {
+        &self.flags
+    }
+
+    /// Current immutable collision variant, including load-time D gate selection.
+    /// # Errors
+    /// Rejects incompatible data or unavailable profiles.
+    pub fn current_room<'a>(&self, data: &'a GameData) -> Result<&'a Room, SliceError> {
+        if self.identity != data.identity
+            || self.progression_enabled != data.conversation_progression()
+        {
+            return Err(SliceError::Data);
+        }
+        if self.map_id == 13 && self.d_open_loaded {
+            return data
+                .progression
+                .as_ref()
+                .map(|p| &p.open_d)
+                .ok_or(SliceError::Data);
+        }
+        data.room(self.map_id, self.fresh_bedroom, self.wooden_door_open)
+    }
+    /// Inspect the current request and page/choice wait without advancing a tick.
+    /// # Errors
+    /// Rejects incompatible data or invalid ownership.
+    pub fn dialogue(&self, data: &GameData) -> Result<Option<DialogueOutput>, SliceError> {
+        if self.identity != data.identity
+            || self.progression_enabled != data.conversation_progression()
+        {
+            return Err(SliceError::Data);
+        }
+        self.dialogue
+            .map(|active| {
+                data.progression
+                    .as_ref()
+                    .ok_or(SliceError::Data)?
+                    .conversation
+                    .output(active)
+            })
+            .transpose()
+    }
+    /// Acknowledge exactly one real page in one atomic tick; choices are rejected.
+    /// # Errors
+    /// Rejects wrong data, absence of a page wait or tick overflow atomically.
+    pub fn acknowledge(&mut self, data: &GameData) -> Result<FrameOutput, SliceError> {
+        self.dialogue_action(data, None)
+    }
+    /// Select explicit result 0=cancel or 1/2=option in one atomic tick.
+    /// No frontend selection state or implicit/default result enters simulation.
+    /// # Errors
+    /// Rejects wrong data, absence of a choice, invalid result or tick overflow atomically.
+    pub fn choose(&mut self, data: &GameData, selection: u8) -> Result<FrameOutput, SliceError> {
+        self.dialogue_action(data, Some(selection))
+    }
+    fn dialogue_action(
+        &mut self,
+        data: &GameData,
+        choice: Option<u8>,
+    ) -> Result<FrameOutput, SliceError> {
+        self.dialogue(data)?;
+        let active = self.dialogue.ok_or(SliceError::Interaction)?;
+        let spec = &data
+            .progression
+            .as_ref()
+            .ok_or(SliceError::Interaction)?
+            .conversation;
+        let mut next = self.clone();
+        next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
+        next.dialogue = if let Some(selection) = choice {
+            Some(spec.choose(active, selection, &mut next.flags)?)
+        } else {
+            spec.acknowledge(active, &mut next.flags)?
+        };
+        // Every active/finished conversation keeps one canonical frozen pose/history.
+        next.walking = WalkingState::new(120, 128);
+        next.animation = AnimationState::standing(Direction::Up);
+        *self = next;
+        Ok(self.output())
+    }
     /// Current stable semantic result, without advancing simulation.
     #[must_use]
     pub fn output(&self) -> FrameOutput {
@@ -392,16 +593,23 @@ impl GameState {
             position: self
                 .transition
                 .map_or_else(|| self.walking.position(), Transition::position),
-            phase: self.transition.map_or(Phase::Walking, |t| {
-                if t.elapsed() <= 17 {
-                    Phase::Departing
+            phase: self.transition.map_or(
+                if self.dialogue.is_some() {
+                    Phase::Dialogue
                 } else {
-                    Phase::Arriving
-                }
-            }),
+                    Phase::Walking
+                },
+                |t| {
+                    if t.elapsed() <= 17 {
+                        Phase::Departing
+                    } else {
+                        Phase::Arriving
+                    }
+                },
+            ),
         }
     }
-    /// Fixed 109-byte little-endian snapshot; immutable content is identified, not embedded.
+    /// Fixed 181-byte little-endian snapshot; immutable content is identified, not embedded.
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
     #[must_use]
     pub fn snapshot(&self) -> Vec<u8> {
@@ -413,7 +621,7 @@ impl GameState {
         bytes.push(self.transition.map_or(255, Transition::route));
         // No walking component is serialized while a doorway owns control.
         // Erasing its marker cannot turn a transition into a valid walking state.
-        bytes.extend(if self.transition.is_some() {
+        bytes.extend(if self.transition.is_some() || self.dialogue.is_some() {
             [0; crate::SNAPSHOT_SIZE]
         } else {
             self.walking.encode_snapshot()
@@ -432,6 +640,15 @@ impl GameState {
             bytes.extend([0; 5]);
         }
         bytes.push(u8::from(self.wooden_door_open));
+        bytes.extend(self.flags.bytes());
+        bytes.push(u8::from(self.d_open_loaded));
+        bytes.extend(self.dialogue.map_or(0, |a| a.request).to_le_bytes());
+        bytes.extend(
+            self.dialogue
+                .map_or(0, |a| a.cursor.position())
+                .to_le_bytes(),
+        );
+        bytes.push(u8::from(self.progression_enabled));
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
@@ -439,7 +656,7 @@ impl GameState {
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
     #[allow(clippy::too_many_lines)] // Keep the coupled ownership/schema checks together.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
-        if bytes.len() != 109
+        if bytes.len() != 181
             || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
@@ -460,6 +677,54 @@ impl GameState {
         };
         data.room(map_id, fresh_bedroom, wooden_door_open)
             .map_err(|_| SliceError::Snapshot)?;
+        let progression_enabled = match bytes[180] {
+            0 => false,
+            1 => true,
+            _ => return Err(SliceError::Snapshot),
+        };
+        if progression_enabled != data.conversation_progression() {
+            return Err(SliceError::Snapshot);
+        }
+        let flags = EventFlags::new(
+            bytes[109..173]
+                .try_into()
+                .map_err(|_| SliceError::Snapshot)?,
+        );
+        let granted = flags.contains(0x26) == Ok(true);
+        if flags != conversation::initial_flags(granted)
+            || (granted && (!progression_enabled || !wooden_door_open || fresh_bedroom))
+            || (map_id == 10 && !granted)
+        {
+            return Err(SliceError::Snapshot);
+        }
+        let d_open_loaded = match bytes[173] {
+            0 => false,
+            1 if map_id == 13 && granted && progression_enabled => true,
+            _ => return Err(SliceError::Snapshot),
+        };
+        let request = u32::from_le_bytes(
+            bytes[174..178]
+                .try_into()
+                .map_err(|_| SliceError::Snapshot)?,
+        );
+        let cursor = u16::from_le_bytes([bytes[178], bytes[179]]);
+        let dialogue = if request == 0 {
+            if cursor != 0 {
+                return Err(SliceError::Snapshot);
+            }
+            None
+        } else {
+            if map_id != 11 || !wooden_door_open || fresh_bedroom || bytes[82] != 255 {
+                return Err(SliceError::Snapshot);
+            }
+            Some(
+                data.progression
+                    .as_ref()
+                    .ok_or(SliceError::Snapshot)?
+                    .conversation
+                    .restore(request, cursor, &flags)?,
+            )
+        };
         let transition = if bytes[82] == 255 {
             if bytes[103..108] != [0; 5] {
                 return Err(SliceError::Snapshot);
@@ -473,6 +738,12 @@ impl GameState {
             let t =
                 Transition::restore(bytes[82], bytes[103], handoff).ok_or(SliceError::Snapshot)?;
             if (!data.door_interaction() && t.route() > 1)
+                || (t.exterior()
+                    && (!progression_enabled || !granted || (map_id == 13 && !d_open_loaded)))
+                // A retained arrival proves reconstruction already selected this
+                // profile with the same flags; unlike an old loaded D, it cannot
+                // legitimately preserve a pre-grant gate.
+                || (t.map_id() == 13 && t.source_map() != 13 && d_open_loaded != granted)
                 || (!wooden_door_open
                     && (t.source_map() == 11 || (t.source_map() == 12 && t.index() == 2)))
                 || data.exit(t.source_map(), handoff).map(|(i, _)| i) != Some(t.index())
@@ -481,7 +752,12 @@ impl GameState {
             }
             Some(t)
         };
-        let walking = if let Some(t) = transition {
+        let walking = if dialogue.is_some() {
+            if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
+                return Err(SliceError::Snapshot);
+            }
+            WalkingState::new(120, 128)
+        } else if let Some(t) = transition {
             if t.map_id() != map_id
                 || bytes[83..99] != [0; crate::SNAPSHOT_SIZE]
                 || (fresh_bedroom && t.source_map() != 15)
@@ -515,7 +791,9 @@ impl GameState {
         };
         let animation = AnimationState::from_parts(facing, is_walking, bytes[102])
             .ok_or(SliceError::Snapshot)?;
-        let coherent = if let Some(t) = transition {
+        let coherent = if dialogue.is_some() {
+            animation == AnimationState::standing(Direction::Up)
+        } else if let Some(t) = transition {
             !is_walking && facing == t.direction()
         } else if let Some(active) = walking.active_direction() {
             // Animation and horizontal movement share a 54-tick cycle. Vertical
@@ -547,6 +825,10 @@ impl GameState {
             transition,
             fresh_bedroom,
             wooden_door_open,
+            flags,
+            dialogue,
+            d_open_loaded,
+            progression_enabled,
         })
     }
 }
@@ -880,3 +1162,7 @@ mod tests {
 #[cfg(test)]
 #[path = "house_tests.rs"]
 mod house_tests;
+
+#[cfg(test)]
+#[path = "progression_tests.rs"]
+mod progression_tests;

@@ -106,10 +106,10 @@ fn snapshot_profile_append_and_coherence_are_fail_closed() {
     let data = data(false, None);
     let mut state = GameState::new_game(&data, Policy::SemanticPreview);
     let initial = state.snapshot();
-    assert_eq!(PROFILE_VERSION, 8);
+    assert_eq!(PROFILE_VERSION, 9);
     assert_eq!(SNAPSHOT_SIZE, 16);
-    assert_eq!(initial.len(), 109);
-    assert_eq!(initial[5], 8);
+    assert_eq!(initial.len(), 181);
+    assert_eq!(initial[5], 9);
     assert_eq!(
         &initial[83..99],
         &WalkingState::new(304, 112).encode_snapshot()

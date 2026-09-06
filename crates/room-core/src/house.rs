@@ -156,3 +156,14 @@ pub(crate) const DOORWAYS: [Doorway; 12] = [
         endpoint: (215, 688),
     },
 ];
+
+// Source $818DFE, enabled only by progression data and post-grant D reload.
+pub(crate) const EXTERIOR: Doorway = Doorway {
+    source: 13,
+    index: 0,
+    destination: 10,
+    direction: Direction::Down,
+    handoff: (120, 720),
+    anchor: (504, 752),
+    endpoint: (504, 769),
+};

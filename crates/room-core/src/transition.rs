@@ -18,8 +18,9 @@ impl Transition {
     pub(crate) fn select(map: u16, index: usize, position: (u16, u16)) -> Option<Self> {
         let route = DOORWAYS
             .iter()
+            .chain(core::iter::once(&crate::house::EXTERIOR))
             .position(|s| s.source == map && s.index == index)?;
-        let spec = DOORWAYS[route];
+        let spec = Self::route_spec(u8::try_from(route).ok()?)?;
         let valid = match spec.direction {
             Direction::Down => {
                 position.0 == spec.handoff.0
@@ -40,7 +41,17 @@ impl Transition {
         })
     }
     fn spec(self) -> Doorway {
-        DOORWAYS[usize::from(self.route)]
+        Self::route_spec(self.route).expect("validated route")
+    }
+    fn route_spec(route: u8) -> Option<Doorway> {
+        if usize::from(route) == DOORWAYS.len() {
+            Some(crate::house::EXTERIOR)
+        } else {
+            DOORWAYS.get(usize::from(route)).copied()
+        }
+    }
+    pub(crate) fn exterior(self) -> bool {
+        usize::from(self.route) == DOORWAYS.len()
     }
     pub(crate) fn source_map(self) -> u16 {
         self.spec().source
@@ -92,7 +103,7 @@ impl Transition {
         self.spec().index
     }
     pub(crate) fn restore(route: u8, elapsed: u8, handoff: (u16, u16)) -> Option<Self> {
-        let spec = DOORWAYS.get(usize::from(route))?;
+        let spec = Self::route_spec(route)?;
         let mut t = Self::select(spec.source, spec.index, handoff)?;
         if elapsed >= 35 {
             return None;
