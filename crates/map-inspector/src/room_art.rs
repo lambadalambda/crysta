@@ -198,6 +198,15 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
             )
         })
         .collect::<BTreeMap<_, _>>();
+    // Bounded exterior landing: no ordinary outdoor resident in its qualified
+    // viewport. OBJ3 labels/shadow/secondary effects are explicitly omitted.
+    rooms.insert(
+        10,
+        RoomActors {
+            actors: Vec::new(),
+            ark_tie_rank: 0,
+        },
+    );
     let mut actors = Vec::new();
     for actor in scenes.actors() {
         // Instance-keyed rasters deliberately avoid assuming pose identity alone
@@ -255,9 +264,18 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
         }
         masks.insert(map, foreground(&background)?);
     }
+    let exterior = StaticBackground::from_rom(rom.image(), 10)?;
+    masks.insert(10, foreground(&exterior)?);
+    let backgrounds = json!({"house":{"url":"/map.bmp","width":bedroom.layer().width()*16,"height":bedroom.layer().height()*16},
+        "exterior":{"url":"/exterior.bmp","width":exterior.layer().width()*16,"height":exterior.layer().height()*16}});
+    let background_keys: BTreeMap<_, _> = rooms
+        .keys()
+        .map(|&map| (map, if map == 10 { "exterior" } else { "house" }))
+        .collect();
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
             "scene_ids":membership(&rooms),"actors":actors,"foreground":masks,
+            "backgrounds":backgrounds,"background_keys":background_keys,"door_background":"house",
             "door_patches":door::compile(rom.image(), &bedroom)?,
             "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests}))?,
         rooms,
@@ -537,8 +555,39 @@ mod tests {
             assert_eq!(entry["setup_record"], 0);
             assert!(art["frames"].get(entry["key"].as_str().unwrap()).is_some());
         }
-        assert_eq!(art["scene_ids"].as_object().unwrap().len(), 6);
-        assert_eq!(art["foreground"].as_object().unwrap().len(), 6);
+        assert_eq!(art["scene_ids"].as_object().unwrap().len(), 7);
+        assert_eq!(art["scene_ids"]["10"], json!(["ark"]));
+        assert_eq!(art["foreground"].as_object().unwrap().len(), 7);
+        assert_exterior_background(art);
+    }
+
+    fn assert_exterior_background(art: &Value) {
+        assert_eq!(
+            art["backgrounds"],
+            json!({"house":{"url":"/map.bmp","width":512,"height":1024},"exterior":{"url":"/exterior.bmp","width":1024,"height":1280}})
+        );
+        assert_eq!(
+            art["background_keys"],
+            json!({"10":"exterior","11":"house","12":"house","13":"house","15":"house","16":"house","17":"house"})
+        );
+        assert_eq!(art["door_background"], "house");
+        let mask = &art["foreground"]["10"];
+        assert_eq!(mask["width"], 1024);
+        assert_eq!(mask["height"], 1280);
+        let mut pixels = vec![0; 1024 * 1280];
+        for pair in mask["runs"].as_array().unwrap().chunks_exact(2) {
+            let start = usize::try_from(pair[0].as_u64().unwrap()).unwrap();
+            let length = usize::try_from(pair[1].as_u64().unwrap()).unwrap();
+            pixels[start..start + length].fill(1);
+        }
+        let pins: Value = serde_json::from_str(include_str!(
+            "../../../tools/house-exterior-qualification/reference.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            crate::sha256(&pixels),
+            pins["export"][0]["files"]["priorities"]
+        );
     }
 
     #[test]

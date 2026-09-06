@@ -12,6 +12,7 @@ pub(super) struct Preview {
     data: GameData,
     state: GameState,
     bitmap: Vec<u8>,
+    exterior_bitmap: Vec<u8>,
     art: crate::room_art::Art,
     cameras: BTreeMap<u16, [u16; 2]>,
     error: Option<String>,
@@ -28,10 +29,13 @@ impl Preview {
             .collect::<Result<BTreeMap<_, _>>>()?;
         let viewer = crate::visual_export::export(rom, 15)?;
         let bitmap = std::fs::read(viewer.with_file_name("map.bmp"))?;
+        let exterior = crate::visual_export::export(rom, 10)?;
+        let exterior_bitmap = std::fs::read(exterior.with_file_name("map.bmp"))?;
         Ok(Self {
             data,
             state,
             bitmap,
+            exterior_bitmap,
             art,
             cameras,
             error: None,
@@ -43,6 +47,9 @@ impl Preview {
     }
     pub(super) fn bitmap(&self) -> &[u8] {
         &self.bitmap
+    }
+    pub(super) fn exterior_bitmap(&self) -> &[u8] {
+        &self.exterior_bitmap
     }
     pub(super) fn step(&mut self, button: u8) {
         if self.error.is_some() {

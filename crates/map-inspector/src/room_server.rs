@@ -13,6 +13,7 @@ const VIEWER: &str = include_str!("../web/room-slice.html");
 enum Request {
     Viewer,
     Map,
+    ExteriorMap,
     Art,
     State,
     Step(u8),
@@ -83,6 +84,7 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
     match (head.method, head.path, body) {
         ("GET", "/", "") => Ok(Request::Viewer),
         ("GET", "/map.bmp", "") => Ok(Request::Map),
+        ("GET", "/exterior.bmp", "") => Ok(Request::ExteriorMap),
         ("GET", "/art.json", "") => Ok(Request::Art),
         ("GET", "/state", "") => Ok(Request::State),
         ("POST", "/reset", "") => Ok(Request::Reset),
@@ -153,6 +155,12 @@ pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
                 VIEWER.as_bytes(),
             ),
             Ok(Request::Map) => respond(&mut stream, "200 OK", "image/bmp", preview.bitmap()),
+            Ok(Request::ExteriorMap) => respond(
+                &mut stream,
+                "200 OK",
+                "image/bmp",
+                preview.exterior_bitmap(),
+            ),
             Ok(Request::Art) => respond(&mut stream, "200 OK", "application/json", preview.art()),
             Ok(request) => {
                 match request {
@@ -209,6 +217,26 @@ mod tests {
         }
         let foreign = b"GET /art.json HTTP/1.1\r\nHost: evil.invalid\r\n\r\n";
         assert!(parse_request(foreign, ORIGIN).is_err());
+    }
+    #[test]
+    fn exterior_bitmap_is_one_exact_read_only_route() {
+        assert_eq!(
+            parse_request(&request("GET", "/exterior.bmp", "", ""), ORIGIN).unwrap(),
+            Request::ExteriorMap
+        );
+        for (method, path, headers, body) in [
+            ("GET", "/exterior.bmp?map=10", "", ""),
+            ("GET", "/exterior.bmp/../ROM", "", ""),
+            (
+                "POST",
+                "/exterior.bmp",
+                "Origin: http://127.0.0.1:1234\r\n",
+                "",
+            ),
+            ("GET", "/exterior.bmp", "Content-Length: 1\r\n", "0"),
+        ] {
+            assert!(parse_request(&request(method, path, headers, body), ORIGIN).is_err());
+        }
     }
     #[test]
     fn new_game_requires_same_origin_empty_post() {
