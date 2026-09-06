@@ -51,6 +51,10 @@ Implement only the maps, source assets and semantic state transitions required b
   Two error-presentation findings were fixed red→green: hide stale dialogue on
   host error, and preserve that primary error over a previous art failure. The
   actual inline harness exercises both sequences; no fallback art is displayed.
+- Capability-gated help now distinguishes house-only scope from the bounded
+  Pandora route, source-endpoint/record0 presentation, first-layer omissions and
+  Z versus Interact/Continue/Resume. Inline red→green tests check both capability
+  views; no input behavior changes.
 - Both module registrations are explicit in main. Producer bridge/current pins
   and the continuous real-browser journey remain acceptance gates, not bypassed
   by passing the offline route.

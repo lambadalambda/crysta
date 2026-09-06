@@ -91,6 +91,12 @@ async function main() {
   const optin=browserHarness({mutateBundle:b=>Object.assign(b,source.bundle),mutateState:s=>({...s,...source.state})});
   await flush();await flush();
   assert.equal(optin.element('error').textContent,'');
+  const pandoraHelp=browserHarness({mutateState:s=>({...s,pot_action:true})});
+  await flush();await flush();
+  assert.equal(pandoraHelp.element('house-scope').hidden,true);
+  assert.equal(pandoraHelp.element('pandora-scope').hidden,false);
+  assert.equal(pandoraHelp.element('pandora-action-help').hidden,false);
+  assert.match(pandoraHelp.element('scene-legend').textContent,/first background/);
   assert.deepEqual(optin.images.map(i=>i.url).sort(),['/box.bmp','/cellars.bmp','/exterior.bmp','/map.bmp','/tour.bmp','/town13.bmp']);
   for(const change of [{scene_phase:'missing'},{scene_phase:undefined},{map_id:66},{scene:source.state.scene.map(e=>({...e,priority:1}))}]) {
     const bad=browserHarness({mutateBundle:b=>Object.assign(b,source.bundle),mutateState:s=>({...s,...source.state,...change})});
@@ -141,6 +147,9 @@ async function main() {
   const loaded = browserHarness(); await flush(); await flush();
   assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);
   assert.equal(loaded.element('error').textContent,'');
+  assert.equal(loaded.element('house-scope').hidden,false);
+  assert.equal(loaded.element('pandora-scope').hidden,true);
+  assert.equal(loaded.element('pandora-action-help').hidden,true);
   loaded.element('reset').emit('click'); await flush();
   loaded.element('new-game').emit('click'); await flush();
   assert.equal(loaded.images.length,2,'starts reuse both preloaded sheets');

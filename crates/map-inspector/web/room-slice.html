@@ -31,12 +31,13 @@ dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0}d
 Choose <strong>New Game</strong>, then <strong>Resume</strong> to explore the supported house paths.
 This semantic start uses the default name and skips the intro and room-entry dialogue; it does not play the original opening.
 Ordinary walking, partial furniture and passive flagged walls are supported; rapid same-direction double taps trigger an unsupported dash error.
-The six fresh house rooms are connected. Open the wooden door, talk to the northern room’s resident, then leave south through the house’s exterior gate. Only a small outdoor landing is supported; cellar and further town progression remain outside scope.
-Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroom table object use frozen source-setup poses. Source-setup occupancy is solid; NPC movement and other residents’ interactions are not simulated. The northern resident’s Japanese dialogue and explicit choices are supported. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
+<span id="house-scope">The six fresh house rooms are connected. Open the wooden door, talk to the northern room’s resident, then leave south through the house’s exterior gate. Only a small outdoor landing is supported; cellar and further town progression remain outside scope.
+Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroom table object use frozen source-setup poses. Source-setup occupancy is solid; NPC movement and other residents’ interactions are not simulated. The northern resident’s Japanese dialogue and explicit choices are supported. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</span>
+<span id="pandora-scope" hidden>The supported route continues through the required town conversation, cellar pots and door, Pandora’s Box warning/opening, and the mandatory first-time tour back to player control. Only the direct first cellar response and qualified movement/throw lanes are supported; this is not free exploration of Crysta. Source actors are frozen or shown at finite cue endpoints; carry poses use source record0. The first background uses natural colors and effective door/pot patches. Scene timing is logical, not native video timing. Other layers, windows, color effects, wandering AI, inventory navigation, equipment, combat and audio are omitted.</span></p>
 <div class="layout">
 <section class="panel" aria-label="Room preview">
 <canvas id="room" width="256" height="224" aria-label="Room background with ROM-derived Ark standing and walking sprites">Canvas is required for the preview.</canvas>
-<p class="legend">ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
+<p id="scene-legend" class="legend">ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
 <section id="dialogue-panel" aria-label="Dialogue" hidden>
 <canvas id="dialogue-page" width="256" height="64" role="img" aria-label="Original Japanese dialogue"></canvas>
 <p><button id="continue" disabled>Continue (Space / Enter)</button></p>
@@ -62,7 +63,8 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 </div>
 <p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
 Release before changing direction. Escape pauses.
-Space/Enter or Interact opens the wooden door or talks to the qualified resident; release movement first. Face Up against the door in the upper part of the western middle room, then continue north and face Up toward the resident. Use Continue for pages, or explicitly choose an option / Cancel. Tab and Enter work on choice buttons. Interaction pauses the preview; Resume to walk again. Touch and hold a cardinal button; sliding outside releases it.</p>
+Space/Enter or Interact opens the wooden door or talks to the qualified resident; release movement first. Face Up against the door in the upper part of the western middle room, then continue north and face Up toward the resident. Use Continue for pages, or explicitly choose an option / Cancel. Tab and Enter work on choice buttons. Interaction pauses the preview; Resume to walk again. Touch and hold a cardinal button; sliding outside releases it.
+<span id="pandora-action-help" hidden>Lift / throw (Z) is a separate single action: release movement first, press once, then Resume to finish lifting or throwing. Continue acknowledges a dialogue page; Resume advances text-free recovery and owned scene cues. The first-time box tour owns control until it finishes; it is not a free inventory menu.</span></p>
 </section>
 <section class="panel" aria-labelledby="inspector-heading">
 <h2 id="inspector-heading">Host state inspector</h2>
@@ -745,6 +747,11 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('dialogue-panel').hidden = !ready || state?.error != null || !state?.dialogue;
     $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
     $('pot-action').hidden = state?.pot_action !== true;
+    const pandora = state?.pot_action === true;
+    $('house-scope').hidden = pandora;
+    $('pandora-scope').hidden = !pandora;
+    $('pandora-action-help').hidden = !pandora;
+    $('scene-legend').textContent = pandora ? 'ROM-derived source poses, first background and effective door/pot patches. Actor movement and scene pacing use bounded semantic presentation.' : 'ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.';
     $('pot-action').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.pot_action !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
