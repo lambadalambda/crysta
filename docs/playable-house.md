@@ -6,10 +6,11 @@ checkpoint, or original CPU execution in its simulation loop.
 
 **This is a limited semantic start, not a complete port of the opening.** It
 uses the default name and explicitly completes/omits intro presentation and
-conversation waits. Ark now uses ROM-derived ordinary standing/walking sprites
+room-entry conversation waits. The northern room B resident’s progression
+conversation is now supported, with original Japanese text and explicit choices. Ark now uses ROM-derived ordinary standing/walking sprites
 over the static first background (hardware BG2), with **nine frozen fresh-setup
 residents and F's table object across six rooms**. Source-setup occupancy remains
-solid, but NPC movement, interactions and dialogue are not simulated.
+solid; NPC movement and other residents’ interactions are not simulated.
 Inventory/stats, combat and audio are not implemented. Doorways use endpoint-qualified logical timing, not the native
 loader's video-frame schedule. The frontend still uses a native Rust host;
 the same device-free core builds for Wasm but browser Wasm glue is not yet wired.
@@ -33,7 +34,8 @@ one-shot action pauses; choose Resume to continue. The final ROM metatiles and
 collision patch persist across the house and reset with New Game/Checkpoint Reset.
 This does not grant story event`$0026` or trigger NPC dialogue.
 
-Exterior D/A and cellar C/E progression remain closed; attached E/20/21 scenes
+After the B conversation grants `$0026`, reload D to open the exterior gate.
+Cellar C/E progression remains closed; attached E/20/21 scenes
 and exceptional F/122 are not admitted. Unsupported exits remain scope errors,
 not free warps. Partial furniture and passive flagged walls use source-qualified
 collision responses. Pushing, attacks and general action hooks are unsupported.
@@ -105,13 +107,50 @@ qualified separately:17 departure updates end225 or226, respectively, followed
 by spawn336 and settled353. The reference6968 sample already belongs to the
 transition; it must not be admitted as another walking frame.
 
-Profile8 slice snapshots are109 bytes. Byte99 selects the fresh bedroom overlay;
-bytes100–102 retain animation. The final six bytes encode doorway progress,
-handoff and the persistent wooden-door flag. Profile7 snapshots reject rather
-than silently migrating. Source/content identity covers all six compiled room
-profiles, fresh startup, source exits, navigation and door policy. The core
-retains16-byte v3 walking state and validates walking/transition ownership.
-See [snapshot layout](house-navigation.md).
+Profile9 slice snapshots are181 bytes. They retain the original house state,
+then a64-byte event block, loaded-D gate history, active request/cursor and
+progression capability. Profile8 snapshots reject rather than silently migrating.
+Aggregate source/content identity binds the house/startup, conversation graph and
+ordered source pages, exterior grid, camera and bounded sampling policy. Walking,
+transition and dialogue ownership are mutually exclusive; every admitted action
+is checked against a snapshot-restored continuation. See the current
+[core snapshot layout](../crates/room-core/README.md).
+
+## Talk and leave
+
+From C’s open wooden door, continue north into B. Face Up toward the northern
+resident at Ark `(120,128)`, release movement, then **Interact**. Room-entry text
+is omitted and cannot grant progression. **Continue** acknowledges a real page;
+retained choice tails are not extra Continue waits. The first acknowledgement
+sets event`$0026` **before** the first explicit choice and its follow-up finish.
+Choose either displayed option or **Cancel choice**; cancellation follows the
+source’s second-result branch rather than aborting the conversation. Repeat talks
+start immediately at the repeat choice and do not grant another event.
+
+Walking cannot advance text or select a default response. Use Tab/Enter on the
+choice buttons, and Resume after the conversation closes. New Game and Checkpoint
+Reset can interrupt a page or choice and clear the grant. An already-loaded D gate
+keeps its old state; reloading D after the grant removes its collision stamp. The
+normal B→C→D journey necessarily reloads it.
+
+Leave D south through `(120,720/721)`. The semantic17/load/17 handoff reaches mapA
+at `(504,769)`. A separate ROM-derived1024×1280 background follows Ark using the
+source1024×1024 camera bounds. Only the small landing’s collision-sample halo
+`[29,47,36,53]` (half-open cell coordinates) is admitted: stepping beyond it reports
+a scope error atomically, not an invented wall. No outdoor NPCs, exits or full-town
+simulation are promised. The qualified Down32 / release, Right24 / release route
+ends at `(538,815)`. See [conversation evidence](house-conversation.md),
+[text boundaries](house-dialogue.md) and [exterior limits](house-exterior.md).
+
+Focused host regression (owned ROM required to avoid the optional skip):
+
+```sh
+cargo test -p map-inspector source_conversation_branches_restore_and_leave_through_gate
+```
+
+It checks all nine first/repeat result combinations, the early flag boundary,
+wrong-action no-ops, frozen movement, reset interruption and the exterior endpoint,
+with each admitted action repeated from its restored snapshot.
 
 ## Actual browser verification
 
@@ -129,7 +168,8 @@ console.log('('+fs.readFileSync('tools/verify-house-browser.js','utf8')+').then(
 JS
 # Once the page pauses at tick2244, read the retained result:
 agent-browser eval 'globalThis.HOUSE_BROWSER_RESULT'
-# Clear HOUSE_BROWSER_ROUTE before repeating the default511 route.
+# Clear HOUSE_BROWSER_ROUTE and set HOUSE_BROWSER_HELPERS_ONLY=false before
+# repeating the default511 route in a page used by the conversation harness.
 ```
 
 The harness clicks the actual New Game button, observes the real host's fresh
@@ -147,6 +187,21 @@ Both modes validate the complete fixed source roster, exact room membership,
 world-Y/tie order and canvas pixels; the full route additionally requires
 nonvacuous visible evidence for every resident. Open-door pixels and foreground
 replacement are composed independently from the transported source patches.
+
+The talk-and-leave browser harness uses the same independent scene compositor,
+actual controls and sequential tick checks, plus fixed source page boundaries,
+flag-before-choice assertions and nonblank dialogue/choice canvas pixels:
+
+```sh
+{
+  echo 'globalThis.HOUSE_BROWSER_HELPERS_ONLY=true;'
+  cat tools/verify-house-browser.js
+  echo '; globalThis.CONVERSATION_BROWSER_READY=true;'
+  cat tools/verify-conversation-browser.js
+} | agent-browser eval --stdin
+# Returns immediately; inspect the retained result after the run:
+agent-browser eval '({status:CONVERSATION_BROWSER_RUN.status,error:CONVERSATION_BROWSER_RUN.error,result:CONVERSATION_BROWSER_RUN.result})'
+```
 
 Raw ROM-derived captures, screenshots and verification logs stay ignored under
 `local/`; only source, selected numeric metadata and hashes are committed.

@@ -2,6 +2,7 @@
 use crate::{invalid, sha256, Result};
 use rom::Rom;
 use room_core::{
+    conversation::DialogueWait,
     slice::{GameData, GameState, Phase, Policy, SliceError},
     Direction, FrameInput,
 };
@@ -58,10 +59,15 @@ impl Preview {
         if self.error.is_some() {
             return;
         }
-        if button == 5 {
+        if (5..=9).contains(&button) {
             // A wrong target is ordinary user input. Core guarantees atomic rejection;
             // only the unsupported interaction is harmless, not identity/overflow errors.
-            if let Err(error) = self.state.interact(&self.data) {
+            let result = match button {
+                5 => self.state.interact(&self.data),
+                6 => self.state.acknowledge(&self.data),
+                _ => self.state.choose(&self.data, button - 7),
+            };
+            if let Err(error) = result {
                 if error != SliceError::Interaction {
                     self.error = Some(error.to_string());
                 }
@@ -96,9 +102,31 @@ impl Preview {
     pub(super) fn state(&self) -> Value {
         let output = self.state.output();
         let actor_key = crate::room_art::frame_key(output.animation);
+        let dialogue = self.state.dialogue(&self.data);
+        let presentation =
+            dialogue
+                .as_ref()
+                .ok()
+                .and_then(|value| *value)
+                .map(|output| match output.wait {
+                    DialogueWait::Page(key) => json!({"key":crate::room_dialogue::key(key)}),
+                    DialogueWait::Choice { catalog, key } => {
+                        json!({"key":crate::room_dialogue::key(key),"choice":catalog})
+                    }
+                });
+        let error = self
+            .error
+            .clone()
+            .or_else(|| dialogue.err().map(|error| error.to_string()));
+        let events: Vec<_> = (0..512usize)
+            .filter(|bit| self.state.event_flags().bytes()[bit / 8] & (1 << (bit % 8)) != 0)
+            .collect();
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
             "door_interaction":self.data.door_interaction(),
+            "dialogue_acknowledgement":self.data.conversation_progression(),
+            "choice_interaction":self.data.conversation_progression(),
+            "dialogue":presentation,"events":events,
             "wooden_door_open":self.state.wooden_door_open(),
             "actor_key":actor_key,
             "scene":self.art.scene(output.map_id, &actor_key, output.position),
@@ -106,8 +134,8 @@ impl Preview {
                 room_core::AnimationSet::Standing=>"standing",room_core::AnimationSet::Walking=>"walking"},
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
-            "phase":match output.phase{Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
-            "camera":self.cameras[&output.map_id].at(output.position),"error":self.error,
+            "phase":match output.phase{Phase::Dialogue=>"dialogue",Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
+            "camera":self.cameras[&output.map_id].at(output.position),"error":error,
             "snapshot_sha256":sha256(&self.state.snapshot())})
     }
 }
@@ -118,7 +146,7 @@ fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<room_core::Room> {
 }
 
 fn compile(rom: &Rom) -> Result<GameData> {
-    crate::house_navigation::compile(rom)
+    crate::house_progression::compile(rom)
 }
 
 pub(super) fn verify(rom: &Rom) -> Result<Value> {
@@ -178,7 +206,7 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     Ok(
         json!({"kind":"cpu-free-semantic-room-preview","initial":initial,"handoff":handoff,"departure":departure,"spawn":spawn,"arrival":arrival,
         "return_handoff":return_handoff,"returned":returned,
-        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, no native AI/dialogue, shadows, effects, combat, audio or events."}),
+        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, bounded B dialogue/choices and exterior landing; no native AI, shadows, effects, combat or audio."}),
     )
 }
 
@@ -237,7 +265,7 @@ pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
         json!({"kind":"cpu-free-semantic-new-game-house-route", "initial":initial,
         "outbound_handoff":outbound_handoff,"arrival":arrival,"return_handoff":return_handoff,
         "returned":returned,"revisited":revisited,
-        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, no native loader timing, AI/dialogue, shadows, effects, combat or audio."}),
+        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, bounded B dialogue/choices and exterior landing; no native loader timing, AI, shadows, effects, combat or audio."}),
     )
 }
 
@@ -255,6 +283,169 @@ mod tests {
         Some(Rom::load(&std::fs::read(path).unwrap()).unwrap())
     }
 
+    fn advance_restored(preview: &mut Preview, button: u8, count: usize) {
+        for _ in 0..count {
+            let before = preview.state.snapshot();
+            preview.step(button);
+            assert!(preview.error.is_none(), "{:?}", preview.error);
+            let expected = preview.state.snapshot();
+            preview.state = GameState::restore(&preview.data, &before).unwrap();
+            preview.step(button);
+            assert_eq!(preview.state.snapshot(), expected);
+            assert!(preview.error.is_none());
+        }
+    }
+
+    fn assert_action_overflow(preview: &mut Preview, command: u8) {
+        let before = preview.state.snapshot();
+        let mut overflow = before.clone();
+        overflow[72..80].copy_from_slice(&u64::MAX.to_le_bytes());
+        preview.state = GameState::restore(&preview.data, &overflow).unwrap();
+        preview.step(command);
+        assert_eq!(preview.error, Some(SliceError::TickOverflow.to_string()));
+        assert_eq!(preview.state.snapshot(), overflow);
+        preview.state = GameState::restore(&preview.data, &before).unwrap();
+        preview.error = None;
+    }
+
+    fn assert_dialogue(preview: &Preview, source: u32, index: usize, choice: Option<u16>) {
+        let state = preview.state();
+        assert_eq!(state["phase"], "dialogue");
+        assert_eq!(
+            state["dialogue"]["key"],
+            crate::room_dialogue::key(crate::room_dialogue::page_key(source, index).unwrap())
+        );
+        assert_eq!(state["dialogue"]["choice"], json!(choice));
+        assert_eq!(
+            (state["x"].as_u64(), state["y"].as_u64()),
+            (Some(120), Some(128))
+        );
+        assert_eq!(state["error"], Value::Null);
+    }
+
+    #[test]
+    #[allow(clippy::too_many_lines)] // One source journey: all branch combinations, restore, gate, exterior and reset.
+    fn source_conversation_branches_restore_and_leave_through_gate() {
+        let Some(rom) = owned_rom() else { return };
+        let mut preview = Preview::new(&rom).unwrap();
+        preview.new_game();
+        assert_eq!(preview.state()["events"], json!([32, 251]));
+        assert_eq!(preview.state()["dialogue_acknowledgement"], true);
+        assert_eq!(preview.state()["choice_interaction"], true);
+        let fresh = preview.state.snapshot();
+        for command in
+            include_str!("../../../tools/house-navigation-qualification/core-route.jsonl")
+                .lines()
+                .take(15)
+        {
+            let command: Value = serde_json::from_str(command).unwrap();
+            advance_restored(
+                &mut preview,
+                u8::try_from(command["button"].as_u64().unwrap()).unwrap(),
+                usize::try_from(command["steps"].as_u64().unwrap()).unwrap(),
+            );
+        }
+        advance_restored(&mut preview, 3, 45);
+        advance_restored(&mut preview, 0, 60);
+        assert_eq!(preview.state.output().position, (120, 128));
+        let target = preview.state.snapshot();
+        for first in 0..=2 {
+            for repeat in 0..=2 {
+                preview.state = GameState::restore(&preview.data, &target).unwrap();
+                advance_restored(&mut preview, 5, 1);
+                assert_dialogue(&preview, 0x88_8ff0, 0, None);
+                assert_eq!(preview.state()["events"], json!([32, 251]));
+                // Wrong actions and ordinary movement cannot acknowledge or grant.
+                for command in 0..=4 {
+                    let mut expected = preview.state.snapshot();
+                    expected[72..80]
+                        .copy_from_slice(&(preview.state.output().tick + 1).to_le_bytes());
+                    advance_restored(&mut preview, command, 1);
+                    assert_eq!(
+                        preview.state.snapshot(),
+                        expected,
+                        "dialogue movement consumes only a tick"
+                    );
+                }
+                assert_action_overflow(&mut preview, 6);
+                let waiting = preview.state.snapshot();
+                for command in [5, 7, 8, 9] {
+                    preview.step(command);
+                    assert_eq!(preview.state.snapshot(), waiting);
+                    assert!(preview.error.is_none());
+                }
+                advance_restored(&mut preview, 6, 1);
+                assert_dialogue(&preview, 0x88_8ff0, 1, Some(0));
+                assert_eq!(preview.state()["events"], json!([32, 38, 251]));
+                for command in 7..=9 {
+                    assert_action_overflow(&mut preview, command);
+                }
+                let choice = preview.state.snapshot();
+                preview.step(6);
+                assert_eq!(preview.state.snapshot(), choice);
+                advance_restored(&mut preview, 7 + first, 1);
+                for index in 0..3 {
+                    assert_dialogue(
+                        &preview,
+                        if first == 1 { 0x88_90d9 } else { 0x88_905a },
+                        index,
+                        None,
+                    );
+                    advance_restored(&mut preview, 6, 1);
+                }
+                assert_eq!(preview.state()["dialogue"], Value::Null);
+                advance_restored(&mut preview, 5, 1);
+                assert_dialogue(&preview, 0x88_9156, 0, Some(1));
+                advance_restored(&mut preview, 7 + repeat, 1);
+                for index in 0..2 {
+                    assert_dialogue(
+                        &preview,
+                        if repeat == 1 { 0x88_918c } else { 0x88_91d6 },
+                        index,
+                        None,
+                    );
+                    advance_restored(&mut preview, 6, 1);
+                }
+                assert_eq!(preview.state()["dialogue"], Value::Null);
+                assert_eq!(preview.state()["phase"], "walking");
+                assert_eq!(preview.state()["events"], json!([32, 38, 251]));
+                for (button, steps) in [
+                    (4, 60),
+                    (0, 100),
+                    (1, 10),
+                    (4, 82),
+                    (0, 100),
+                    (4, 70),
+                    (0, 100),
+                ] {
+                    advance_restored(&mut preview, button, steps);
+                }
+                assert_eq!(preview.state.output().map_id, 10);
+                assert_eq!(preview.state.output().position, (504, 769));
+                assert_eq!(preview.state()["camera"], json!([376, 657]));
+                assert_eq!(preview.state()["scene"].as_array().unwrap().len(), 1);
+                for (button, steps) in [(4, 32), (0, 60), (2, 24), (0, 90)] {
+                    advance_restored(&mut preview, button, steps);
+                }
+                assert_eq!(preview.state.output().position, (538, 815));
+                assert_eq!(preview.state()["camera"], json!([410, 703]));
+            }
+        }
+        // Reset may interrupt a page or choice; neither leaks progression.
+        for command in [5, 6] {
+            preview.state = GameState::restore(&preview.data, &target).unwrap();
+            preview.step(5);
+            if command == 6 {
+                preview.step(6);
+            }
+            preview.reset();
+            assert_eq!(preview.state()["events"], json!([32, 251]));
+            assert_eq!(preview.state()["dialogue"], Value::Null);
+            preview.new_game();
+            assert_eq!(preview.state.snapshot(), fresh);
+        }
+    }
+
     #[test]
     fn wrong_interaction_is_atomic_noop_but_step_errors_still_latch() {
         let Some(rom) = owned_rom() else { return };
@@ -266,7 +457,12 @@ mod tests {
         assert_eq!(preview.state(), before);
         preview.step(2);
         assert_eq!(preview.state.output().tick, 1);
-        preview.step(6);
+        for command in 6..=9 {
+            let before = preview.state();
+            preview.step(command);
+            assert_eq!(preview.state(), before);
+        }
+        preview.step(10);
         assert!(preview.error.is_some());
         let snapshot = preview.state.snapshot();
         preview.step(5);

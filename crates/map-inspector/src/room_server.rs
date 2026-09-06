@@ -89,9 +89,7 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
         ("GET", "/state", "") => Ok(Request::State),
         ("POST", "/reset", "") => Ok(Request::Reset),
         ("POST", "/new-game", "") => Ok(Request::NewGame),
-        ("POST", "/step", value)
-            if value.len() == 1 && (b'0'..=b'5').contains(&value.as_bytes()[0]) =>
-        {
+        ("POST", "/step", value) if value.len() == 1 && value.as_bytes()[0].is_ascii_digit() => {
             Ok(Request::Step(value.as_bytes()[0] - b'0'))
         }
         _ => Err(invalid("unsupported route or input").into()),
@@ -281,7 +279,14 @@ mod tests {
             parse_request(&post(headers, "5"), ORIGIN).unwrap(),
             Request::Step(5)
         );
-        for body in ["", "6", "11", "-", "x", "A"] {
+        for command in 0..=9 {
+            let body = command.to_string();
+            assert_eq!(
+                parse_request(&request("POST", "/step", headers, &body), ORIGIN).unwrap(),
+                Request::Step(command)
+            );
+        }
+        for body in ["", "10", "11", "-", "x", "A"] {
             assert!(parse_request(&post(headers, body), ORIGIN).is_err());
         }
         for bad in [

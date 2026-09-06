@@ -10,6 +10,7 @@ use std::{
 };
 
 mod house_navigation;
+mod house_progression;
 mod house_profiles;
 mod new_game;
 mod opening_qualification;

@@ -29,10 +29,10 @@ dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0}d
 <h1>Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU</h1>
 <p class="warning"><strong>This is a bounded canvas preview, not a playable full game.</strong>
 Choose <strong>New Game</strong>, then <strong>Resume</strong> to explore the supported house paths.
-This semantic start uses the default name and skips the intro and dialogue; it does not play the original opening.
+This semantic start uses the default name and skips the intro and room-entry dialogue; it does not play the original opening.
 Ordinary walking, partial furniture and passive flagged walls are supported; rapid same-direction double taps trigger an unsupported dash error.
-The six fresh house rooms are connected. The wooden door is the only supported action; exterior and cellar progression stay closed.
-Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroom table object use frozen source-setup poses. Source-setup occupancy is solid; NPC movement, interactions and dialogue are not simulated. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
+The six fresh house rooms are connected. Open the wooden door, talk to the northern room’s resident, then leave south through the house’s exterior gate. Only a small outdoor landing is supported; cellar and further town progression remain outside scope.
+Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroom table object use frozen source-setup poses. Source-setup occupancy is solid; NPC movement and other residents’ interactions are not simulated. The northern resident’s Japanese dialogue and explicit choices are supported. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
 <div class="layout">
 <section class="panel" aria-label="Room preview">
 <canvas id="room" width="256" height="224" aria-label="Room background with ROM-derived Ark standing and walking sprites">Canvas is required for the preview.</canvas>
@@ -50,7 +50,7 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 <div class="actions">
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
-<button id="interact" disabled>Interact (door only)</button>
+<button id="interact" disabled>Interact</button>
 <button id="reset" disabled>Checkpoint Reset</button><button id="demo" disabled>Checkpoint doorway demo</button>
 </div>
 <div class="pad" aria-label="Touch cardinal controls">
@@ -61,7 +61,7 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 </div>
 <p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
 Release before changing direction. Escape pauses.
-Space/Enter or Interact opens the qualified wooden door only; release movement first. Face Up against the wooden door in the upper part of the western middle room. Interaction pauses the preview; Resume to continue. Touch and hold a cardinal button; sliding outside releases it.</p>
+Space/Enter or Interact opens the wooden door or talks to the qualified resident; release movement first. Face Up against the door in the upper part of the western middle room, then continue north and face Up toward the resident. Use Continue for pages, or explicitly choose an option / Cancel. Tab and Enter work on choice buttons. Interaction pauses the preview; Resume to walk again. Touch and hold a cardinal button; sliding outside releases it.</p>
 </section>
 <section class="panel" aria-labelledby="inspector-heading">
 <h2 id="inspector-heading">Host state inspector</h2>
@@ -220,7 +220,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         if (dialogue()) { this.acknowledge(); return; }
         if (!state || state.door_interaction !== true || mode === 'demo' || transition()) return;
         if (held.size) { note = 'Release movement before interacting.'; notify(); return; }
-        manualStep(5, 'Wooden-door interaction — paused. Resume to continue.');
+        manualStep(5, 'Interaction requested — paused. Resume to continue.');
       },
       newGame() { startSession('/new-game'); }, reset() { startSession('/reset'); }, demo() { startSession('/reset', true); }, reject,
     };

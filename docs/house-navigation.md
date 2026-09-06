@@ -194,7 +194,11 @@ Unsupported A/E/122 records remain in ordered lists but have no doorway spec.
 
 ## Snapshot and atomicity
 
-Profile **8**, schema1, **109 bytes**. The identity, tick, map, walking/fresh and
+The original six-room-only layout was profile **8**, schema1, **109 bytes**.
+The talk-and-leave extension uses profile9/181 bytes; see the current
+[core snapshot contract](../crates/room-core/README.md). The fields below retain
+their offsets; walking payload is now also zero during dialogue ownership.
+In the original layout, the identity, tick, map, walking/fresh and
 animation fields retain their previous offsets; profile7 snapshots reject.
 
 - byte82: immutable doorway spec index, or255 for walking;
