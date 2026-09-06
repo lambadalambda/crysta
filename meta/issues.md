@@ -29,3 +29,4 @@
 - [ ] [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
 - [ ] [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
 - [ ] [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
+- [ ] [Render bounded Pandora carrying and pot flight](issues/render-pandora-carrying.md)
