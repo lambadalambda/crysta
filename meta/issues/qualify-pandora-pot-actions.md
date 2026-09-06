@@ -33,3 +33,8 @@ Qualify and implement source-derived FA/FB lifting, carrying and throws sufficie
 - Per-frame observations are selected player/actor fields, not full WRAM. Held slots/counter/collision are checkpoint fields; source/script boundaries qualify intervening reservation release. No new native run or restore was used, and no raw captures/trace data are shipped.
 - Parent reports semantics resolved in source `5b7b88b` / parent `42fe162`: frame logs and non-pixel captures match; intermittent pixel zeroing is the shim async publication race. This work never reads pixels and does not weaken exact pins or claim the renewed observer-fix replay has passed.
 - Deliberate limit: general COP65 collision dispatch/ballistics remain unqualified; only the documented immutable direct-C Up lanes and exact released-flight contact are admitted. Parent owns the request/reaction graph and final acceptance/tracker closure. Issue remains open pending that handoff.
+
+### Parent independent reproduction
+
+- Rebuilt the source contract and projected all three original contiguous segments into `local/pandora-pots/fixtures` without changing the source route or pins. Explicit `PANDORA_POT_FIXTURES` run passes the 2184-tick native/restore comparison and all 14 focused component tests; six qualification tests pass normal/-O. Log: `local/map-research/pandora-pots-parent.txt`.
+- Runtime integration still owns persistent event gates, visit-local lifecycle, frozen throw-lane profile, response/door patches and stair handoff. Component reproduction does not enable the Pandora preview or replace the separate full-route observer gate.
