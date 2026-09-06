@@ -17,12 +17,14 @@ sh tools/pandora-runtime-qualification/run.sh 'local/Tenchi Souzou (Japan).sfc'
 
 The standalone crate is generated below ignored `local/`; it imports the source
 compilers directly, without modifying host module registration. Optional second
-argument selects a test. Current result: **4 tests pass**:
+argument selects a test. Current result: **6 tests pass**:
 
 - Authentic 33-resource / 34-invocation text, source page IDs and choice contexts.
 - Fourteen raw collision profiles, source pot catalog and temporary C occupancy.
   All four C variants retain source wooden-door words `(8,19)=1CF2`,
   `(8,20)=1CF3`. E/20 are unconsumed source bases, not captured/used pot states.
+- Source-scoped raw material policies, plus exact resident/box contacts and
+  structural compatibility with the delivered `PandoraData` constructor.
 - Six COP14 reconstruction samples, source standing facing and mutation controls.
 - The existing house input prefix reaches mapA `(538,815)` at tick1701 with26.
   This is only the regression prefix, **not** Pandora completion.
@@ -100,20 +102,32 @@ If the runtime admission cannot carry completed-rest semantics, omit handoff
 completion and fail closed. Proximity, warning completion or a timer alone is
 insufficient.
 
+## Delivered early APIs
+
+`051b127`, `73f51ff`, `51d558c` are applied locally as `ea81720`, `85c6fe1`,
+`5f0821b`. The adapter uses `MotionPose::Absolute` for genuine reconstruction
+samples; `Preserve { facing }` is available for the upcoming non-reload cues.
+The enabled core envelope is schema4/profile12, still320 bytes.
+
+`compile_rooms` now installs core `MaterialRule`s over unchanged source words:
+TownSolid25 only over Town's authenticated halo; ClosedDoorPartial5 and
+StairOpen29 Up-only at C `(11,21)`; StairOpen29 Up-only at E `(6,53)` and20
+`(22,53)`. Other rooms have no aliases. The source navigation compiler authenticates
+all sixteen dispatch tables before adaptation. Core retains delayed collision
+direction, old-edge slope rejection before bit15, and aliases after occupancy.
+The policy is carried by `Room` and must be included in aggregate identity.
+
 ## Remaining integration gates
 
-1. Core-owned direction/cell-scoped classification on raw rooms, preserving delayed
-   collision direction and old-edge slope rejection before bit15. No global29
-   floor or source-word normalization.
-2. Source-backed Town wooden-door interaction/patch for A→13 and A→D. Do not start
+1. Source-backed Town wooden-door interaction/patch for A→13 and A→D. Do not start
    Town with open doors or travel from a closed approach.
-3. Preserve-player cue samples (optional source-backed facing change). Absolute
-   anchors cannot express the rectangular, any-facing box gate without teleport.
-   C residents and tour guide move; their coordinates are not Ark's coordinates.
-4. Ordered source exit selection: first coarse match, then that record's fine
+2. Compile the cue catalog using preserve-player samples. Absolute anchors cannot
+   express the rectangular, any-facing box gate without teleport. C residents and
+   tour guide move; their coordinates are not Ark's coordinates.
+3. Ordered source exit selection: first coarse match, then that record's fine
    test, never fallthrough on failed fine; unsupported records fail closed.
    Delivered runtime currently selects exact motion triggers instead.
-5. Aggregate identity binding all base-house and Pandora data/policies; complete
+4. Aggregate identity binding all base-house and Pandora data/policies; complete
    39-motion catalog; actual New Game→final41 input itinerary and restoration.
 
 Semantic preview may use finite logical cue completion, not native frame-count

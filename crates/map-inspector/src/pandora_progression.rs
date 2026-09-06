@@ -7,8 +7,8 @@ use assets::{
 use room_core::{
     pots::SourceObject,
     slice::{
-        Anchor, CollisionKey, Cue, Invocation, MotionFrame, MotionKey, PandoraText, ProfileRoom,
-        RequestPages, ScenePhase,
+        Anchor, CollisionKey, Cue, Invocation, MotionFrame, MotionKey, MotionPose, PandoraText,
+        ProfileRoom, RequestPages, ScenePhase,
     },
     Direction,
 };
@@ -171,14 +171,76 @@ fn compile_rooms(
                 cells[i] = opened.cells()[i] | 0x8000;
             }
         }
-        // No type normalization here. The pending core-owned bounded classifier
-        // seam must consume the same direction/cell rules as Profile::sample.
+        use room_core::{MaterialAlias::*, MaterialRule};
+        let lane = |alias, x, y| MaterialRule {
+            bounds: [x, y, x + 1, y + 1],
+            direction: Some(Direction::Up),
+            alias,
+        };
+        // Navigation::compile authenticated the ROM and all sixteen dispatch tables.
+        // Policies admit only those source map/cell aliases; raw words stay intact.
+        let policy = match key {
+            Town => vec![MaterialRule {
+                bounds: halo,
+                direction: None,
+                alias: TownSolid25,
+            }],
+            CClosed | CDamaged | CReaction | COpen => {
+                vec![lane(ClosedDoorPartial5, 11, 21), lane(StairOpen29, 11, 21)]
+            }
+            CellarE => vec![lane(StairOpen29, 6, 53)],
+            Cellar20 => vec![lane(StairOpen29, 22, 53)],
+            _ => vec![],
+        };
         rooms.push(ProfileRoom {
             key,
-            room: room_core::Room::new_passive(width, height, cells)?.with_sample_halo(halo)?,
+            room: room_core::Room::new_passive(width, height, cells)?
+                .with_sample_halo(halo)?
+                .with_material_policy(policy)?,
         });
     }
     Ok(rooms)
+}
+
+fn compile_contacts(
+    nav: &pandora_navigation::Navigation,
+) -> Result<[room_core::slice::ContactSpec; 2]> {
+    use room_core::slice::{ContactKind, ContactSpec};
+    let resident = Anchor {
+        position: (360, 144),
+        facing: Direction::Up,
+    };
+    let first = Anchor {
+        position: (136, 370),
+        facing: Direction::Down,
+    };
+    require(
+        pandora_navigation::resident13_witness(resident.position, resident.facing),
+        "qualified resident interaction witness",
+    )?;
+    require(
+        nav.contact().first_geometry(first.position)
+            && nav.contact().first_bounds() == [123, 370, 149, 400]
+            && nav.contact().opening_bounds() == [120, 368, 152, 400],
+        "qualified box geometry",
+    )?;
+    Ok([
+        ContactSpec {
+            kind: ContactKind::Resident,
+            trigger: resident,
+            result: resident,
+        },
+        ContactSpec {
+            kind: ContactKind::BoxWarning,
+            trigger: first,
+            // This witness represents COMPLETED northern recoil/rest, including
+            // $8488CD STZ $097C, not merely visiting Y359 during a recoil.
+            result: Anchor {
+                position: (136, 359),
+                facing: Direction::Down,
+            },
+        },
+    ])
 }
 
 /// Only the explicit reconstruction samples, not the preceding cue completion.
@@ -272,14 +334,14 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
             MotionKey::Cue(cue),
             MotionFrame {
                 map_id: map,
-                anchor: Anchor {
+                pose: MotionPose::Absolute(Anchor {
                     position: (add(site + 6, 8)?, add(site + 8, 16)?),
                     facing: if selector == 1 {
                         Direction::Down
                     } else {
                         Direction::Up
                     },
-                },
+                }),
                 reload: true,
                 scene,
             },
@@ -344,8 +406,10 @@ mod tests {
             assert!(matches!(key, MotionKey::Cue(_)));
             assert!(frame.reload);
             assert_eq!(frame.map_id, map);
-            assert_eq!(frame.anchor.position, position);
-            assert_eq!(frame.anchor.facing, facing);
+            assert_eq!(
+                frame.pose,
+                MotionPose::Absolute(Anchor { position, facing })
+            );
         }
         let mut changed = rom.image().to_vec();
         changed[0x88ad53 & 0x3fffff] ^= 1;
@@ -356,6 +420,87 @@ mod tests {
         let mut changed = rom.image().to_vec();
         changed[0x84a315 & 0x3fffff] ^= 1;
         assert!(forced_arrivals(&changed).is_err());
+    }
+
+    #[test]
+    #[ignore = "owned ROM; run tools/pandora-runtime-qualification/run.sh"]
+    fn source_contacts_and_raw_rooms_satisfy_delivered_constructor() {
+        use room_core::slice::{BoxOpeningGate, ContactKind, PandoraData};
+        let rom = owned_rom();
+        let nav = pandora_navigation::compile(rom.image()).unwrap();
+        let contacts = compile_contacts(&nav).unwrap();
+        assert_eq!(contacts[0].kind, ContactKind::Resident);
+        assert_eq!(
+            contacts[0].trigger,
+            Anchor {
+                position: (360, 144),
+                facing: Direction::Up
+            }
+        );
+        assert_eq!(contacts[0].result, contacts[0].trigger);
+        assert_eq!(contacts[1].kind, ContactKind::BoxWarning);
+        assert_eq!(
+            contacts[1].trigger,
+            Anchor {
+                position: (136, 370),
+                facing: Direction::Down
+            }
+        );
+        assert_eq!(
+            contacts[1].result,
+            Anchor {
+                position: (136, 359),
+                facing: Direction::Down
+            }
+        );
+        let objects = source_objects(rom.image(), &nav).unwrap();
+        let rooms = compile_rooms(rom.image(), &nav, &objects).unwrap();
+        // Constructor compatibility only: no incomplete motion set is executed.
+        PandoraData::new(
+            compile_text(rom.image()).unwrap().0,
+            rooms,
+            vec![],
+            contacts,
+            BoxOpeningGate {
+                raw_bounds: nav.contact().opening_bounds(),
+            },
+            objects,
+            true,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    #[ignore = "owned ROM; run tools/pandora-runtime-qualification/run.sh"]
+    fn room_policies_are_scoped_to_source_map_halo_and_delayed_direction() {
+        use room_core::{MaterialAlias::*, MaterialRule};
+        let rom = owned_rom();
+        let nav = pandora_navigation::compile(rom.image()).unwrap();
+        let objects = source_objects(rom.image(), &nav).unwrap();
+        for profile in compile_rooms(rom.image(), &nav, &objects).unwrap() {
+            let cell = |alias, x, y| MaterialRule {
+                bounds: [x, y, x + 1, y + 1],
+                direction: Some(Direction::Up),
+                alias,
+            };
+            let expected = match profile.key {
+                CollisionKey::Town => vec![MaterialRule {
+                    bounds: nav.profile("a").unwrap().room().sample_halo().unwrap(),
+                    direction: None,
+                    alias: TownSolid25,
+                }],
+                CollisionKey::CClosed
+                | CollisionKey::CDamaged
+                | CollisionKey::CReaction
+                | CollisionKey::COpen => {
+                    vec![cell(ClosedDoorPartial5, 11, 21), cell(StairOpen29, 11, 21)]
+                }
+                CollisionKey::CellarE => vec![cell(StairOpen29, 6, 53)],
+                CollisionKey::Cellar20 => vec![cell(StairOpen29, 22, 53)],
+                _ => vec![],
+            };
+            assert_eq!(profile.room.material_policy(), expected);
+        }
     }
 
     #[test]
