@@ -10,7 +10,7 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1);
 const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
-const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground} = sandbox.RoomSlice;
+const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0], door_interaction:true});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
@@ -48,8 +48,8 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false} = {}) {
-  const elements = new Map(), timers = new Map(); let timerId = 0, key = actorKey;
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null} = {}) {
+  const elements = new Map(), timers = new Map(); let timerId = 0, key = actorKey, clock = 0;
   const context = {fillRect(){},drawImage(){},save(){},restore(){},translate(){},putImageData(){},
     getImageData(){return {width:512,height:1024,data:new Uint8ClampedArray(512*1024*4)};}};
   const element = id => {
@@ -63,16 +63,18 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
   doc.createElement=()=>({getContext:()=>context});
   const win = new Target();
   const bundle = {schema_version:1,scene_ids:{15:['ark']},frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
-    foreground:{'15':{width:512,height:1024,runs:[]}}};
-  const browser = {console,document:doc,window:win,performance:{now:()=>0},AbortController,AbortSignal,Uint8ClampedArray,
+    foreground:{'15':{width:512,height:1024,runs:[]}},
+    dialogue_pages:{'page:1':{width:2,height:1,rgba:[255,255,255,255,0,0,0,0]}}};
+  const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
     async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
+      ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey},dialogue_acknowledgement:true}:{}),
       scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
-  return {element,timers,setKey(value){key=value;},fixScene(){invalidScene=false;}};
+  return {element,timers,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
   const recovery = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
@@ -107,6 +109,28 @@ async function main() {
   assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
   assert.match(stalled.element('error').textContent, /timed out/i);
   assert.equal(stalled.element('pause').disabled,true);
+  for(const key of ['page:1','missing']) {
+    const ui=browserHarness({dialogueKey:key}); await flush(); await flush();
+    ui.element('interact').emit('click');
+    const stepTimer=[...ui.timers].find(([,timer])=>timer.ms<100); assert(stepTimer);
+    ui.timers.delete(stepTimer[0]);stepTimer[1].fn();await flush();await flush();
+    if(key==='page:1') {
+      assert.equal(ui.element('dialogue-panel').hidden,false);
+      assert.equal(ui.element('dialogue-page').width,2);assert.equal(ui.element('dialogue-page').height,1);
+      assert.equal(ui.element('dialogue-page').dataset.key,'page:1');
+      assert.equal(ui.element('continue').disabled,false);assert.equal(ui.element('pause').disabled,true);
+      ui.setDialogueKey('missing');ui.element('continue').emit('click');
+      const nextTimer=[...ui.timers].find(([,timer])=>timer.ms<100);assert(nextTimer);
+      ui.timers.delete(nextTimer[0]);ui.advance(nextTimer[1].ms);nextTimer[1].fn();await flush();await flush();
+      assert.match(ui.element('error').textContent,/dialogue/i);
+      assert.equal(ui.element('dialogue-panel').hidden,true,'invalid next page hides previously visible text');
+      assert.equal(ui.element('continue').disabled,true);
+    } else {
+      assert.match(ui.element('error').textContent,/dialogue/i);
+      assert.equal(ui.element('dialogue-panel').hidden,true);
+      assert.equal(ui.element('continue').disabled,true);
+    }
+  }
   // Dialogue owns control; each acknowledgement is one paced command, never autoplay.
   const talk=harness(); await talk.start();
   const page = (key,tick) => ({...initial(),tick,phase:'dialogue',dialogue:{key},dialogue_acknowledgement:true});
@@ -138,6 +162,11 @@ async function main() {
   resetAck.controller.reset(); await resetAck.reply(page('test:2',2));
   assert.equal(resetAck.calls.at(-1).url,'/reset'); await resetAck.reply(initial());
   assert.equal(resetAck.timers.size,0); assert.equal(resetAck.views.at(-1).dialogue,false);
+  const pageBindings = new Target(), pageWindow = new Target();
+  bindInputs(talk.controller,pageBindings,pageWindow,[]);
+  let blockedRepeat=false;
+  pageBindings.emit('keydown',{key:'Enter',repeat:true,target:{closest:()=>({id:'continue'})},preventDefault(){blockedRepeat=true;}});
+  assert.equal(blockedRepeat,true,'focused Continue must suppress native repeated Enter clicks');
   // Door interaction is one paced command, never a held direction or autoplay.
   const door = harness(); await door.start(); door.controller.interact();
   assert.equal(door.calls.length,1); door.controller.interact(); door.controller.stepOnce();
@@ -515,4 +544,21 @@ main().catch(error => { console.error(error); process.exitCode = 1; });
   }
   const legacy=prepareArt({...bundle,door_patches:undefined},background,make);
   assert.throws(()=>selectBackground(legacy,{map_id:12,wooden_door_open:true},image),/door/i);
+}
+
+// Dialogue pages are immutable source rasters; missing keys must fail visibly.
+{
+  const rgba=[255,255,255,255,0,0,0,0];
+  const bundle={schema_version:1,frames:{},scene_ids:{15:['ark']},foreground:{15:{width:2,height:1,runs:[]}},
+    dialogue_pages:{'page:1':{width:2,height:1,rgba}}};
+  const background={width:2,height:1,data:rgba},make=(width,height,rgba)=>({width,height,rgba:Array.from(rgba)});
+  const art=prepareArt(bundle,background,make);
+  assert.equal(selectDialogue(art,{}),null);
+  assert.equal(selectDialogue(art,{dialogue:null}),null);
+  const page=selectDialogue(art,{dialogue:{key:'page:1'}});
+  assert.equal(page.width,2);assert.equal(page.height,1);assert.deepEqual(page.image.rgba,rgba);
+  assert.throws(()=>selectDialogue(art,{dialogue:{key:'missing'}}),/dialogue/i);
+  for(const change of [{width:0},{width:513},{height:225},{rgba:[1]},{rgba:[255,255,255,255,0,0,0,256]}]) {
+    assert.throws(()=>prepareArt({...bundle,dialogue_pages:{'page:1':{...bundle.dialogue_pages['page:1'],...change}}},background,make),/dialogue/i);
+  }
 }

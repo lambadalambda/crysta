@@ -36,6 +36,11 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 <section class="panel" aria-label="Room preview">
 <canvas id="room" width="256" height="224" aria-label="Room background with ROM-derived Ark standing and walking sprites">Canvas is required for the preview.</canvas>
 <p class="legend">ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
+<section id="dialogue-panel" aria-label="Dialogue" hidden>
+<canvas id="dialogue-page" width="256" height="64" role="img" aria-label="Original Japanese dialogue"></canvas>
+<p><button id="continue" disabled>Continue (Space / Enter)</button></p>
+<small>ROM-derived Japanese text; simplified dialogue presentation.</small>
+</section>
 <div class="actions">
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
@@ -217,7 +222,11 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         event.preventDefault(); if (!event.repeat) controller.press(`key:${key}`, keyDirections[key]);
       } else if (key === 'escape') controller.pause();
       else if (key === ' ' || key === 'enter') {
-        if (event.target?.closest?.('button,input,textarea,select,[contenteditable]')) return;
+        const control = event.target?.closest?.('button,input,textarea,select,[contenteditable]');
+        if (control) {
+          if (event.repeat && control.id === 'continue') event.preventDefault();
+          return;
+        }
         event.preventDefault(); if (!event.repeat) controller.interact();
       }
       else if (key.length === 1 && key !== ' ') controller.press(`key:${key}`, 0);
@@ -285,19 +294,26 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     }
     return {pixels,writes};
   }
+  function validPixels(width, height, rgba, maxWidth, maxHeight) {
+    return Number.isInteger(width) && Number.isInteger(height) && width >= 1 && height >= 1 && width <= maxWidth && height <= maxHeight &&
+      Array.isArray(rgba) && rgba.length === width*height*4 && rgba.every(v=>Number.isInteger(v) && v >= 0 && v <= 255);
+  }
   function prepareArt(bundle, background, makeRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
-    const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null);
+    const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null);
     const door = prepareDoor(bundle.door_patches, background);
     const openBackground = door ? makeRaster(background.width, background.height, door.pixels) : null;
     for (const [key, frame] of Object.entries(bundle.frames)) {
       const {width, height, offset, rgba} = frame;
-      if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 64 || height > 64 ||
-          !Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger) ||
-          !Array.isArray(rgba) || rgba.length !== width * height * 4 || !rgba.every(v => Number.isInteger(v) && v >= 0 && v <= 255)) {
+      if (!validPixels(width,height,rgba,64,64) || !Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger)) {
         throw new Error('Invalid sprite raster');
       }
       actors[key] = {image:makeRaster(width, height, rgba), source:[0,0,width,height], offset, flipX:false};
+    }
+    for (const [key,page] of Object.entries(bundle.dialogue_pages || {})) {
+      const {width,height,rgba} = page || {};
+      if (!validPixels(width,height,rgba,512,224)) throw new Error('Invalid dialogue raster');
+      dialoguePages[key] = {width,height,image:makeRaster(width,height,rgba)};
     }
     for (const [id, mask] of Object.entries(bundle.foreground)) {
       if (mask.width !== background.width || mask.height !== background.height ||
@@ -329,7 +345,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds, openBackground, openForeground};
+    return {actors, foreground, sceneIds, openBackground, openForeground, dialoguePages};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
@@ -338,6 +354,12 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       return {image:art.openBackground,foreground:art.openForeground[state.map_id]};
     }
     return {image,foreground:art.foreground[state.map_id]};
+  }
+  function selectDialogue(art, state) {
+    if (!state.dialogue) return null;
+    const page = art.dialoguePages[state.dialogue.key];
+    if (!page) throw new Error('Unsupported dialogue page key');
+    return page;
   }
   function selectActor(art, state) {
     const actor = art.actors[state.actor_key];
@@ -358,7 +380,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     return scene.map(entry => ({...art.actors[entry.key], position:entry.position}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground};
+  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
@@ -379,20 +401,29 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     const announcement = error ? 'Input paused — choose New Game or Checkpoint Reset.' : paused ? note : mode === 'demo' ? 'Checkpoint doorway demo running.' : 'Preview running.';
     if (announcement !== lastAnnouncement) { $('announcement').textContent = announcement; lastAnnouncement = announcement; }
     $('pause').textContent = paused ? 'Resume' : 'Pause';
-    $('pause').disabled = !ready || !canDrive || !!error;
-    $('step').disabled = !ready || !canDrive || !!error || busy || !paused;
+    $('pause').disabled = !ready || !canDrive || !!error || view.dialogue;
+    $('step').disabled = !ready || !canDrive || !!error || busy || !paused || view.dialogue;
+    $('continue').disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || !view.dialogue || state?.dialogue_acknowledgement !== true;
+    $('dialogue-panel').hidden = !ready || !state?.dialogue;
     $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
     if (ready && state) {
       try {
+        const page = selectDialogue(art, state);
+        if (page) {
+          const canvas = $('dialogue-page'); canvas.width = page.width; canvas.height = page.height;
+          const context = canvas.getContext('2d'); context.imageSmoothingEnabled = false; context.drawImage(page.image,0,0);
+          canvas.dataset.key = state.dialogue.key;
+        }
         const background = selectBackground(art, state, image);
         drawScene(ctx, background.image, state, selectActors(art, state), background.foreground);
         assetError = null; $('error').textContent = error || '';
       }
       catch (failure) {
         const message = String(failure.message || failure);
+        $('dialogue-panel').hidden = true;
         drawScene(ctx, null, null);
         assetError = message;
         // A start may still be replacing the old state; reject its final result,
@@ -415,6 +446,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
   $('step').addEventListener('click', () => controller.stepOnce());
   $('interact').addEventListener('click', () => controller.interact());
+  $('continue').addEventListener('click', () => controller.acknowledge());
   $('new-game').addEventListener('click', () => controller.newGame());
   $('reset').addEventListener('click', () => controller.reset());
   $('demo').addEventListener('click', () => controller.demo());
