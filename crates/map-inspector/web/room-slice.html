@@ -39,6 +39,7 @@ Ark uses ROM-derived standing/walking sprites. One room10 resident is shown in a
 <div class="actions">
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
+<button id="interact" disabled>Interact (door only)</button>
 <button id="reset" disabled>Checkpoint Reset</button><button id="demo" disabled>Checkpoint doorway demo</button>
 </div>
 <div class="pad" aria-label="Touch cardinal controls">
@@ -48,7 +49,8 @@ Ark uses ROM-derived standing/walking sprites. One room10 resident is shown in a
 <button class="right" data-direction="2" aria-label="Right" disabled>→</button>
 </div>
 <p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
-Release before changing direction. Escape pauses. Touch and hold a cardinal button; sliding outside releases it.</p>
+Release before changing direction. Escape pauses.
+Space/Enter or Interact opens the qualified wooden door only; release movement first. Interaction pauses the preview. Touch and hold a cardinal button; sliding outside releases it.</p>
 </section>
 <section class="panel" aria-labelledby="inspector-heading">
 <h2 id="inspector-heading">Host state inspector</h2>
@@ -97,31 +99,31 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     let state = null, error = null, paused = true, busy = false, hidden = false, timer = null;
     let initialized = false, pendingStart = null, activeStart = null, mode = 'live', demoIndex = 0;
     let note = 'Choose New Game, then Resume to explore.', walkingPhase = null;
-    let lastStepAt = -Infinity, singlePending = false;
+    let lastStepAt = -Infinity, pendingCommand = null;
     const interval = 1000 / 60;
     const held = new Map();
     // The protocol leaves phase names open. Learn the normal phase only at a
     // known new-game start or saved checkpoint, never a mid-session response.
     const transition = () => state && state.phase !== walkingPhase;
-    const view = () => ({state, error, paused, busy: busy || singlePending || pendingStart !== null, mode, demoIndex, note,
+    const view = () => ({state, error, paused, busy: busy || pendingCommand !== null || pendingStart !== null, mode, demoIndex, note,
       canDrive: walkingPhase !== null, walking: !!state && !transition()});
     const notify = () => render(view());
     function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
-    function stop(message) { paused = true; singlePending = false; held.clear(); clearTimer(); if (message) note = message; }
+    function stop(message) { paused = true; pendingCommand = null; held.clear(); clearTimer(); if (message) note = message; }
     function reject(message) { error = message; cancelAutoplay(); stop('Input paused — choose New Game or Checkpoint Reset.'); notify(); }
     function cancelAutoplay() {
       if (activeStart) activeStart.demo = false;
       if (pendingStart) pendingStart.demo = false;
     }
     function arm() {
-      if (timer !== null || busy || (paused && !singlePending) || hidden || error || !state || pendingStart) return;
+      if (timer !== null || busy || (paused && pendingCommand === null) || hidden || error || !state || pendingStart) return;
       const remaining = Math.max(0, interval - (now() - lastStepAt));
       timer = schedule(() => {
         timer = null;
         if (now() - lastStepAt < interval) { arm(); return; }
-        const direction = singlePending || transition() ? 0 : mode === 'demo' ? (demoIndex < 56 ? 1 : demoIndex < 80 ? 4 : 0) : (held.values().next().value || 0);
-        singlePending = false; lastStepAt = now(); transact('/step', String(direction));
-      }, Math.ceil(singlePending ? remaining : Math.max(interval, remaining)));
+        const direction = transition() ? 0 : pendingCommand !== null ? pendingCommand : mode === 'demo' ? (demoIndex < 56 ? 1 : demoIndex < 80 ? 4 : 0) : (held.values().next().value || 0);
+        pendingCommand = null; lastStepAt = now(); transact('/step', String(direction));
+      }, Math.ceil(pendingCommand !== null ? remaining : Math.max(interval, remaining)));
     }
     async function transact(url, body, start = null) {
       if (busy) return;
@@ -170,6 +172,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       stop(url === '/new-game' ? 'Starting New Game…' : 'Resetting the saved checkpoint…'); notify();
       if (!busy) dispatchStart();
     }
+    function manualStep(command, message) {
+      if (busy || pendingCommand !== null || !state || walkingPhase === null || error || hidden || pendingStart) return;
+      cancelAutoplay(); mode = 'live'; stop(message); pendingCommand = command; notify(); arm();
+    }
     return {
       init() { if (!initialized) { initialized = true; transact('/state'); } },
       press(token, direction) {
@@ -182,13 +188,15 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       pause(message = 'Paused — controls released.') { cancelAutoplay(); stop(message); notify(); },
       resume() {
         if (!state || walkingPhase === null || error || hidden || pendingStart) return;
-        singlePending = false; clearTimer(); paused = false; note = mode === 'demo' ? `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
+        pendingCommand = null; clearTimer(); paused = false; note = mode === 'demo' ? `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
         notify(); arm();
       },
       setHidden(value) { hidden = value; if (hidden) this.pause('Tab hidden — paused and controls released.'); },
-      stepOnce() {
-        if (busy || singlePending || !state || walkingPhase === null || error || hidden || pendingStart) return;
-        cancelAutoplay(); mode = 'live'; stop('Single neutral logical step — paused.'); singlePending = true; notify(); arm();
+      stepOnce() { manualStep(0, 'Single neutral logical step — paused.'); },
+      interact() {
+        if (!state || state.door_interaction !== true || mode === 'demo' || transition()) return;
+        if (held.size) { note = 'Release movement before interacting.'; notify(); return; }
+        manualStep(5, 'Wooden-door interaction — paused. Resume to continue.');
       },
       newGame() { startSession('/new-game'); }, reset() { startSession('/reset'); }, demo() { startSession('/reset', true); }, reject,
     };
@@ -200,6 +208,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (keyDirections[key]) {
         event.preventDefault(); if (!event.repeat) controller.press(`key:${key}`, keyDirections[key]);
       } else if (key === 'escape') controller.pause();
+      else if (key === ' ' || key === 'enter') {
+        if (event.target?.closest?.('button,input,textarea,select,[contenteditable]')) return;
+        event.preventDefault(); if (!event.repeat) controller.interact();
+      }
       else if (key.length === 1 && key !== ' ') controller.press(`key:${key}`, 0);
     });
     doc.addEventListener('keyup', event => controller.release(`key:${event.key.toLowerCase()}`));
@@ -324,6 +336,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('pause').textContent = paused ? 'Resume' : 'Pause';
     $('pause').disabled = !ready || !canDrive || !!error;
     $('step').disabled = !ready || !canDrive || !!error || busy || !paused;
+    $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
@@ -355,6 +368,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   });
   $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
   $('step').addEventListener('click', () => controller.stepOnce());
+  $('interact').addEventListener('click', () => controller.interact());
   $('new-game').addEventListener('click', () => controller.newGame());
   $('reset').addEventListener('click', () => controller.reset());
   $('demo').addEventListener('click', () => controller.demo());

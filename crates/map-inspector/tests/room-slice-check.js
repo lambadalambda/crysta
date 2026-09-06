@@ -12,7 +12,7 @@ const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
 const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
-  policy: 'semantic-preview', camera: [256, 0]});
+  policy: 'semantic-preview', camera: [256, 0], door_interaction:true});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
 const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 function harness() {
@@ -107,6 +107,44 @@ async function main() {
   assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
   assert.match(stalled.element('error').textContent, /timed out/i);
   assert.equal(stalled.element('pause').disabled,true);
+  // Door interaction is one paced command, never a held direction or autoplay.
+  const door = harness(); await door.start(); door.controller.interact();
+  assert.equal(door.calls.length,1); door.controller.interact(); door.controller.stepOnce();
+  assert.equal(door.timers.size,1); await door.fire();
+  assert.equal(door.calls.at(-1).body,'5'); await door.reply({...initial(),tick:1});
+  assert.equal(door.views.at(-1).paused,true); assert.equal(door.timers.size,0);
+  door.controller.interact(); door.controller.newGame();
+  assert.equal(door.timers.size,0); await door.reply(newGameState());
+  assert.equal(door.calls.filter(call=>call.body==='5').length,1,'new start cancels undispatched action');
+  door.controller.resume(); door.controller.press('held',3); door.controller.interact();
+  assert.match(door.views.at(-1).note,/release/i); assert.equal(door.views.at(-1).error,null);
+  door.controller.release('held'); door.controller.pause();
+  door.controller.interact(); door.controller.setHidden(true);
+  assert.equal(door.timers.size,0,'hidden tab cancels action');
+  const incapable=harness(); incapable.controller.init(); await incapable.reply({...initial(),door_interaction:undefined});
+  incapable.controller.interact(); assert.equal(incapable.timers.size,0);
+  const transitionDoor=harness(); await transitionDoor.start(); transitionDoor.controller.resume(); await transitionDoor.fire();
+  await transitionDoor.reply({...initial(),phase:'departing'}); transitionDoor.controller.pause();
+  transitionDoor.controller.interact(); assert.equal(transitionDoor.timers.size,0);
+  const busyDoor=harness(); await busyDoor.start(); busyDoor.controller.resume(); await busyDoor.fire();
+  busyDoor.controller.interact(); assert.equal(busyDoor.timers.size,0);
+  await busyDoor.reply({...initial(),tick:1}); await busyDoor.fire();
+  assert.equal(busyDoor.calls.at(-1).body,'0'); await busyDoor.reply({...initial(),tick:2}); busyDoor.controller.pause();
+  assert(!busyDoor.calls.some(call=>call.body==='5'),'busy action must not replay later');
+  const demoDoor=harness(); await demoDoor.start(); demoDoor.controller.demo(); demoDoor.controller.interact();
+  await demoDoor.reply(initial()); demoDoor.controller.interact(); await demoDoor.fire();
+  assert.equal(demoDoor.calls.at(-1).body,'1'); await demoDoor.reply({...initial(),tick:1});
+  assert.equal(demoDoor.views.at(-1).demoIndex,1); assert.equal(demoDoor.views.at(-1).mode,'demo');
+  assert(!demoDoor.calls.some(call=>call.body==='5')); demoDoor.controller.pause();
+  const actionKeys=harness(); await actionKeys.start();
+  const actionDoc=new Target(), actionWin=new Target(); bindInputs(actionKeys.controller,actionDoc,actionWin,[]);
+  actionDoc.emit('keydown',{key:'Enter',target:{closest:()=>({})}});
+  actionDoc.emit('keydown',{key:' ',repeat:true}); assert.equal(actionKeys.timers.size,0);
+  actionDoc.emit('keydown',{key:' '}); await actionKeys.fire();
+  assert.equal(actionKeys.calls.at(-1).body,'5'); await actionKeys.reply(initial());
+  actionDoc.emit('keydown',{key:'Enter'}); actionKeys.controller.pause();
+  assert.equal(actionKeys.timers.size,0);
+
   // Start paused; requests and timers never overlap or accumulate a catch-up queue.
   const h = harness(); await h.start();
   assert.equal(h.calls[0].url, '/state'); assert.equal(h.timers.size, 0);
