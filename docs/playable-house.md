@@ -164,7 +164,9 @@ snapshot. Its16×33 raster uses the shared component decoder with palette base20
 only while map16 is loaded, including the explicit semantic doorway phase;
 returning to map15 removes it. The neighboring resident is not rendered yet.
 
-The host supplies an ordered `scene:[{key,position}]` alongside the player state.
+The host supplies an ordered `scene:[{id,key,position}]` alongside the player state.
+The immutable art manifest declares per-room `scene_ids`; the browser requires
+exact unique actor membership while allowing different actors to share a raster.
 For the qualified ordinary pair, painter order uses worldY before sprite-anchor
 subtraction; equalY puts the NPC first and Ark last. The browser consumes that
 order without inventing entity simulation. Ordering on either side and the tie

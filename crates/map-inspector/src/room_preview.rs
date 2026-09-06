@@ -416,12 +416,25 @@ mod tests {
         assert_eq!(state["actor_key"], key);
         let scene = state["scene"].as_array().unwrap();
         assert_eq!(scene.len(), if output.map_id == 16 { 2 } else { 1 });
+        let mut ids: Vec<_> = scene
+            .iter()
+            .map(|entry| entry["id"].as_str().unwrap())
+            .collect();
+        ids.sort_unstable();
+        let mut expected: Vec<_> = art["scene_ids"][output.map_id.to_string()]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|id| id.as_str().unwrap())
+            .collect();
+        expected.sort_unstable();
+        assert_eq!(ids, expected);
         for entry in scene {
             assert!(art["frames"].get(entry["key"].as_str().unwrap()).is_some());
         }
-        assert!(
-            scene.contains(&json!({ "key":key, "position":[output.position.0,output.position.1] }))
-        );
+        assert!(scene.contains(
+            &json!({ "id":"ark", "key":key, "position":[output.position.0,output.position.1] })
+        ));
         assert!(art["frames"].get(&key).is_some(), "missing {key}");
         assert_eq!(state["animation"]["sequence"], output.animation.sequence);
         assert_eq!(state["animation"]["record"], output.animation.record);

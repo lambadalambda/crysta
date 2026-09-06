@@ -62,14 +62,14 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
   const doc = new Target(); doc.getElementById=element; doc.querySelectorAll=()=>[];
   doc.createElement=()=>({getContext:()=>context});
   const win = new Target();
-  const bundle = {schema_version:1,frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
+  const bundle = {schema_version:1,scene_ids:{15:['ark']},frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
     foreground:{'15':{width:512,height:1024,runs:[]}}};
   const browser = {console,document:doc,window:win,performance:{now:()=>0},AbortController,AbortSignal,Uint8ClampedArray,
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
     async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
-      scene:[{key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
+      scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
   return {element,timers,setKey(value){key=value;},fixScene(){invalidScene=false;}};
@@ -353,7 +353,7 @@ async function main() {
 
   // Real asset adapter: pre-mirrored bounds, transparent gaps, and high-only occlusion.
   const rgba = [10,20,30,255, 40,50,60,255, 70,80,90,255, 100,110,120,255];
-  const bundle = {schema_version:1, frames:{'2:1':{width:2,height:2,offset:[-9,-31],rgba}},
+  const bundle = {schema_version:1,scene_ids:{15:['ark']}, frames:{'2:1':{width:2,height:2,offset:[-9,-31],rgba}},
     foreground:{'15':{width:2,height:2,runs:[1,1,3,1]}}};
   const rasterCalls = [];
   const art = prepareArt(bundle, {width:2,height:2,data:rgba}, (width,height,data) => {
@@ -365,24 +365,44 @@ async function main() {
   assert.equal(selected.flipX, false, 'native alternate mirror anchors are already composed');
   assert.throws(() => selectActor(art, {...initial(),actor_key:'unknown'}), /sprite/i);
   assert.throws(() => prepareArt({...bundle,schema_version:99}, {width:2,height:2,data:rgba}, () => {}), /art/i);
+  for (const ids of [undefined, [], ['other'], ['ark','ark'], ['ark',7], ['ark',''],
+    ['ark',...Array.from({length:128},(_,i)=>`resident-${i}`)]]) {
+    assert.throws(()=>prepareArt({...bundle,scene_ids:{15:ids}}, {width:2,height:2,data:rgba},()=>({})), /membership/i);
+  }
   spriteCalls.length = 0;
   drawScene(spriteCtx, image, initial(), selected, art.foreground['15']);
   assert.equal(spriteCalls.at(-1)[1], art.foreground['15'], 'opaque high background is drawn after Ark');
-  const sceneArt = {...art,actors:{...art.actors,'npc:house':selected}};
+  const sceneArt = {...art,sceneIds:{15:['ark','resident-a']},actors:{...art.actors,'npc:house':selected}};
   const sceneState = {...initial(),actor_key:'2:1',scene:[
-    {key:'npc:house',position:[320,336]}, {key:'2:1',position:[472,176]},
+    {id:'resident-a',key:'npc:house',position:[320,336]}, {id:'ark',key:'2:1',position:[472,176]},
   ]};
   const entries = selectActors(sceneArt,sceneState);
   assert.deepEqual(Array.from(entries[0].position), [320,336]);
   assert.deepEqual(Array.from(entries[1].position), [472,176]);
-  for(const scene of [[],null,[{key:'2:1',position:[0,0]}],
-    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[-1,336]}],
-    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[320,65536]}],
-    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[320]}],
+  for(const scene of [[],null,[{id:'ark',key:'2:1',position:[0,0]}],
+    [{id:'ark',key:'2:1',position:[472,176]}, {id:'resident-a',key:'npc:house',position:[-1,336]}],
+    [{id:'ark',key:'2:1',position:[472,176]}, {id:'resident-a',key:'npc:house',position:[320,65536]}],
+    [{id:'ark',key:'2:1',position:[472,176]}, {id:'resident-a',key:'npc:house',position:[320]}],
     [sceneState.scene[0],sceneState.scene[1],sceneState.scene[0]],
-    [{key:'missing',position:[472,176]}],
-    [{key:'2:1',position:[472,176]},{key:'2:1',position:[472,176]}]]) {
+    [{id:'ark',key:'missing',position:[472,176]}],
+    [{id:'ark',key:'2:1',position:[472,176]},{id:'ark',key:'2:1',position:[472,176]}]]) {
     assert.throws(()=>selectActors(sceneArt,{...sceneState,scene}),/scene|sprite/i);
+  }
+  // NPC instances can share art; membership is keyed by stable actor identity.
+  const sharedSceneArt = {...sceneArt,sceneIds:{15:['ark','resident-a','resident-b']}};
+  const sharedScene = {...sceneState,scene:[
+    {id:'resident-a',key:'npc:house',position:[320,336]},
+    {id:'resident-b',key:'npc:house',position:[440,416]},
+    {id:'ark',key:'2:1',position:[472,176]},
+  ]};
+  const shared = selectActors(sharedSceneArt,sharedScene);
+  assert.equal(shared.length,3);
+  assert.equal(shared[0].image,shared[1].image,'shared raster is not duplicate actor identity');
+  assert.deepEqual(Array.from(shared[1].position),[440,416]);
+  for (const scene of [sharedScene.scene.slice(1),
+    sharedScene.scene.map((entry,i)=>({...entry,id:i===1?'resident-a':entry.id})),
+    sharedScene.scene.map((entry,i)=>({...entry,id:i===1?'unknown':entry.id}))]) {
+    assert.throws(()=>selectActors(sharedSceneArt,{...sharedScene,scene}),/scene/i);
   }
   assert(!html.includes('Cyan box ='));
 

@@ -19,11 +19,11 @@ pub(super) struct Art {
 }
 impl Art {
     pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
-        let ark = json!({"key":key,"position":[position.0,position.1]});
+        let ark = json!({"id":"ark","key":key,"position":[position.0,position.1]});
         if map != self.npc_map {
             return json!([ark]);
         }
-        let npc = json!({"key":NPC_KEY,"position":self.npc_position});
+        let npc = json!({"id":NPC_KEY,"key":NPC_KEY,"position":self.npc_position});
         // Ordinary native depth buckets use world Y before sprite anchors.
         // Linked-list insertion gives Ark precedence at equal Y; see house-npc.md.
         if position.1 < self.npc_position[1] {
@@ -168,6 +168,7 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     }
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
+            "scene_ids":{"15":["ark"],"16":["ark",NPC_KEY]},
             "npc":{"key":NPC_KEY,"map_id":npc.map_id(),"position":npc.position(),"policy":"frozen-ordinary-pose"},
             "foreground":{"15":foreground(&bedroom)?,"16":foreground(&house)?}}))?,
         npc_map: npc.map_id(),
