@@ -5,3 +5,4 @@ pub mod graphics;
 
 pub mod maps;
 pub mod sprites;
+pub mod text;
