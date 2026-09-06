@@ -39,7 +39,7 @@ fn omittable(command: u8, before: &Value, after: &Value) -> bool {
     command <= 4 && blocking(&before["state"]) && equivalent(before, after)
 }
 
-fn fixture(tick: u64, dialogue: Value, ready: bool) -> Value {
+fn fixture(tick: u64, dialogue: &Value, ready: bool) -> Value {
     json!({"state":{"tick":tick,"snapshot_sha256":"a".repeat(64),
         "dialogue":dialogue,"dialogue_ready":ready,"error":null,
         "start_kind":"new-game","x":304,"y":112,"map_id":15},
@@ -48,7 +48,7 @@ fn fixture(tick: u64, dialogue: Value, ready: bool) -> Value {
 
 #[test]
 fn hashing_copy_changes_only_global_tick_and_never_the_input() {
-    let mut bytes: Vec<u8> = (0..320).map(|n| (n % 251) as u8).collect();
+    let mut bytes: Vec<u8> = (0..320).map(|n| u8::try_from(n % 251).unwrap()).collect();
     bytes[..8].copy_from_slice(b"RSLC\x05\x0d\0\x01");
     let original = bytes.clone();
     let mut expected = bytes.clone();
@@ -91,7 +91,7 @@ fn hashing_rejects_every_header_mutation_and_wrong_size() {
 
 #[test]
 fn omission_requires_blocking_dialogue_and_all_nonclock_identity() {
-    let before = fixture(8, json!({"key":"page"}), true);
+    let before = fixture(8, &json!({"key":"page"}), true);
     let mut after = before.clone();
     after["state"]["tick"] = json!(9);
     after["state"]["snapshot_sha256"] = json!("c".repeat(64));
@@ -107,7 +107,7 @@ fn omission_requires_blocking_dialogue_and_all_nonclock_identity() {
     changed["continuation"] = json!("d".repeat(64));
     assert!(!omittable(0, &before, &changed));
     for (dialogue, ready) in [(Value::Null, true), (json!({"key":"CEntry"}), false)] {
-        let idle = fixture(8, dialogue, ready);
+        let idle = fixture(8, &dialogue, ready);
         assert!(!omittable(0, &idle, &idle));
     }
     let mut unknown = after.clone();
@@ -229,12 +229,12 @@ fn validate_proof(commands: &[u8], proof: &Value) -> Result<Vec<usize>> {
 }
 
 fn proof_fixture() -> (Vec<u8>, Value) {
-    let initial = fixture(0, Value::Null, false);
-    let page = fixture(1, json!({"key":"page"}), true);
+    let initial = fixture(0, &Value::Null, false);
+    let page = fixture(1, &json!({"key":"page"}), true);
     let mut paused = page.clone();
     paused["state"]["tick"] = json!(2);
-    let resumed = fixture(3, Value::Null, false);
-    let idle = fixture(4, Value::Null, false);
+    let resumed = fixture(3, &Value::Null, false);
+    let idle = fixture(4, &Value::Null, false);
     let mut projected_resumed = resumed.clone();
     projected_resumed["state"]["tick"] = json!(2);
     let mut projected_idle = idle.clone();
@@ -281,7 +281,7 @@ fn proof_validator_requires_complete_fresh_replay_at_every_retained_boundary() {
         bad[array]
             .as_array_mut()
             .unwrap()
-            .push(fixture(99, Value::Null, false));
+            .push(fixture(99, &Value::Null, false));
         assert!(validate_proof(&commands, &bad).is_err());
     }
     for field in ["x", "unknown_future_field"] {
@@ -338,11 +338,11 @@ fn apply_raw(
 }
 
 fn exact_raw_result(
-    result: std::result::Result<room_core::slice::FrameOutput, SliceError>,
+    result: &std::result::Result<room_core::slice::FrameOutput, SliceError>,
     expected: room_core::slice::FrameOutput,
 ) -> Result<()> {
     require(
-        result == Ok(expected),
+        result == &Ok(expected),
         &format!("raw core result differs: {result:?}; expected {expected:?}"),
     )
 }
@@ -350,7 +350,7 @@ fn exact_raw_result(
 fn checked_step(preview: &mut Preview, raw: &mut GameState, command: u8) -> Result<()> {
     let result = apply_raw(&preview.data, raw, command);
     preview.step(command); // Actual public host command adapter, not a reconstructed host.
-    exact_raw_result(result, preview.state.output())?;
+    exact_raw_result(&result, preview.state.output())?;
     require(
         raw.snapshot() == preview.state.snapshot() && raw.output() == preview.state.output(),
         "host command differs from continuous raw core mirror",
@@ -417,7 +417,7 @@ fn route_commands(route: &Value) -> Result<Vec<u8>> {
 #[test]
 #[ignore = "private ROM + clean-source wrapper required; never skip missing evidence"]
 fn generate_canonical_cadence_proof() -> Result<()> {
-    use std::{env, fs, io::Write};
+    use std::{env, fmt::Write as _, fs, io::Write};
     let route_bytes = include_bytes!("../../../../tools/pandora-runtime-qualification/route.json");
     require(
         sha256(route_bytes) == ROUTE_SHA,
@@ -437,10 +437,11 @@ fn generate_canonical_cadence_proof() -> Result<()> {
     let (mut original, mut raw) = fresh(&rom)?;
     let initial_snapshot = original.state.snapshot();
     let mut offline = vec![record(&original)?];
-    provenance["compiler_content_sha256"] = json!(initial_snapshot[40..72]
-        .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>());
+    let mut compiler_identity = String::with_capacity(64);
+    for byte in &initial_snapshot[40..72] {
+        write!(compiler_identity, "{byte:02x}")?;
+    }
+    provenance["compiler_content_sha256"] = json!(compiler_identity);
     provenance["rom_sha256"] = json!(ROM_SHA);
     provenance["route_sha256"] = json!(ROUTE_SHA);
     provenance["start"] = json!("NewGame");
@@ -553,12 +554,12 @@ fn raw_success_must_return_the_exact_frame_not_merely_ok() {
             mirror_x: false,
         },
     };
-    assert!(exact_raw_result(Ok(expected), expected).is_ok());
-    assert!(exact_raw_result(Err(SliceError::Interaction), expected).is_err());
+    assert!(exact_raw_result(&Ok(expected), expected).is_ok());
+    assert!(exact_raw_result(&Err(SliceError::Interaction), expected).is_err());
     let mut wrong = expected;
     wrong.tick += 1;
-    assert!(exact_raw_result(Ok(wrong), expected).is_err());
+    assert!(exact_raw_result(&Ok(wrong), expected).is_err());
     wrong = expected;
     wrong.position.0 += 1;
-    assert!(exact_raw_result(Ok(wrong), expected).is_err());
+    assert!(exact_raw_result(&Ok(wrong), expected).is_err());
 }
