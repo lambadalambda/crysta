@@ -1,0 +1,68 @@
+{
+  "epoch": "threaded-video-v0",
+  "inventory": {
+    "capture.json": {
+      "bytes": 62568,
+      "sha256": "55801357fabe6637f1062bb443bde8e230d3db88625e3f4af506f5d4723dc8ed"
+    },
+    "cgram-1600.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "cgram-1840.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "index.html": {
+      "bytes": 29651,
+      "sha256": "807183ae419953b79e5b7d162f51b5408a8260aecd9b040b3c6b9c4f49d8d670"
+    },
+    "reference-1600.bmp": {
+      "bytes": 184374,
+      "sha256": "1d46048a906051bdd3e0dc480fd15a05f77aa0c93239d22d18cb22bbb37c3a18"
+    },
+    "reference-1840.bmp": {
+      "bytes": 184374,
+      "sha256": "6320b0b40c356449365077214f59115c0ecf475635280acdd16fa9a30d3ac9f1"
+    },
+    "vram-1600.bin": {
+      "bytes": 65536,
+      "sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a"
+    },
+    "vram-1840.bin": {
+      "bytes": 65536,
+      "sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd"
+    },
+    "wram-1600.bin": {
+      "bytes": 131072,
+      "sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    "wram-1840.bin": {
+      "bytes": 131072,
+      "sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  },
+  "nonpixel_manifest_sha256": "7998be259cce4218983f03bb81e3bf189577958dc9f190ba38880036d680cb22",
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "rgb_sha256": [
+    "78c20d6a5dca2a006815c13f6577b33bcdc1ddb788ddad9949bdf889eaa7b0ea",
+    "93a224b980b538bf5bbed26c7d7052a6c14777608e6d02162eb55cfb2ef74c8a"
+  ],
+  "source_commit": "8034889f6dbc78181d2458e6f2e05881f48f5e5c",
+  "source_hashes": {
+    "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+    "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+    "crates/map-inspector/src/main.rs": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3",
+    "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+    "crates/oracle/build.rs": "3aa498ab4ac0eba9237d0026ec5441047946998e183ef468e1e30c8d4961226c",
+    "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+    "vendor/ares/ares-unity.cpp": "052c088a37debc4ba2710b5f1569fb2bf1880d6dbdb24e6be59551a1547524b7",
+    "vendor/ares/ares/ares/ares.hpp": "b11947c252b503ae1d9d8b5d7dbe75f5b53b9af28f35f8f469d0ff7d76db8c18",
+    "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+    "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+    "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+    "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+    "vendor/ares/shims.cpp": "0f7abb6af4f7aaa08519aa7ae0f821bab98794c33a96c74c7455847053e0f82c"
+  },
+  "test_sha256": "098c63bef080629f2448cf5e00a7952edc50857184449abacacf284ad7b6b0bf"
+}

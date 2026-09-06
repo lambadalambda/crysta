@@ -23,3 +23,18 @@ The existing SRAM-based local capture integration test has an old threaded-obser
 ## Notes
 
 - Parent audit: `tools/pandora-qualification/OBSERVER-MIGRATION.md`, map-inspector integration section. Current test fails old `93a224...` versus observed `3833db...` at its second RGB checkpoint; one failure message alone is not renewal evidence.
+
+## Bounded renewal evidence
+
+- Old producer reproduced at `8034889` (`0db0aad^`); fixed twins built from
+  `7c5c90b`. The capture driver is byte-identical between these sources. Owned
+  slot3 SRAM/ROM are authenticated; no production code or shared index changed.
+- Complete private captures/manifests/binaries/build records:
+  `/Users/lainsoykaf/repos/ilar-task-capture-renewal/local/map-inspector-renewal/{old,fixed-a,fixed-b}`.
+- Byte-preserved old test and hash-only evidence metadata are archived under
+  `tools/map-inspector-qualification/epochs/threaded-video-v0/`.
+- Independent static architecture review approved the bounded tooling; a separate
+  execution-capable reviewer recomputed all inventories, decoded all six BMPs,
+  compared all 394,240 nonpixel surface bytes per run, and reran all three retained
+  producers. Only the second RGB changes; complete fixed captures agree.
+- Parent owns index closure/integration. Other legacy wrappers remain unrenewed.
