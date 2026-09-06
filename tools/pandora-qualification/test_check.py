@@ -3,7 +3,7 @@ from copy import deepcopy
 import unittest
 import json
 from pathlib import Path
-from check import FINAL, STORY, SURFACES, require_equal, timeline, validate, validate_discovery
+from check import FINAL, STORY, SURFACES, report, require_equal, timeline, validate, validate_discovery
 
 
 def good():
@@ -80,8 +80,12 @@ class SemanticTests(unittest.TestCase):
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_current_checker_rejects_unrenewed_discovery_epoch(self):
+        with self.assertRaisesRegex(ValueError, 'discovery.*not renewed'):
+            report('unused-ROM', 'unused-root', discovery=True)
+
     def test_controls_and_mutations(self):
-        ref = json.loads(Path(__file__).with_name('discovery-reference.json').read_text())
+        ref = json.loads((Path(__file__).parent / 'epochs/threaded-video-v0/discovery-reference.json').read_text())
         validate_discovery(ref)
         for label, key, value in [
             ('cellar-without28-blocked', 'events', [1, 32, 38, 40, 251]),

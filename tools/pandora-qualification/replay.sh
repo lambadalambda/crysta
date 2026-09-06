@@ -7,6 +7,8 @@ python3 -B tools/pandora-qualification/test_source.py
 python3 -O -B tools/pandora-qualification/test_source.py
 python3 -B tools/pandora-qualification/test_check.py
 python3 -O -B tools/pandora-qualification/test_check.py
+python3 -B tools/pandora-qualification/test_epoch.py
+python3 -O -B tools/pandora-qualification/test_epoch.py
 sh tools/house-conversation-qualification/build.sh
 probe=local/house-conversation-qualification/probe
 binary=${CARGO_TARGET_DIR:-$probe/target}/release/house-conversation-probe

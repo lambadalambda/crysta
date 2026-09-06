@@ -5,20 +5,22 @@
 
 **Endpoint: `pandora-tour-control`, inside map `$41`, after the first-time box
 interior tour.** This is not a claimed return to the field or a frozen Crysta.
-The original retained captures pass normal/optimized checkers. Independent final
-source/evidence/architecture review approved this declared scope (static review).
-The parent's fresh replay **confirms the progression/control semantics but fails
-strict pixel equality**; see the [replay diagnosis](#independent-replay-diagnosis).
-Acceptance and parent-owned tracker closure remain blocked on visual capture
-reproducibility, not on a demonstrated gameplay divergence. Source-only projection
-received an independent review before signed commit `380d0b1`.
+Strict qualification now uses **`headless-sync-video-v1`**. Both independently
+produced parent fixed roots and both video-task roots pass the migrated exact
+checker normally and under `-O`, with unchanged source/gameplay semantics. See
+[observer migration and remaining wrapper gates](../tools/pandora-qualification/OBSERVER-MIGRATION.md).
+Old threaded pixels are archived, not backward-equal. Parent post-cherry-pick
+strict verification and tracker closure remain parent-owned. Source-only
+projection received an independent review before signed commit `380d0b1`.
 
 ## What the retained journeys establish
 
 `tools/pandora-qualification/route.jsonl` preserves all 77 commands of the accepted
 [house conversation](house-conversation.md) recipe, omits its finish, and extends
-the **same empty-SRAM Session**. Its prefix frame-log hash and all 31 previously
-selected sets of capture hashes match the accepted house reference exactly.
+the **same empty-SRAM Session**. Its prefix frame-log hash and all non-pixel
+surfaces match the accepted house reference exactly. All 31 selected capture sets
+match Pandora's versioned `prefix-reference.json`; four pixel pins were renewed
+under the fixed observer, without modifying the standalone conversation fixture.
 No SRAM was supplied, no save was loaded, and no debug warp, memory patch or
 fixture initialization was used. The native game's own scripted map changes
 are real progression, not tool-injected warps.
@@ -34,9 +36,10 @@ An earlier, separate fresh discovery process retained missing-prerequisite,
 cancellation, push/dash, off-target and box-warning controls. It explored C's
 longer `$2F` refusal branch. Its later actor geometry is **not** used as evidence
 for the direct `$2E` route. Both processes flushed and exited successfully; neither
-restored a state. `discovery-reference.json` selects its control evidence, not an
-alternative production initialization. Optional X/Select exploration after its
-control witness is outside the endpoint claim.
+restored a state. `epochs/threaded-video-v0/discovery-reference.json` selects its
+historical control evidence, not an alternative production initialization. The
+discovery observer epoch has not been renewed. Optional X/Select exploration
+after its control witness is outside the endpoint claim.
 
 Historical opening/Pandora scenarios prove no endpoint here. The historical ares
 “same input causes script desync” claim was explicitly corrected in
@@ -61,10 +64,18 @@ sync. The checker requires the exact command/capture schedule, every frame row
 and checkpoint order, the unchanged prefix, and the complete log hash. Omitting
 a capture is a different, unqualified timing policy. The wrapper uses one Session
 per process and `finish` flushes then calls `process::exit(0)` to avoid teardown.
-Observer source hashes and probe/bootstrap/build-source hashes are retained.
-This is output-pinned, not a claim of a fully dependency-locked build environment.
+Observer source hashes now include the build definition, both translation units,
+patched video configuration header, Screen/PPU publication/color code, Rust API
+and serializer. Probe/bootstrap/build-script hashes are unchanged. Completed
+pixels are from the **last explicit `run_frame` before the save-state sync**, not
+the later synchronized machine instant. This is output/source-pinned, not a claim
+of a fully dependency-locked build environment or historical binary identity.
 
 ## Independent replay diagnosis
+
+**Historical `threaded-video-v0` investigation (before the separately reviewed
+synchronous fix and migration).** Statements below describe the old checker and
+source epoch; current acceptance is documented in the migration audit.
 
 Parent capture `replay-JmCgU8/journey` ran the frozen recipe to completion. The
 checker runs source/ROM, recipe, timeline and accepted-prefix checks, then
@@ -137,13 +148,12 @@ source/build provenance and observation policy, plus missing/extra fields; a
 no-op comparator produces 42 expected failures. Existing semantic mutation
 controls remain independent and unchanged.
 
-**Gate remains open:** correcting video publication requires a separately owned
-observer change and renewed strict replay/review. A mutex alone might prevent
-torn reads yet still select a previous frame; completion/frame association must
-also be defined. Do not add sleeps or state loads, quietly discard pixels, or
-accept a new golden from one favorable race outcome. Until then the source/state
-contract is independently supported, but neither whole-capture reproducibility
-nor every intermediate captured image is qualified for asset fidelity work.
+**Historical gate disposition:** the diagnosis deliberately left pixels strict
+and required an observer fix plus renewed evidence. That fix is now separately
+reviewed; the migration uses independently reproduced completed publications,
+not a mutex-only previous-frame policy, sleeps, state loads, dropped pixels or a
+single favorable race outcome. Discovery and unrelated wrapper epochs remain
+unrenewed; see the migration audit rather than generalizing Pandora's pass.
 
 ## Required story contract
 
@@ -361,22 +371,25 @@ the historical cellar-band RGB discrepancy remains separate from this route.
 
 ```sh
 sh tools/pandora-qualification/replay.sh "$ROM"
-# Existing captures, no new Session:
-python3 -B tools/pandora-qualification/check.py "$ROM" local/pandora-qualification/journey
-python3 -O -B tools/pandora-qualification/check.py "$ROM" local/pandora-qualification/journey
-python3 -B tools/pandora-qualification/check.py "$ROM" local/pandora-qualification/discovery --discovery
-python3 -O -B tools/pandora-qualification/check.py "$ROM" local/pandora-qualification/discovery --discovery
+# Existing fixed-epoch captures, no new Session ($CAPTURE is a journey directory):
+python3 -B tools/pandora-qualification/check.py "$ROM" "$CAPTURE"
+python3 -O -B tools/pandora-qualification/check.py "$ROM" "$CAPTURE"
 python3 -B tools/pandora-qualification/test_source.py
 python3 -O -B tools/pandora-qualification/test_source.py
 python3 -B tools/pandora-qualification/test_check.py
 python3 -O -B tools/pandora-qualification/test_check.py
+python3 -B tools/pandora-qualification/test_epoch.py
+python3 -O -B tools/pandora-qualification/test_epoch.py
 ```
 
 `reference.json` contains only selected semantic observations and capture/source/
-recipe hashes. `discovery-reference.json` separately checks missing `$28`, cancel/
-retry, failed pushing, off-target throw, two actual hits and warning/open/control
-distinctions. Neither checker loads a state. Raw ROM, scripts/text, graphics,
-per-frame traces and every capture stay ignored under `local/`.
+recipe hashes for `headless-sync-video-v1`. The archived discovery reference
+retains missing `$28`, cancel/retry, failed pushing, off-target throw, two actual
+hits and warning/open/control distinctions; `--discovery` reports its unrenewed
+epoch instead of accepting it under current provenance. No checker loads a state.
+Raw ROM, scripts/text, graphics, per-frame traces and every capture stay ignored
+under `local/`. `check.py --record` was removed: current pin changes require the
+explicit four-root, full-invariant `migrate.py` audit.
 
 RE discovery preceded executable checker work. Source helper tests went red for
 the missing bank-first palette reader, then green; the semantic checker was

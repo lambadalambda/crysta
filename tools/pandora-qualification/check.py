@@ -3,16 +3,11 @@ import json
 from pathlib import Path
 import sys
 from source import ROOT, ROM_SHA, Source, project, require, sha
+from epoch import EPOCH, POLICY, SURFACES, observer_sources
 
 HOUSE = ROOT.parent / 'house-conversation-qualification'
 STORY = [0x20, 0x26, 0x27, 0x28, 0x2e, 0xfb]
 FINAL = sorted(STORY + [0x22, 0x243, 0x244, 0x292])
-DISCOVERY_LABELS = {'cellar-without28-blocked', 'resident13-choice-no-confirm',
-                    'resident13-refused', 'resident13-granted28', 'door-dash2-rest',
-                    'throw-pot-impact', 'second-impact', 'door-second-hit',
-                    '21-warning-complete-neutral', '21-opening-wait',
-                    'inside-box-neutral', 'inside-box-left-rest', 'inside-box-up-rest'}
-SURFACES = ('state', 'wram', 'vram', 'cgram', 'pixels', 'oam', 'obj')
 
 
 def require_equal(observed, expected, context):
@@ -152,12 +147,13 @@ def validate_discovery(result):
 
 
 def report(rom_path, root, discovery=False):
+    require(not discovery, 'discovery observer epoch not renewed; historical evidence is in epochs/threaded-video-v0')
     rom = Path(rom_path).read_bytes()
     require(sha(rom) == ROM_SHA, 'owned Japanese ROM authentication')
     require(project(rom) == json.loads((ROOT / 'source.json').read_text()), 'source metadata mismatch')
     root = Path(root)
     route = (root / 'route.jsonl').read_bytes()
-    require(route == (ROOT / ('discovery-route.jsonl' if discovery else 'route.jsonl')).read_bytes(), 'exact retained input/observation recipe')
+    require(route == (ROOT / 'route.jsonl').read_bytes(), 'exact retained input/observation recipe')
     prefix = (HOUSE / 'route.jsonl').read_bytes().splitlines(keepends=True)[:-1]
     require(route.startswith(b''.join(prefix)), 'accepted fresh prefix changed')
     commands = [json.loads(l) for l in route.splitlines()]
@@ -165,14 +161,17 @@ def report(rom_path, root, discovery=False):
     lines = raw.splitlines(keepends=True)
     rows = [json.loads(l) for l in lines]
     last = timeline(commands, rows)
-    house = json.loads((HOUSE / 'reference.json').read_text())
+    house = json.loads((ROOT / 'prefix-reference.json').read_text())
+    sources = observer_sources()
+    require(house['observer_epoch'] == EPOCH, 'prefix observer epoch changed')
+    require_equal(sources, house['observer_source_hashes'], 'prefix observer source changed')
     require(sha(b''.join(l for l, row in zip(lines, rows) if row['frame'] <= 12059))
             == house['frame_log_sha256'], 'accepted prefix log changed')
     for label, point in house['checkpoints'].items():
         require_equal({ext: sha((root / f'{label}.{ext}').read_bytes()) for ext in SURFACES},
                       point['hashes'], f'accepted prefix capture {label} changed')
     # One-frame input edges remain in the hash-bound log and schedule, not duplicated in the semantic table.
-    selected = DISCOVERY_LABELS if discovery else {c['label'] for c in commands[:-1] if c['frames'] > 1}
+    selected = {c['label'] for c in commands[:-1] if c['frames'] > 1}
     points = {r['label']: checkpoint(root, r, rom) for r in rows
               if r['kind'] == 'checkpoint' and r['frame'] > 12059 and r['label'] in selected}
     tutorial = []
@@ -180,30 +179,21 @@ def report(rom_path, root, discovery=False):
         m = row['map']
         if m in (0x41, 0x42, 0x43, 0x44) and (not tutorial or tutorial[-1] != m):
             tutorial.append(m)
-    repo = ROOT.parent.parent
-    observer_files = ['crates/oracle/src/lib.rs', 'vendor/ares/shims.cpp',
-                      'vendor/ares/ares/sfc/system/serialization.cpp']
     result = {'rom_sha256': ROM_SHA, 'route_sha256': sha(route), 'frame_log_sha256': sha(raw),
               'final_frame': last, 'tutorial_map_path': tutorial, 'points': points,
-              'observer_source_hashes': {name: sha((repo / name).read_bytes()) for name in observer_files},
+              'observer_source_hashes': sources,
               'provenance': {str(p.relative_to(ROOT.parent)): sha(p.read_bytes()) for p in
                              [HOUSE / 'probe.rs', HOUSE / 'build.sh',
                               ROOT.parent / 'new-game-qualification/bootstrap.rs']},
-              'observation_policy': 'one-empty-SRAM-Session; bootstrap6800; save_state-sync-at-boot-and-every-command; no-restore; finish-flush-exit'}
-    (validate_discovery if discovery else validate)(result)
+              'observation_policy': POLICY, 'observer_epoch': EPOCH}
+    validate(result)
     return result
 
 
 if __name__ == '__main__':
     options = sys.argv[3:]
-    require(set(options) <= {'--record', '--discovery'}, 'unknown option')
-    discovery = '--discovery' in options
-    result = report(sys.argv[1], sys.argv[2], discovery)
-    ref = ROOT / ('discovery-reference.json' if discovery else 'reference.json')
-    if '--record' in options:
-        ref.write_text(json.dumps(result, indent=2) + '\n')
-    else:
-        require_equal(result, json.loads(ref.read_text()),
-                      'retained evidence changed (semantic controls passed)')
-        print('Fresh discovery controls verified' if discovery else
-              'Fresh input-only New Game → Pandora tour → two-axis control verified')
+    require(set(options) <= {'--discovery'}, 'unknown option; epoch pin changes require migrate.py audit')
+    result = report(sys.argv[1], sys.argv[2], '--discovery' in options)
+    require_equal(result, json.loads((ROOT / 'reference.json').read_text()),
+                  'retained evidence changed (semantic controls passed)')
+    print(f'Fresh input-only New Game → Pandora tour → two-axis control verified ({EPOCH})')
