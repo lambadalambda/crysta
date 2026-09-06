@@ -64,7 +64,7 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 <p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
 Release before changing direction. Escape pauses.
 Space/Enter or Interact opens the wooden door or talks to the qualified resident; release movement first. Face Up against the door in the upper part of the western middle room, then continue north and face Up toward the resident. Use Continue for pages, or explicitly choose an option / Cancel. Tab and Enter work on choice buttons. Interaction pauses the preview; Resume to walk again. Touch and hold a cardinal button; sliding outside releases it.
-<span id="pandora-action-help" hidden>Lift / throw (Z) is a separate single action: release movement first, press once, then Resume to finish lifting or throwing. Continue acknowledges a dialogue page; Resume advances text-free recovery and owned scene cues. The first-time box tour owns control until it finishes; it is not a free inventory menu.</span></p>
+<span id="pandora-action-help" hidden>Lift / throw (Z) is a separate single action: release movement first, press once, then Resume to finish lifting or throwing. Continue acknowledges a ready dialogue page; Resume advances arrival, recovery and owned scene cues. Entry text can be visible before Continue becomes ready. The first-time box tour owns control until it finishes; it is not a free inventory menu.</span></p>
 </section>
 <section class="panel" aria-labelledby="inspector-heading">
 <h2 id="inspector-heading">Host state inspector</h2>
@@ -96,6 +96,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
         !(state.start_kind === undefined || typeof state.start_kind === 'string') ||
         !(state.pot_action === undefined || typeof state.pot_action === 'boolean') ||
+        !(state.dialogue_ready === undefined || typeof state.dialogue_ready === 'boolean') ||
         !(state.dialogue === undefined || state.dialogue === null || (typeof state.dialogue === 'object' && typeof state.dialogue.key === 'string' && state.dialogue.key.length > 0 && state.dialogue.key.length <= 128 && (state.dialogue.choice == null || (Number.isInteger(state.dialogue.choice) && state.dialogue.choice >= 0 && state.dialogue.choice <= 65535)))) ||
         typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
         !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
@@ -120,8 +121,11 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     const held = new Map();
     // The protocol leaves phase names open. Learn the normal phase only at a
     // known new-game start or saved checkpoint, never a mid-session response.
-    const dialogue = () => !!state?.dialogue;
-    const choice = () => state?.dialogue?.choice ?? null;
+    // A request can already be visible while an arrival still owns control.
+    // Only the core's ready page/choice pauses ticking; visibility never erases
+    // remaining transition samples. Older house hosts omit this capability.
+    const dialogue = () => !!state?.dialogue && state.dialogue_ready !== false;
+    const choice = () => dialogue() ? state.dialogue.choice ?? null : null;
     const transition = () => state && !dialogue() && state.phase !== walkingPhase;
     const view = () => ({state, error, paused, busy: busy || pendingCommand !== null || pendingStart !== null, mode, demoIndex, note,
       canDrive: walkingPhase !== null, walking: !!state && !transition() && !dialogue(), dialogue: dialogue(), choice: choice()});

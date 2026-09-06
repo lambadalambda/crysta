@@ -128,6 +128,7 @@ impl Preview {
         let mut phase = None;
         if self.data.pandora_enabled() {
             let story = self.state.pandora_output(&self.data)?;
+            visual["dialogue_ready"] = json!(self.state.dialogue_input_ready(&self.data)?);
             phase = story.scene.key();
             if let Some(phase) = phase {
                 visual["scene_phase"] = json!(phase);

@@ -55,6 +55,19 @@ Implement only the maps, source assets and semantic state transitions required b
   Pandora route, source-endpoint/record0 presentation, first-layer omissions and
   Z versus Interact/Continue/Resume. Inline red→green tests check both capability
   views; no input behavior changes.
+- The first real-browser diagnostic matched904 consecutive inputs/pixels, then
+  stopped at an unproved dialogue-paused span. It also exposed visible C/Box entry
+  text before arrival completion. No arrival ticks were removed or requests moved.
+- Readonly core `dialogue_input_ready` now distinguishes page visibility from the
+  exact existing acknowledgement guard. Host transports the boolean; UI keeps
+  unready text visible, allows Resume/neutral arrival, blocks premature page/choice
+  input and pauses precisely when ready. Legacy omitted readiness is unchanged.
+  TDD covers all17 C updates, Box completion, unready choices/malformed values and
+  visible-page controls. Independent review approved; nine host tests retain the
+  exact11,590-action final snapshot and workspace Clippy passes.
+- Full browser cadence still requires the canonical no-op proof and a second
+  independently fresh projected replay; no omitted input is accepted merely
+  because it looks unchanged. The producer bridge remains held.
 - Both module registrations are explicit in main. Producer bridge/current pins
   and the continuous real-browser journey remain acceptance gates, not bypassed
   by passing the offline route.

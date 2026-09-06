@@ -232,6 +232,39 @@ async function main() {
       assert.equal(ui.element('continue').disabled,true);
     }
   }
+  for(const dialogue_ready of [null,0,1,'false']) {
+    const bad=harness();bad.controller.init();await bad.reply({...initial(),dialogue_ready});
+    assert.match(bad.views.at(-1).error,/Invalid host state/);assert.equal(bad.timers.size,0);
+  }
+  // Visible entry text does not erase the remaining source arrival clock.
+  const arrival=harness();await arrival.start();arrival.controller.resume();await arrival.fire();
+  const entry=(tick,ready)=>({...initial(),map_id:12,x:120,y:464-(tick-1),tick,
+    phase:ready?'dialogue':'arriving',owner:ready?'dialogue':'transition',
+    dialogue:{key:'c-entry',choice:null},dialogue_ready:ready,dialogue_acknowledgement:true});
+  await arrival.reply({...entry(1,false),dialogue:{key:'pending-choice',choice:0},choice_interaction:true});
+  assert.equal(arrival.views.at(-1).choice,null);
+  arrival.controller.choose(1);
+  assert.equal(arrival.views.at(-1).paused,false,'visible-but-unready text must not pause an arrival');
+  assert.equal(arrival.views.at(-1).dialogue,false);
+  arrival.controller.acknowledge();arrival.controller.interact();arrival.controller.potAction();
+  for(let tick=2;tick<=18;tick++) {
+    arrival.controller.press('blocked',2);await arrival.fire();assert.equal(arrival.calls.at(-1).body,'0');
+    await arrival.reply(entry(tick,tick===18));
+  }
+  assert.equal(arrival.views.at(-1).paused,true,'stop exactly when acknowledgement becomes ready');
+  assert.equal(arrival.timers.size,0);assert.equal(arrival.calls.length,19);
+  arrival.controller.acknowledge();await arrival.fire();assert.equal(arrival.calls.at(-1).body,'6');
+  await arrival.reply({...initial(),tick:19,dialogue:null,dialogue_ready:false});
+
+  const entryPage=browserHarness({dialogueKey:'page:1',mutateState:s=>s.dialogue?{...s,phase:'arriving',owner:'transition',dialogue_ready:false}:s});
+  await flush();await flush();entryPage.element('interact').emit('click');
+  const entryTimer=[...entryPage.timers].find(([,t])=>t.ms<100);assert(entryTimer);
+  entryPage.timers.delete(entryTimer[0]);entryTimer[1].fn();await flush();await flush();
+  assert.equal(entryPage.element('dialogue-panel').hidden,false);
+  assert.equal(entryPage.element('continue').disabled,true);
+  assert.equal(entryPage.element('pause').disabled,false,'Resume advances arrival while its page remains visible');
+  assert.equal(entryPage.element('step').disabled,false);
+
   // Dialogue owns control; each acknowledgement is one paced command, never autoplay.
   const talk=harness(); await talk.start();
   const page = (key,tick) => ({...initial(),tick,phase:'dialogue',dialogue:{key,choice:null},dialogue_acknowledgement:true});

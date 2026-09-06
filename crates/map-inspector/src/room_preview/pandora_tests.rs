@@ -20,6 +20,7 @@ fn opt_in_host_starts_from_same_new_game_and_reserves_complete_presentation() {
     let state = preview.state();
     assert_eq!(state["pot_action"], true);
     assert_eq!(state["owner"], "player");
+    assert_eq!(state["dialogue_ready"], false);
     assert_eq!(
         state["world_background"],
         json!({"key":"house","patches":[]})
@@ -37,7 +38,13 @@ fn opt_in_host_starts_from_same_new_game_and_reserves_complete_presentation() {
     let mut old = Preview::new(&rom).unwrap();
     old.new_game();
     let legacy = old.state();
-    for key in ["owner", "world_background", "scene_phase", "carry"] {
+    for key in [
+        "owner",
+        "world_background",
+        "scene_phase",
+        "carry",
+        "dialogue_ready",
+    ] {
         assert!(legacy.get(key).is_none());
     }
     assert_eq!(legacy["pot_action"], false);
@@ -89,6 +96,17 @@ fn source_itinerary_projects_every_host_state_and_restores_through_final_control
             assert_eq!(preview.state(), state);
             frames.push(state);
         }
+    }
+    for tick in (5706..=5722).chain([9763]) {
+        let state = &frames[tick - 1];
+        assert!(state["dialogue"].is_object());
+        assert_eq!(
+            state["dialogue_ready"], false,
+            "unfinished visible arrival at {tick}"
+        );
+    }
+    for tick in [5723, 9764] {
+        assert_eq!(frames[tick - 1]["dialogue_ready"], true);
     }
     let final_state = frames.last().unwrap();
     assert_eq!(final_state["tick"], route["expected"]["tick"]);
