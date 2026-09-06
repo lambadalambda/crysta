@@ -3,7 +3,7 @@ from copy import deepcopy
 import unittest
 import json
 from pathlib import Path
-from check import FINAL, STORY, timeline, validate, validate_discovery
+from check import FINAL, STORY, SURFACES, require_equal, timeline, validate, validate_discovery
 
 
 def good():
@@ -95,6 +95,72 @@ class DiscoveryTests(unittest.TestCase):
                 changed = deepcopy(ref)
                 changed['points'][label][key] = value
                 validate_discovery(changed)
+
+
+class ExactEvidenceTests(unittest.TestCase):
+    def fixture(self):
+        ref = json.loads(Path(__file__).with_name('reference.json').read_text())
+        # Keep real top-level provenance and one full point: exact comparisons must
+        # cover more than the intentionally bounded gameplay semantic predicates.
+        ref['points'] = {'pandora-tour-control': ref['points']['pandora-tour-control']}
+        return ref
+
+    def test_accepts_identical_evidence(self):
+        ref = self.fixture()
+        require_equal(deepcopy(ref), ref, 'retained evidence')
+
+    def test_reports_all_pixel_differences_without_accepting_them(self):
+        ref = self.fixture()
+        ref['points']['second-checkpoint'] = deepcopy(ref['points']['pandora-tour-control'])
+        changed = deepcopy(ref)
+        changed['points']['pandora-tour-control']['hashes']['pixels'] = 'changed'
+        changed['points']['second-checkpoint']['hashes']['pixels'] = 'also changed'
+        changed['provenance']['house-conversation-qualification/build.sh'] = 'changed'
+        with self.assertRaises(ValueError) as error:
+            require_equal(changed, ref, 'retained evidence (semantic controls passed)')
+        message = str(error.exception)
+        self.assertIn('semantic controls passed', message)
+        self.assertIn('/points/pandora-tour-control/hashes/pixels', message)
+        self.assertIn('/points/second-checkpoint/hashes/pixels', message)
+        self.assertIn('/provenance/house-conversation-qualification/build.sh', message)
+        self.assertIn('expected', message)
+        self.assertIn('observed', message)
+
+    def test_rejects_every_surface_semantic_and_provenance_category(self):
+        ref = self.fixture()
+        paths = [('points', 'pandora-tour-control', 'hashes', ext) for ext in SURFACES]
+        paths += [('points', 'pandora-tour-control', key) for key in
+                  ref['points']['pandora-tour-control'] if key != 'hashes']
+        paths += [(key,) for key in ref if key not in ('points', 'provenance', 'observer_source_hashes')]
+        paths += [(category, key) for category in ('provenance', 'observer_source_hashes')
+                  for key in ref[category]]
+        for path in paths:
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                changed = deepcopy(ref)
+                node = changed
+                for key in path[:-1]:
+                    node = node[key]
+                node[path[-1]] = 'mutated'
+                require_equal(changed, ref, 'retained evidence')
+
+    def test_rejects_missing_and_extra_fields(self):
+        ref = self.fixture()
+        for missing in (True, False):
+            with self.subTest(missing=missing), self.assertRaises(ValueError):
+                changed = deepcopy(ref)
+                hashes = changed['points']['pandora-tour-control']['hashes']
+                if missing:
+                    del hashes['pixels']
+                else:
+                    hashes['extra'] = 'unexpected'
+                require_equal(changed, ref, 'retained evidence')
+
+    def test_prefix_diagnostic_does_not_claim_semantic_success(self):
+        with self.assertRaises(ValueError) as error:
+            require_equal({'pixels': 'changed'}, {'pixels': 'original'},
+                          'accepted prefix capture repeat2-closed')
+        self.assertIn('accepted prefix capture repeat2-closed', str(error.exception))
+        self.assertNotIn('semantic controls passed', str(error.exception))
 
 
 class TimelineTests(unittest.TestCase):

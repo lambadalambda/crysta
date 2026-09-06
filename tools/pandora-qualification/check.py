@@ -15,6 +15,25 @@ DISCOVERY_LABELS = {'cellar-without28-blocked', 'resident13-choice-no-confirm',
 SURFACES = ('state', 'wram', 'vram', 'cgram', 'pixels', 'oam', 'obj')
 
 
+def require_equal(observed, expected, context):
+    """Preserve strict equality, but identify every differing field and surface."""
+    def differences(actual, retained, path):
+        if isinstance(actual, dict) and isinstance(retained, dict):
+            for key in sorted(actual.keys() | retained.keys()):
+                child = f'{path}/{key}'
+                if key not in actual:
+                    yield f'{child}: missing observed field'
+                elif key not in retained:
+                    yield f'{child}: unexpected observed field'
+                else:
+                    yield from differences(actual[key], retained[key], child)
+        elif actual != retained:
+            yield f'{path}: expected {retained!r}; observed {actual!r}'
+
+    if observed != expected:
+        raise ValueError(context + '\n' + '\n'.join(differences(observed, expected, '')))
+
+
 def timeline(commands, rows):
     require(commands and commands[-1] == {'finish': True}, 'missing final finish')
     commands = commands[:-1]
@@ -150,8 +169,8 @@ def report(rom_path, root, discovery=False):
     require(sha(b''.join(l for l, row in zip(lines, rows) if row['frame'] <= 12059))
             == house['frame_log_sha256'], 'accepted prefix log changed')
     for label, point in house['checkpoints'].items():
-        require({ext: sha((root / f'{label}.{ext}').read_bytes()) for ext in SURFACES} == point['hashes'],
-                'accepted prefix capture changed')
+        require_equal({ext: sha((root / f'{label}.{ext}').read_bytes()) for ext in SURFACES},
+                      point['hashes'], f'accepted prefix capture {label} changed')
     # One-frame input edges remain in the hash-bound log and schedule, not duplicated in the semantic table.
     selected = DISCOVERY_LABELS if discovery else {c['label'] for c in commands[:-1] if c['frames'] > 1}
     points = {r['label']: checkpoint(root, r, rom) for r in rows
@@ -184,6 +203,7 @@ if __name__ == '__main__':
     if '--record' in options:
         ref.write_text(json.dumps(result, indent=2) + '\n')
     else:
-        require(result == json.loads(ref.read_text()), 'retained semantic evidence changed')
+        require_equal(result, json.loads(ref.read_text()),
+                      'retained evidence changed (semantic controls passed)')
         print('Fresh discovery controls verified' if discovery else
               'Fresh input-only New Game → Pandora tour → two-axis control verified')

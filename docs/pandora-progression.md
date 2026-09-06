@@ -5,11 +5,13 @@
 
 **Endpoint: `pandora-tour-control`, inside map `$41`, after the first-time box
 interior tour.** This is not a claimed return to the field or a frozen Crysta.
-The candidate fresh replay and normal/optimized checkers pass. Independent final
-source/evidence/architecture review approved this declared scope (static review,
-not independent test execution). The parent's independent replay remains an
-acceptance gate; tracker closure remains parent-owned. Source-only projection received an independent review before
-signed commit `380d0b1`.
+The original retained captures pass normal/optimized checkers. Independent final
+source/evidence/architecture review approved this declared scope (static review).
+The parent's fresh replay **confirms the progression/control semantics but fails
+strict pixel equality**; see the [replay diagnosis](#independent-replay-diagnosis).
+Acceptance and parent-owned tracker closure remain blocked on visual capture
+reproducibility, not on a demonstrated gameplay divergence. Source-only projection
+received an independent review before signed commit `380d0b1`.
 
 ## What the retained journeys establish
 
@@ -40,7 +42,8 @@ Historical opening/Pandora scenarios prove no endpoint here. The historical ares
 “same input causes script desync” claim was explicitly corrected in
 `meta/issues/switch-reference-core.md` and `initial-reference-scenarios.md`.
 A stale milestone summary is not evidence of an emulator defect. The current
-fresh route reaches Pandora without an oracle fix.
+fresh route reaches Pandora without a gameplay oracle fix. The independently
+observed pixel publication defect below is distinct from that historical claim.
 
 ### Observation policy is part of the recipe
 
@@ -60,6 +63,87 @@ a capture is a different, unqualified timing policy. The wrapper uses one Sessio
 per process and `finish` flushes then calls `process::exit(0)` to avoid teardown.
 Observer source hashes and probe/bootstrap/build-source hashes are retained.
 This is output-pinned, not a claim of a fully dependency-locked build environment.
+
+## Independent replay diagnosis
+
+Parent capture `replay-JmCgU8/journey` ran the frozen recipe to completion. The
+checker runs source/ROM, recipe, timeline and accepted-prefix checks, then
+`validate(result)`, **before** the final exact-reference comparison. Calling
+`report()` on the parent capture in both checkouts succeeds. Every semantic
+field, full frame log, source/provenance field and non-pixel capture matches the
+original. Thus the parent actually reproduced the declared `$28/$2E/$292/$22`
+progression, mandatory tour, final events and named two-axis/stability witnesses.
+The failed exact comparison is not evidence of a semantic/native-state desync.
+
+An exhaustive byte comparison of all **2682 files** (383 checkpoints × seven
+surfaces, plus recipe) finds exactly four parent differences, all `.pixels`:
+
+| Checkpoint | Completed frame | Differing bytes | Strict checker coverage |
+| --- | ---: | ---: | --- |
+| `roomC` | 7260 | 129095 | Unselected prefix checkpoint |
+| `repeat-wrong-facing` | 9173 | 88192 | Unselected one-frame prefix checkpoint |
+| `13-followup-3` | 14648 | 88153 | Selected reference pixel hash |
+| `C28-entry-request3` | 17444 | 29289 | Selected reference pixel hash |
+
+All four retain the same 983040-byte extent; every changed byte is nonzero in
+the original and zero in the parent. These are **pixel data differences**, not
+metadata, unused alpha-byte padding or evidence of a changed Cargo lock. The
+last two are the *only* differences in the complete checker report. Selected
+source/observer/probe provenance values are identical in both checkouts.
+
+A further fresh process, `diagnosis-gAPhmb/journey`, used the current parent
+executable and the same redirected recipe, without restore/patch/seed. Its full
+log and every non-pixel file again match byte-for-byte, but its pixel mismatches
+move to `repeat2-closed` (11114; 96897 bytes), `middle-route-left` (21409; 69310)
+and `landed-21` (26299; 5119). The previous four now match. Again all replacements
+are zero. This run fails earlier at the selected `repeat2-closed` prefix hash;
+its strict checker never reaches `validate`. This demonstrates within-binary
+pixel nondeterminism, not a deterministic build-provenance mismatch. All three
+capture sets' final control-witness surfaces match exactly.
+
+The bounded source diagnosis identifies an **unsynchronized video publication
+race**, consistent with the observed zero bands (not proof of each precise
+thread interleaving):
+
+- `vendor/ares/ares/ares/ares.hpp:61–63` enables threaded video;
+  `node/video/screen.cpp:202–214` queues the current refresh without waiting for
+  its completion. `sfc/ppu/main.cpp:51–52` immediately returns the frame event.
+- The worker's `Screen::refresh` calls the platform video callback. In
+  `vendor/ares/shims.cpp:168–180`, that callback zero-fills `lastFrame` with
+  `assign(...)`, then fills it in row order. `snes_setPixels` at lines338–350
+  reads the dimensions/vector without a lock or completion wait.
+- `crates/oracle/src/lib.rs:485–490` copies those pixels immediately after the
+  frame call. `pixels()` returns this cached Rust buffer. The subsequent
+  synchronized save in the probe does not recopy pixels or synchronize the
+  separate OS video worker. Serialized PPU state excludes these image buffers.
+
+The current standalone probe manifests, **standalone** Cargo locks and generated
+probe/bootstrap sources match across trees. The root workspace's Wasm crate/lock
+change is not a demonstrated cause. Report provenance hashes current checkout
+source, **not** the historical producer executable/compiler/full dependency tree;
+those historical build identities were not retained. The observed race and
+same-current-binary repeatability failure cannot be dismissed as metadata noise.
+Original adaptive command delivery versus batch delivery can change host thread
+scheduling despite identical emulated input and save-state schedules.
+
+[`replay-diagnosis.json`](../tools/pandora-qualification/replay-diagnosis.json)
+retains every differing file's hashes, offset/count metadata, comparison counts
+and current producer/standalone-lock hashes. It is **not an alternate golden or
+allowlist**. No recipe, reference, source operand, observation schedule or capture
+surface has been repinned, masked or omitted. Strict comparisons now report each
+differing field, separating semantic-validator success from exact-output failure.
+Tests reject mutations of all seven surfaces, each retained checkpoint field,
+source/build provenance and observation policy, plus missing/extra fields; a
+no-op comparator produces 42 expected failures. Existing semantic mutation
+controls remain independent and unchanged.
+
+**Gate remains open:** correcting video publication requires a separately owned
+observer change and renewed strict replay/review. A mutex alone might prevent
+torn reads yet still select a previous frame; completion/frame association must
+also be defined. Do not add sleeps or state loads, quietly discard pixels, or
+accept a new golden from one favorable race outcome. Until then the source/state
+contract is independently supported, but neither whole-capture reproducibility
+nor every intermediate captured image is qualified for asset fidelity work.
 
 ## Required story contract
 

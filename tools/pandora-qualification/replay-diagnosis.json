@@ -1,0 +1,167 @@
+{
+  "purpose": "Strict-gate failure diagnosis; not an alternate reference or an allowlist.",
+  "captures": {
+    "original": "journey",
+    "parent": "replay-JmCgU8/journey",
+    "repeat": "diagnosis-gAPhmb/journey"
+  },
+  "frame_log_sha256": "d19191a33eb0e41603d2d80d24e054bb4e6510ec0218d94f57bb43303bb09339",
+  "comparisons_to_original": {
+    "parent": {
+      "artifact_count": 2682,
+      "same_names": true,
+      "byte_equal_count": 2678,
+      "differing_files": [
+        "13-followup-3.pixels",
+        "C28-entry-request3.pixels",
+        "repeat-wrong-facing.pixels",
+        "roomC.pixels"
+      ],
+      "full_frame_log_equal": true
+    },
+    "repeat": {
+      "artifact_count": 2682,
+      "same_names": true,
+      "byte_equal_count": 2679,
+      "differing_files": [
+        "landed-21.pixels",
+        "middle-route-left.pixels",
+        "repeat2-closed.pixels"
+      ],
+      "full_frame_log_equal": true
+    }
+  },
+  "mismatches": {
+    "13-followup-3.pixels": {
+      "frame": 14648,
+      "gate": "selected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "00a98e45755a39244f1907e51786a79f94be5de4298ca3064ed4df7d460e9eb2",
+        "parent": "2798529a7860d29aa90055bdb5b52032a483a287521129464a82d3e56ebd1580",
+        "repeat": "00a98e45755a39244f1907e51786a79f94be5de4298ca3064ed4df7d460e9eb2"
+      },
+      "differences_from_original": {
+        "parent": {
+          "byte_count": 88153,
+          "first_offset": 190308,
+          "last_offset": 316254,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "C28-entry-request3.pixels": {
+      "frame": 17444,
+      "gate": "selected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "35780cab87abbce1b1653fc3645708652e37362def44d9f96ce3cce657d51fa5",
+        "parent": "1729375eb913005cb2b100254de99e4de3376a996cea853520f4dd7b4148b967",
+        "repeat": "35780cab87abbce1b1653fc3645708652e37362def44d9f96ce3cce657d51fa5"
+      },
+      "differences_from_original": {
+        "parent": {
+          "byte_count": 29289,
+          "first_offset": 433460,
+          "last_offset": 475070,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "landed-21.pixels": {
+      "frame": 26299,
+      "gate": "selected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "8eed326149abf673f171a16055737531c4e44a4fd3a70b341474980682411226",
+        "parent": "8eed326149abf673f171a16055737531c4e44a4fd3a70b341474980682411226",
+        "repeat": "425a4b66f9e70b3d43b1c09ba29be7b427218e9a0940828884a9c9dad832718b"
+      },
+      "differences_from_original": {
+        "repeat": {
+          "byte_count": 5119,
+          "first_offset": 443540,
+          "last_offset": 474780,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "middle-route-left.pixels": {
+      "frame": 21409,
+      "gate": "selected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "aece4827d008999d37d68965c77c92e63db25febb190bf9ad55a5b9f6064bedd",
+        "parent": "aece4827d008999d37d68965c77c92e63db25febb190bf9ad55a5b9f6064bedd",
+        "repeat": "f3b76da3a0a60279181b7166fc64d1f8f14ce5cfe78b20450a54bf6e1a5955b3"
+      },
+      "differences_from_original": {
+        "repeat": {
+          "byte_count": 69310,
+          "first_offset": 374848,
+          "last_offset": 475070,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "repeat-wrong-facing.pixels": {
+      "frame": 9173,
+      "gate": "unselected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "3f69d6dd4191ed36430f51f0bbcb9ed9c6e31519a03459a617d841521130344b",
+        "parent": "67886735d52efa875ec0778f2b36fe4245ccb6fc2937712c5ad3befad228ae2d",
+        "repeat": "3f69d6dd4191ed36430f51f0bbcb9ed9c6e31519a03459a617d841521130344b"
+      },
+      "differences_from_original": {
+        "parent": {
+          "byte_count": 88192,
+          "first_offset": 292128,
+          "last_offset": 475070,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "repeat2-closed.pixels": {
+      "frame": 11114,
+      "gate": "prefix",
+      "bytes": 983040,
+      "sha256": {
+        "original": "6427c4e5efaf3e8a2af8ae7ea297fbdfba935045964129b72af84ce4d01d050d",
+        "parent": "6427c4e5efaf3e8a2af8ae7ea297fbdfba935045964129b72af84ce4d01d050d",
+        "repeat": "453b4ea8fe7582f64493e4ec3a0411db4cea2f7b2091f80d4a5d59431819133b"
+      },
+      "differences_from_original": {
+        "repeat": {
+          "byte_count": 96897,
+          "first_offset": 337300,
+          "last_offset": 475070,
+          "all_observed_replacements_zero": true
+        }
+      }
+    },
+    "roomC.pixels": {
+      "frame": 7260,
+      "gate": "unselected",
+      "bytes": 983040,
+      "sha256": {
+        "original": "56b8d59163ab7d7edca6e2fca5b61319fcdf565b5f5a9af5da7b70b14246d835",
+        "parent": "1029821059cf7f9552cf3bd22ecd0fed54f2ca68151103e3c97e4a475b119a86",
+        "repeat": "56b8d59163ab7d7edca6e2fca5b61319fcdf565b5f5a9af5da7b70b14246d835"
+      },
+      "differences_from_original": {
+        "parent": {
+          "byte_count": 129095,
+          "first_offset": 291464,
+          "last_offset": 475070,
+          "all_observed_replacements_zero": true
+        }
+      }
+    }
+  },
+  "current_parent_producer_sha256": "dc55648ac307505cc12be280ae586ff833ababb3d9a5db7696f72d3262895363",
+  "standalone_probe_lock_sha256": "e14825917fc0a5d0622d6a1483e18fdec0fe0a7e7bd21bd19fecdb724e255b71",
+  "provenance_note": "Current standalone manifests, locks and generated probe/bootstrap sources match across trees. Original producer binary/compiler identity was not retained. Report provenance hashes current checkout files, not the historical executable. Repeat used the current parent executable, whose hash was unchanged before/after.",
+  "parent_conclusion": "report() including source, recipe, timeline, prefix and semantic controls passes in both checkouts. All report differences are the two selected pixels hashes. Exact equality fails.",
+  "repeat_conclusion": "Strict report stops at repeat2-closed prefix pixel hash. All full frame logs and non-pixel artifacts remain byte-identical. Pixel differences move under the same current parent executable."
+}
