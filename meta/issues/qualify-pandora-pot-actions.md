@@ -26,3 +26,6 @@ Qualify and implement source-derived FA/FB lifting, carrying and throws sufficie
 
 - Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
 - Source contract: [Pandora progression](../../docs/pandora-progression.md). Parent fresh replay is an independent source acceptance gate.
+- Alice owns this detail, new `room-core::pots`, pot qualification tools and docs in `task/pandora-pots`. No parent runtime, assets, profile, or live-preview changes.
+- In progress: retained original logs expose per-frame player/actor positions, scripts and control, but held slots/counter/collision are full-WRAM checkpoint fields only. Synchronizing checkpoints are not passive frames. Broad physics must not be inferred from endpoint equality; unsupported behavior will remain explicitly unadmitted.
+- Parent replay exact-check mismatch remains source-owner work; this component must not weaken that gate or claim independent fresh acceptance.
