@@ -1,0 +1,117 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "pages": [
+    {
+      "text_source": 8949722,
+      "index": 0,
+      "boundary_source": 8949743,
+      "acknowledgement": "end",
+      "glyph_count": 19,
+      "sha256": "8a5d62b94bf93255647f8d2b1dbe7d64d0ec4f003ec2a81ca25be6a806b7fb50"
+    },
+    {
+      "text_source": 8949744,
+      "index": 0,
+      "boundary_source": 8949799,
+      "acknowledgement": "next",
+      "glyph_count": 37,
+      "sha256": "d7d118a8893da9b06b690dd03845ccaa2fc5125499b8ad394c79d01016bdfbd7"
+    },
+    {
+      "text_source": 8949744,
+      "index": 1,
+      "boundary_source": 8949849,
+      "acknowledgement": "none",
+      "glyph_count": 36,
+      "sha256": "0e069b92aee4809a850724ca1d7cf0ce35846cf4cb7b07b7ffd8b31f9105a589"
+    },
+    {
+      "text_source": 8949850,
+      "index": 0,
+      "boundary_source": 8949891,
+      "acknowledgement": "next",
+      "glyph_count": 39,
+      "sha256": "a2e868d51775a4c18754a49d686b9cece9ed931d42896d2a565a69c275858413"
+    },
+    {
+      "text_source": 8949850,
+      "index": 1,
+      "boundary_source": 8949936,
+      "acknowledgement": "next",
+      "glyph_count": 33,
+      "sha256": "afb41692cf6c5134ce629a60fa4fff6b6881202321251bd200d732d0be098a16"
+    },
+    {
+      "text_source": 8949850,
+      "index": 2,
+      "boundary_source": 8949976,
+      "acknowledgement": "end",
+      "glyph_count": 36,
+      "sha256": "787a41c0a53c3328856dd2660f7346a98acace08a345635216b1493a8f5d5a74"
+    },
+    {
+      "text_source": 8949977,
+      "index": 0,
+      "boundary_source": 8950008,
+      "acknowledgement": "next",
+      "glyph_count": 29,
+      "sha256": "eba86ba2bca80456853605d0db835a844b85eb4dea1e219c7f17a7887db176f2"
+    },
+    {
+      "text_source": 8949977,
+      "index": 1,
+      "boundary_source": 8950054,
+      "acknowledgement": "next",
+      "glyph_count": 39,
+      "sha256": "4abafba79ca352bfa11f3f9625b82e9adb58251dcaeabbfb11c6fb4f062868fb"
+    },
+    {
+      "text_source": 8949977,
+      "index": 2,
+      "boundary_source": 8950101,
+      "acknowledgement": "end",
+      "glyph_count": 39,
+      "sha256": "7f03005e8bacf371295c35e35e4ae26460dda31a933c258f88a19e316d07ac99"
+    },
+    {
+      "text_source": 8950102,
+      "index": 0,
+      "boundary_source": 8950155,
+      "acknowledgement": "none",
+      "glyph_count": 35,
+      "sha256": "14a43663f25d8a5ca9cf051eb160d5da161664a23ab7218faf2683cb862884cd"
+    },
+    {
+      "text_source": 8950156,
+      "index": 0,
+      "boundary_source": 8950186,
+      "acknowledgement": "next",
+      "glyph_count": 27,
+      "sha256": "b72bdc56a981b0b29b070e61f3d2517125a30628d80205e2fc84b030c73fd493"
+    },
+    {
+      "text_source": 8950156,
+      "index": 1,
+      "boundary_source": 8950229,
+      "acknowledgement": "end",
+      "glyph_count": 36,
+      "sha256": "7f95c92b48ffb3701633875a1c0517d225b47f3307bd5f010d220614f715b9eb"
+    },
+    {
+      "text_source": 8950230,
+      "index": 0,
+      "boundary_source": 8950251,
+      "acknowledgement": "next",
+      "glyph_count": 20,
+      "sha256": "c3b30bede23e197943c7ca70047427ef3f7b6df0f1286814d76afc6d7b36bc6f"
+    },
+    {
+      "text_source": 8950230,
+      "index": 1,
+      "boundary_source": 8950295,
+      "acknowledgement": "end",
+      "glyph_count": 38,
+      "sha256": "85b62f723d2ef6b37ac8c3f758bc07549683891d9e2354c90499b2f8cbcee7ab"
+    }
+  ]
+}
