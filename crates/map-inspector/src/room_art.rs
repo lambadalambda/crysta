@@ -43,7 +43,6 @@ pub(super) struct Art {
 impl Art {
     /// Complete current low-nine-bit diff from `GameState::effective_room()`.
     /// Live opt-in profile wiring is a separate acceptance gate.
-    #[allow(dead_code)]
     pub(super) fn world_background(&self, map: u16, effective: &room_core::Room) -> Result<Value> {
         self.world
             .as_ref()
@@ -51,7 +50,6 @@ impl Art {
             .state(map, effective)
     }
     /// Parent-owned live wiring may use public PotState/GameState projections.
-    #[allow(dead_code)]
     pub(super) fn carry(&self, map: u16, input: CarryInput) -> Result<Option<CarryPresentation>> {
         if self.pandora.is_none() {
             return Err(invalid("Pandora carry art capability absent").into());
@@ -62,6 +60,7 @@ impl Art {
     pub(super) fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
         self.extra_backgrounds.get(key).map(Vec::as_slice)
     }
+    #[cfg(test)]
     pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
         self.scene_phase(map, None, key, position)
             .expect("game map has a compiled scene")

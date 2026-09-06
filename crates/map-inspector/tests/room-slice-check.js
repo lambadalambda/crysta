@@ -118,6 +118,26 @@ async function main() {
     assert.equal(bad.timers.size,0,'invalid overlay cannot auto-step');
   }
 
+  const projectionFailure=browserHarness({mutateState:s=>({...s,actor_key:'missing',scene:[],error:'missing compiled camera'})});
+  await flush();await flush();
+  assert.equal(projectionFailure.element('error').textContent,'missing compiled camera');
+  assert.equal(projectionFailure.element('pause').disabled,true);
+  assert.equal(projectionFailure.timers.size,0,'host projection error stays latched without render retries');
+
+  let failProjection=false;
+  const staleDialogue=browserHarness({mutateState:s=>({...s,dialogue:{key:'page:1'},error:failProjection?'missing compiled camera':null})});
+  await flush();await flush();
+  assert.equal(staleDialogue.element('dialogue-page').dataset.key,'page:1');
+  assert.equal(staleDialogue.element('dialogue-panel').hidden,false);
+  failProjection=true;staleDialogue.element('new-game').emit('click');await flush();await flush();
+  assert.equal(staleDialogue.element('dialogue-panel').hidden,true,'a host error hides previously painted dialogue');
+  assert.equal(staleDialogue.element('error').textContent,'missing compiled camera');
+  let hostFailure=null;
+  const oldArtFailure=browserHarness({actorKey:'unsupported',mutateState:s=>({...s,error:hostFailure})});
+  await flush();await flush();assert.match(oldArtFailure.element('error').textContent,/sprite/);
+  hostFailure='missing compiled camera';oldArtFailure.element('new-game').emit('click');await flush();await flush();
+  assert.equal(oldArtFailure.element('error').textContent,hostFailure,'current host error takes precedence over stale art failure');
+
   const loaded = browserHarness(); await flush(); await flush();
   assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);
   assert.equal(loaded.element('error').textContent,'');

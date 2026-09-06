@@ -21,14 +21,31 @@ pub(super) struct Preview {
 }
 impl Preview {
     pub(super) fn new(rom: &Rom) -> Result<Self> {
-        let data = compile(rom)?;
+        Self::new_profile(rom, false)
+    }
+    pub(super) fn new_profile(rom: &Rom, include_pandora: bool) -> Result<Self> {
+        let data = if include_pandora {
+            crate::pandora_progression::compile(rom)?
+        } else {
+            compile(rom)?
+        };
         let state = GameState::new(&data, Policy::SemanticPreview);
-        let art = crate::room_art::compile(rom)?;
+        let art = if include_pandora {
+            crate::room_art::compile_profile(rom, true)?
+        } else {
+            crate::room_art::compile(rom)?
+        };
         let cameras = crate::house_profiles::MAPS
             .into_iter()
             .chain(std::iter::once(10))
+            .chain(
+                [0xe, 0x13, 0x20, 0x21, 0x41, 0x42, 0x43, 0x44]
+                    .into_iter()
+                    .filter(|_| include_pandora),
+            )
             .map(|id| {
-                crate::room_camera::Camera::compile(rom.image(), id).map(|camera| (id, camera))
+                crate::room_camera::Camera::compile_profile(rom.image(), id, include_pandora)
+                    .map(|camera| (id, camera))
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let viewer = crate::visual_export::export(rom, 15)?;
@@ -103,6 +120,55 @@ impl Preview {
         self.fresh_start = false;
         self.error = None;
     }
+    fn visuals(&self) -> Result<Value> {
+        use room_core::slice::ControlOwner;
+        let output = self.state.output();
+        let mut key = crate::room_art::frame_key(output.animation);
+        let mut visual = json!({});
+        let mut phase = None;
+        if self.data.pandora_enabled() {
+            let story = self.state.pandora_output(&self.data)?;
+            phase = story.scene.key();
+            if let Some(phase) = phase {
+                visual["scene_phase"] = json!(phase);
+            }
+            visual["owner"] = json!(match story.owner {
+                ControlOwner::Player => "player",
+                ControlOwner::Dialogue => "dialogue",
+                ControlOwner::Presentation => "presentation",
+                ControlOwner::Transition => "transition",
+                ControlOwner::PotRecovery => "pot-recovery",
+            });
+            // Inspection only: never used to choose art or advance the graph.
+            visual["pandora"] = json!({"invocation":story.invocation.map(|i|format!("{i:?}")),
+                "cue":story.cue.map(|c|format!("{c:?}")),"motion":story.motion.map(|(m,c)|json!({"key":format!("{m:?}"),"cursor":c})),
+                "locals":story.locals,"door_counter":story.door_counter,"town_open":story.town_open,
+                "sheet":{"resident":story.sheet.resident,"cellar":format!("{:?}",story.sheet.cellar),"consumed":story.sheet.consumed}});
+            if let Some(pot) = self.state.pot_state() {
+                if let Some(carry) = self.art.carry(
+                    output.map_id,
+                    crate::room_art::CarryInput::from_state(pot, self.state.pot_slots(&self.data)?),
+                )? {
+                    key = carry.actor_key;
+                    visual["carry"] = carry.overlay;
+                }
+            }
+            visual["world_background"] = self
+                .art
+                .world_background(output.map_id, &self.state.effective_room(&self.data)?)?;
+        }
+        visual["actor_key"] = json!(key);
+        visual["scene"] = self
+            .art
+            .scene_phase(output.map_id, phase, &key, output.position)?;
+        visual["camera"] = json!(self
+            .cameras
+            .get(&output.map_id)
+            .ok_or_else(|| invalid("missing compiled camera"))?
+            .at(output.position));
+        Ok(visual)
+    }
+
     pub(super) fn state(&self) -> Value {
         let output = self.state.output();
         let actor_key = crate::room_art::frame_key(output.animation);
@@ -122,10 +188,14 @@ impl Preview {
             .error
             .clone()
             .or_else(|| dialogue.err().map(|error| error.to_string()));
-        let events: Vec<_> = (0..512usize)
-            .filter(|bit| self.state.event_flags().bytes()[bit / 8] & (1 << (bit % 8)) != 0)
+        let events: Vec<_> = (0..if self.data.pandora_enabled() {
+            1024usize
+        } else {
+            512usize
+        })
+            .filter(|bit| self.state.story_flags().bytes()[bit / 8] & (1 << (bit % 8)) != 0)
             .collect();
-        json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
+        let mut state = json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
             "door_interaction":self.data.door_interaction(),
             "dialogue_acknowledgement":self.data.conversation_progression(),
@@ -134,16 +204,27 @@ impl Preview {
             "dialogue":presentation,"events":events,
             "wooden_door_open":self.state.wooden_door_open(),
             "actor_key":actor_key,
-            "scene":self.art.scene(output.map_id, &actor_key, output.position),
+            "scene":[],
             "animation":{"set":match output.animation.set {
                 room_core::AnimationSet::Standing=>"standing",room_core::AnimationSet::Walking=>"walking"},
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
             "phase":match output.phase{Phase::Dialogue=>"dialogue",Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
-            "camera":self.cameras[&output.map_id].at(output.position),"error":error,
-            "snapshot_sha256":sha256(&self.state.snapshot())})
+            "camera":[0,0],"error":error,
+            "snapshot_sha256":sha256(&self.state.snapshot())});
+        match self.visuals() {
+            Ok(Value::Object(fields)) => {
+                state.as_object_mut().expect("state object").extend(fields);
+            }
+            Ok(_) => unreachable!("visuals constructs an object"),
+            Err(error) => state["error"] = json!(error.to_string()),
+        }
+        state
     }
 }
+
+#[cfg(test)]
+mod pandora_tests;
 
 #[cfg(test)]
 fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<room_core::Room> {

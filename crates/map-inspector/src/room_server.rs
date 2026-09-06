@@ -144,7 +144,10 @@ fn respond(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8]) -> std
 }
 
 pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
-    let mut preview = crate::room_preview::Preview::new(rom)?;
+    serve_preview(crate::room_preview::Preview::new(rom)?, port)
+}
+
+fn serve_preview(mut preview: crate::room_preview::Preview, port: u16) -> Result<()> {
     let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, port))?;
     let origin = format!("http://{}", listener.local_addr()?);
     println!("Semantic room preview: {origin}/\nLoopback only; Ctrl-C to stop. No original CPU in the simulation loop.");
@@ -207,6 +210,14 @@ pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    #[ignore = "isolated opt-in browser server; explicit owned ROM and loopback port required"]
+    fn serve_pandora_preview() -> Result<()> {
+        let rom = rom::Rom::load(&std::fs::read(std::env::var("PANDORA_PREVIEW_ROM")?)?)?;
+        let port = std::env::var("PANDORA_PREVIEW_PORT")?.parse()?;
+        serve_preview(crate::room_preview::Preview::new_profile(&rom, true)?, port)
+    }
+
     const ORIGIN: &str = "http://127.0.0.1:1234";
     fn request(method: &str, path: &str, headers: &str, body: &str) -> Vec<u8> {
         format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:1234\r\n{headers}\r\n{body}")

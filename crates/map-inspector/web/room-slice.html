@@ -731,7 +731,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       canvas.dataset.scene = JSON.stringify(state.scene);
       canvas.dataset.woodenDoorOpen = String(state.wooden_door_open === true);
     }
-    $('error').textContent = assetError || error || '';
+    $('error').textContent = state?.error != null ? state.error || 'Unsupported host step.' : assetError || error || '';
     $('status').textContent = note + (busy ? ' Waiting for host…' : '');
     const announcement = error ? 'Input paused — choose New Game or Checkpoint Reset.' : paused ? note : mode === 'demo' ? 'Checkpoint doorway demo running.' : 'Preview running.';
     if (announcement !== lastAnnouncement) { $('announcement').textContent = announcement; lastAnnouncement = announcement; }
@@ -742,14 +742,17 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('dialogue-choices').hidden = view.choice === null;
     for (const id of ['choice1','choice2','choice-cancel']) $(id).disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || view.choice === null || state?.choice_interaction !== true;
     $('continue').disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || !view.dialogue || view.choice !== null || state?.dialogue_acknowledgement !== true;
-    $('dialogue-panel').hidden = !ready || !state?.dialogue;
+    $('dialogue-panel').hidden = !ready || state?.error != null || !state?.dialogue;
     $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
     $('pot-action').hidden = state?.pot_action !== true;
     $('pot-action').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.pot_action !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
-    if (ready && state) {
+    // Host projection errors deliberately have no drawable scene. Preserve the
+    // primary error and clear the viewport, rather than replacing it with a
+    // secondary missing-art error or showing unqualified fallback pixels.
+    if (ready && state && state.error === null) {
       try {
         const page = selectDialogue(art, state);
         const choices = selectChoices(art, state);

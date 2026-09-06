@@ -30,6 +30,31 @@ Implement only the maps, source assets and semantic state transitions required b
 - House511/2244 and conversation/exterior1671 routes remain valid, or any intentional source-backed contract revision has explicit replacement evidence.
 - Native/Wasm builds, workspace tests, lint, browser checks, repository safety/tracker and independent correctness/architecture review pass.
 
+## Opt-in host integration (browser acceptance pending)
+
+- Parent independently reproduced the source aggregate's 11 tests and all11,590
+  public input actions with per-action restoration; debug/release reports are
+  byte-identical (`local/map-research/pandora-aggregate-parent*`).
+- `Preview::new_profile(rom, true)` now composes that exact compiler, source art,
+  additional cameras, core scene key/control owner, 1024-bit inspection, typed
+  carry projection and complete effective-room world patch set. No presentation
+  drives the graph; diagnostic invocation/cue/local fields are read-only.
+- Three new host tests cover initial capability/legacy separation, every11,590
+  serialized host projection across restored states with the exact offline final
+  snapshot, high flags/final owner and fallible camera projection. All nine host
+  preview tests and strict workspace Clippy pass. Raw export is opt-in test-only,
+  ignored at `local/map-research/pandora-preview-parent.json`.
+- A dedicated ignored `serve_pandora_preview` test runs the same loopback handler
+  with explicit owned-ROM/port environment variables. Parent diagnostic port8877
+  is enabled for the browser qualifier; ordinary port8765 remains house-only.
+- Independent review approved authoritative projection and unchanged transport.
+  Two error-presentation findings were fixed red→green: hide stale dialogue on
+  host error, and preserve that primary error over a previous art failure. The
+  actual inline harness exercises both sequences; no fallback art is displayed.
+- Both module registrations are explicit in main. Producer bridge/current pins
+  and the continuous real-browser journey remain acceptance gates, not bypassed
+  by passing the offline route.
+
 ## Notes
 
 - Parent: [Open Pandora’s Box in the portable slice](open-pandora-portable-slice.md).
