@@ -22,7 +22,7 @@ mod snapshot;
 mod transition;
 
 pub use animation::{AnimationFrame, AnimationSet, AnimationState};
-pub use room::Room;
+pub use room::{MaterialAlias, MaterialPolicyError, MaterialRule, Room};
 pub use snapshot::{SNAPSHOT_SIZE, SNAPSHOT_VERSION};
 
 /// Cardinal directions with stable discriminants.
