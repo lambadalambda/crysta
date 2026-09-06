@@ -30,10 +30,10 @@ Run an early browser feasibility spike before the full game depends on assumptio
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Full browser caching, audio, input, rendering, and release packaging remain in M7.
 
-## Bounded spike — awaiting independent parent acceptance
+## Accepted bounded spike
 
-Owned in `task/wasm-spike`; leave this issue open for parent acceptance. Scope is
-one JP packet and the existing six-frame synthetic walking/snapshot replay,
+Developed in `task/wasm-spike` and independently reproduced from the main checkout.
+Scope is one JP packet and the existing six-frame synthetic walking/snapshot replay,
 not the room preview or a production frontend. The preview on port 8765 is
 untouched. No shared tracker indexes or milestones are changed.
 
@@ -68,6 +68,24 @@ Observed 2026-09-06 using separate port 8876/session `wasm-spike`:
 TDD and independent correctness/architecture review completed; reviewer found
 no must-fix issues. Workspace tests/Clippy, Wasm Clippy, safety/tracker checks and
 spike formatting pass. Full workspace formatting reports pre-existing unrelated
-assets/map-inspector differences, intentionally not changed. Issue/index closure
-is reserved to the parent after independent acceptance, including explicit
-acceptance of the browser-total-peak measurement limitation.
+assets/map-inspector differences, intentionally not changed. Parent acceptance explicitly covers the measured Wasm linear-capacity high-water,
+not a total browser peak or production extraction budget. Full-browser memory and
+responsiveness sizing remains a production-bootstrap constraint, not a result of
+this feasibility spike.
+
+
+## Independent parent reproduction
+
+Main-checkout build produced the identical Wasm artifact SHA-256 and native report.
+Actual browser file selection matched the packet and both replay hashes. HAR
+inspection found exactly six bodyless startup GETs and no selection requests;
+one valid reselection plus invalid-image rejection produced an empty second HAR.
+Parent cold read/probe:2.4/84.0 ms; warm probe:15.3 ms. Linear-capacity high-water
+again9,699,328 bytes; total browser peak remains unmeasured. Runtime memory was
+nonshared ArrayBuffer with only the two generated helper imports.
+
+All339 workspace tests with required core/fresh-house fixtures, native/Wasm
+Clippy, three spike Rust tests, five JS tests and spike formatting passed. Isolated
+browser/session and port8876 were stopped; room-preview8765 was untouched.
+Ignored main `local/web-spike/parent-acceptance.json`, HARs, reports and
+`parent-workspace.txt` retain the independent evidence.

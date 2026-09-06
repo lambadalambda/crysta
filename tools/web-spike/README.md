@@ -1,6 +1,6 @@
 # Bounded browser-local extraction spike
 
-Acceptance evidence for [the open spike issue](../../meta/issues/validate-web-extraction-spike.md).
+Acceptance evidence for [the spike issue](../../meta/issues/validate-web-extraction-spike.md).
 This is not a frontend, renderer, source qualification, or game-fidelity claim.
 
 ## Reproduce
@@ -191,3 +191,17 @@ pass. Optional unrelated ROM-backed tests still skip absent inputs.
 pre-existing formatting in assets sprites/tests and map-inspector module order.
 Those unrelated files are deliberately untouched. Independent code review found
 no must-fix issues; total browser peak remains explicitly unmeasured.
+
+
+## Independent main-checkout acceptance
+
+The parent reproduced the build and actual file-input workflow after integration.
+The Wasm artifact hash and complete native/browser report match the run above.
+Main `local/web-spike/parent-acceptance.json` binds the parent HARs and reports:
+six bodyless startup GETs, zero selection requests, and zero requests across a
+valid reselection plus invalid-ROM rejection. Parent read/probe times were
+2.4/84.0 ms cold and15.3 ms for the warm probe; the same9.25 MiB linear-capacity
+high-water was observed. These are further samples, not a benchmark or a new
+browser-total-memory measurement. The runtime inspection confirmed nonshared
+ArrayBuffer memory. All339 main-workspace tests and native/Wasm Clippy passed.
+Both parent spike service and isolated browser session were stopped afterward.

@@ -48,3 +48,4 @@
 - [x] [Decode the required opening dialogue presentation](issues/decode-house-conversation-text.md)
 - [x] [Qualify the first exterior landing profile](issues/qualify-house-exterior-profile.md)
 - [x] [Talk to the room B resident and leave the house](issues/talk-and-leave-house.md)
+- [x] [Validate extraction and the core boundary in WebAssembly](issues/validate-web-extraction-spike.md)
