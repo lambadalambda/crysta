@@ -134,7 +134,8 @@ qualification remain open.
 
 - [Implement the classic renderer](issues/classic-renderer.md)
 - [Complete the fresh house scene with all residents](issues/complete-house-scene-setup.md)
-- [Qualify the fresh house room and actor roster](issues/qualify-house-scene-roster.md)
+- [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)
+- [Qualify complete house background profiles](issues/qualify-house-background-profiles.md)
 - [Decode the complete ordinary house actor set](issues/decode-house-scene-actors.md)
 - [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)

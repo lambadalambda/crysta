@@ -23,3 +23,9 @@ Inventory the fresh post-intro house, replacing the single-NPC assumption with a
 ## Notes
 
 - Subissue of [complete house setup](complete-house-scene-setup.md).
+
+## Verified result
+
+- Completed: nine structural scenes inventoried; fresh visits authenticate six ordinary rooms and nine residents, with every linked/compact/helper/visible object assigned a disposition. E/20/21 source conditions and access frontiers are explicit, not fabricated native visits.
+- Two fresh processes per itinerary reproduce selected membership/OAM/VRAM/CGRAM, source boundaries and depth/ties; replay `local/house-scene-qualification/replay-gVc1Gx`. Eight synthetic tests pass normally and under Python optimization; independent review found no blockers.
+- See [complete census and contract](../../docs/house-scene.md). Dialogue-band framebuffer variability is retained as a local diagnostic; full-frame equality is not claimed. Actor art decoding, background/navigation and behavioral limitations are separate work.

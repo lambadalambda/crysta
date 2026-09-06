@@ -39,3 +39,4 @@
 - [x] [Qualify Ark's standing and walking animation](issues/qualify-ark-walking-animation.md)
 - [x] [Bound the animation comparator's initial idle exemption](issues/bound-initial-animation-exemption.md)
 - [x] [Render the first NPC in the adjoining house room](issues/render-first-house-npc.md)
+- [x] [Qualify the fresh house room and actor roster](issues/qualify-house-scene-roster.md)
