@@ -105,10 +105,25 @@ Normalizer and validator followed red→green, including every-bit identity chec
 partial/shifted/mismatched replay rejection and the raw `Interaction` negative
 control. The clean-source wrapper also has publication failure tests.
 
-**No final proof or browser acceptance is claimed here yet.** The parent must
-independently review this producer, rerun both debug and release from committed
-source, compare complete arrays and qualified counts, and pin the private proof
-file before the browser owner consumes it. Build/source metadata can differ
-between independent runs; all replay boundary observations and continuations must
-agree. Parent-owned UI/GET readiness is observational only; no core ticks, graph
-rules or snapshot schema changes are authorized by this qualification.
+**Canonical cadence proof accepted; real browser acceptance remains pending.**
+Parent clean debug/release runs at `9db17d9373740d1084983d047817d6d37c2d54d6`
+produced identical complete offline (11591 boundaries), projected (11410 boundaries)
+and qualification arrays:181 omitted inputs,17 C arrivals and1 Box arrival retained.
+Both ran5 synthetic tests, the explicit raw-rejection control and the full generator.
+Independent source/log review found no blocker; the parent separately recomputed
+proof/archive/toolchain-output/lockfile/executable/input hashes and verified exact
+Git archive/tree linkage and embedded provenance. This is not a hermetic build or
+an independent native-behavior proof.
+
+Pinned private browser expectation:
+`local/pandora-cadence-qualification/parent-reviewed/debug/proof.json`, SHA256
+`e5342dc5e6965d298e4e9a6d142e55a2161fac0ab247f143a098016c97465ab6`.
+The release counterpart SHA256 is
+`af061efc509cd7ecd1dda9657096b8e7925ee923ef114e3f2c60cc08ba30a0e4`.
+Compiler-content identity is
+`c6613fd4b30db083deb229964cd035bbd30d27f2d47a72d6f70530d919237be4`;
+projected final map41 at(136,208), tick11409, owner player has snapshot SHA256
+`8aab7a37cb0c1115438e8f177c7213fabb0cee14f94d7eaed0cf58635c7484d5`.
+The proof is expectation data only, never an execution initializer. Parent-owned
+UI/GET readiness remains observational; no core ticks, graph rules or snapshot
+schema changes are authorized by this qualification.
