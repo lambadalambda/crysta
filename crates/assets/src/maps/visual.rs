@@ -77,7 +77,7 @@ impl VisualResource {
     }
 }
 
-/// Qualified first background for Japanese maps $000F, $0010 and $0128.
+/// Qualified first background for Japanese maps $000B–$000D, $000F–$0011 and $0128.
 ///
 /// Preserves raw cells, definition words and natural ROM colors. Does not apply
 /// animation, sprites, windows, color math, brightness or layer composition.
@@ -104,7 +104,7 @@ impl StaticBackground {
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
         let (loads, graphics_size) = match map_id {
             0x128 => (cavern_loads(image)?, 0x4000),
-            0x000F | 0x0010 => (room_loads(image, map_id)?, 0x6000),
+            0x000B..=0x000D | 0x000F..=0x0011 => (room_loads(image, map_id)?, 0x6000),
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
@@ -443,7 +443,15 @@ const ROOM_SUBSCRIPTS: &[(usize, u32)] = &[
 ];
 fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
-    let entry: u32 = if id == 0xf { 0x98_8496 } else { 0x98_84ad };
+    let entry: u32 = match id {
+        0xb => 0x98_8401,
+        0xc => 0x98_8446,
+        0xd => 0x98_844d,
+        0xf => 0x98_8496,
+        0x10 => 0x98_84ad,
+        0x11 => 0x98_84b4,
+        _ => return Err(invalid()),
+    };
     let at = 0x06_959c + usize::from(id) * 3;
     if image.get(at..at + 3) != Some(&entry.to_le_bytes()[..3]) {
         return Err(invalid());
@@ -454,21 +462,23 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             return Err(invalid());
         }
     }
-    // $98:84AD — FA: defer subscript $0001; $98:84B1 — END: follow it at root.
-    if id == 0x10
-        && image.get(0x18_84ad..0x18_84b2)
-            != Some(&[
-                8, 0xfa, 1, 0, // $98:84AD — defer common room loads.
-                0, // $98:84B1 — END.
-            ])
-    {
-        return Err(invalid());
-    }
-    let mut spans = vec![&ROOM_COMMON, &ROOM_AUDIO, &ROOM_SHARED];
-    if id == 0xf {
-        spans.push(&ROOM_ROOT);
-    }
-    for span in spans {
+    // B falls through FE $0001 into the common palette load; C/D/10/11
+    // defer subscript $0001 and END. F additionally loads non-overlapping OBJ art.
+    let root = RoomSpan {
+        offset: (entry & 0x3f_ffff) as usize,
+        bytes: if id == 0xb {
+            &[8, 0xfe, 1, 0]
+        } else {
+            &[8, 0xfa, 1, 0, 0]
+        },
+        pointers: &[],
+    };
+    for span in [
+        if id == 0xf { &ROOM_ROOT } else { &root },
+        &ROOM_COMMON,
+        &ROOM_AUDIO,
+        &ROOM_SHARED,
+    ] {
         let bytes = image
             .get(span.offset..span.offset + span.bytes.len())
             .ok_or_else(invalid)?;
@@ -557,7 +567,14 @@ mod tests {
 
     fn room_fixture() -> Vec<u8> {
         let mut image = vec![0; 0x28_0000];
-        for (id, entry) in [(0xf_usize, 0x98_8496_u32), (0x10, 0x98_84ad)] {
+        for (id, entry) in [
+            (0xb_usize, 0x98_8401_u32),
+            (0xc, 0x98_8446),
+            (0xd, 0x98_844d),
+            (0xf, 0x98_8496),
+            (0x10, 0x98_84ad),
+            (0x11, 0x98_84b4),
+        ] {
             let at = 0x06_959c + id * 3;
             image[at..at + 3].copy_from_slice(&entry.to_le_bytes()[..3]);
         }
@@ -568,7 +585,10 @@ mod tests {
         for span in [&ROOM_ROOT, &ROOM_COMMON, &ROOM_AUDIO, &ROOM_SHARED] {
             image[span.offset..span.offset + span.bytes.len()].copy_from_slice(span.bytes);
         }
-        image[0x18_84ad..0x18_84b2].copy_from_slice(&[8, 0xfa, 1, 0, 0]);
+        image[0x18_8401..0x18_8405].copy_from_slice(&[8, 0xfe, 1, 0]);
+        for at in [0x18_8446, 0x18_844d, 0x18_84ad, 0x18_84b4] {
+            image[at..at + 5].copy_from_slice(&[8, 0xfa, 1, 0, 0]);
+        }
         let mut graphics = vec![0; 0x6000];
         for row in 0..8 {
             graphics[32 + row * 2] = 255;
@@ -604,7 +624,7 @@ mod tests {
     #[test]
     fn room_profiles_decode_relocated_synthetic_resources_and_full_layer() {
         let image = room_fixture();
-        for id in [0xf, 0x10] {
+        for id in [0xb, 0xc, 0xd, 0xf, 0x10, 0x11] {
             let scene = StaticBackground::from_rom(&image, id).unwrap();
             assert_eq!((scene.layer().width(), scene.layer().height()), (32, 64));
             assert_eq!(scene.tiles().len(), 768);
@@ -659,6 +679,32 @@ mod tests {
         let mut image = good;
         image[0x18_8417..0x18_841a].copy_from_slice(&[0, 0, 0x73]);
         assert!(StaticBackground::from_rom(&image, 0x10).is_err());
+    }
+
+    #[test]
+    fn new_house_roots_reject_changed_bytes_tables_and_gated_maps() {
+        let good = room_fixture();
+        for (id, at, len) in [
+            (0xb, 0x18_8401, 4),
+            (0xc, 0x18_8446, 5),
+            (0xd, 0x18_844d, 5),
+            (0x11, 0x18_84b4, 5),
+        ] {
+            for byte in (at..at + len)
+                .chain(0x06_959c + usize::from(id) * 3..0x06_959f + usize::from(id) * 3)
+            {
+                let mut image = good.clone();
+                image[byte] ^= 1;
+                assert!(
+                    StaticBackground::from_rom(&image, id).is_err(),
+                    "map {id:x} at {byte:x}"
+                );
+            }
+            assert!(StaticBackground::from_rom(&good[..at + len - 1], id).is_err());
+        }
+        for id in [0xa, 0xe, 0x12, 0x20, 0x21, 0x122] {
+            assert!(StaticBackground::from_rom(&good, id).is_err());
+        }
     }
 
     #[test]
