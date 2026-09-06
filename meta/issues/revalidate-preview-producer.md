@@ -47,3 +47,19 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
   exact current navigation-only delta, ROM and 8,192-byte SRAM. `local/historical.json`
   and `local/historical-O.json` reproduce the frozen report. No production, shared
   index or frontend files changed; only private input symlinks added under local.
+
+## Final source relay
+
+- Parent authorized final qualification at `d293c62`; merged at `8060d04` with
+  production bytes identical to parent. Exact two-registration main SHA-256:
+  `2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d`.
+- `current-producer.json` SHA-256:
+  `85de8d72d6f0a433345645f5dd86f5c80f8e1ffd18549fb357a59b2d97590714`.
+  Original 13-key inventory retained, only main changed; twelve separate hook
+  pins now include the settled camera. Independent scope/descriptor reviews
+  approved this addition; a camera-inventory negative control went red→green.
+- Old Git blob and both old/fixed worktree main files authenticate identically;
+  `bridge.verify_current` passes the exact whole-byte insertion proof. Frozen
+  observer/migration/archive unchanged. Current Rust gate reproduced the expected
+  old-main pin failure before switching descriptors. Capture/evidence acceptance
+  and parent-independent reruns remain pending.

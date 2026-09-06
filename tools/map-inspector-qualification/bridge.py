@@ -13,7 +13,7 @@ OLD_MAIN_SHA = '7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3
 OBSERVER_SHA = '7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718'
 MIGRATION_SHA = 'db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c'
 ANCHOR = b'mod opening_qualification;\n'
-# Proposed final parent registration: deliberately not an extensible allowlist.
+# Final parent registration: deliberately not an extensible allowlist.
 REGISTRATIONS = b'pub mod pandora_navigation;\npub mod pandora_progression;\n'
 # Reviewed preview modules/hooks, NOT a retroactive historical inventory or a
 # claim of a complete transitive build-input inventory.
@@ -21,7 +21,7 @@ ADDITIONAL_FILES = tuple('crates/map-inspector/' + name for name in (
     'src/pandora_navigation.rs', 'src/pandora_progression.rs', 'src/room_art.rs',
     'src/room_art/backgrounds.rs', 'src/room_art/carry.rs', 'src/room_art/door.rs',
     'src/room_art/pandora.rs', 'src/room_art/world_patches.rs',
-    'src/room_preview.rs', 'src/room_server.rs', 'web/room-slice.html',
+    'src/room_camera.rs', 'src/room_preview.rs', 'src/room_server.rs', 'web/room-slice.html',
 ))
 
 

@@ -159,9 +159,9 @@ it never tries the current checkout or chooses whichever descriptor passes.
 The viewer used to validate historical derived HTML is also from that explicit
 fixed repository. Both audit modes still byte-reproduce `migration.json`.
 The current preview producer uses the bounded `bridge.py` API below, not a
-renewal of any RGB/nonpixel pin. **Final registration is parent-owned: no current
-descriptor, Rust source-gate switch or bridge report is finalized yet.** The
-proposed exact insertion is these bytes, once, immediately after
+renewal of any RGB/nonpixel pin. The final parent relay at `d293c62` is now
+authenticated by `current-producer.json`; fresh captures and the Rust source-gate
+switch are in progress. The exact insertion is these bytes, once, immediately after
 `mod opening_qualification;\n`:
 
 ```text
@@ -172,16 +172,17 @@ pub mod pandora_progression;
 `verify_main_delta` authenticates the original main SHA-256 before comparing the
 entire new file to that single byte insertion. It does not split/strip lines or
 normalize whitespace. The original Git blob at `8034889` and old worktree main
-were independently hashed as `7736b543…a4d3`; the current one-registration main
-is deliberately not accepted by this proposed two-registration bridge.
+were independently hashed as `7736b543…a4d3`. The final main is
+`2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d`.
+The earlier navigation-only main remains deliberately rejected.
 
-### Tooling handoff (run only after final source registration)
+### Current producer recipe
 
-The eventual `current-producer.json` has `schema_version: 1`, the unchanged
+`current-producer.json` has `schema_version: 1`, the unchanged
 `epoch`/`policy`, `original_descriptor_sha256`, `migration_sha256`, the original
 13-key `source_hashes` inventory with **only** main's digest changed, and
-`additional_source_hashes`. The latter is a separate explicit set of eleven
-preview modules/hooks (including the embedded preview HTML); it is provenance,
+`additional_source_hashes`. The latter is a separate explicit set of twelve
+preview modules/hooks (including the settled camera and embedded preview HTML); it is provenance,
 not a retroactive expansion of the historical inventory or a complete transitive
 build-input inventory. Both historical descriptor/report identities are fixed
 in the bridge. There is no producer registry or descriptor-fallback search.
@@ -194,7 +195,7 @@ OLD_REPO=../ilar-task-capture-old
 FIXED_REPO=../ilar-task-capture-renewal
 ACCEPTED="$FIXED_REPO/local/map-inspector-renewal"
 CURRENT="$PWD/local/map-inspector-preview" # must be a new evidence root
-D="$T/current-producer.json"              # pending final parent registration
+D="$T/current-producer.json"
 python3 -B "$T/capture.py" . "$CURRENT/current-a" "$ROM" "$SRAM" \
   --current-descriptor "$D" --fixed-source-repo "$FIXED_REPO"
 python3 -B "$T/capture.py" . "$CURRENT/current-b" "$ROM" "$SRAM" \
@@ -229,8 +230,8 @@ sources, and capture aliases are negative controls. No output pins are written.
 Tooling validators used red→green. Independent static review traced the unchanged
 recipe and requested two test improvements: independently literal two-registration
 fixtures (including nav-only rejection), and producer/audit/recorder orchestration
-controls. These are now covered: 12 bridge tests and 4 mocked recorder tests pass
+controls. These are now covered: 13 bridge tests and 4 mocked recorder tests pass
 in normal/optimized modes. The mocks verify wiring only; real current subprocess/
-build validation remains pending final registration. A provisional isolated Rust
+build validation is in progress after the final source relay. A provisional isolated Rust
 build reproduced exactly the expected old main-source-pin failure; its private log
 is `local/provisional-source-gate.txt`, not final qualification evidence.

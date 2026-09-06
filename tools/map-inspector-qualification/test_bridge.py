@@ -44,6 +44,9 @@ class BridgeGates(unittest.TestCase):
         bridge.verify_descriptor(self.repo, self.original, descriptor or self.descriptor)
         bridge.verify_main_delta(self.old, (self.repo / bridge.MAIN).read_bytes())
 
+    def test_final_camera_hook_is_pinned(self):
+        self.assertIn('crates/map-inspector/src/room_camera.rs', bridge.ADDITIONAL_FILES)
+
     def test_exact_registration_bytes(self):
         self.verify()
         mutations = [self.current + b'\n', self.current.replace(b'\n', b'\r\n'),
