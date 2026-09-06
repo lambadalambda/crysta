@@ -27,3 +27,5 @@ Derive immutable collision/occupancy profiles and transition/contact contracts n
 
 - Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
 - Reverse-engineering/source discovery may precede tests; implementation must use red → green.
+- Source discovery: [bounded navigation](../../docs/pandora-navigation.md) records material aliases, actual edge/actor samples, selector14 adjustment, box polling and pointer-cache lifecycle. Independent read-only correctness/evidence/architecture review approved the discovery-only increment; requested spatial-coverage and residue provenance clarifications were applied.
+- Still open: exact profile/sample qualification, first-contact participant completion, tested compiler/checker, and parent reproduction. No existing house profile or source-observer contract changes.
