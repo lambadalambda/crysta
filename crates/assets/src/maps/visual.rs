@@ -2,8 +2,8 @@
 pub mod pandora;
 
 use super::{
-    StaticLayer, StaticMapError,
     scripts::{self, Command, Limits, ResourceKind},
+    StaticLayer, StaticMapError,
 };
 use crate::{
     compression,

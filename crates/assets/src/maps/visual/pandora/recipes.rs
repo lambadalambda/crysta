@@ -1,9 +1,9 @@
 //! Audited instruction windows. Map-script, controller and COP5A pointers are distinct.
 use super::super::{
-    Bgr555, Load, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED, ROOM_SUBSCRIPTS, ResourceKind, RoomSpan,
-    StaticBackground, StaticLayer, VisualMapError, resource, scripts, validate_spans,
+    resource, scripts, validate_spans, Bgr555, Load, ResourceKind, RoomSpan, StaticBackground,
+    StaticLayer, VisualMapError, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED, ROOM_SUBSCRIPTS,
 };
-use super::{Initialization, expect};
+use super::{expect, Initialization};
 
 const CELLAR: RoomSpan = RoomSpan {
     offset: 0x18_8461,

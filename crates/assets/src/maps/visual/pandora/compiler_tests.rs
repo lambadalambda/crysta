@@ -31,10 +31,9 @@ fn compiler_returns_source_resources_full_grid_pixels_and_separate_policies() {
         for resource in b.resources() {
             assert_eq!(resource.source_bytes(), &image[resource.source_range()]);
         }
-        assert!(
-            b.pixel(b.layer().width() * 16 - 1, b.layer().height() * 16 - 1)
-                .is_ok()
-        );
+        assert!(b
+            .pixel(b.layer().width() * 16 - 1, b.layer().height() * 16 - 1)
+            .is_ok());
         assert!(b.pixel(b.layer().width() * 16, 0).is_err());
         assert_eq!(
             p.initialization(),

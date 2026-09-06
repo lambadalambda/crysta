@@ -95,11 +95,116 @@ ordered overrides. The separately retained `layer()` includes its original
 container. Resource order is storage order, **not chronological transfer order**:
 shared colors first, base controller palette next, then the six overrides.
 
-## Verification boundary
+## Qualification and explicit omissions
 
-Synthetic source/mutation tests, the complete assets suite and authenticated
-Japanese house/cavern/exterior regressions pass. Independent compiler review
-found no blocker; nonzero inherited-color and distinct relocated-layer tests
-were strengthened after review. The fullviewport source-pixel comparator has
-also undergone independent review; its reproducible tooling is the next topical
-commit. No captured RGB or accepted parent route replay is claimed.
+The dedicated checker reads **only WRAM, VRAM and CGRAM**, never `.pixels`.
+For each of 17 selected settled states in **both** existing journeys it checks:
+
+- All 512 source definition records equal native `$7E2000..2FFF`.
+- The full source grid independently equals
+  `tile | ((attributes[tile] & 127) << 9)`. Full native-grid differences are
+  counted and hashed without suppressing bit15, tile changes or other attributes.
+- Source camera bounds, both native camera pairs, clamp extent and first-layer
+  hardware assignment. Source table/scene/controller fields are independently
+  cross-checked against the delivered typed `source.json`.
+- **Every intersecting ring tileword and all 57,344 viewport pixels** per state
+  (256×224, clipped at partial tiles). Aligned cameras sample896 words; fine Y
+  samples928 and fine X/Y957. Whole tilewords include flips, palette selectors
+  and priority; source export sampling is checked independently against the
+  SNES planar decoder.
+- Tileword expectations come from the **source base grid**, never native WRAM.
+  The suite separately requires zero visible low-tile phase changes, even if a
+  changed tile ID has identical definitions. Full-grid deltas outside this
+  qualification remain reported rather than admitted. Native memory never feeds
+  a compiler or parent initializer.
+
+All 17 selected background reports agree between the original and parent
+journeys. Both high and low priority are covered across the set (not every
+individual viewport has high-priority tiles).
+
+| Selected states | Full-grid deltas (source base → native) | Natural-base pixel differences |
+|---|---|---|
+| A west/north/gap/gap-up/door-align rests | 13/13/12/14/13, bit15 only | 833 ring-alias pixels / 0 / 0 / 0 / 0 |
+| 13 landed/west-rest | 2 each, bit15 only | 17 / 10 |
+| E/20 left-rest | 5 each, changed tiles; 4 also change attributes | 0 each |
+| 21 entry-closed/contact-rest/opening-wait | 0 / 1 bit15 / 0 | 0 each |
+| 41 tutorial020, 44 tutorial034, 42 tutorial041, 43 tutorial045, final stable41 | 0 / 0 / 1 bit15 / 0 / 0 | 84 / 84 / 104 / 104 / 84 |
+
+The five E/20 differences are the opened C door and three lifted pots in the
+**C sector of the shared sheet**, outside the sampled cellar sector. They
+correspond to the delivered door/carry progression, not a new cellar base.
+Do not reset the shared sheet's route phase merely because map ID changes to
+E/20. Conversely, do not grant full-grid collision admission from these results.
+Actor/object occupancy, dynamic door/pot patches, wider movement/material halos
+and their timing remain parent/source-phase-owner work. Attribute0 differs at
+13/21 after load; those differences are also retained in the reference report.
+
+### Fine-scroll ring edge, not a hidden border exclusion
+
+At town-west camera `(236,703)`, the visible footprint intersects33 tile columns
+but the hardware ring has32. Its 33rd column aliases the leading resident column
+at the same VRAM addresses. The checker compares **that edge too**, mapping
+`resident_x = first_tile_x + (tile_x-first_tile_x)%32`, and separately retains
+its mismatch with a natural unwrapped source crop: **28 words / 833 pixels**.
+All 57,344 resident-ring/source-animation pixel comparisons agree. This is not
+natural-crop equality at that edge and not a reason to change the source sheet.
+No other selected state has a horizontal alias difference. A nonuniform synthetic
+fine-X/Y fixture tests partial edges, alias counts and shared-ring-slot mutation.
+
+### Source-selected animation, not arbitrary changed-tile masks
+
+The checker reconstructs all supplied graphics bytes using bounded source-table
+payloads before comparing pixels. It never exempts whichever tiles happen to
+change. Scene records `$838A73/$838A78` select A graphics animations0/1 at
+`$9B807E/$9B84DF` (tiles9–12 and496–511). Record `$838EED` selects13's animation
+F at `$9BE5ED` (tiles37–40). Record `$839559` selects tour animation3C at
+`$9CE240` (tile341). Eight-byte records specify repetition/source/destination/
+size/delay; native spans must exactly match source-selected payloads. The tour
+animation persists into42–44. Production compilation returns natural base art,
+not the observed phase or an animation scheduler.
+
+Natural palette differences are reported separately: runtime backdrop0 in all
+profiles, plus A's animated colors in96–119. **No whole-frame RGB equivalence**
+is claimed. Secondary layers, sprites/text, windows, color math, brightness,
+animation timing and the historical cellar-band RGB discrepancy are omitted
+layers/effects—not reasons to alter source art or suppress mismatches.
+
+## Reproduction and acceptance status
+
+```sh
+sh tools/pandora-background-qualification/compare.sh "$ROM" "$SOURCE_JOURNEY" "$PARENT_JOURNEY"
+cargo test -p assets
+cargo clippy -p assets --all-targets -- -D warnings
+```
+
+The wrapper builds a local source exporter, runs normal/optimized Python tests
+and strict comparisons. It never boots an emulator or captures a new frame.
+`--record` is an audit aid for initial metadata review, not an acceptance bypass;
+it still requires source/parent nonpixel reports to agree and all semantic
+comparisons to pass. No source pixels, palette payloads or captured grids are
+committed. ROM-backed outputs remain ignored under `local/`.
+
+The parent reports that the original exact checker failure was isolated to
+intermittently zeroed regions in a handful of `.pixels` files: an unsynchronized
+async video-publication race in `vendor/ares/shims.cpp` (source diagnosis
+`5b7b88b`, parent `42fe162`). Frame logs/native state/nonpixel captures and
+provenance agree in a further fresh same-binary replay, including final control
+pixels. **Do not use `.pixels` as uniformly trustworthy RGB evidence yet.**
+Observer repair and renewed strict route replay are parent-owned and pending;
+this background comparison does not claim accepted parent route replay.
+
+TDD covered missing compiler/camera/comparator APIs, relocated synthetic source
+resources, negative control/table/extent mutations and palette overwrite order.
+Independent compiler review found no blocker and prompted stronger nonzero
+inherited-color and distinct-layer tests. Independent source-pixel review prompted full-viewport coverage, explicit ring
+alias reporting, a visible-phase rejection gate and independent camera-table
+linkage. Input-level mutation tests cover real ring tile/palette/priority/flip
+changes, every graphics plane, a coordinated grid/ring change, camera metadata
+and native pairs, missing/one-sided captures, and invalid animation payloads or
+destinations. Normal and optimized Python pass. The reviewer found no remaining
+blocking source-pixel issue; the requested nonuniform fine-scroll regression was
+also added and passes.
+
+The public camera is a transport: `settled_origin` expects its unmodified
+source-derived bounds (documented panic precondition for manually manufactured
+invalid bounds).

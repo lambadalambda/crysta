@@ -1,0 +1,2282 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "typed_source_sha256": "e4fd95c9e9a5280a3d34f27e2672db9fa86a37c332510233f032de18c6570e1c",
+  "profiles": [
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          0,
+          0,
+          1024,
+          1024
+        ],
+        "display": [
+          22,
+          1,
+          130,
+          51,
+          100,
+          192,
+          9,
+          237,
+          19
+        ],
+        "display_offset": 1489967,
+        "hardware_background": 2,
+        "record": [
+          64,
+          64
+        ],
+        "record_offset": 1490500,
+        "ring_word_base": 14336,
+        "scene_offset": 231847,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "f9f9b75e600655258cf4f5902491faccb82097ebc5802bac323b476d0108773c",
+        "cells": "1ff4401c085ac9a20850bc28335828367c37db25ed561a3a86112d9708caa633",
+        "definitions": "ac6fb37dde4ccaae22ec1c4c29a5637ff84747774768a5451c10dba0643ab9fd",
+        "graphics": "87f09d39d71a6cd6e9c2621cc9c223d35ce07ea9dd00ec3fb914024b378fbfe2",
+        "indices": "e42b8fe246cd0b5c39a5ba66f670973330c504ba600a31c71d2a24f4bf3712e4",
+        "palette": "1cf795b6bf004bbdde30af067fe1c2936201094bcafd9d8683987f8ff832c6af",
+        "priorities": "d424358ffb721b808075af586fda49d17d39ab80a27819ba78fbe2e425642a83",
+        "static-grid": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f"
+      },
+      "height": 1280,
+      "initialization": "MapLoad",
+      "map": 10,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 24576,
+          "end": 1965543,
+          "kind": "Graphics",
+          "sha256": "cd96d51709ce33fe2d09748a0d0854d9b351f6c00f7a261b5cc8a109fd378674",
+          "start": 1950182
+        },
+        {
+          "decoded_bytes": 192,
+          "end": 3270981,
+          "kind": "Palette",
+          "sha256": "68bb56ce1c4bea316a763abc0303ea908580d5a44e11d7034d4b11ddb129c0e4",
+          "start": 3270789
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2868020,
+          "kind": "Metatiles",
+          "sha256": "b74becf8aad52951ca8b0f4461f151a929371814f768287b8c6353dde185fba5",
+          "start": 2865658
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3269821,
+          "kind": "Metatiles",
+          "sha256": "733f49835334622b9e3138f4aa347d969d84a0a7fa56bf182ea314c36995c735",
+          "start": 3269624
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 10240,
+          "end": 2738337,
+          "kind": "Layer",
+          "sha256": "3694b021141468a6f6d84e719ae4f51b77a7bccb510f0d0f8fc7560af3ee038e",
+          "start": 2734837
+        }
+      ],
+      "width": 1024
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          0,
+          768,
+          256,
+          1024
+        ],
+        "display": [
+          21,
+          0,
+          32,
+          179,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1490138,
+        "hardware_background": 1,
+        "record": [
+          16,
+          19
+        ],
+        "record_offset": 1490508,
+        "ring_word_base": 14336,
+        "scene_offset": 232698,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "f4a836fc55450d600becc83b3a8b5836de0983ef2fa63f30e8deeea262d98ede",
+        "cells": "65fc3047ab007461b3d0fb9837ae534d7ea0eb4c59efb31bd82484965d5de499",
+        "definitions": "ad57ffc7e313e0c5436c8372542845da994bf965b88195d86b068ca2f0c3f4da",
+        "graphics": "0615ed6038f710e54707c8a9614eca0b9ae9716367f3b6cc2b679e81dc98f443",
+        "indices": "4adec38bf192483ec43e62feaeb9219cc1e0d02b4860bc3b682dd5cc11c8886d",
+        "palette": "b7e16ce75df494edb87ea1adfe311fe038e9f288e1c068e1847b2ff1ef5d4fc7",
+        "priorities": "689d88232a9fc9a10d4550ffc8ff31a55ef0826b28046e8b14933cc902968174",
+        "static-grid": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db"
+      },
+      "height": 1024,
+      "initialization": "MapLoad",
+      "map": 14,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 24576,
+          "end": 2351650,
+          "kind": "Graphics",
+          "sha256": "766b41296521cb04cad5195f044009c068ba3a988231c273f6fc484e76217e0f",
+          "start": 2339101
+        },
+        {
+          "decoded_bytes": 192,
+          "end": 3271365,
+          "kind": "Palette",
+          "sha256": "8e41ac848f91402504f0da03287ea9469c2cbabb890b04e0a0e0bebd361cedd3",
+          "start": 3271173
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2802950,
+          "kind": "Metatiles",
+          "sha256": "79ff0b3911c4128622d615b17d4df2363d403b3099966f6c313ee5d5c20ddea5",
+          "start": 2800195
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3211260,
+          "kind": "Metatiles",
+          "sha256": "b676ce4175b5afedbbec2f0eb5214e2314b19030796ed99e7b85b6471a124f6a",
+          "start": 3211091
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 3133409,
+          "kind": "Layer",
+          "sha256": "5cd9280fb1970c08492a391a208f2838ae7c159f5c18e097981f85957d70b783",
+          "start": 3132339
+        }
+      ],
+      "width": 512
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          256,
+          0,
+          512,
+          256
+        ],
+        "display": [
+          23,
+          18,
+          130,
+          33,
+          100,
+          128,
+          9,
+          17,
+          17
+        ],
+        "display_offset": 1489949,
+        "hardware_background": 2,
+        "record": [
+          17,
+          16
+        ],
+        "record_offset": 1490518,
+        "ring_word_base": 14336,
+        "scene_offset": 233131,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "f4a836fc55450d600becc83b3a8b5836de0983ef2fa63f30e8deeea262d98ede",
+        "cells": "c1256e270fb9dc74ce5e9df610b199d0b852607e7be15df91a4e243dac1b5277",
+        "definitions": "ad57ffc7e313e0c5436c8372542845da994bf965b88195d86b068ca2f0c3f4da",
+        "graphics": "0615ed6038f710e54707c8a9614eca0b9ae9716367f3b6cc2b679e81dc98f443",
+        "indices": "720e9cafbeddbd5fad6568dc2a430ce9c31f03b64d6310ffa94a6178073afead",
+        "palette": "f390bfcaf76ff322de892ca50514b387bce1c2c29b949376ea6e6d409dec2010",
+        "priorities": "e2f7ad7f4e33343ee0a69a1655292ecb7f8e038526c068889c6a8232f19c08fc",
+        "static-grid": "1e80a1177a4aae00e19735f8927bbd2ad613ba4067c4b3380a571462b1e4b713"
+      },
+      "height": 512,
+      "initialization": "MapLoad",
+      "map": 19,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 24576,
+          "end": 2351650,
+          "kind": "Graphics",
+          "sha256": "766b41296521cb04cad5195f044009c068ba3a988231c273f6fc484e76217e0f",
+          "start": 2339101
+        },
+        {
+          "decoded_bytes": 192,
+          "end": 3271173,
+          "kind": "Palette",
+          "sha256": "38b1af79146a7a1360decaa84aa5d49c65d378c3cf0b05787814a998a79d5c2e",
+          "start": 3270981
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2802950,
+          "kind": "Metatiles",
+          "sha256": "79ff0b3911c4128622d615b17d4df2363d403b3099966f6c313ee5d5c20ddea5",
+          "start": 2800195
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3211260,
+          "kind": "Metatiles",
+          "sha256": "b676ce4175b5afedbbec2f0eb5214e2314b19030796ed99e7b85b6471a124f6a",
+          "start": 3211091
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 3127857,
+          "kind": "Layer",
+          "sha256": "ff5824763eed404be760669509597f6ffe9030041c1b6d490214c8fa189de23b",
+          "start": 3126697
+        }
+      ],
+      "width": 1024
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          256,
+          768,
+          512,
+          1024
+        ],
+        "display": [
+          21,
+          0,
+          32,
+          179,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1490138,
+        "hardware_background": 1,
+        "record": [
+          17,
+          19
+        ],
+        "record_offset": 1490544,
+        "ring_word_base": 14336,
+        "scene_offset": 234042,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "f4a836fc55450d600becc83b3a8b5836de0983ef2fa63f30e8deeea262d98ede",
+        "cells": "65fc3047ab007461b3d0fb9837ae534d7ea0eb4c59efb31bd82484965d5de499",
+        "definitions": "ad57ffc7e313e0c5436c8372542845da994bf965b88195d86b068ca2f0c3f4da",
+        "graphics": "0615ed6038f710e54707c8a9614eca0b9ae9716367f3b6cc2b679e81dc98f443",
+        "indices": "4adec38bf192483ec43e62feaeb9219cc1e0d02b4860bc3b682dd5cc11c8886d",
+        "palette": "b7e16ce75df494edb87ea1adfe311fe038e9f288e1c068e1847b2ff1ef5d4fc7",
+        "priorities": "689d88232a9fc9a10d4550ffc8ff31a55ef0826b28046e8b14933cc902968174",
+        "static-grid": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db"
+      },
+      "height": 1024,
+      "initialization": "MapLoad",
+      "map": 32,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 24576,
+          "end": 2351650,
+          "kind": "Graphics",
+          "sha256": "766b41296521cb04cad5195f044009c068ba3a988231c273f6fc484e76217e0f",
+          "start": 2339101
+        },
+        {
+          "decoded_bytes": 192,
+          "end": 3271365,
+          "kind": "Palette",
+          "sha256": "8e41ac848f91402504f0da03287ea9469c2cbabb890b04e0a0e0bebd361cedd3",
+          "start": 3271173
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2802950,
+          "kind": "Metatiles",
+          "sha256": "79ff0b3911c4128622d615b17d4df2363d403b3099966f6c313ee5d5c20ddea5",
+          "start": 2800195
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3211260,
+          "kind": "Metatiles",
+          "sha256": "b676ce4175b5afedbbec2f0eb5214e2314b19030796ed99e7b85b6471a124f6a",
+          "start": 3211091
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 3133409,
+          "kind": "Layer",
+          "sha256": "5cd9280fb1970c08492a391a208f2838ae7c159f5c18e097981f85957d70b783",
+          "start": 3132339
+        }
+      ],
+      "width": 512
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          0,
+          0,
+          256,
+          512
+        ],
+        "display": [
+          21,
+          0,
+          32,
+          179,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1490138,
+        "hardware_background": 1,
+        "record": [
+          16,
+          32
+        ],
+        "record_offset": 1490546,
+        "ring_word_base": 14336,
+        "scene_offset": 234088,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "f4a836fc55450d600becc83b3a8b5836de0983ef2fa63f30e8deeea262d98ede",
+        "cells": "695da76a226ee839b8fbb066baab662d922d05a31918fbd3eade52ae5c5a4953",
+        "definitions": "ad57ffc7e313e0c5436c8372542845da994bf965b88195d86b068ca2f0c3f4da",
+        "graphics": "0615ed6038f710e54707c8a9614eca0b9ae9716367f3b6cc2b679e81dc98f443",
+        "indices": "89be5656d187ae8d039a5ceff0ed340ea8174a04b7220305c36273f0cbaf4446",
+        "palette": "b7e16ce75df494edb87ea1adfe311fe038e9f288e1c068e1847b2ff1ef5d4fc7",
+        "priorities": "0c7b993a8eba8712258274f4e4254f7c8ee3ee0a5b2edb736a1fb68542ad6b23",
+        "static-grid": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768"
+      },
+      "height": 512,
+      "initialization": "MapLoad",
+      "map": 33,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 24576,
+          "end": 2351650,
+          "kind": "Graphics",
+          "sha256": "766b41296521cb04cad5195f044009c068ba3a988231c273f6fc484e76217e0f",
+          "start": 2339101
+        },
+        {
+          "decoded_bytes": 192,
+          "end": 3271365,
+          "kind": "Palette",
+          "sha256": "8e41ac848f91402504f0da03287ea9469c2cbabb890b04e0a0e0bebd361cedd3",
+          "start": 3271173
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2802950,
+          "kind": "Metatiles",
+          "sha256": "79ff0b3911c4128622d615b17d4df2363d403b3099966f6c313ee5d5c20ddea5",
+          "start": 2800195
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3211260,
+          "kind": "Metatiles",
+          "sha256": "b676ce4175b5afedbbec2f0eb5214e2314b19030796ed99e7b85b6471a124f6a",
+          "start": 3211091
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 1024,
+          "end": 3310177,
+          "kind": "Layer",
+          "sha256": "951663ad65be41094ed1023bbd4745653c50218c02d8647092cac98655fd30c7",
+          "start": 3310033
+        }
+      ],
+      "width": 256
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          0,
+          0,
+          256,
+          256
+        ],
+        "display": [
+          21,
+          0,
+          128,
+          0,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1489922,
+        "hardware_background": 1,
+        "record": [
+          16,
+          16
+        ],
+        "record_offset": 1490610,
+        "ring_word_base": 14336,
+        "scene_offset": 234791,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "4068ad9e7a504e37733ef56a0ade46a2d789879e9a7eeca5ca15b4547796b7ed",
+        "cells": "beef9089f82001717ccd063d5be6a5a9d8f31d13288176653a627437477d6319",
+        "definitions": "6d40c97e8ae893a60b33acaf3b19623a05a3ce292485325164d658aa88c63930",
+        "graphics": "d81fc4e11b6608b09b5def67f004cf01b3afc0c7e8f75fe4b5dbb10e69794831",
+        "indices": "4d6016d66371c6e8771c2ce0845cb2675ed5ec95e06d82912c6102472363a63c",
+        "palette": "d48a09b6f541ad3dc1046aeefdae5dc91df12f65c84c63cddd90b052dbddca1b",
+        "priorities": "0b1c6d3f4ccca3faf2c7e7d8b04bde23abaf6d85423b0e31a04b65c33ec9639e",
+        "static-grid": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "height": 512,
+      "initialization": "Map21ThenController41Tour",
+      "map": 65,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 12288,
+          "end": 2193278,
+          "kind": "Graphics",
+          "sha256": "8453016fcc2738ba185512ff67724588fc6d195287ef869df1d40c1743cc9019",
+          "start": 2186709
+        },
+        {
+          "decoded_bytes": 224,
+          "end": 3268570,
+          "kind": "Palette",
+          "sha256": "a9ca2eed44a70a0113289eaf5fcc216dd566aecc5841d7e71e71dfda1012f8ee",
+          "start": 3268346
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2996196,
+          "kind": "Metatiles",
+          "sha256": "969570abe27e4c9cadad2b92ca8be171b868608909418765f92eab6bc132a20d",
+          "start": 2994176
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3311702,
+          "kind": "Metatiles",
+          "sha256": "6fd2b6773abe9f74977a8a37792a6ecd4dc23f66a393d63b7c9e370a1628c4bd",
+          "start": 3311599
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138667,
+          "kind": "Palette",
+          "sha256": "632b00d56d3b0e313ec71eedadb0fb08f2363535936dac14e0dd77ffde12737b",
+          "start": 3138651
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138699,
+          "kind": "Palette",
+          "sha256": "c450678ba40dbef195719e40d3b5571fa42ab717b53527de77313e65f895b16c",
+          "start": 3138683
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138763,
+          "kind": "Palette",
+          "sha256": "a46e92f02a31dd6a79c7ffc6e47214737271533d6df17cf9391d3165ceae314f",
+          "start": 3138747
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138827,
+          "kind": "Palette",
+          "sha256": "1cc1f38d631673fafea3cb9aadf431251242291838765ff404b5bdb42d343528",
+          "start": 3138811
+        },
+        {
+          "decoded_bytes": 2048,
+          "end": 3190255,
+          "kind": "Layer",
+          "sha256": "ad380e39bf1e5199a0c8bd0749d2d73882b8eabe515b3d49e4fecfe513d3f67b",
+          "start": 3189445
+        }
+      ],
+      "width": 512
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          0,
+          256,
+          256,
+          512
+        ],
+        "display": [
+          21,
+          0,
+          128,
+          0,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1489922,
+        "hardware_background": 1,
+        "record": [
+          16,
+          17
+        ],
+        "record_offset": 1490612,
+        "ring_word_base": 14336,
+        "scene_offset": 234857,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "4068ad9e7a504e37733ef56a0ade46a2d789879e9a7eeca5ca15b4547796b7ed",
+        "cells": "beef9089f82001717ccd063d5be6a5a9d8f31d13288176653a627437477d6319",
+        "definitions": "6d40c97e8ae893a60b33acaf3b19623a05a3ce292485325164d658aa88c63930",
+        "graphics": "d81fc4e11b6608b09b5def67f004cf01b3afc0c7e8f75fe4b5dbb10e69794831",
+        "indices": "4d6016d66371c6e8771c2ce0845cb2675ed5ec95e06d82912c6102472363a63c",
+        "palette": "d48a09b6f541ad3dc1046aeefdae5dc91df12f65c84c63cddd90b052dbddca1b",
+        "priorities": "0b1c6d3f4ccca3faf2c7e7d8b04bde23abaf6d85423b0e31a04b65c33ec9639e",
+        "static-grid": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "height": 512,
+      "initialization": "Map21ThenController41Tour",
+      "map": 66,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 12288,
+          "end": 2193278,
+          "kind": "Graphics",
+          "sha256": "8453016fcc2738ba185512ff67724588fc6d195287ef869df1d40c1743cc9019",
+          "start": 2186709
+        },
+        {
+          "decoded_bytes": 224,
+          "end": 3268570,
+          "kind": "Palette",
+          "sha256": "a9ca2eed44a70a0113289eaf5fcc216dd566aecc5841d7e71e71dfda1012f8ee",
+          "start": 3268346
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2996196,
+          "kind": "Metatiles",
+          "sha256": "969570abe27e4c9cadad2b92ca8be171b868608909418765f92eab6bc132a20d",
+          "start": 2994176
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3311702,
+          "kind": "Metatiles",
+          "sha256": "6fd2b6773abe9f74977a8a37792a6ecd4dc23f66a393d63b7c9e370a1628c4bd",
+          "start": 3311599
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138667,
+          "kind": "Palette",
+          "sha256": "632b00d56d3b0e313ec71eedadb0fb08f2363535936dac14e0dd77ffde12737b",
+          "start": 3138651
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138699,
+          "kind": "Palette",
+          "sha256": "c450678ba40dbef195719e40d3b5571fa42ab717b53527de77313e65f895b16c",
+          "start": 3138683
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138763,
+          "kind": "Palette",
+          "sha256": "a46e92f02a31dd6a79c7ffc6e47214737271533d6df17cf9391d3165ceae314f",
+          "start": 3138747
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138827,
+          "kind": "Palette",
+          "sha256": "1cc1f38d631673fafea3cb9aadf431251242291838765ff404b5bdb42d343528",
+          "start": 3138811
+        },
+        {
+          "decoded_bytes": 2048,
+          "end": 3190255,
+          "kind": "Layer",
+          "sha256": "ad380e39bf1e5199a0c8bd0749d2d73882b8eabe515b3d49e4fecfe513d3f67b",
+          "start": 3189445
+        }
+      ],
+      "width": 512
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          256,
+          0,
+          512,
+          256
+        ],
+        "display": [
+          21,
+          0,
+          128,
+          0,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1489922,
+        "hardware_background": 1,
+        "record": [
+          17,
+          16
+        ],
+        "record_offset": 1490614,
+        "ring_word_base": 14336,
+        "scene_offset": 234935,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "4068ad9e7a504e37733ef56a0ade46a2d789879e9a7eeca5ca15b4547796b7ed",
+        "cells": "beef9089f82001717ccd063d5be6a5a9d8f31d13288176653a627437477d6319",
+        "definitions": "6d40c97e8ae893a60b33acaf3b19623a05a3ce292485325164d658aa88c63930",
+        "graphics": "d81fc4e11b6608b09b5def67f004cf01b3afc0c7e8f75fe4b5dbb10e69794831",
+        "indices": "4d6016d66371c6e8771c2ce0845cb2675ed5ec95e06d82912c6102472363a63c",
+        "palette": "d48a09b6f541ad3dc1046aeefdae5dc91df12f65c84c63cddd90b052dbddca1b",
+        "priorities": "0b1c6d3f4ccca3faf2c7e7d8b04bde23abaf6d85423b0e31a04b65c33ec9639e",
+        "static-grid": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "height": 512,
+      "initialization": "Map21ThenController41Tour",
+      "map": 67,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 12288,
+          "end": 2193278,
+          "kind": "Graphics",
+          "sha256": "8453016fcc2738ba185512ff67724588fc6d195287ef869df1d40c1743cc9019",
+          "start": 2186709
+        },
+        {
+          "decoded_bytes": 224,
+          "end": 3268570,
+          "kind": "Palette",
+          "sha256": "a9ca2eed44a70a0113289eaf5fcc216dd566aecc5841d7e71e71dfda1012f8ee",
+          "start": 3268346
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2996196,
+          "kind": "Metatiles",
+          "sha256": "969570abe27e4c9cadad2b92ca8be171b868608909418765f92eab6bc132a20d",
+          "start": 2994176
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3311702,
+          "kind": "Metatiles",
+          "sha256": "6fd2b6773abe9f74977a8a37792a6ecd4dc23f66a393d63b7c9e370a1628c4bd",
+          "start": 3311599
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138667,
+          "kind": "Palette",
+          "sha256": "632b00d56d3b0e313ec71eedadb0fb08f2363535936dac14e0dd77ffde12737b",
+          "start": 3138651
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138699,
+          "kind": "Palette",
+          "sha256": "c450678ba40dbef195719e40d3b5571fa42ab717b53527de77313e65f895b16c",
+          "start": 3138683
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138763,
+          "kind": "Palette",
+          "sha256": "a46e92f02a31dd6a79c7ffc6e47214737271533d6df17cf9391d3165ceae314f",
+          "start": 3138747
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138827,
+          "kind": "Palette",
+          "sha256": "1cc1f38d631673fafea3cb9aadf431251242291838765ff404b5bdb42d343528",
+          "start": 3138811
+        },
+        {
+          "decoded_bytes": 2048,
+          "end": 3190255,
+          "kind": "Layer",
+          "sha256": "ad380e39bf1e5199a0c8bd0749d2d73882b8eabe515b3d49e4fecfe513d3f67b",
+          "start": 3189445
+        }
+      ],
+      "width": 512
+    },
+    {
+      "camera": {
+        "bgmode": 9,
+        "bounds": [
+          256,
+          256,
+          512,
+          512
+        ],
+        "display": [
+          21,
+          0,
+          128,
+          0,
+          100,
+          0,
+          9,
+          0,
+          0
+        ],
+        "display_offset": 1489922,
+        "hardware_background": 1,
+        "record": [
+          17,
+          17
+        ],
+        "record_offset": 1490616,
+        "ring_word_base": 14336,
+        "scene_offset": 234996,
+        "vertical_extent": 256
+      },
+      "files": {
+        "attributes": "4068ad9e7a504e37733ef56a0ade46a2d789879e9a7eeca5ca15b4547796b7ed",
+        "cells": "beef9089f82001717ccd063d5be6a5a9d8f31d13288176653a627437477d6319",
+        "definitions": "6d40c97e8ae893a60b33acaf3b19623a05a3ce292485325164d658aa88c63930",
+        "graphics": "d81fc4e11b6608b09b5def67f004cf01b3afc0c7e8f75fe4b5dbb10e69794831",
+        "indices": "4d6016d66371c6e8771c2ce0845cb2675ed5ec95e06d82912c6102472363a63c",
+        "palette": "d48a09b6f541ad3dc1046aeefdae5dc91df12f65c84c63cddd90b052dbddca1b",
+        "priorities": "0b1c6d3f4ccca3faf2c7e7d8b04bde23abaf6d85423b0e31a04b65c33ec9639e",
+        "static-grid": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "height": 512,
+      "initialization": "Map21ThenController41Tour",
+      "map": 68,
+      "policies": "BackgroundPolicies { grid: FullSourceAttributed, admission: CallerSuppliedHalo, dynamic_phase: CallerAppliedSourcePatches }",
+      "sources": [
+        {
+          "decoded_bytes": 12288,
+          "end": 2193278,
+          "kind": "Graphics",
+          "sha256": "8453016fcc2738ba185512ff67724588fc6d195287ef869df1d40c1743cc9019",
+          "start": 2186709
+        },
+        {
+          "decoded_bytes": 224,
+          "end": 3268570,
+          "kind": "Palette",
+          "sha256": "a9ca2eed44a70a0113289eaf5fcc216dd566aecc5841d7e71e71dfda1012f8ee",
+          "start": 3268346
+        },
+        {
+          "decoded_bytes": 4096,
+          "end": 2996196,
+          "kind": "Metatiles",
+          "sha256": "969570abe27e4c9cadad2b92ca8be171b868608909418765f92eab6bc132a20d",
+          "start": 2994176
+        },
+        {
+          "decoded_bytes": 512,
+          "end": 3311702,
+          "kind": "Metatiles",
+          "sha256": "6fd2b6773abe9f74977a8a37792a6ecd4dc23f66a393d63b7c9e370a1628c4bd",
+          "start": 3311599
+        },
+        {
+          "decoded_bytes": 64,
+          "end": 3312568,
+          "kind": "Palette",
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138667,
+          "kind": "Palette",
+          "sha256": "632b00d56d3b0e313ec71eedadb0fb08f2363535936dac14e0dd77ffde12737b",
+          "start": 3138651
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138699,
+          "kind": "Palette",
+          "sha256": "c450678ba40dbef195719e40d3b5571fa42ab717b53527de77313e65f895b16c",
+          "start": 3138683
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138763,
+          "kind": "Palette",
+          "sha256": "a46e92f02a31dd6a79c7ffc6e47214737271533d6df17cf9391d3165ceae314f",
+          "start": 3138747
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138731,
+          "kind": "Palette",
+          "sha256": "65c2236ac7a5cfa6fc111edbfef43715bf403ea176157c9fbc6a9b6354a23922",
+          "start": 3138715
+        },
+        {
+          "decoded_bytes": 16,
+          "end": 3138827,
+          "kind": "Palette",
+          "sha256": "1cc1f38d631673fafea3cb9aadf431251242291838765ff404b5bdb42d343528",
+          "start": 3138811
+        },
+        {
+          "decoded_bytes": 2048,
+          "end": 3190255,
+          "kind": "Layer",
+          "sha256": "ad380e39bf1e5199a0c8bd0749d2d73882b8eabe515b3d49e4fecfe513d3f67b",
+          "start": 3189445
+        }
+      ],
+      "width": 512
+    }
+  ],
+  "source_consumers": [
+    {
+      "start": 430961,
+      "end": 431096,
+      "sha256": "e7bb463a819ce34ee0ad74f477ffab7477193637546484243e95d506b3892acf"
+    },
+    {
+      "start": 495777,
+      "end": 495878,
+      "sha256": "7eb35cb537b2b9d262fe4ce4e1b0092e9c18303cf92be3885fe27d37491eb68c"
+    },
+    {
+      "start": 429278,
+      "end": 429287,
+      "sha256": "6082049afbd07e136684d8ef3293b2a0b782d1412dcde415c6c72ee1b8f50828"
+    },
+    {
+      "start": 429375,
+      "end": 429427,
+      "sha256": "83f6bb969aaccb1093c1dc4ba7003c2a952593082f655ee45ca456fcca5e212a"
+    },
+    {
+      "start": 430764,
+      "end": 430870,
+      "sha256": "f777bbb65264992d1fcdf9b7fe9dba191c55e9feb3cc7fb08e711badf33dfc2f"
+    },
+    {
+      "start": 643662,
+      "end": 643745,
+      "sha256": "f4df51d5e9c6c77125baef674deddbad0eed0a04454d849041028de0c53b264e"
+    },
+    {
+      "start": 889816,
+      "end": 890013,
+      "sha256": "f258369fe00b0c861dbeb14b27cde3038a7c550976a9cc2704517ee2cf4a2926"
+    },
+    {
+      "start": 435832,
+      "end": 435909,
+      "sha256": "30dc87d513911d6282b103803231b37d508b2f7dda039b72134fc144c0fd21c7"
+    }
+  ],
+  "captures": {
+    "town-west-rest": {
+      "map": 10,
+      "camera": [
+        236,
+        703
+      ],
+      "source_camera": [
+        236,
+        703
+      ],
+      "capture_hashes": {
+        "wram": "838899aaaa94088bdee2b2bcaec4440b70460a127f454b0ea8490566fa9fe253",
+        "vram": "5b7867d322eb193cf7d5e33eecee91e75a6eb83184b4224a90cae8620126ec79",
+        "cgram": "c3bbe91466dd58ceb3a8ffb64c2f1a7c5606405dfaf12491320efcb07544530a"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 957,
+      "high_words": 28,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 28,
+      "ring_alias_different_pixels": 833,
+      "viewport": [
+        236,
+        703,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 833,
+      "animation_frames": [
+        {
+          "selector": 0,
+          "table": 1802366,
+          "source": 1802975,
+          "destination": 288,
+          "size": 128,
+          "sha256": "d3221ceb1fd75d40b72feb6bc279e7696665b8e800e8c59d99f3fd8a46a0f290"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1810144,
+          "destination": 15872,
+          "size": 128,
+          "sha256": "2927880378ee996102fddfc618b21ffdf10c0f27164f67fe5a8f6a0f2fd813ee"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1810272,
+          "destination": 16000,
+          "size": 128,
+          "sha256": "7cfd814946b76dfe1633d458f0ab460dc0d4b3d3d61851efdbc1568f180ca964"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1809888,
+          "destination": 16128,
+          "size": 128,
+          "sha256": "51e194b6e9e82920cda11ce6ed995b72955515b87a7c28d38311eeb53b795c5a"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1810016,
+          "destination": 16256,
+          "size": 128,
+          "sha256": "18aa66d0df057a880ed74585ba98b364562091b182a4937d25e9ceef3267b923"
+        }
+      ],
+      "grid": {
+        "total_differences": 13,
+        "bit15_only": 13,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f",
+        "native_sha256": "2e314ac5ed205db8bfd21e70b59dae05fc8561e3fcc1b589a351ae27b71057ae"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0,
+        96,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    "town-north-rest": {
+      "map": 10,
+      "camera": [
+        232,
+        288
+      ],
+      "source_camera": [
+        232,
+        288
+      ],
+      "capture_hashes": {
+        "wram": "247fb9f071fb122e456bc31f2beb199e63476b6cfe6beb6338e9ebfc8e7d64ea",
+        "vram": "9adedfbca3fd6310f277667d7e0c88de3b010a935c0544a021fae138881c4b92",
+        "cgram": "cb90cba32d80e783b1cf3e2b7dfb35f99adad8579a0e39543b5c2f6ef267e6d8"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 4,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        232,
+        288,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [
+        {
+          "selector": 0,
+          "table": 1802366,
+          "source": 1802591,
+          "destination": 288,
+          "size": 128,
+          "sha256": "4be16e20fc4e40d7eb6904f37ff7fe062204fb459eae604968eb5eff9ffebb98"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1807072,
+          "destination": 15872,
+          "size": 128,
+          "sha256": "d3b975a9d22aa5009f8c588de83146ad12254bf283a019d68b9979924c959db3"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1807200,
+          "destination": 16000,
+          "size": 128,
+          "sha256": "4629800f8dacd8b1bbdb09659d74ad5ec39321d9426e01abf1b88a99be79c409"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806816,
+          "destination": 16128,
+          "size": 128,
+          "sha256": "f33f3405dc148fb6924f659a454f58d2bae0e1cf08f7488e8bfb3e33b146beac"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806944,
+          "destination": 16256,
+          "size": 128,
+          "sha256": "fce6a05ef85139da35ea5d056ce28b95d342cba49316573ab9d865cea899b67a"
+        }
+      ],
+      "grid": {
+        "total_differences": 13,
+        "bit15_only": 13,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f",
+        "native_sha256": "da0b7a2bba1f5acbddf03b5ced7e1b0a6e2f8ea0a222085c5099b2cb950dc064"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    "town-gap-rest": {
+      "map": 10,
+      "camera": [
+        424,
+        288
+      ],
+      "source_camera": [
+        424,
+        288
+      ],
+      "capture_hashes": {
+        "wram": "cc82af895bbcef4c862d326e16bc5ce2a27ebb14e419ea01f638afb5ddc7e64f",
+        "vram": "d0ccf06301808bb6fbcaab61ba8347e1a93e30a4eb60a148608d4222163b7056",
+        "cgram": "2cc16f5ba5579dd25eddefab313c58c1b8e1b5078c501d4458211236b67bea76"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 0,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        424,
+        288,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [
+        {
+          "selector": 0,
+          "table": 1802366,
+          "source": 1803359,
+          "destination": 288,
+          "size": 128,
+          "sha256": "ec04884c6cdeaf37e83c4371f427286f7e3639c468595969ed095256dedcf119"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1807072,
+          "destination": 15872,
+          "size": 128,
+          "sha256": "d3b975a9d22aa5009f8c588de83146ad12254bf283a019d68b9979924c959db3"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1807200,
+          "destination": 16000,
+          "size": 128,
+          "sha256": "4629800f8dacd8b1bbdb09659d74ad5ec39321d9426e01abf1b88a99be79c409"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806816,
+          "destination": 16128,
+          "size": 128,
+          "sha256": "f33f3405dc148fb6924f659a454f58d2bae0e1cf08f7488e8bfb3e33b146beac"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806944,
+          "destination": 16256,
+          "size": 128,
+          "sha256": "fce6a05ef85139da35ea5d056ce28b95d342cba49316573ab9d865cea899b67a"
+        }
+      ],
+      "grid": {
+        "total_differences": 12,
+        "bit15_only": 12,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f",
+        "native_sha256": "fd684291bd6b8559c3b12a0405107b4309e521da10c2a097132aee2b5063ca65"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    "town-gap-up-rest": {
+      "map": 10,
+      "camera": [
+        424,
+        208
+      ],
+      "source_camera": [
+        424,
+        208
+      ],
+      "capture_hashes": {
+        "wram": "80f586bfcf92b5774b09b78d4612be890c42b598ee728d534d2f8e977d103f3b",
+        "vram": "b25904dddd8e01396c45f4b8e8fae98393311464cc4360405ace8d5c47584690",
+        "cgram": "97ae8ba3f097ff653044b7e7433480f970d54f0d40549a4c9f317b303ad87e36"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 38,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        424,
+        208,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [
+        {
+          "selector": 0,
+          "table": 1802366,
+          "source": 1803359,
+          "destination": 288,
+          "size": 128,
+          "sha256": "ec04884c6cdeaf37e83c4371f427286f7e3639c468595969ed095256dedcf119"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806560,
+          "destination": 15872,
+          "size": 128,
+          "sha256": "58ecabe3669818628ca38e3dfa9f2eb25e7fc4301c32028a7a939eebc568f0f0"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806688,
+          "destination": 16000,
+          "size": 128,
+          "sha256": "2bd7d5de257d6343d7d248ab193183dc694223af17730f9042353b6b03c19260"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806816,
+          "destination": 16128,
+          "size": 128,
+          "sha256": "f33f3405dc148fb6924f659a454f58d2bae0e1cf08f7488e8bfb3e33b146beac"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1806432,
+          "destination": 16256,
+          "size": 128,
+          "sha256": "0aa5206b20dab9cbb63842380f5ce2eae2fff5f2c75ecf8b3b87f4e0cc4d47f3"
+        }
+      ],
+      "grid": {
+        "total_differences": 14,
+        "bit15_only": 14,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f",
+        "native_sha256": "23e4b82a39426bf2915ad63f8467274914e0d9054f259ac6f11d6dee4bd9a2da"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0,
+        96,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    "town-door-align-rest": {
+      "map": 10,
+      "camera": [
+        344,
+        208
+      ],
+      "source_camera": [
+        344,
+        208
+      ],
+      "capture_hashes": {
+        "wram": "8fb9af299568daedc613c1e1ccbe1906ed959e74ff9affa9035e21ef0ea4cadc",
+        "vram": "70008d18dff862a6508273b41b86019d19e2feed793a965a7a547d7c3e8dbb25",
+        "cgram": "367436ba5c13a0f77937c8f9614fe2c80cc910020dd3c6f92ed8b73658ee449e"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 21,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        344,
+        208,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [
+        {
+          "selector": 0,
+          "table": 1802366,
+          "source": 1803231,
+          "destination": 288,
+          "size": 128,
+          "sha256": "d12bd4b25ff740fd5d1ba0351c706695c6cc929a0c4a137d073566e4c86d3cee"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1805024,
+          "destination": 15872,
+          "size": 128,
+          "sha256": "e73efc30dc5bfc5c3a824f8b78cad9636f7bb085c4ddea11c830c417cdae790d"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1805152,
+          "destination": 16000,
+          "size": 128,
+          "sha256": "9d83bdfd2cf1c755719eedb2b4e6f6d2f43a35351e4f86eec3bc6d62c3e9aee3"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1805280,
+          "destination": 16128,
+          "size": 128,
+          "sha256": "0e45a783e145f57e784d8310cb7ddb994fec93de9d7301262ed28647b344809c"
+        },
+        {
+          "selector": 1,
+          "table": 1803487,
+          "source": 1804896,
+          "destination": 16256,
+          "size": 128,
+          "sha256": "4b666eadc5b77209f6402e266609f0d930a83818ef463408e10e09d19dba8e9e"
+        }
+      ],
+      "grid": {
+        "total_differences": 13,
+        "bit15_only": 13,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f",
+        "native_sha256": "bdfcf35d3441eb2f3c46b3964646468cad9a328be4065200a9c9bb70ea42b5d9"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0,
+        96,
+        97,
+        98,
+        99,
+        100,
+        101,
+        102,
+        103,
+        104,
+        105,
+        106,
+        107,
+        108,
+        109,
+        110,
+        111,
+        112,
+        113,
+        114,
+        115,
+        116,
+        117,
+        118,
+        119
+      ]
+    },
+    "landed-13": {
+      "map": 19,
+      "camera": [
+        256,
+        0
+      ],
+      "source_camera": [
+        256,
+        0
+      ],
+      "capture_hashes": {
+        "wram": "7e87c59e88c7a49e18bbf1d8f9af13f04b5f74cfd03c0a9bdfafa4de084e9a5b",
+        "vram": "d3a36fb66f5482bcba024b823cae1e9d3ba9a436f5936a1969abd5b03ff1df2b",
+        "cgram": "d27a18eb5b719530ab03a206f6e91d6ff4a8b5b0c25f61b8325a9c9106f8f69c"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 346,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        256,
+        0,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 17,
+      "animation_frames": [
+        {
+          "selector": 15,
+          "table": 1828333,
+          "source": 1828782,
+          "destination": 1184,
+          "size": 128,
+          "sha256": "76b3955c4bc3fb62e1f5be12c7142ed52d61989b3b07bc7e89f778c70ef8b5be"
+        }
+      ],
+      "grid": {
+        "total_differences": 2,
+        "bit15_only": 2,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "1e80a1177a4aae00e19735f8927bbd2ad613ba4067c4b3380a571462b1e4b713",
+        "native_sha256": "3d0e48f3843a460ca6def078375352d39fbf5f7f9bcc8c2d8fa39a1a986c1dc8"
+      },
+      "attribute_differences": [
+        [
+          0,
+          0,
+          20
+        ]
+      ],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "13-west-rest": {
+      "map": 19,
+      "camera": [
+        256,
+        0
+      ],
+      "source_camera": [
+        256,
+        0
+      ],
+      "capture_hashes": {
+        "wram": "55226d037ef141ebe40fa5e3ee17ed9cc0e976120f66c1e1a9846988cfa0988b",
+        "vram": "32f1c71c0c643c60eaef83ac5a3eb600b8d84baa5b0bc84fad7c9d1b648f71a9",
+        "cgram": "d27a18eb5b719530ab03a206f6e91d6ff4a8b5b0c25f61b8325a9c9106f8f69c"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 346,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        256,
+        0,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 10,
+      "animation_frames": [
+        {
+          "selector": 15,
+          "table": 1828333,
+          "source": 1828526,
+          "destination": 1184,
+          "size": 128,
+          "sha256": "0b7cc120a1ad7adf93b6cda7929e46d8b2de7139ab95e30981be41daa8f9721c"
+        }
+      ],
+      "grid": {
+        "total_differences": 2,
+        "bit15_only": 2,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "1e80a1177a4aae00e19735f8927bbd2ad613ba4067c4b3380a571462b1e4b713",
+        "native_sha256": "3d0e48f3843a460ca6def078375352d39fbf5f7f9bcc8c2d8fa39a1a986c1dc8"
+      },
+      "attribute_differences": [
+        [
+          0,
+          0,
+          20
+        ]
+      ],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "E-left-rest": {
+      "map": 14,
+      "camera": [
+        0,
+        768
+      ],
+      "source_camera": [
+        0,
+        768
+      ],
+      "capture_hashes": {
+        "wram": "321f7f9b84b1f761b15a73bedecd560e7f0b532f4f154d46aecdeeb1e70dc066",
+        "vram": "c48a3cbf9a7714f25cca3f911d4791867961fce90cfecc5f2c6f8ed16f1bb7e5",
+        "cgram": "36804efc51a208cbe6bb5c70876c398dde4954399a9868cb62557680d09304aa"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 576,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        768,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [],
+      "grid": {
+        "total_differences": 5,
+        "bit15_only": 0,
+        "changed_tile": 5,
+        "changed_tile_coordinates": [
+          [
+            11,
+            20
+          ],
+          [
+            3,
+            21
+          ],
+          [
+            4,
+            21
+          ],
+          [
+            5,
+            21
+          ],
+          [
+            11,
+            21
+          ]
+        ],
+        "other_attribute": 4,
+        "source_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+        "native_sha256": "aa2dfe8383da30166a8a6463170eb1f88b9ad07d1c37d53fef5267e22e1a2f0c"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "20-left-rest": {
+      "map": 32,
+      "camera": [
+        256,
+        768
+      ],
+      "source_camera": [
+        256,
+        768
+      ],
+      "capture_hashes": {
+        "wram": "510ba58d745390101a216b2ff4040d9a6dbfd27af441023523705ce8839fc81e",
+        "vram": "f7455234b200b3c255dccde97fed52f2300ac1516c3a7604a3007469e9482db6",
+        "cgram": "1b87687f39218d3f96ce53c95b554a476024478a4bc254972cce899bf0106a2c"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 576,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        256,
+        768,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [],
+      "grid": {
+        "total_differences": 5,
+        "bit15_only": 0,
+        "changed_tile": 5,
+        "changed_tile_coordinates": [
+          [
+            11,
+            20
+          ],
+          [
+            3,
+            21
+          ],
+          [
+            4,
+            21
+          ],
+          [
+            5,
+            21
+          ],
+          [
+            11,
+            21
+          ]
+        ],
+        "other_attribute": 4,
+        "source_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+        "native_sha256": "aa2dfe8383da30166a8a6463170eb1f88b9ad07d1c37d53fef5267e22e1a2f0c"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "21-entry-closed": {
+      "map": 33,
+      "camera": [
+        0,
+        16
+      ],
+      "source_camera": [
+        0,
+        16
+      ],
+      "capture_hashes": {
+        "wram": "a763b6912a2653d32c48912dca9e6143a0bdfa3a57077db7e89c825f2b68468b",
+        "vram": "022d015f882b003eb09404565571199fff9c105a68fd983cc7c4654fbed91879",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 336,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        16,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768",
+        "native_sha256": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768"
+      },
+      "attribute_differences": [
+        [
+          0,
+          0,
+          22
+        ]
+      ],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "21-box-contact-rest": {
+      "map": 33,
+      "camera": [
+        0,
+        247
+      ],
+      "source_camera": [
+        0,
+        247
+      ],
+      "capture_hashes": {
+        "wram": "d7da6daed5fa2d45d5f0168bb65313b3f061614be1676e265b581d7da2eb01e0",
+        "vram": "a9d6902ecaf5aa391e26a8bbebd2ee769292e64d0accf6c1b16871439b9249fa",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 928,
+      "high_words": 368,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        247,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [],
+      "grid": {
+        "total_differences": 1,
+        "bit15_only": 1,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768",
+        "native_sha256": "e9f58a9ac3ecd980330f58ca2027b1551b05288a23b80b6ffd1d32c9bb54c036"
+      },
+      "attribute_differences": [
+        [
+          0,
+          0,
+          22
+        ]
+      ],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "21-opening-wait": {
+      "map": 33,
+      "camera": [
+        0,
+        256
+      ],
+      "source_camera": [
+        0,
+        256
+      ],
+      "capture_hashes": {
+        "wram": "083bbcd8f43eb65fdfc487a1426a75967fc15f298e66b20cc0b84dc7cc5dfe42",
+        "vram": "9c89c05d71bc8228651bb9cda3bda74912d4cbc5e8d5f6e54cd5a99fb0243c57",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 376,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        256,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 0,
+      "animation_frames": [],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768",
+        "native_sha256": "280a8c445b89b6e6cc61ef9b63c04830ae6abbae4b62d8acbaab07f6069ed768"
+      },
+      "attribute_differences": [
+        [
+          0,
+          0,
+          22
+        ]
+      ],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "tutorial-020": {
+      "map": 65,
+      "camera": [
+        0,
+        0
+      ],
+      "source_camera": [
+        0,
+        0
+      ],
+      "capture_hashes": {
+        "wram": "921a68e89cc0c8b917881aa471e5c3cec05443603a34f5eae58096061ba0067d",
+        "vram": "3e8e6d8c709f84873d91165ce15ace2f35733ad3b302d22fd73a60b24edc0da3",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 38,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        0,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 84,
+      "animation_frames": [
+        {
+          "selector": 60,
+          "table": 1892928,
+          "source": 1893057,
+          "destination": 10912,
+          "size": 32,
+          "sha256": "de7dfae315158f5dba8d3bb47ac14d782f3dff892e43808b5d08123e47e8e083"
+        }
+      ],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d",
+        "native_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "tutorial-034": {
+      "map": 68,
+      "camera": [
+        256,
+        256
+      ],
+      "source_camera": [
+        256,
+        256
+      ],
+      "capture_hashes": {
+        "wram": "b759ac9ad14f4d5a239f2daf806337d25da349810fb71268fccc256bd983a414",
+        "vram": "55bfbc671cc3db26f936b98d8ad6f825fcd5c939dab3b769adfe3e23f59e1737",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 0,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        256,
+        256,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 84,
+      "animation_frames": [
+        {
+          "selector": 60,
+          "table": 1892928,
+          "source": 1893057,
+          "destination": 10912,
+          "size": 32,
+          "sha256": "de7dfae315158f5dba8d3bb47ac14d782f3dff892e43808b5d08123e47e8e083"
+        }
+      ],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d",
+        "native_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "tutorial-041": {
+      "map": 66,
+      "camera": [
+        0,
+        256
+      ],
+      "source_camera": [
+        0,
+        256
+      ],
+      "capture_hashes": {
+        "wram": "7e8ff64b0b2fe14ca55cb14a2a1d89b41455b2b3d942dab26bcf343b48675f31",
+        "vram": "eca536317a8ec20b32749b6c9db18875c9b651903ad865082a88a40024c46a04",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 0,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        256,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 104,
+      "animation_frames": [
+        {
+          "selector": 60,
+          "table": 1892928,
+          "source": 1893025,
+          "destination": 10912,
+          "size": 32,
+          "sha256": "daf6561fd2500b1562cc270a91446d3ffc9883e0942a2f15d051898a0c9efed1"
+        }
+      ],
+      "grid": {
+        "total_differences": 1,
+        "bit15_only": 1,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d",
+        "native_sha256": "165946e00d07037d92118eb58255de4f0d28983527931f6bf08635ed46fc0855"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "tutorial-045": {
+      "map": 67,
+      "camera": [
+        256,
+        0
+      ],
+      "source_camera": [
+        256,
+        0
+      ],
+      "capture_hashes": {
+        "wram": "8d0b7e4933a88eb1a4352b0429438ada92d5c69b63f2543dc96da8ce67642805",
+        "vram": "ff1c0dba551d9938236c8e5d69e007b581600e76dc989606b8ed489c7d797d10",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 0,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        256,
+        0,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 104,
+      "animation_frames": [
+        {
+          "selector": 60,
+          "table": 1892928,
+          "source": 1893025,
+          "destination": 10912,
+          "size": 32,
+          "sha256": "daf6561fd2500b1562cc270a91446d3ffc9883e0942a2f15d051898a0c9efed1"
+        }
+      ],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d",
+        "native_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    },
+    "pandora-neutral-stable": {
+      "map": 65,
+      "camera": [
+        0,
+        0
+      ],
+      "source_camera": [
+        0,
+        0
+      ],
+      "capture_hashes": {
+        "wram": "d7eb96fd20fab0a1e85a9514b12dec90371d6041fa990d7794c12508fd650704",
+        "vram": "e426e6f21dc9f887e226ddd0a80ce1b386178b92c9aef3635037f071e7f0a217",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5"
+      },
+      "tileword_errors": [],
+      "unexpected_pixels": [],
+      "tile_words": 896,
+      "high_words": 38,
+      "phase_changed_words": 0,
+      "source_phase_equal_pixels": 57344,
+      "visible_phase_changed_cells": 0,
+      "ring_alias_different_words": 0,
+      "ring_alias_different_pixels": 0,
+      "viewport": [
+        0,
+        0,
+        256,
+        224
+      ],
+      "natural_base_different_pixels": 84,
+      "animation_frames": [
+        {
+          "selector": 60,
+          "table": 1892928,
+          "source": 1893057,
+          "destination": 10912,
+          "size": 32,
+          "sha256": "de7dfae315158f5dba8d3bb47ac14d782f3dff892e43808b5d08123e47e8e083"
+        }
+      ],
+      "grid": {
+        "total_differences": 0,
+        "bit15_only": 0,
+        "changed_tile": 0,
+        "changed_tile_coordinates": [],
+        "other_attribute": 0,
+        "source_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d",
+        "native_sha256": "30735169ed9e66caa31bba12b8467d7b5708bfe1660fcaa860653ccf9462ee0d"
+      },
+      "attribute_differences": [],
+      "palette_different_indices": [
+        0
+      ]
+    }
+  },
+  "independent_report_hashes": {
+    "source": "d69c69f91518c318de36e5872ad0cd8d3f5c58b91cccf455cceaf95dc745ec7c",
+    "parent": "d69c69f91518c318de36e5872ad0cd8d3f5c58b91cccf455cceaf95dc745ec7c"
+  },
+  "source_parent_differing_points": []
+}
