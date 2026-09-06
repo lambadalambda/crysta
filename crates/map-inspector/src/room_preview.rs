@@ -1,10 +1,9 @@
 //! Authenticated ROM-to-preview adapter. No oracle session is constructed here.
 use crate::{invalid, sha256, Result};
-use assets::maps::exits::ExitList;
 use rom::Rom;
 use room_core::{
-    slice::{DataIdentity, Exit, GameData, GameState, NewGameData, Phase, Policy},
-    Direction, FrameInput, Room,
+    slice::{GameData, GameState, Phase, Policy},
+    Direction, FrameInput,
 };
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -91,98 +90,13 @@ impl Preview {
     }
 }
 
-fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<Room> {
+#[cfg(test)]
+fn compile_room(rom: &Rom, id: u16, fresh: bool) -> Result<room_core::Room> {
     crate::house_profiles::compile(rom, id, fresh)
 }
 
 fn compile(rom: &Rom) -> Result<GameData> {
-    let rooms = [compile_room(rom, 15, false)?, compile_room(rom, 16, false)?];
-    let startup = crate::new_game::compile(rom)?;
-    let new_game = NewGameData {
-        bedroom: compile_room(rom, 15, true)?,
-        position: startup.position,
-    };
-    let lists = [
-        ExitList::from_rom(rom.image(), 15)?,
-        ExitList::from_rom(rom.image(), 16)?,
-    ];
-    let exits = lists.each_ref().map(|list| {
-        list.records()
-            .iter()
-            .map(|record| Exit(*record.bytes()))
-            .collect()
-    });
-    let record = lists[0]
-        .select(384, 193)
-        .ok_or_else(|| invalid("missing semantic doorway"))?;
-    let word = |at| u16::from_le_bytes([rom.image()[at], rom.image()[at + 1]]);
-    let pointer =
-        |at| u32::from_le_bytes([rom.image()[at], rom.image()[at + 1], rom.image()[at + 2], 0]);
-    let raw = record.destination_position();
-    // Selector 5's signed adjustment and the player FD/header anchor override.
-    let adjustment = (
-        i16::from_le_bytes(word(0x0d_8985 + 5 * 4).to_le_bytes()),
-        i16::from_le_bytes(word(0x0d_8987 + 5 * 4).to_le_bytes()),
-    );
-    let queue = (
-        raw.0.wrapping_add_signed(adjustment.0),
-        raw.1.wrapping_add_signed(adjustment.1),
-    );
-    let spawn = (queue.0.checked_add(8), queue.1.checked_add(16));
-    if record.direct_destination() != Ok(16)
-        || record.transition_mode() != 0
-        || record.selector() != 5
-        || adjustment != (0, -16)
-        || queue != (384, 320)
-        || spawn != (Some(392), Some(336))
-        || pointer(0x0d_895b + 4 * 3) != 0x84_b94d
-        || word(0x04_8808) != 0xbb3b
-        || word(0x03_8020) != 0x8d69
-        || rom.image()[0x03_8d6b] != 0xfd
-        || pointer(0x03_8d6f) != 0x84_a129
-        || word(0x04_a12a) & 0x0400 == 0
-    {
-        return Err(invalid("unqualified departure/spawn/arrival profile").into());
-    }
-    let reverse = lists[1]
-        .select(384, 320)
-        .ok_or_else(|| invalid("missing reverse semantic doorway"))?;
-    if reverse.direct_destination() != Ok(15)
-        || reverse.transition_mode() != 0
-        || reverse.selector() != 6
-        || reverse.destination_position() != (384, 176)
-        || (word(0x0d_899d), word(0x0d_899f)) != (0, 16)
-        || pointer(0x0d_896a) != 0x84_b979
-        || word(0x04_880a) != 0xbb74
-        || word(0x03_801e) != 0x8d1e
-        || rom.image()[0x03_8d20] != 0xfd
-        || pointer(0x03_8d24) != 0x84_a129
-    {
-        return Err(invalid("unqualified reverse departure/spawn/arrival profile").into());
-    }
-    let mut content = Vec::new();
-    for room in rooms.iter().chain(std::iter::once(&new_game.bedroom)) {
-        content.extend(room.width().to_le_bytes());
-        content.extend(room.height().to_le_bytes());
-        for &cell in room.cells() {
-            content.extend(cell.to_le_bytes());
-        }
-    }
-    for list in &lists {
-        content.extend(list.source_bytes());
-    }
-    content.extend(new_game.position.0.to_le_bytes());
-    content.extend(new_game.position.1.to_le_bytes());
-    content.extend(startup.events); // source-derived reset/default/semantic intro completion
-    content.push(1); // explicit passive collision policy; Room::new is not equivalent
-    content.extend([1, room_core::slice::PROFILE_VERSION, 0, 1]); // slice/profile/no-RNG/policy versions
-    content.extend(queue.0.to_le_bytes());
-    content.extend(queue.1.to_le_bytes());
-    let identity = DataIdentity {
-        rom_sha256: rom::digests(rom.image()).sha256,
-        content_sha256: rom::digests(&content).sha256,
-    };
-    Ok(GameData::new(rooms, exits, identity, new_game)?)
+    crate::house_navigation::compile(rom)
 }
 
 pub(super) fn verify(rom: &Rom) -> Result<Value> {
