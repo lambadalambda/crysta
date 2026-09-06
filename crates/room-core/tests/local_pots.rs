@@ -1,5 +1,5 @@
 //! Optional exact-original contiguous native pot segments; private grids are TEST
-//! collision oracles only, never a production initializer. Set PANDORA_POT_FIXTURES.
+//! collision oracles only, never a production initializer. Set `PANDORA_POT_FIXTURES`.
 use room_core::pots::{Admission, Input, Phase, PotState, SourceObject};
 use room_core::{Direction, Room, WalkingState};
 use std::{
@@ -39,12 +39,13 @@ fn direction(d: u32) -> Direction {
     }
 }
 #[test]
+#[allow(clippy::too_many_lines)] // Keep each authenticated replay's per-frame assertions together.
 fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
-    let Ok(root) = std::env::var("PANDORA_POT_FIXTURES") else {
+    let Ok(fixture_dir) = std::env::var("PANDORA_POT_FIXTURES") else {
         eprintln!("SKIP private native pots: set PANDORA_POT_FIXTURES");
         return;
     };
-    let root = Path::new(&root);
+    let fixture_dir = Path::new(&fixture_dir);
     let mut total_hits = 0;
     for (name, csv_pin, grid_pin, expected_hit, expected_slot) in [
         (
@@ -69,7 +70,7 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
             0x98f,
         ),
     ] {
-        let grid = read_pin(&root.join(format!("{name}.grid")), grid_pin);
+        let grid = read_pin(&fixture_dir.join(format!("{name}.grid")), grid_pin);
         let cells: Vec<u16> = grid
             .chunks_exact(2)
             .map(|b| u16::from_le_bytes([b[0], b[1]]))
@@ -94,7 +95,8 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
             cellar_up_lanes: true,
             door_hit_enabled: true,
         };
-        let csv = String::from_utf8(read_pin(&root.join(format!("{name}.csv")), csv_pin)).unwrap();
+        let csv =
+            String::from_utf8(read_pin(&fixture_dir.join(format!("{name}.csv")), csv_pin)).unwrap();
         let mut rows = csv.lines().map(|line| {
             line.split(',')
                 .map(|s| s.parse::<u32>().unwrap())
@@ -141,25 +143,27 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
                 "{name} frame{frame} control"
             );
             let script = match state.phase() {
-                Phase::Empty => 0x84a258,
+                Phase::Empty => 0x0084_a258,
                 Phase::Lifting => {
                     if state.phase_tick() < 22 {
-                        0x84be9d
+                        0x0084_be9d
                     } else {
-                        0x84bea1
+                        0x0084_bea1
                     }
                 }
                 Phase::Held => {
                     if out.control == 0 {
-                        [0x84b4cd, 0x84b4df, 0x84b4fc, 0x84b4fc][state.facing() as usize]
+                        [0x0084_b4cd, 0x0084_b4df, 0x0084_b4fc, 0x0084_b4fc]
+                            [state.facing() as usize]
                     } else {
-                        [0x84b50d, 0x84b51e, 0x84b533, 0x84b533][state.facing() as usize]
+                        [0x0084_b50d, 0x0084_b51e, 0x0084_b533, 0x0084_b533]
+                            [state.facing() as usize]
                     }
                 }
                 Phase::Throwing => match state.phase_tick() {
-                    0..=29 => 0x84b558,
-                    30 => 0x84b55c,
-                    31 => 0x84a318,
+                    0..=29 => 0x0084_b558,
+                    30 => 0x0084_b55c,
+                    31 => 0x0084_a318,
                     _ => unreachable!(),
                 },
             };
@@ -171,7 +175,7 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
                 // Source STZ0988 executes in the native break script, not release.
                 assert_eq!(
                     state.reserved_slot_in(&admission).is_some(),
-                    row[9] == 0x84c721
+                    row[9] == 0x0084_c721
                 );
                 assert_eq!(state.held_slot_in(&admission), None);
             }
@@ -181,17 +185,24 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
                     (row[7], row[8]),
                     "{name} frame{frame} flight"
                 );
-                assert_eq!(row[9], 0x84c721);
+                assert_eq!(row[9], 0x0084_c721);
                 flights += 1;
             }
             assert_eq!(
                 out.flight.is_some(),
-                row[9] == 0x84c721,
+                row[9] == 0x0084_c721,
                 "{name} frame{frame} flight admission"
             );
             if out.door_hit {
                 assert_eq!(frame, expected_hit);
-                assert_eq!(row[11], if name == "fa-hit" { 0x88abac } else { 0x88abde });
+                assert_eq!(
+                    row[11],
+                    if name == "fa-hit" {
+                        0x0088_abac
+                    } else {
+                        0x0088_abde
+                    }
+                );
                 hits += 1;
             }
             if out.consumed_cell.is_some() {
@@ -202,7 +213,7 @@ fn original_lift_carry_release_flight_and_two_contacts_without_teleports() {
             }
             if out.control_restored {
                 recovery += 1;
-                assert_eq!(row[6], 0x84a258);
+                assert_eq!(row[6], 0x0084_a258);
             }
         }
         assert_eq!((consumes, releases, recovery), (1, 1, 1));
