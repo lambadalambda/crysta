@@ -60,3 +60,5 @@
 - [x] [Decode the required Pandora actors and carrying poses](issues/decode-pandora-scene-art.md)
 
 - [x] [Render bounded Pandora source scenes in the preview](issues/render-pandora-source-scenes.md)
+
+- [x] [Renew map-inspector fixture for completed video publication](issues/renew-map-inspector-observer-fixture.md)

@@ -118,7 +118,6 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
-- [Renew map-inspector fixture for completed video publication](issues/renew-map-inspector-observer-fixture.md)
 - [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
 - [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
 - [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)

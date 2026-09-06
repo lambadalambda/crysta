@@ -45,3 +45,11 @@ The existing SRAM-based local capture integration test has an old threaded-obser
   (49 unit + 10 integration); Python gates pass 13 tests in each mode; all ten
   targeted mutations are detected normally and under `-O` (20/20).
 - Parent owns index closure/integration. Other legacy wrappers remain unrenewed.
+
+## Parent acceptance
+
+- Parent independently recomputed the retained old/fixed/twin audit normally and optimized; both outputs exactly match the reviewed `migration.json`. Reports: `local/map-inspector-renewal/parent-audit{,-O}.json`.
+- All 13 validator tests pass normally/optimized and 20/20 mutations are detected. The rebuilt parent full `map-inspector` suite passes with owned inputs: 51 unit + 10 integration tests, including actual native RGB/nonpixel capture validation. Log: `local/map-research/pandora-parent-full-host.txt`. The initial 120-second orchestration deadline interrupted a later long opening test; the complete rerun with an adequate deadline passed, rather than counting the interrupted run as green.
+- A trivial formatting-allocation lint in the new test hash helper was corrected without changing pins/assertions; local capture tests and strict workspace Clippy pass afterward.
+- Reviewed scope and all nonpixel/input/save/conversion invariants remain unchanged. This supersedes the earlier red SRAM-fixture status in the Pandora observer audit and component handoffs. Other legacy wrappers remain explicitly unrenewed.
+- Issue archived; this fixture renewal does not enable portable Pandora gameplay.

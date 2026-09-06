@@ -138,3 +138,14 @@ archived nonpixel digest, with a ROM-free exact source-inventory/hash test.
 
 Other legacy wrappers remain audited but **unrenewed**. Shared issue-index
 closure and parent integration remain parent-owned.
+
+## Parent acceptance
+
+The parent independently recomputed both audit modes and matched `migration.json`,
+reran 13 tests per mode and detected all20 mutations. Its rebuilt complete host
+suite passed 51 unit +10 integration tests with owned inputs; the capture test and
+strict workspace Clippy also passed after a hash-helper allocation lint correction.
+Reports are retained in `terranigma/local/map-inspector-renewal/`; the full suite
+log is `terranigma/local/map-research/pandora-parent-full-host.txt`. The dedicated
+renewal issue is accepted; earlier SRAM-red handoff statements are historical.
+Other wrappers and portable Pandora gameplay are not accepted by this result.
