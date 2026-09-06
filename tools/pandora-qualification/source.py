@@ -84,6 +84,13 @@ def project(data):
     require(s.u(0x838ec2, 3) == 0x88b61e, 'map13 resident header')
     s.expect(0x88b63b, [2, 0x21])
     require(s.u(0x88b63d) == 0xb653, 'map13 callback registration')
+    s.expect(0x8d8735, [0x20, 0xed, 0x8a])
+    s.expect(0x8d8af9, [0xa2, 0, 0])
+    for a, word in [(0x8d8b0b, 0x6c0), (0x8d8b0e, 0x6c2), (0x8d8b11, 0x640)]:
+        s.expect(a, [0x8e])
+        require(s.u(a + 1) == word, 'room-local reset destination')
+    s.expect(0x8796ac, [0xa9])
+    s.expect(0x8796b4, [0xa9])
     # Conditional membership, not an invented flag-to-open subscription.
     require(s.u(s.cop(0x88aaee, 0x48)) == 0x0028, 'door requires event28')
     require(s.u(s.cop(0x88aaf2, 0x48)) == 0x8292, 'door rejects opened event292')
@@ -109,18 +116,21 @@ def project(data):
     palettes = [s.palette(a) for a in range(0x89d26c, 0x89d29d, 7)]
     requests = [0x88b673, 0x88b67f, 0x88b691, 0x88b69c,
                 0x889ae9, 0x889afb, 0x889b11, 0x889b24, 0x889b3a, 0x889da9,
-                0x88abbc, 0x889b9f, 0x889bc2, 0x889bef, 0x889c10,
+                0x88abbc, 0x889b9f, 0x889bc2, 0x889bef, 0x889c10, 0x88a241, 0x88a3d9,
                 0x88ad95, 0x88adb7, 0x88ae77, 0x88ae85, 0x88ae93, 0x88aea1,
                 0x89d3e0, 0x89d3f4, 0x89d408, 0x89d41c, 0x89d430, 0x89d444,
                 0x89d458, 0x89d470, 0x89d48b, 0x89d4a4, 0x89d4ae,
                 0x89d4c9, 0x89d4d3, 0x89d4ee, 0x89d4f8]
     flags = [0x88b697, 0x88b6a2, 0x889adb, 0x889daf, 0x88aba2, 0x88abc6,
              0x88abd1, 0x88abee, 0x889ba9, 0x889bcc, 0x889bf5,
+             0x889d1f, 0x889d4f, 0x88a252, 0x88a3f5,
              0x88ad69, 0x88adc5, 0x88ad4f, 0x88ae7d, 0x88ae8b, 0x88ae99,
              0x89d508, 0x89d495]
     ranges = [
         (0x838eab, 0x838eea), (0x88b61e, 0x88b6c7),
         (0x838bf0, 0x838c4d), (0x889a6a, 0x889dc3), (0x88aaee, 0x88acd3),
+        (0x88a1a4, 0x88a295), (0x88a321, 0x88a420),
+        (0x8d8720, 0x8d8770), (0x8d8aed, 0x8d8b30),
         (0x838cfa, 0x838d1e), (0x83923a, 0x8392b4),
         (0x88acfa, 0x88adcb), (0x88ae64, 0x88afa6),
         (0x839527, 0x839637), (0x89d24e, 0x89d50f),
@@ -146,6 +156,8 @@ def project(data):
                                      0x818dfe, 0x818e0a, 0x818df1, 0x818e2f, 0x818fc1]],
         'layers': [s.layer(a) for a in [0x9884c6, 0x988458, 0x9885ed, 0x9885f9,
                                        0x98831c, 0x988338, 0x988340, 0x988348]],
+        'room_local_reset': {'caller': 0x8d8735, 'entry': 0x8d8aed,
+                             'zero_words': [0x6c0, 0x6c2, 0x640]},
         'resident13': {'source': 0x838ebe, 'position': [360, 128], 'callback': 0x88b653,
                        'descriptor': s.u(0x838ec5, 3)},
         'choices': [s.choice(a) for a in [0x88b679, 0x88b685, 0x889b17, 0x889b40]],
@@ -154,7 +166,8 @@ def project(data):
         'door': {'source': 0x838c32, 'position': [184, 352], 'entry': 0x88aaee,
                  'hit_callback': 0x88ab81, 'counter': 0x640, 'increment_bcd': s.u(0x88ab84),
                  'hit_cases': hit_cases, 'patches': patches,
-                 'lift_tiles': [0xfa], 'lift_entry': 0x879683, 'held_slot': 0x98a},
+                 'admitted_lift_tiles': [0xfa, 0xfb], 'lift_entry': 0x879683,
+                 'held_slots': [s.u(0x8796ad), s.u(0x8796b5)]},
         'transitions': [s.transition(a) for a in [0x88ad53, 0x88aeab, 0x89d476,
                                                  0x89d4b4, 0x89d4d9, 0x89d4fe]],
         'interior_setup': {'controller': 0x89d24e, 'graphics': graphics, 'palettes': palettes},

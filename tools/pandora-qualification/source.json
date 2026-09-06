@@ -252,6 +252,15 @@
       "pointer": 11578053
     }
   ],
+  "room_local_reset": {
+    "caller": 9275189,
+    "entry": 9276141,
+    "zero_words": [
+      1728,
+      1730,
+      1600
+    ]
+  },
   "resident13": {
     "source": 8621758,
     "position": [
@@ -363,6 +372,14 @@
     {
       "source": 8952848,
       "request": 8953354
+    },
+    {
+      "source": 8954433,
+      "request": 8954517
+    },
+    {
+      "source": 8954841,
+      "request": 8954912
     },
     {
       "source": 8957333,
@@ -506,6 +523,26 @@
       "set": true
     },
     {
+      "source": 8953119,
+      "event": 4,
+      "set": true
+    },
+    {
+      "source": 8953167,
+      "event": 6,
+      "set": true
+    },
+    {
+      "source": 8954450,
+      "event": 8,
+      "set": true
+    },
+    {
+      "source": 8954869,
+      "event": 9,
+      "set": true
+    },
+    {
       "source": 8957289,
       "event": 1,
       "set": true
@@ -610,11 +647,15 @@
         "delay": 1
       }
     ],
-    "lift_tiles": [
-      250
+    "admitted_lift_tiles": [
+      250,
+      251
     ],
     "lift_entry": 8885891,
-    "held_slot": 2442
+    "held_slots": [
+      2442,
+      2447
+    ]
   },
   "transitions": [
     {
@@ -751,6 +792,26 @@
       "start": 8956654,
       "end": 8957139,
       "sha256": "c4d7cfa97d962ab9e660d5ce3ef6a1de26f58e4c044d3ca7f7c5a8947a60d56b"
+    },
+    {
+      "start": 8954276,
+      "end": 8954517,
+      "sha256": "fc683b3b8c24ec87baceb03d43c852ce2266f192f288dee99deacbc96904b155"
+    },
+    {
+      "start": 8954657,
+      "end": 8954912,
+      "sha256": "cdfddc477e3bd3dcab37909e6e1bf2bd0f9b979b0a1e2ac3c7c9bf9387e0c4aa"
+    },
+    {
+      "start": 9275168,
+      "end": 9275248,
+      "sha256": "f090e2b476d17995e38370715c834e374ff1542221c76870e281f8135c0a3a42"
+    },
+    {
+      "start": 9276141,
+      "end": 9276208,
+      "sha256": "a42e5dcef6113afb56cc4a842661c79beee1ad5ad83960391fd64818608e99e4"
     },
     {
       "start": 8621306,
