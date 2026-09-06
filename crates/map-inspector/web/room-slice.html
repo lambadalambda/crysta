@@ -228,13 +228,16 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     const [cx, cy] = state.camera;
     if (image) ctx.drawImage(image, cx, cy, 256, 224, 0, 0, 256, 224);
     if (actor) {
-      // The asset adapter supplies a composed raster and its original anchor.
-      // Mirroring is around the player, not the cropped image's left edge.
-      const [sx, sy, width, height] = actor.source;
-      ctx.save(); ctx.translate(state.x - cx, state.y - cy);
-      if (actor.flipX) ctx.scale(-1, 1);
-      ctx.drawImage(actor.image, sx, sy, width, height, actor.offset[0], actor.offset[1], width, height);
-      ctx.restore();
+      // The adapter supplies ordered, composed rasters and world anchors.
+      // Native mirrors are precomposed; diagnostic flipX is anchor-relative.
+      for (const sprite of Array.isArray(actor) ? actor : [actor]) {
+        const [sx, sy, width, height] = sprite.source;
+        const [x, y] = sprite.position || [state.x, state.y];
+        ctx.save(); ctx.translate(x - cx, y - cy);
+        if (sprite.flipX) ctx.scale(-1, 1);
+        ctx.drawImage(sprite.image, sx, sy, width, height, sprite.offset[0], sprite.offset[1], width, height);
+        ctx.restore();
+      }
       if (foreground) ctx.drawImage(foreground, cx, cy, 256, 224, 0, 0, 256, 224);
       return;
     }
@@ -277,8 +280,21 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (!actor || !art.foreground[state.map_id]) throw new Error('Unsupported sprite or background key');
     return actor;
   }
+  function selectActors(art, state) {
+    selectActor(art, state); // Player and background remain mandatory.
+    const scene = state.scene;
+    if (!Array.isArray(scene) || scene.length < 1 || scene.length > 2 ||
+        scene.some(entry => !entry || !art.actors[entry.key] || !Array.isArray(entry.position) ||
+          entry.position.length !== 2 || !entry.position.every(v => Number.isInteger(v) && v >= 0 && v <= 65535)) ||
+        new Set(scene.map(entry => entry.key)).size !== scene.length ||
+        !scene.some(entry => entry.key === state.actor_key && entry.position[0] === state.x && entry.position[1] === state.y)) {
+      throw new Error('Unsupported sprite scene');
+    }
+    // Native adapter owns scene membership and painter order, not the client.
+    return scene.map(entry => ({...art.actors[entry.key], position:entry.position}));
+  }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor};
+  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
@@ -291,6 +307,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       $('position').textContent = `${state.x}, ${state.y}`; $('camera').textContent = state.camera.join(', ');
       $('tick').textContent = String(state.tick); $('phase').textContent = state.phase;
       $('actor-key').textContent = state.actor_key || 'unavailable';
+      canvas.dataset.scene = JSON.stringify(state.scene);
     }
     $('error').textContent = assetError || error || '';
     $('status').textContent = note + (busy ? ' Waiting for host…' : '');
@@ -304,7 +321,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
     if (ready && state) {
       try {
-        drawScene(ctx, image, state, selectActor(art, state), art.foreground[state.map_id]);
+        drawScene(ctx, image, state, selectActors(art, state), art.foreground[state.map_id]);
         assetError = null; $('error').textContent = error || '';
       }
       catch (failure) {

@@ -69,9 +69,11 @@ impl Preview {
     }
     pub(super) fn state(&self) -> Value {
         let output = self.state.output();
+        let actor_key = crate::room_art::frame_key(output.animation);
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
-            "actor_key":crate::room_art::frame_key(output.animation),
+            "actor_key":actor_key,
+            "scene":[{"key":actor_key,"position":[output.position.0,output.position.1]}],
             "animation":{"set":match output.animation.set {
                 room_core::AnimationSet::Standing=>"standing",room_core::AnimationSet::Walking=>"walking"},
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
@@ -412,6 +414,10 @@ mod tests {
         let state = preview.state();
         let key = crate::room_art::frame_key(output.animation);
         assert_eq!(state["actor_key"], key);
+        assert_eq!(
+            state["scene"],
+            json!([{ "key":key, "position":[output.position.0,output.position.1] }])
+        );
         assert!(art["frames"].get(&key).is_some(), "missing {key}");
         assert_eq!(state["animation"]["sequence"], output.animation.sequence);
         assert_eq!(state["animation"]["record"], output.animation.record);

@@ -38,17 +38,30 @@
     const [cx,cy]=$('camera').textContent.split(', ').map(Number);
     const map=parseInt($('map').textContent.slice(1),16), mask=masks[map];
     const actual=$('room').getContext('2d').getImageData(0,0,256,224).data;
+    const scene=JSON.parse($('room').dataset.scene);
+    if(!scene.some(entry=>entry.key===actorKey && entry.position[0]===px && entry.position[1]===py)) {
+      throw new Error('Scene omitted or misplaced Ark');
+    }
+    const sprites=scene.map(entry=>({frame:art.frames[entry.key],position:entry.position,key:entry.key}));
+    for(const sprite of sprites) {
+      if(!sprite.frame) throw new Error(`Missing scene sprite ${sprite.key}`);
+      visualKeys.add(sprite.key);
+    }
     for(let y=0;y<224;y++) for(let x=0;x<256;x++) {
-      const world=(y+cy)*sheet.width+x+cx, bg=world*4;
-      const sx=x+cx-px-actor.offset[0], sy=y+cy-py-actor.offset[1];
-      const src=(sy*actor.width+sx)*4;
-      const opaque=sx>=0 && sy>=0 && sx<actor.width && sy<actor.height && actor.rgba[src+3]===255 && !mask[world];
+      const world=(y+cy)*sheet.width+x+cx;
+      let pixels=background, at=world*4;
+      if(!mask[world]) for(const {frame,position} of sprites) {
+        const sx=x+cx-position[0]-frame.offset[0], sy=y+cy-position[1]-frame.offset[1];
+        const src=(sy*frame.width+sx)*4;
+        if(sx>=0 && sy>=0 && sx<frame.width && sy<frame.height && frame.rgba[src+3]===255) {
+          pixels=frame.rgba; at=src;
+        }
+      }
       for(let c=0;c<4;c++) {
-        const expected=opaque?actor.rgba[src+c]:background[bg+c];
-        if(actual[(y*256+x)*4+c]!==expected) throw new Error(`Canvas mismatch tick ${$('tick').textContent}, key ${actorKey}, pixel ${x},${y}, channel ${c}`);
+        if(actual[(y*256+x)*4+c]!==pixels[at+c]) throw new Error(`Canvas mismatch tick ${$('tick').textContent}, pixel ${x},${y}, channel ${c}`);
       }
     }
-    visualKeys.add(actorKey); visualChecks++;
+    visualChecks++;
   }
   checkPixels();
   // Fresh control witness, then repeated directions to the covered doorway pair.

@@ -10,7 +10,7 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1);
 const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
-const {createController, bindInputs, drawScene, prepareArt, selectActor} = sandbox.RoomSlice;
+const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0]});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
@@ -48,7 +48,7 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0'} = {}) {
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false} = {}) {
   const elements = new Map(), timers = new Map(); let timerId = 0, key = actorKey;
   const context = {fillRect(){},drawImage(){},save(){},restore(){},translate(){},putImageData(){},
     getImageData(){return {width:512,height:1024,data:new Uint8ClampedArray(512*1024*4)};}};
@@ -68,10 +68,11 @@ function browserHarness({stallBitmap = false, actorKey = '0:0'} = {}) {
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
-    async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key};}};},
+    async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
+      scene:[{key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
-  return {element,timers,setKey(value){key=value;}};
+  return {element,timers,setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
   const recovery = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
@@ -88,6 +89,19 @@ async function main() {
   recoveredDemo.setKey('0:0'); recoveredDemo.element('demo').emit('click'); await flush();
   assert.equal(recoveredDemo.element('error').textContent, '');
   assert.equal(recoveredDemo.timers.size, 1, 'valid demo replacement must retain autoplay intent');
+  for (const validStart of ['new-game','demo']) {
+    const badScene = browserHarness({invalidScene:true}); await flush(); await flush();
+    assert.match(badScene.element('error').textContent, /scene/i);
+    for (const control of ['new-game','demo']) {
+      badScene.element(control).emit('click'); await flush();
+      assert.equal(badScene.element('pause').disabled, true);
+      assert.equal(badScene.timers.size, 0, 'invalid scene cannot start stepping');
+    }
+    badScene.fixScene(); badScene.element(validStart).emit('click'); await flush();
+    assert.equal(badScene.element('error').textContent, '');
+    assert.equal(badScene.element('pause').disabled, false);
+    assert.equal(badScene.timers.size, validStart==='demo'?1:0);
+  }
   const stalled = browserHarness({stallBitmap:true}); await flush();
   const deadlines=[...stalled.timers.values()].filter(t => t.ms===5000);
   assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
@@ -324,6 +338,19 @@ async function main() {
     ['draw',texture,16,32,24,32,-10,-28,24,32], ['restore'],
   ]);
 
+  // Ordered scene entries have independent world anchors, not player-relative positions.
+  spriteCalls.length = 0;
+  const npcTexture = {}, foregroundTexture = {};
+  drawScene(spriteCtx, image, {...initial(),x:392,y:353,camera:[256,256]}, [
+    {...actor,image:npcTexture,position:[320,336]}, actor,
+  ], foregroundTexture);
+  assert.deepEqual(spriteCalls, [
+    ['draw',image,256,256,256,224,0,0,256,224],
+    ['save'], ['translate',64,80], ['draw',npcTexture,16,32,24,32,-10,-28,24,32], ['restore'],
+    ['save'], ['translate',136,97], ['draw',texture,16,32,24,32,-10,-28,24,32], ['restore'],
+    ['draw',foregroundTexture,256,256,256,224,0,0,256,224],
+  ]);
+
   // Real asset adapter: pre-mirrored bounds, transparent gaps, and high-only occlusion.
   const rgba = [10,20,30,255, 40,50,60,255, 70,80,90,255, 100,110,120,255];
   const bundle = {schema_version:1, frames:{'2:1':{width:2,height:2,offset:[-9,-31],rgba}},
@@ -341,6 +368,22 @@ async function main() {
   spriteCalls.length = 0;
   drawScene(spriteCtx, image, initial(), selected, art.foreground['15']);
   assert.equal(spriteCalls.at(-1)[1], art.foreground['15'], 'opaque high background is drawn after Ark');
+  const sceneArt = {...art,actors:{...art.actors,'npc:house':selected}};
+  const sceneState = {...initial(),actor_key:'2:1',scene:[
+    {key:'npc:house',position:[320,336]}, {key:'2:1',position:[472,176]},
+  ]};
+  const entries = selectActors(sceneArt,sceneState);
+  assert.deepEqual(Array.from(entries[0].position), [320,336]);
+  assert.deepEqual(Array.from(entries[1].position), [472,176]);
+  for(const scene of [[],null,[{key:'2:1',position:[0,0]}],
+    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[-1,336]}],
+    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[320,65536]}],
+    [{key:'2:1',position:[472,176]}, {key:'npc:house',position:[320]}],
+    [sceneState.scene[0],sceneState.scene[1],sceneState.scene[0]],
+    [{key:'missing',position:[472,176]}],
+    [{key:'2:1',position:[472,176]},{key:'2:1',position:[472,176]}]]) {
+    assert.throws(()=>selectActors(sceneArt,{...sceneState,scene}),/scene|sprite/i);
+  }
   assert(!html.includes('Cyan box ='));
 
   assert(html.includes('Experimental semantic preview — reference-qualified walking; doorway timing simplified; no original CPU'));
