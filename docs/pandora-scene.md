@@ -235,3 +235,27 @@ carry-choice and review-driven malformed-operand tests went red then green;
 Python native OAM/VRAM/CGRAM/anchor/size mutations and six phase mutations are
 nonvacuous. Replacing the native checker with a no-op makes its test fail.
 Independent source/API and evidence-tool reviews are recorded in the owned issue.
+
+## Opt-in preview atlas adapter
+
+`room_art::compile_profile(rom, true)` retains every old house/Ark raster and adds
+all **482** mirrored Pandora rasters under source/list/record/mirror keys. Its
+`pandora_scenes` manifest retains all **33** finite source phases, instance IDs,
+positions/source operands, selectors, source tie ranks, explicit OBJ priority and
+omission labels. `scene_phase` rejects unknown phases and phase/map mismatches;
+ordinary house scene output is unchanged. Phase records currently select source
+record0: this is **not scripted-motion or animation-timing implementation**.
+
+The live preview still calls `compile_profile(..., false)`. The opt-in artifact
+is an integration component, not a Pandora-capable browser renderer: new map
+sheets, core-driven phase/carry selection, and priority3-versus-background
+composition must be wired before enablement. In particular OBJ priority is a
+background comparison property, not permission to reorder overlapping actors.
+Held composition anchors already include elevation; the adapter adds no offset.
+
+Parent independently exported and checked all resources, 18 native art witnesses,
+24 phase witnesses and six phase mutation controls against the fixed observer
+capture `local/oracle-video-qualification/replay-WKFf0d/a/journey` in normal and
+optimized Python. `local/pandora-scene-qualification/parent-root.txt` names the
+private export; `local/map-research/pandora-scene-parent.txt` retains the results.
+This does not substitute for the separate full-route observer fixture migration.

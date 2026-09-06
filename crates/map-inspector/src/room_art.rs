@@ -1,6 +1,7 @@
 //! Immutable, bounded art adapter for the ordinary house preview.
 
 mod door;
+mod pandora;
 
 use crate::{invalid, Result};
 use assets::{
@@ -31,10 +32,32 @@ struct RoomActors {
 pub(super) struct Art {
     pub(super) bytes: Vec<u8>,
     rooms: BTreeMap<u16, RoomActors>,
+    pandora: Option<pandora::Presentation>,
 }
 impl Art {
     pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
-        let room = self.rooms.get(&map).expect("game map has a compiled scene");
+        self.scene_phase(map, None, key, position)
+            .expect("game map has a compiled scene")
+    }
+
+    pub(super) fn scene_phase(
+        &self,
+        map: u16,
+        phase: Option<&str>,
+        key: &str,
+        position: (u16, u16),
+    ) -> Result<Value> {
+        if let Some(phase) = phase {
+            return self
+                .pandora
+                .as_ref()
+                .ok_or_else(|| invalid("Pandora art capability absent"))?
+                .scene(map, phase, key, position);
+        }
+        let room = self
+            .rooms
+            .get(&map)
+            .ok_or_else(|| invalid("game map has no compiled scene"))?;
         let mut entries: Vec<_> = room
             .actors
             .iter()
@@ -54,7 +77,9 @@ impl Art {
         // Ordinary depth uses world Y before anchor subtraction. Neither IDs,
         // resource reuse nor source-spawn order defines equal-Y precedence.
         entries.sort_by_key(|(y, tie, _)| (*y, *tie));
-        Value::Array(entries.into_iter().map(|(_, _, entry)| entry).collect())
+        Ok(Value::Array(
+            entries.into_iter().map(|(_, _, entry)| entry).collect(),
+        ))
     }
 }
 fn membership(rooms: &BTreeMap<u16, RoomActors>) -> Value {
@@ -180,10 +205,7 @@ fn ark_frames(rom: &rom::Rom) -> Result<serde_json::Map<String, Value>> {
     Ok(frames)
 }
 
-pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
-    let mut frames = ark_frames(rom)?;
-    let dialogue = crate::room_dialogue::compile(rom)?;
-    let scenes = HouseScenes::from_rom(rom.image())?;
+fn house_rooms() -> BTreeMap<u16, RoomActors> {
     let mut rooms = crate::house_profiles::MAPS
         .into_iter()
         .map(|map| {
@@ -207,6 +229,22 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
             ark_tie_rank: 0,
         },
     );
+    rooms
+}
+
+pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
+    compile_profile(rom, false)
+}
+
+pub(super) fn compile_profile(rom: &rom::Rom, include_pandora: bool) -> Result<Art> {
+    let mut frames = ark_frames(rom)?;
+    let dialogue = if include_pandora {
+        crate::room_dialogue::compile_profile(rom, true)?
+    } else {
+        crate::room_dialogue::compile(rom)?
+    };
+    let scenes = HouseScenes::from_rom(rom.image())?;
+    let mut rooms = house_rooms();
     let mut actors = Vec::new();
     for actor in scenes.actors() {
         // Instance-keyed rasters deliberately avoid assuming pose identity alone
@@ -272,14 +310,25 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
         .keys()
         .map(|&map| (map, if map == 10 { "exterior" } else { "house" }))
         .collect();
-    Ok(Art {
-        bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
+    let (pandora, phase_manifest) = if include_pandora {
+        let (presentation, manifest) = pandora::compile(rom, &mut frames)?;
+        (Some(presentation), Some(manifest))
+    } else {
+        (None, None)
+    };
+    let mut bundle = json!({"schema_version":1,"frames":frames,
             "scene_ids":membership(&rooms),"actors":actors,"foreground":masks,
             "backgrounds":backgrounds,"background_keys":background_keys,"door_background":"house",
             "door_patches":door::compile(rom.image(), &bedroom)?,
             "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests,
-            "dialogue_choice_contexts":dialogue.choice_contexts}))?,
+            "dialogue_choice_contexts":dialogue.choice_contexts});
+    if let Some(manifest) = phase_manifest {
+        bundle["pandora_scenes"] = manifest;
+    }
+    Ok(Art {
+        bytes: serde_json::to_vec(&bundle)?,
         rooms,
+        pandora,
     })
 }
 
@@ -299,6 +348,7 @@ mod tests {
         };
         let art = Art {
             bytes: Vec::new(),
+            pandora: None,
             rooms: BTreeMap::from([
                 (
                     15,
@@ -359,6 +409,7 @@ mod tests {
     fn frozen_npc_membership_and_native_depth_tie() {
         let art = Art {
             bytes: Vec::new(),
+            pandora: None,
             rooms: BTreeMap::from([
                 (
                     15,
