@@ -27,5 +27,3 @@
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
 - [ ] [Complete the fresh house scene with all residents](issues/complete-house-scene-setup.md)
-- [ ] [Decode the complete ordinary house actor set](issues/decode-house-scene-actors.md)
-- [ ] [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)

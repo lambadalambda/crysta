@@ -25,3 +25,10 @@ Extend the playable house from F/10 to fresh rooms B,C,D,F,10,11, retaining the 
 ## Notes
 
 - Subissue of [complete fresh house setup](complete-house-scene-setup.md).
+
+## Completion
+
+- Six-room immutable core and authenticated host compiler now cover the full source-ordered internal graph, preserve the prior511-step route, and retain the wooden-door patch in profile8 snapshots.
+- The atomic one-shot door action has source-derived collision and complete metatile visual replacements; no entry dialogue or event0026 grant is invented. Exterior/cellar gates remain closed.
+- Parent independently repeated four fresh native runs at ignored `local/house-navigation-qualification/replay-xF3xFu`, including374 ordinary-owned walking comparisons. The2,244-step CPU-free core and host routes check all six rooms,15 checkpoints, every-step restored continuation and reset.
+- Core/host/visual independent reviews, synthetic atomicity/source-mutation tests, required authenticated legacy route fixtures, strict Clippy and Wasm build pass. See `docs/house-navigation.md`; whole-house browser acceptance remains tracked by the umbrella issue.

@@ -41,3 +41,5 @@
 - [x] [Render the first NPC in the adjoining house room](issues/render-first-house-npc.md)
 - [x] [Qualify the fresh house room and actor roster](issues/qualify-house-scene-roster.md)
 - [x] [Qualify complete house background profiles](issues/qualify-house-background-profiles.md)
+- [x] [Decode the complete ordinary house actor set](issues/decode-house-scene-actors.md)
+- [x] [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)
