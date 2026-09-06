@@ -225,6 +225,8 @@ impl Preview {
 }
 
 #[cfg(test)]
+mod cadence_tests;
+#[cfg(test)]
 mod pandora_tests;
 
 #[cfg(test)]
