@@ -78,7 +78,7 @@ See main's corrected `docs/pandora-navigation.md` source contract (e98a7cc).
 
 `MotionSpec { key, trigger, frames }` holds at most4096 logical samples; ordinary
 exits require exact triggers. Ambiguous same-map/same-anchor travel pairs are
-rejected. `MotionFrame { map_id, anchor, reload, scene }` carries compiler-qualified
+rejected. `MotionFrame { map_id, pose, reload, scene }` carries compiler-qualified
 samples. Load motions contain exactly one explicit reload marker, even for 21→21.
 Map membership and pose bounds are checked. Missing cue motions reject the whole
 action atomically; there are **no fallback timers, inferred stairs or teleports**.
@@ -95,6 +95,19 @@ Only preceding samples expose their supplied `scene`. A one-sample motion theref
 performs its endpoint/continuation atomically; it does not display a separate
 terminal actor frame. This policy is tested and adds no unqualified trailing wait.
 These logical samples are not a claim of native scheduler/video-frame fidelity.
+
+`MotionFrame.pose` is `MotionPose::Absolute(Anchor)` or
+`MotionPose::Preserve { facing: Option<Direction> }`. Preserve is allowed only for
+non-reloading cue samples; it retains the active player coordinates, and `None`
+also retains facing. This is Ark's pose, never a moving resident/guide's position.
+For `BoxAcquireControl`, the compiler can supply Preserve with stationary Down on
+successful completion without teleporting from the rectangular, any-facing gate.
+The source-qualified completed-recoil result clears `$097C`; only the admitted
+ordinary grounded walking/neutral and warning subset preserves that readiness
+certificate. The compiler authenticates this closed-subset assertion; core does
+not infer readiness from elapsed time, proximity, or the installed Down facing.
+Missing readiness data still fail closed. This API/schema change requires a new
+aggregate content identity; profile11 snapshots are intentionally not accepted.
 
 ## Host actions and presentation
 
@@ -182,7 +195,7 @@ map41, **not** equipment acquisition, free inventory-room transitions or world r
 ## Canonical snapshots
 
 Disabled data retain the exact **181-byte version1/profile9** encoding. Opt-in data
-use **320-byte version3/profile11**, bound to the same aggregate identity and tick:
+use **320-byte version4/profile12**, bound to the same aggregate identity and tick:
 
 | Byte range | Meaning |
 |---|---|
@@ -192,8 +205,9 @@ use **320-byte version3/profile11**, bound to the same aggregate identity and ti
 | 249..252 | Motion index/next-sample cursor;255/0 means none |
 | 252..292 | Existing POT1 encoding, or canonical zero absence |
 | 292 | Frozen launch collision key;255 means none |
-| 293..296 | Reserved zero |
-| 296..300 | Frozen graph-owned anchor when no motion/legacy owner supplies it |
+| 293 | Active-motion witness (0/1), checked against motion ownership |
+| 294..296 | Reserved zero |
+| 296..300 | Frozen graph/motion-owned X/Y (LE u16); zero with pot/legacy ownership |
 | 300 | Resident-sheet boolean |
 | 301 | Cellar patch: Closed0 / Damaged1 / Open2 |
 | 302 | Visit-baseline cellar patch |
@@ -202,7 +216,8 @@ use **320-byte version3/profile11**, bound to the same aggregate identity and ti
 | 312..320 | Visit consumed baseline, LE u64 |
 
 The walking component is erased when a dialogue, transition, graph or pot owns its
-continuation. Motion-owned poses are reconstructed from immutable samples; graph
+continuation. Motion-owned poses use the frozen owner anchor and are checked against every
+known absolute-position/facing constraint in the applied immutable prefix. Graph
 wait anchors and pot poses have canonical consistency checks. Restore rejects
 invalid versions/identities, stage/flag/local/counter combinations, choice/page
 cursors, erased motion ownership, inappropriate launch profiles and fewer consumed

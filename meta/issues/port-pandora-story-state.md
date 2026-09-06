@@ -103,3 +103,19 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
 - Replaced-sheet C reentry with292 remains deliberately unsupported pending source
   load effects. This issue remains open for parent aggregate acceptance; no new
   native itinerary or browser acceptance is claimed.
+
+### Bounded compiler integration corrections (in progress)
+
+- Source adapter identifies four required core seams: scoped raw-material policy,
+  preserve-player cue poses, Town door interaction/patch lifetime, and ordered
+  first-coarse/fine exit admission using the existing decoder/planner.
+- Split work into scoped classification, canonical cue poses, then Town/ordered
+  exit admission. No host/compiler/source-fixture edits; live host stays disabled.
+- Require TDD negative controls, atomic errors, canonical restore, old private
+  fixture regression, Wasm/Clippy and independent review before signed commits.
+
+- Preserve-player cue samples implemented red → green: Absolute or Preserve with
+  optional facing. The same authoritative walking/pot pose feeds each sample;
+  frozen owner coordinates and immutable prefix constraints validate restore.
+  Schema4/profile12 retains 320 bytes and adds an active-motion witness to prevent
+  erasing a preserve-only motion into its graph wait. No profile9 changes.

@@ -270,7 +270,7 @@ mod data;
 mod graph;
 pub use data::{
     Anchor, BoxOpeningGate, CollisionKey, ContactKind, ContactSpec, MotionFrame, MotionKey,
-    MotionSpec, PandoraData, ProfileRoom, ScenePhase, Travel,
+    MotionPose, MotionSpec, PandoraData, ProfileRoom, ScenePhase, Travel,
 };
 pub use graph::Cue;
 pub(crate) use graph::{Node, Runtime};

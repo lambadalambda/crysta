@@ -3,7 +3,8 @@ use crate::conversation::{self, Active, ConversationSpec, DialogueOutput, StoryC
 use crate::events::{EventFlags, StoryFlags};
 pub use crate::pandora::{
     Anchor, BoxOpeningGate, CollisionKey, ContactKind, ContactSpec, Cue, Invocation, MotionFrame,
-    MotionKey, MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages, ScenePhase, Travel,
+    MotionKey, MotionPose, MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages,
+    ScenePhase, Travel,
 };
 mod pandora_runtime;
 mod shared_sheet;
@@ -18,8 +19,8 @@ pub use shared_sheet::{CellarDoorPatch, SharedSheetOutput};
 
 /// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
 pub const PROFILE_VERSION: u8 = 9;
-/// Opt-in Pandora policy; v11 corrects polling and explicit COPDF readiness.
-pub const PANDORA_PROFILE_VERSION: u8 = 11;
+/// Opt-in Pandora policy; v12 adds source-preserving cue pose operations.
+pub const PANDORA_PROFILE_VERSION: u8 = 12;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -693,7 +694,7 @@ impl GameState {
             ),
         }
     }
-    /// Little-endian snapshot: profile9 is 181 bytes; Pandora schema3 is 320 bytes.
+    /// Little-endian snapshot: profile9 is 181 bytes; Pandora schema4 is 320 bytes.
     /// Immutable content is identified, not embedded.
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
     /// Profile 9 persists only the low 64 flag bytes; restore zeros the upper range.
@@ -704,7 +705,7 @@ impl GameState {
             b'S',
             b'L',
             b'C',
-            if self.pandora.is_some() { 3 } else { 1 },
+            if self.pandora.is_some() { 4 } else { 1 },
             if self.pandora.is_some() {
                 PANDORA_PROFILE_VERSION
             } else {
@@ -770,7 +771,7 @@ impl GameState {
                     b'S',
                     b'L',
                     b'C',
-                    if enabled { 3 } else { 1 },
+                    if enabled { 4 } else { 1 },
                     if enabled {
                         PANDORA_PROFILE_VERSION
                     } else {
@@ -931,18 +932,6 @@ impl GameState {
                 return Err(SliceError::Snapshot);
             }
             *pot.walking()
-        } else if let Some((id, cursor)) = pandora.and_then(|p| p.motion) {
-            if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
-                return Err(SliceError::Snapshot);
-            }
-            let motion =
-                &data.pandora.as_ref().ok_or(SliceError::Snapshot)?.motions[usize::from(id)];
-            let anchor = if cursor == 0 {
-                motion.trigger.ok_or(SliceError::Snapshot)?
-            } else {
-                motion.frames[usize::from(cursor - 1)].anchor
-            };
-            WalkingState::new(anchor.position.0, anchor.position.1)
         } else if pandora.is_some_and(pandora_runtime::State::owns) {
             if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
                 return Err(SliceError::Snapshot);

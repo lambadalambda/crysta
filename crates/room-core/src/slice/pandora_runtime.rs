@@ -177,9 +177,9 @@ impl GameData {
         }
         for motion in &pandora.motions {
             for frame in &motion.frames {
-                if frame.map_id == 0xd {
+                if let (0xd, MotionPose::Absolute(anchor)) = (frame.map_id, frame.pose) {
                     self.room(0xd, false, true)?
-                        .validate_position(frame.anchor.position.0, frame.anchor.position.1)
+                        .validate_position(anchor.position.0, anchor.position.1)
                         .map_err(|_| SliceError::Data)?;
                 }
             }
@@ -440,8 +440,12 @@ impl GameState {
             .get(usize::from(cursor))
             .ok_or(SliceError::Exit)?;
         self.map_id = frame.map_id;
-        self.walking = WalkingState::new(frame.anchor.position.0, frame.anchor.position.1);
-        self.animation = AnimationState::standing(frame.anchor.facing);
+        let anchor = frame.pose.apply(Anchor {
+            position: self.walking.position(),
+            facing: self.animation.facing(),
+        });
+        self.walking = WalkingState::new(anchor.position.0, anchor.position.1);
+        self.animation = AnimationState::standing(anchor.facing);
         if frame.reload {
             state.load(self.map_id, &mut self.flags, &mut self.wooden_door_open)?;
             self.fresh_bedroom = false;
@@ -728,9 +732,10 @@ impl GameState {
         bytes.extend(state.motion.map_or(0, |x| x.1).to_le_bytes());
         bytes.extend(state.pot.map_or([0; 40], |p| p.encode_snapshot()));
         bytes.push(state.frozen.map_or(255, |k| k as u8));
-        bytes.extend([0; 3]);
+        // Distinguish an active motion from its graph wait even for preserve-only poses.
+        bytes.extend([u8::from(state.motion.is_some()), 0, 0]);
         let frozen = state.owns()
-            && state.motion.is_none()
+            && state.pot.is_none()
             && self.transition.is_none()
             && self.dialogue.is_none();
         let (x, y) = if frozen {
@@ -784,14 +789,10 @@ impl GameState {
         }
         if let Some((id, cursor)) = state.motion {
             let motion = &spec.motions[usize::from(id)];
-            let expected = if cursor == 0 {
-                motion.trigger
-            } else {
-                Some(motion.frames[usize::from(cursor - 1)].anchor)
-            };
-            if expected.is_some_and(|a| {
-                a.position != self.walking.position() || a.facing != self.animation.facing()
-            }) {
+            let (position, facing) = motion.pose_at(cursor);
+            if position.is_some_and(|p| p != self.walking.position())
+                || facing.is_some_and(|f| f != self.animation.facing())
+            {
                 return Err(SliceError::Snapshot);
             }
         }

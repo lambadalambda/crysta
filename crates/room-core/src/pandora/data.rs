@@ -290,13 +290,36 @@ pub struct Anchor {
     /// Required facing/direction.
     pub facing: Direction,
 }
+/// Player pose operation, never an actor's presentation coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MotionPose {
+    /// Source-qualified absolute player placement.
+    Absolute(Anchor),
+    /// Keep the active player coordinates; optionally select a qualified standing facing.
+    /// Admitted only on non-reloading cue samples.
+    Preserve {
+        /// None retains facing; Some selects a source-qualified stationary direction.
+        facing: Option<Direction>,
+    },
+}
+impl MotionPose {
+    pub(crate) fn apply(self, current: Anchor) -> Anchor {
+        match self {
+            Self::Absolute(anchor) => anchor,
+            Self::Preserve { facing } => Anchor {
+                position: current.position,
+                facing: facing.unwrap_or(current.facing),
+            },
+        }
+    }
+}
 /// One logical source-qualified presentation sample.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MotionFrame {
     /// Fixed source/destination map for this motion.
     pub map_id: u16,
-    /// Source-qualified pose, never a runtime action argument.
-    pub anchor: Anchor,
+    /// Source-qualified player operation, never a runtime action argument.
+    pub pose: MotionPose,
     /// Explicit reconstruction edge, including same-map reload.
     pub reload: bool,
     /// In-progress actor cue. The terminal sample is a completion boundary: its
@@ -500,7 +523,13 @@ impl PandoraData {
                 {
                     return Err(SliceError::Data);
                 }
-                let (x, y) = frame.anchor.position;
+                let MotionPose::Absolute(anchor) = frame.pose else {
+                    if frame.reload || !matches!(motion.key, MotionKey::Cue(_)) {
+                        return Err(SliceError::Data);
+                    }
+                    continue;
+                };
+                let (x, y) = anchor.position;
                 if expected != 0xd {
                     rooms
                         .iter()
@@ -572,5 +601,25 @@ impl PandoraData {
     }
     pub(crate) fn motion(&self, key: MotionKey) -> Option<(usize, &MotionSpec)> {
         self.motions.iter().enumerate().find(|(_, m)| m.key == key)
+    }
+}
+
+impl MotionSpec {
+    // Resolve only immutable constraints. A preserve-only prefix uses the existing
+    // frozen owner coordinates and animation facing, not a duplicate runtime pose.
+    pub(crate) fn pose_at(&self, cursor: u16) -> (Option<(u16, u16)>, Option<Direction>) {
+        let mut position = self.trigger.map(|a| a.position);
+        let mut facing = self.trigger.map(|a| a.facing);
+        for frame in self.frames.iter().take(usize::from(cursor)) {
+            match frame.pose {
+                MotionPose::Absolute(a) => {
+                    position = Some(a.position);
+                    facing = Some(a.facing);
+                }
+                MotionPose::Preserve { facing: Some(f) } => facing = Some(f),
+                MotionPose::Preserve { facing: None } => {}
+            }
+        }
+        (position, facing)
     }
 }

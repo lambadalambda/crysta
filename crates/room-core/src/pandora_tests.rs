@@ -102,14 +102,14 @@ fn data() -> GameData {
             trigger: None,
             frames: vec![MotionFrame {
                 map_id: map,
-                anchor: anchor(
+                pose: MotionPose::Absolute(anchor(
                     pose,
                     if map == 0xc {
                         Direction::Up
                     } else {
                         Direction::Down
                     },
-                ),
+                )),
                 reload,
                 scene,
             }],
@@ -130,7 +130,7 @@ fn data() -> GameData {
             trigger: None,
             frames: vec![MotionFrame {
                 map_id: map,
-                anchor: anchor(pose, Direction::Up),
+                pose: MotionPose::Absolute(anchor(pose, Direction::Up)),
                 reload,
                 scene: if map == 0x21 {
                     ScenePhase::BoxOpening
@@ -250,7 +250,7 @@ fn same_new_game_opt_in_identity_and_old_profile_remain_distinct() {
     let mut s = GameState::new_game(&d, Policy::SemanticPreview);
     assert_eq!(s.output().position, (304, 112));
     assert_eq!(s.output().tick, 0);
-    assert_eq!(&s.snapshot()[..8], b"RSLC\x03\x0b\x00\x01");
+    assert_eq!(&s.snapshot()[..8], b"RSLC\x04\x0c\x00\x01");
     assert_eq!(
         &GameState::new_game(&old, Policy::SemanticPreview).snapshot()[..8],
         b"RSLC\x01\x09\x00\x01"
@@ -309,7 +309,23 @@ fn frames(s: &mut GameState, d: &GameData, direction: Option<Direction>, count: 
 }
 #[test]
 fn real_pot_hit_preserves_launch_grid_and_ledger_through_story_and_recovery() {
-    let d = data();
+    real_pot_hit_with_pose(false);
+}
+#[test]
+fn preserve_cues_follow_authoritative_pot_pose_through_recovery() {
+    real_pot_hit_with_pose(true);
+}
+fn real_pot_hit_with_pose(preserve: bool) {
+    let mut d = data();
+    if preserve {
+        for motion in &mut d.pandora.as_mut().unwrap().motions {
+            if motion.key.maps() == (0xc, 0xc, false) {
+                for frame in &mut motion.frames {
+                    frame.pose = MotionPose::Preserve { facing: None };
+                }
+            }
+        }
+    }
     let mut s = at(
         &d,
         0xc,
@@ -490,19 +506,19 @@ fn qualified_travel_restores_departure_reload_arrival_and_discards_input() {
         frames: vec![
             MotionFrame {
                 map_id: 0xa,
-                anchor: anchor((136, 208), Direction::Down),
+                pose: MotionPose::Absolute(anchor((136, 208), Direction::Down)),
                 reload: false,
                 scene: ScenePhase::TownSource,
             },
             MotionFrame {
                 map_id: 0x13,
-                anchor: anchor((360, 144), Direction::Up),
+                pose: MotionPose::Absolute(anchor((360, 144), Direction::Up)),
                 reload: true,
                 scene: ScenePhase::Resident13,
             },
             MotionFrame {
                 map_id: 0x13,
-                anchor: anchor((360, 144), Direction::Up),
+                pose: MotionPose::Absolute(anchor((360, 144), Direction::Up)),
                 reload: false,
                 scene: ScenePhase::Resident13,
             },
@@ -606,10 +622,38 @@ fn malformed_immutable_geometry_and_catalogs_are_rejected() {
     bad(|p| p.opening_gate.raw_bounds = [120, 368, 256, 400]);
     bad(|p| p.motions[0].frames.clear());
     bad(|p| p.motions[0].frames[0].reload = true);
+    bad(|p| {
+        let m = p
+            .motions
+            .iter_mut()
+            .find(|m| m.key == MotionKey::Cue(Cue::BoxReload))
+            .unwrap();
+        m.frames[0].pose = MotionPose::Preserve { facing: None };
+    });
     bad(|p| p.motions[0].frames[0].map_id = 0x41);
     bad(|p| p.motions[0].frames[0].scene = ScenePhase::Tour410);
-    bad(|p| p.motions[0].frames[0].anchor.position = (512, 352));
+    bad(|p| p.motions[0].frames[0].pose = MotionPose::Absolute(anchor((512, 352), Direction::Up)));
     bad(|p| p.motions[0].key = MotionKey::Cue(Cue::Returned(Invocation::CChoice)));
+    bad(|p| {
+        p.motions.push(MotionSpec {
+            key: MotionKey::Travel(Travel::TownToResident),
+            trigger: Some(anchor((136, 208), Direction::Down)),
+            frames: vec![
+                MotionFrame {
+                    map_id: 0xa,
+                    pose: MotionPose::Preserve { facing: None },
+                    reload: false,
+                    scene: ScenePhase::TownSource,
+                },
+                MotionFrame {
+                    map_id: 0x13,
+                    pose: MotionPose::Absolute(anchor((360, 144), Direction::Up)),
+                    reload: true,
+                    scene: ScenePhase::Resident13,
+                },
+            ],
+        });
+    });
 }
 #[test]
 fn independent_source_dimensions_and_ambiguous_exits_are_checked() {
@@ -642,7 +686,7 @@ fn independent_source_dimensions_and_ambiguous_exits_are_checked() {
             trigger: Some(anchor((136, 208), Direction::Down)),
             frames: vec![MotionFrame {
                 map_id: map,
-                anchor: anchor((136, 208), Direction::Down),
+                pose: MotionPose::Absolute(anchor((136, 208), Direction::Down)),
                 reload: true,
                 scene,
             }],
@@ -1032,14 +1076,14 @@ fn retained_damage_new_visit_throw_and_five_cell_shared_patch_lifetime() {
                     .map(|(map_id, reload)| MotionFrame {
                         map_id,
                         reload,
-                        anchor: anchor(
+                        pose: MotionPose::Absolute(anchor(
                             if map_id == 0xa {
                                 (136, 208)
                             } else {
                                 (136, 600)
                             },
                             Direction::Up,
-                        ),
+                        )),
                         scene: if map_id == 0xa {
                             ScenePhase::TownSource
                         } else {
@@ -1194,4 +1238,92 @@ fn retained_damage_house_reload_replays_every_owned_tick() {
     }
     assert_eq!(s.walking.position(), (120, 447));
     assert_eq!(s.pot_state().unwrap().walking(), &s.walking);
+}
+
+#[test]
+fn preserve_copdf_samples_keep_gate_position_and_restore_facing() {
+    let mut d = data();
+    let motion = d
+        .pandora
+        .as_mut()
+        .unwrap()
+        .motions
+        .iter_mut()
+        .find(|m| m.key == MotionKey::Cue(Cue::BoxAcquireControl))
+        .unwrap();
+    motion.frames[0].pose = MotionPose::Preserve { facing: None };
+    motion.frames[1].pose = MotionPose::Preserve {
+        facing: Some(Direction::Down),
+    };
+    motion.frames.push(motion.frames[1]);
+    for position in [(120, 368), (152, 400), (136, 384)] {
+        for facing in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            let mut s = at(&d, 0x21, position, facing, &[0x26, 0x28, 0x27, 0x2e, 0x292]);
+            ack(&mut s, &d);
+            flag(&mut s, 1);
+            flag(&mut s, 2);
+            replay(&mut s, &d, neutral);
+            replay(&mut s, &d, neutral);
+            assert_eq!(s.walking.position(), position);
+            assert_eq!(s.animation.facing(), facing);
+            assert!(!s.flags.contains(0x22).unwrap());
+            replay(&mut s, &d, neutral);
+            assert_eq!(s.walking.position(), position);
+            assert_eq!(s.animation.facing(), Direction::Down);
+            assert!(!s.flags.contains(0x22).unwrap());
+            for (byte, value) in [(100, Direction::Left as u8), (293, 0)] {
+                let mut forged = s.snapshot();
+                forged[byte] = value;
+                assert!(GameState::restore(&d, &forged).is_err());
+            }
+            replay(&mut s, &d, neutral);
+            assert_eq!(s.walking.position(), position);
+            assert!(s.flags.contains(0x22).unwrap());
+        }
+    }
+}
+
+#[test]
+fn preserve_after_absolute_checks_canonical_position_and_facing() {
+    let mut d = data();
+    let motion = d
+        .pandora
+        .as_mut()
+        .unwrap()
+        .motions
+        .iter_mut()
+        .find(|m| m.key == MotionKey::Cue(Cue::BoxAcquireControl))
+        .unwrap();
+    let absolute = anchor((136, 384), Direction::Left);
+    motion.frames[0].pose = MotionPose::Absolute(absolute);
+    motion.frames[1].pose = MotionPose::Preserve {
+        facing: Some(Direction::Down),
+    };
+    motion.frames.push(motion.frames[1]);
+    let mut s = at(
+        &d,
+        0x21,
+        (136, 368),
+        Direction::Up,
+        &[0x26, 0x28, 0x27, 0x2e, 0x292],
+    );
+    ack(&mut s, &d);
+    flag(&mut s, 1);
+    flag(&mut s, 2);
+    for _ in 0..3 {
+        replay(&mut s, &d, neutral);
+    }
+    assert_eq!(s.walking.position(), absolute.position);
+    assert_eq!(s.animation.facing(), Direction::Down);
+    for (byte, value) in [(296, 137), (100, Direction::Left as u8), (293, 0), (294, 1)] {
+        let mut forged = s.snapshot();
+        forged[byte] = value;
+        assert!(GameState::restore(&d, &forged).is_err());
+    }
+    replay(&mut s, &d, neutral);
 }
