@@ -62,12 +62,13 @@ impl Preview {
         if self.error.is_some() {
             return;
         }
-        if (5..=9).contains(&button) {
+        if (5..=10).contains(&button) {
             // A wrong target is ordinary user input. Core guarantees atomic rejection;
             // only the unsupported interaction is harmless, not identity/overflow errors.
             let result = match button {
                 5 => self.state.interact(&self.data),
                 6 => self.state.acknowledge(&self.data),
+                10 => self.state.pot_action(&self.data),
                 _ => self.state.choose(&self.data, button - 7),
             };
             if let Err(error) = result {
@@ -129,6 +130,7 @@ impl Preview {
             "door_interaction":self.data.door_interaction(),
             "dialogue_acknowledgement":self.data.conversation_progression(),
             "choice_interaction":self.data.conversation_progression(),
+            "pot_action":self.data.pandora_enabled(),
             "dialogue":presentation,"events":events,
             "wooden_door_open":self.state.wooden_door_open(),
             "actor_key":actor_key,
@@ -465,9 +467,11 @@ mod tests {
             preview.step(command);
             assert_eq!(preview.state(), before);
         }
-        preview.step(10);
-        assert!(preview.error.is_some());
+        assert_eq!(preview.state()["pot_action"], false);
         let snapshot = preview.state.snapshot();
+        preview.step(10);
+        assert_eq!(preview.error, Some(SliceError::Data.to_string()));
+        assert_eq!(preview.state.snapshot(), snapshot);
         preview.step(5);
         preview.step(2);
         assert_eq!(preview.state.snapshot(), snapshot);

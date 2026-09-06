@@ -229,3 +229,18 @@ pass. These are **not** new native aggregate navigation/pacing or browser accept
 Source-qualified new motion/contact data, host compiler/transport/render integration
 and final aggregate acceptance remain parent/navigation-owned. The capability must
 remain disabled on the live host until those gates pass. The owned issue stays open.
+
+## Opt-in native-A transport
+
+The loopback step protocol preserves commands0–9 and adds only canonical ASCII
+`10` for `GameState::pot_action`; this is separate from B/Interact and dialogue
+acknowledgement. The request body ceiling is now two bytes, but other two-byte
+forms (`00`, `01`, signed/whitespace forms, `11`) remain invalid. Host/Origin,
+exact route, total request bound and absolute deadline checks are unchanged.
+
+State advertises `pot_action` from the immutable Pandora capability. The frontend
+shows **Lift / throw (Z)** only when enabled, rejects held-direction/dialogue/
+transition use, and submits one paced A pulse without repeat or autoplay. As
+with manual interaction, it pauses; **Resume** supplies neutral ticks to advance
+the delayed action/recovery. Z is not WASD A and never acknowledges a page.
+The current house-only host advertises false and does not enable pot gameplay.

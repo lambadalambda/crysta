@@ -94,6 +94,7 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
         ("GET", "/state", "") => Ok(Request::State),
         ("POST", "/reset", "") => Ok(Request::Reset),
         ("POST", "/new-game", "") => Ok(Request::NewGame),
+        ("POST", "/step", "10") => Ok(Request::Step(10)),
         ("POST", "/step", value) if value.len() == 1 && value.as_bytes()[0].is_ascii_digit() => {
             Ok(Request::Step(value.as_bytes()[0] - b'0'))
         }
@@ -127,7 +128,7 @@ fn read_with_budget(stream: &mut TcpStream, origin: &str, budget: Duration) -> R
         }
         if let Some(end) = bytes.windows(4).position(|s| s == b"\r\n\r\n") {
             let head = parse_head(std::str::from_utf8(&bytes[..end])?)?;
-            if head.length > 1 {
+            if head.length > 2 {
                 return Err(invalid("request body too large").into());
             }
             if bytes.len() >= end + 4 + head.length {
@@ -345,8 +346,29 @@ mod tests {
         assert!(parse_request(&request("GET", "/../ROM", "", ""), ORIGIN).is_err());
     }
     #[test]
+    fn pot_action_is_only_the_canonical_two_byte_same_origin_command() {
+        let headers = format!("Content-Length: 2\r\nOrigin: {ORIGIN}\r\n");
+        assert_eq!(
+            parse_request(&request("POST", "/step", &headers, "10"), ORIGIN).unwrap(),
+            Request::Step(10)
+        );
+        for body in ["00", "01", "11", "-1", "+1", "1 ", " 1"] {
+            assert!(parse_request(&request("POST", "/step", &headers, body), ORIGIN).is_err());
+        }
+        for headers in [
+            "Content-Length: 2\r\n",
+            "Content-Length: 2\r\nOrigin: http://other.invalid\r\n",
+        ] {
+            assert!(parse_request(&request("POST", "/step", headers, "10"), ORIGIN).is_err());
+        }
+    }
+
+    #[test]
     fn segmented_body_uses_the_same_trimmed_length_parser() {
-        for spacing in ["", " ", "  "] {
+        for (spacing, body) in ["", " ", "  "]
+            .into_iter()
+            .flat_map(|spacing| ["4", "10"].map(|body| (spacing, body)))
+        {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             let mut client = TcpStream::connect(listener.local_addr().unwrap()).unwrap();
             let handle = std::thread::spawn(move || {
@@ -358,13 +380,21 @@ mod tests {
                 .write_all(&request(
                     "POST",
                     "/step",
-                    &format!("Content-Length:{spacing}1\r\nOrigin: {ORIGIN}\r\n"),
+                    &format!(
+                        "Content-Length:{spacing}{}\r\nOrigin: {ORIGIN}\r\n",
+                        body.len()
+                    ),
                     "",
                 ))
                 .unwrap();
             std::thread::sleep(Duration::from_millis(30));
-            let _ = client.write_all(b"4");
-            assert_eq!(handle.join().unwrap().unwrap(), Request::Step(4));
+            for byte in body.bytes() {
+                let _ = client.write_all(&[byte]);
+            }
+            assert_eq!(
+                handle.join().unwrap().unwrap(),
+                Request::Step(body.parse().unwrap())
+            );
         }
     }
     #[test]

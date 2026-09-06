@@ -221,7 +221,7 @@ async function main() {
   assert.equal(resetAck.timers.size,0); assert.equal(resetAck.views.at(-1).dialogue,false);
   const pageBindings = new Target(), pageWindow = new Target();
   bindInputs(talk.controller,pageBindings,pageWindow,[]);
-  for(const id of ['continue','choice1','choice2','choice-cancel']) for(const repeat of [false,true]) {
+  for(const id of ['continue','choice1','choice2','choice-cancel','pot-action']) for(const repeat of [false,true]) {
     let prevented=false;
     pageBindings.emit('keydown',{key:'Enter',repeat,target:{closest:()=>({id})},preventDefault(){prevented=true;}});
     assert.equal(prevented,repeat,'only repeated native button clicks are suppressed');
@@ -271,6 +271,35 @@ async function main() {
   const noChoice=harness();await noChoice.start();noChoice.controller.resume();await noChoice.fire();
   await noChoice.reply({...page('prompt:0',1),dialogue:{key:'prompt:0',choice:0}});
   noChoice.controller.choose(1);assert.equal(noChoice.timers.size,0,'choice capability required');
+  // Native A is a distinct bounded pulse, not B interaction or page acknowledgement.
+  const pots=harness();pots.controller.init();await pots.reply({...initial(),pot_action:true});
+  pots.controller.resume();pots.controller.press('held',3);pots.controller.potAction();
+  assert.match(pots.views.at(-1).note,/Release movement/);pots.controller.release('held');
+  const potKeys=new Target();bindInputs(pots.controller,potKeys,new Target(),[]);
+  potKeys.emit('keydown',{key:'z'});potKeys.emit('keydown',{key:'z',repeat:true});
+  assert.equal(pots.views.at(-1).paused,true);await pots.fire();
+  assert.equal(pots.calls.at(-1).body,'10');
+  pots.controller.potAction();assert.equal(pots.timers.size,0,'one in-flight A only');
+  await pots.reply({...initial(),tick:1,pot_action:true});
+  assert.equal(pots.timers.size,0,'manual A does not autoplay');
+  pots.controller.resume();await pots.fire();assert.equal(pots.calls.at(-1).body,'0','Resume advances delayed A neutrally');
+  await pots.reply({...page('pot-response',2),pot_action:true});
+  pots.controller.potAction();assert.equal(pots.timers.size,0,'A never acknowledges dialogue');
+  const noPots=harness();await noPots.start();noPots.controller.potAction();assert.equal(noPots.timers.size,0);
+  const disabledPots=harness();disabledPots.controller.init();await disabledPots.reply({...initial(),pot_action:false});
+  disabledPots.controller.potAction();assert.equal(disabledPots.timers.size,0);
+  for(const invalid of [null,0,1,'true',{},[]]) {
+    const bad=harness();bad.controller.init();await bad.reply({...initial(),pot_action:invalid});
+    assert.match(bad.views.at(-1).error,/Invalid host state/);assert.equal(bad.timers.size,0);
+  }
+
+  const potUi=browserHarness({mutateState:state=>({...state,pot_action:true})});await flush();await flush();
+  assert.equal(potUi.element('pot-action').hidden,false);assert.equal(potUi.element('pot-action').disabled,false);
+  potUi.element('pot-action').emit('click');
+  const potTimer=[...potUi.timers].find(([,timer])=>timer.ms<100);assert(potTimer);
+  potUi.timers.delete(potTimer[0]);potUi.advance(potTimer[1].ms);potTimer[1].fn();await flush();await flush();
+  assert.equal(potUi.requests.at(-1).body,'10');
+  const oldPotUi=browserHarness();await flush();await flush();assert.equal(oldPotUi.element('pot-action').hidden,true);
   // Door interaction is one paced command, never a held direction or autoplay.
   const door = harness(); await door.start(); door.controller.interact();
   assert.equal(door.calls.length,1); door.controller.interact(); door.controller.stepOnce();

@@ -51,6 +51,7 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
 <button id="interact" disabled>Interact</button>
+<button id="pot-action" hidden disabled>Lift / throw (Z)</button>
 <button id="reset" disabled>Checkpoint Reset</button><button id="demo" disabled>Checkpoint doorway demo</button>
 </div>
 <div class="pad" aria-label="Touch cardinal controls">
@@ -92,6 +93,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (!state || state.policy !== 'semantic-preview' || !Number.isInteger(state.map_id) ||
         !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
         !(state.start_kind === undefined || typeof state.start_kind === 'string') ||
+        !(state.pot_action === undefined || typeof state.pot_action === 'boolean') ||
         !(state.dialogue === undefined || state.dialogue === null || (typeof state.dialogue === 'object' && typeof state.dialogue.key === 'string' && state.dialogue.key.length > 0 && state.dialogue.key.length <= 128 && (state.dialogue.choice == null || (Number.isInteger(state.dialogue.choice) && state.dialogue.choice >= 0 && state.dialogue.choice <= 65535)))) ||
         typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
         !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
@@ -216,6 +218,11 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         if (choice() === null || state.choice_interaction !== true || mode === 'demo' || ![0,1,2].includes(selection)) return;
         manualStep(7+selection, 'Choice submitted — paused.');
       },
+      potAction() {
+        if (!state || state.pot_action !== true || mode === 'demo' || transition() || dialogue()) return;
+        if (held.size) { note = 'Release movement before lifting or throwing.'; notify(); return; }
+        manualStep(10, 'Lift / throw requested — paused. Resume to finish the action.');
+      },
       interact() {
         if (dialogue()) { this.acknowledge(); return; }
         if (!state || state.door_interaction !== true || mode === 'demo' || transition()) return;
@@ -235,10 +242,14 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       else if (key === ' ' || key === 'enter') {
         const control = event.target?.closest?.('button,input,textarea,select,[contenteditable]');
         if (control) {
-          if (event.repeat && ['continue','choice1','choice2','choice-cancel'].includes(control.id)) event.preventDefault();
+          if (event.repeat && ['continue','choice1','choice2','choice-cancel','pot-action'].includes(control.id)) event.preventDefault();
           return;
         }
         event.preventDefault(); if (!event.repeat) controller.interact();
+      }
+      else if (key === 'z') {
+        if (event.target?.closest?.('input,textarea,select,[contenteditable]')) return;
+        event.preventDefault(); if (!event.repeat) controller.potAction();
       }
       else if (key.length === 1 && key !== ' ') controller.press(`key:${key}`, 0);
     });
@@ -588,6 +599,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('continue').disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || !view.dialogue || view.choice !== null || state?.dialogue_acknowledgement !== true;
     $('dialogue-panel').hidden = !ready || !state?.dialogue;
     $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
+    $('pot-action').hidden = state?.pot_action !== true;
+    $('pot-action').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.pot_action !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
@@ -626,6 +639,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
   $('step').addEventListener('click', () => controller.stepOnce());
   $('interact').addEventListener('click', () => controller.interact());
+  $('pot-action').addEventListener('click', () => controller.potAction());
   $('continue').addEventListener('click', () => controller.acknowledge());
   for (const [id,selection] of [['choice-cancel',0],['choice1',1],['choice2',2]]) $(id).addEventListener('click', () => controller.choose(selection));
   $('new-game').addEventListener('click', () => controller.newGame());
