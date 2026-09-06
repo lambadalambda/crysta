@@ -173,6 +173,16 @@ impl Admission<'_> {
 }
 
 impl PotState {
+    // Aggregate-only qualified forced motion: preserve the visit ledger, never a new pot.
+    pub(crate) fn rebase(&mut self, walking: WalkingState, facing: Direction) -> Result<(), Error> {
+        if self.phase != Phase::Empty || self.delayed_action {
+            return Err(Error::Input);
+        }
+        self.walking = walking;
+        self.facing = facing;
+        Ok(())
+    }
+
     /// Enter from a parent-owned ordinary walking state, without a WRAM initializer.
     /// The parent must retain this component/ledger across actions in this room.
     ///
@@ -212,6 +222,18 @@ impl PotState {
         self.age
     }
     /// Read-only movement continuation for parent animation and eventual handoff.
+    /// Current qualified pre-fragment world sample, independent of a renderer.
+    /// None before release and at/after flight break; recovery may still own control.
+    #[must_use]
+    pub fn flight(&self) -> Option<Flight> {
+        if self.phase != Phase::Throwing || self.age < 18 || self.age - 18 >= self.flight_length() {
+            return None;
+        }
+        Some(Flight {
+            x: self.position().0,
+            y: 357 - 3 * u16::from(self.age - 18),
+        })
+    }
     /// The enclosing pot snapshot, not this walker alone, owns the carry cadence.
     #[must_use]
     pub const fn walking(&self) -> &WalkingState {
@@ -398,17 +420,8 @@ impl PotState {
             }
         }
         if next.phase == Phase::Throwing && next.age >= 18 {
-            let (x, _) = next.position();
             let flight_age = next.age - 18;
-            // These are only the uninterrupted pre-fragment world-coordinate
-            // samples established for the two Up lanes, not general ballistics.
-            let duration = next.flight_length();
-            if flight_age < duration {
-                out.flight = Some(Flight {
-                    x,
-                    y: 357 - 3 * u16::from(flight_age),
-                });
-            }
+            out.flight = next.flight();
             // Exact admitted flight contact, not player proximity or consumption.
             // The generic COP65 collision dispatcher is outside this component.
             out.door_hit = a.door_hit_enabled

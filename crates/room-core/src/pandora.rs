@@ -266,5 +266,11 @@ impl PandoraText {
     }
 }
 
-#[allow(dead_code)] // Fixed graph is wired into the aggregate in the next topical change.
+mod data;
 mod graph;
+pub use data::{
+    Anchor, CollisionKey, ContactKind, ContactSpec, MotionFrame, MotionKey, MotionSpec,
+    PandoraData, ProfileRoom, ScenePhase, Travel,
+};
+pub use graph::Cue;
+pub(crate) use graph::{Node, Runtime};

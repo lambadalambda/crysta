@@ -40,7 +40,7 @@ fn base_data() -> GameData {
     )
     .unwrap()
 }
-fn data() -> GameData {
+pub(super) fn data() -> GameData {
     let identity = base_data().identity;
     base_data()
         .with_progression(
@@ -510,7 +510,8 @@ fn widened_b_preserves_unrelated_flags_and_grants_before_choice() {
         let mut followup = Some(spec.choose(active, selection, &mut flags).unwrap());
         while let Some(active) = followup {
             assert_eq!(
-                spec.restore(active.request, active.cursor.position(), &flags).unwrap(),
+                spec.restore(active.request, active.cursor.position(), &flags)
+                    .unwrap(),
                 active
             );
             followup = spec.acknowledge(active, &mut flags).unwrap();
@@ -521,7 +522,8 @@ fn widened_b_preserves_unrelated_flags_and_grants_before_choice() {
         let mut followup = Some(spec.choose(repeat, selection, &mut flags).unwrap());
         while let Some(active) = followup {
             assert_eq!(
-                spec.restore(active.request, active.cursor.position(), &flags).unwrap(),
+                spec.restore(active.request, active.cursor.position(), &flags)
+                    .unwrap(),
                 active
             );
             followup = spec.acknowledge(active, &mut flags).unwrap();

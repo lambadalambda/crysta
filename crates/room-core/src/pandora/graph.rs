@@ -535,17 +535,13 @@ mod tests {
             Some(DialogueWait::Page(_))
         ) {
             let map = match r.node {
-                Node::Request(i, _)
-                    if matches!(
-                        i,
-                        Invocation::ResidentFirst
-                            | Invocation::ResidentRetry
-                            | Invocation::ResidentRefusal
-                            | Invocation::ResidentGrant
-                    ) =>
-                {
-                    0x13
-                }
+                Node::Request(
+                    Invocation::ResidentFirst
+                    | Invocation::ResidentRetry
+                    | Invocation::ResidentRefusal
+                    | Invocation::ResidentGrant,
+                    _,
+                ) => 0x13,
                 Node::Request(i, _) if (i as u8) <= Invocation::ReactionFinal as u8 => 0xc,
                 Node::Request(i, _) if (i as u8) <= Invocation::OpeningFourth as u8 => 0x21,
                 Node::Request(Invocation::Tour44 | Invocation::TourLeave44, _) => 0x44,

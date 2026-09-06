@@ -1,15 +1,18 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
-use crate::conversation::{
-    self, Active, ConversationSpec, DialogueOutput, StoryConversationSpec,
-};
+use crate::conversation::{self, Active, ConversationSpec, DialogueOutput, StoryConversationSpec};
 use crate::events::{EventFlags, StoryFlags};
-pub use crate::pandora::{Invocation, PandoraText, RequestPages};
+pub use crate::pandora::{
+    Anchor, CollisionKey, ContactKind, ContactSpec, Cue, Invocation, MotionFrame, MotionKey,
+    MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages, ScenePhase, Travel,
+};
+mod pandora_runtime;
 use crate::transition::Transition;
 use crate::{
     AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
 };
 use alloc::{vec, vec::Vec};
 use core::fmt;
+pub use pandora_runtime::{ControlOwner, PandoraOutput};
 
 /// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
 pub const PROFILE_VERSION: u8 = 9;
@@ -75,6 +78,7 @@ pub struct GameData {
     new_game: NewGameData,
     open_corridor: Option<Room>,
     progression: Option<ProgressionData>,
+    pandora: Option<PandoraData>,
 }
 #[derive(Debug)]
 struct ProgressionData {
@@ -168,6 +172,7 @@ impl GameData {
             new_game,
             open_corridor,
             progression: None,
+            pandora: None,
         })
     }
     /// Extend a six-room house with the source-qualified B conversation and A landing.
@@ -273,6 +278,8 @@ pub enum SliceError {
     Data,
     /// Walking component left its qualified scope.
     Walking(Unqualified),
+    /// Bounded pot component rejected input/source/ownership.
+    Pot(crate::pots::Error),
     /// An exit or handoff is outside the supported semantic doorways.
     Exit,
     /// No admitted target/wait, wrong dialogue action, or choice outside 0..2.
@@ -292,7 +299,8 @@ impl fmt::Display for SliceError {
 /// Semantic output phase, explicitly distinct from the native scheduler.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Phase {
-    /// The B conversation owns control; movement input is discarded.
+    /// Legacy non-walking control bucket. Pandora uses `PandoraOutput::owner`
+    /// to distinguish text, forced presentation and pot recovery.
     Dialogue,
     /// Ordinary qualified walking owns control.
     Walking,
@@ -333,6 +341,7 @@ pub struct GameState {
     dialogue: Option<Active>,
     d_open_loaded: bool,
     progression_enabled: bool,
+    pandora: Option<pandora_runtime::State>,
 }
 impl GameState {
     /// Starts the authenticated ordinary bedroom checkpoint. Policy opt-in is explicit.
@@ -351,6 +360,7 @@ impl GameState {
             dialogue: None,
             d_open_loaded: false,
             progression_enabled: data.conversation_progression(),
+            pandora: data.pandora_enabled().then(pandora_runtime::State::new),
         }
     }
     /// Starts the source-compiled fresh bedroom after semantic intro completion.
@@ -372,6 +382,7 @@ impl GameState {
             dialogue: None,
             d_open_loaded: false,
             progression_enabled: data.conversation_progression(),
+            pandora: data.pandora_enabled().then(pandora_runtime::State::new),
         }
     }
     /// Advances one walking frame or one *logical* doorway update. While the
@@ -387,6 +398,12 @@ impl GameState {
         {
             return Err(SliceError::Data);
         }
+        if self.pandora.is_some_and(|p| {
+            self.transition.is_none()
+                && (p.owns() || p.collision(self.map_id, &self.flags).is_some())
+        }) {
+            return self.step_pandora(data, input);
+        }
         let mut next = self.clone();
         next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
         if next.dialogue.is_some() {
@@ -399,7 +416,11 @@ impl GameState {
                 next.d_open_loaded =
                     transition.map_id() == 13 && (next.flags.contains(0x26) == Ok(true));
             }
+            let reloaded = next.map_id != transition.map_id();
             next.map_id = transition.map_id();
+            if reloaded {
+                next.pandora_load();
+            }
             if next.map_id != transition.source_map() {
                 next.fresh_bedroom = false;
             }
@@ -407,6 +428,9 @@ impl GameState {
                 let (x, y) = transition.position();
                 next.walking = WalkingState::new(x, y);
                 next.transition = None;
+                if let Some(spec) = &data.pandora {
+                    next.ensure_pot(spec)?;
+                }
             } else {
                 next.transition = Some(transition);
             }
@@ -464,6 +488,14 @@ impl GameState {
             || self.progression_enabled != data.conversation_progression()
         {
             return Err(SliceError::Data);
+        }
+        if let Some(p) = self.pandora {
+            if p.owns() || p.pot.is_some() {
+                return Err(SliceError::Interaction);
+            }
+            if self.map_id == 0x13 {
+                return self.pandora_resident(data);
+            }
         }
         if self.dialogue.is_some() {
             return Err(SliceError::Interaction);
@@ -531,6 +563,12 @@ impl GameState {
         {
             return Err(SliceError::Data);
         }
+        if let Some(key) = self
+            .pandora
+            .and_then(|p| p.collision(self.map_id, &self.flags))
+        {
+            return Ok(data.pandora.as_ref().ok_or(SliceError::Data)?.room(key));
+        }
         if self.map_id == 13 && self.d_open_loaded {
             return data
                 .progression
@@ -548,6 +586,14 @@ impl GameState {
             || self.progression_enabled != data.conversation_progression()
         {
             return Err(SliceError::Data);
+        }
+        if let Some(p) = self.pandora {
+            if let Some(dialogue) = p
+                .graph
+                .dialogue(&data.pandora.as_ref().ok_or(SliceError::Data)?.text)
+            {
+                return Ok(Some(dialogue));
+            }
         }
         self.dialogue
             .map(|active| {
@@ -578,6 +624,12 @@ impl GameState {
         choice: Option<u8>,
     ) -> Result<FrameOutput, SliceError> {
         self.dialogue(data)?;
+        if self
+            .pandora
+            .is_some_and(|p| matches!(p.graph.node, crate::pandora::Node::Request(..)))
+        {
+            return self.pandora_dialogue_action(data, choice);
+        }
         let active = self.dialogue.ok_or(SliceError::Interaction)?;
         let spec = &data
             .progression
@@ -608,7 +660,16 @@ impl GameState {
                 .transition
                 .map_or_else(|| self.walking.position(), Transition::position),
             phase: self.transition.map_or(
-                if self.dialogue.is_some() {
+                if self.pandora.is_some_and(|p| {
+                    p.owns()
+                        || p.pot.is_some_and(|pot| {
+                            matches!(
+                                pot.phase(),
+                                crate::pots::Phase::Lifting | crate::pots::Phase::Throwing
+                            )
+                        })
+                }) || self.dialogue.is_some()
+                {
                     Phase::Dialogue
                 } else {
                     Phase::Walking
@@ -628,7 +689,20 @@ impl GameState {
     /// Profile 9 persists only the low 64 flag bytes; restore zeros the upper range.
     #[must_use]
     pub fn snapshot(&self) -> Vec<u8> {
-        let mut bytes = vec![b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1];
+        let mut bytes = vec![
+            b'R',
+            b'S',
+            b'L',
+            b'C',
+            if self.pandora.is_some() { 2 } else { 1 },
+            if self.pandora.is_some() {
+                10
+            } else {
+                PROFILE_VERSION
+            },
+            0,
+            1,
+        ];
         bytes.extend(self.identity.rom_sha256);
         bytes.extend(self.identity.content_sha256);
         bytes.extend(self.tick.to_le_bytes());
@@ -636,11 +710,16 @@ impl GameState {
         bytes.push(self.transition.map_or(255, Transition::route));
         // No walking component is serialized while a doorway owns control.
         // Erasing its marker cannot turn a transition into a valid walking state.
-        bytes.extend(if self.transition.is_some() || self.dialogue.is_some() {
-            [0; crate::SNAPSHOT_SIZE]
-        } else {
-            self.walking.encode_snapshot()
-        });
+        bytes.extend(
+            if self.transition.is_some()
+                || self.dialogue.is_some()
+                || self.pandora.is_some_and(|p| p.owns() || p.pot.is_some())
+            {
+                [0; crate::SNAPSHOT_SIZE]
+            } else {
+                self.walking.encode_snapshot()
+            },
+        );
         bytes.push(u8::from(self.fresh_bedroom));
         bytes.extend([
             self.animation.facing() as u8,
@@ -665,6 +744,7 @@ impl GameState {
                 .to_le_bytes(),
         );
         bytes.push(u8::from(self.progression_enabled));
+        self.append_pandora_snapshot(&mut bytes);
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
@@ -672,8 +752,19 @@ impl GameState {
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
     #[allow(clippy::too_many_lines)] // Keep the coupled ownership/schema checks together.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
-        if bytes.len() != 181
-            || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
+        let enabled = data.pandora_enabled();
+        if bytes.len() != if enabled { 300 } else { 181 }
+            || bytes[..8]
+                != [
+                    b'R',
+                    b'S',
+                    b'L',
+                    b'C',
+                    if enabled { 2 } else { 1 },
+                    if enabled { 10 } else { PROFILE_VERSION },
+                    0,
+                    1,
+                ]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
         {
@@ -691,8 +782,10 @@ impl GameState {
             1 if data.door_interaction() && !fresh_bedroom => true,
             _ => return Err(SliceError::Snapshot),
         };
-        data.room(map_id, fresh_bedroom, wooden_door_open)
-            .map_err(|_| SliceError::Snapshot)?;
+        if !enabled {
+            data.room(map_id, fresh_bedroom, wooden_door_open)
+                .map_err(|_| SliceError::Snapshot)?;
+        }
         let progression_enabled = match bytes[180] {
             0 => false,
             1 => true,
@@ -707,14 +800,26 @@ impl GameState {
                 .map_err(|_| SliceError::Snapshot)?,
         );
         let granted = flags.contains(0x26) == Ok(true);
-        if flags != conversation::initial_flags(granted)
+        if (!enabled && flags != conversation::initial_flags(granted))
             || (granted && (!progression_enabled || !wooden_door_open || fresh_bedroom))
             || (map_id == 10 && !granted)
         {
             return Err(SliceError::Snapshot);
         }
         // Full legacy admission above remains unchanged; the upper range starts empty.
-        let flags = conversation::initial_story_flags(granted);
+        let flags = if enabled {
+            let mut wide = [0; 128];
+            wide[..64].copy_from_slice(flags.bytes());
+            wide[64..].copy_from_slice(&bytes[181..245]);
+            StoryFlags::new(wide)
+        } else {
+            conversation::initial_story_flags(granted)
+        };
+        let pandora = if enabled {
+            Some(pandora_runtime::State::decode(data, bytes, map_id, &flags)?)
+        } else {
+            None
+        };
         let d_open_loaded = match bytes[173] {
             0 => false,
             1 if map_id == 13 && granted && progression_enabled => true,
@@ -770,6 +875,11 @@ impl GameState {
             }
             Some(t)
         };
+        let collision = if let Some(key) = pandora.and_then(|p| p.collision(map_id, &flags)) {
+            data.pandora.as_ref().ok_or(SliceError::Snapshot)?.room(key)
+        } else {
+            data.room(map_id, fresh_bedroom, wooden_door_open)?
+        };
         let walking = if dialogue.is_some() {
             if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
                 return Err(SliceError::Snapshot);
@@ -784,12 +894,34 @@ impl GameState {
             }
             let (x, y) = t.handoff();
             WalkingState::new(x, y)
-        } else {
-            let walking = WalkingState::decode_snapshot(
-                data.room(map_id, fresh_bedroom, wooden_door_open)?,
-                &bytes[83..99],
+        } else if let Some(pot) = pandora.and_then(|p| p.pot) {
+            if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
+                return Err(SliceError::Snapshot);
+            }
+            *pot.walking()
+        } else if let Some((id, cursor)) = pandora.and_then(|p| p.motion) {
+            if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
+                return Err(SliceError::Snapshot);
+            }
+            let motion =
+                &data.pandora.as_ref().ok_or(SliceError::Snapshot)?.motions[usize::from(id)];
+            let anchor = if cursor == 0 {
+                motion.trigger.ok_or(SliceError::Snapshot)?
+            } else {
+                motion.frames[usize::from(cursor - 1)].anchor
+            };
+            WalkingState::new(anchor.position.0, anchor.position.1)
+        } else if pandora.is_some_and(pandora_runtime::State::owns) {
+            if bytes[83..99] != [0; crate::SNAPSHOT_SIZE] {
+                return Err(SliceError::Snapshot);
+            }
+            WalkingState::new(
+                u16::from_le_bytes([bytes[296], bytes[297]]),
+                u16::from_le_bytes([bytes[298], bytes[299]]),
             )
-            .map_err(|_| SliceError::Snapshot)?;
+        } else {
+            let walking = WalkingState::decode_snapshot(collision, &bytes[83..99])
+                .map_err(|_| SliceError::Snapshot)?;
             if data.exit(map_id, walking.position()).is_some() {
                 return Err(SliceError::Snapshot);
             }
@@ -813,6 +945,8 @@ impl GameState {
             animation == AnimationState::standing(Direction::Up)
         } else if let Some(t) = transition {
             !is_walking && facing == t.direction()
+        } else if pandora.is_some_and(|p| p.owns() || p.pot.is_some()) {
+            true // Coupled pot/cue/motion pose checks below.
         } else if let Some(active) = walking.active_direction() {
             // Animation and horizontal movement share a 54-tick cycle. Vertical
             // movement keeps parity across animation wraps (phase zero may be
@@ -834,7 +968,7 @@ impl GameState {
         if !coherent {
             return Err(SliceError::Snapshot);
         }
-        Ok(Self {
+        let state = Self {
             identity: data.identity,
             tick,
             map_id,
@@ -847,7 +981,12 @@ impl GameState {
             dialogue,
             d_open_loaded,
             progression_enabled,
-        })
+            pandora,
+        };
+        if enabled {
+            state.validate_pandora_restore(data, bytes)?;
+        }
+        Ok(state)
     }
 }
 
@@ -1184,3 +1323,7 @@ mod house_tests;
 #[cfg(test)]
 #[path = "progression_tests.rs"]
 mod progression_tests;
+
+#[cfg(test)]
+#[path = "pandora_tests.rs"]
+mod pandora_tests;

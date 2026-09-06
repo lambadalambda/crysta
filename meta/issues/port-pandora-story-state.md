@@ -43,3 +43,22 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   old fixture suites passing; B highflag preservation tested at both widths.
 - Fixed graph component red → green, independently reviewed. Review's forced-tour
   ownership restore defect fixed with regression tests. Aggregate wiring follows.
+- Aggregate opt-in now extends the same GameData/GameState; live host remains
+  disabled. Concrete compiler/actions/art API and 300-byte version2/profile10
+  snapshot contract are documented in `docs/pandora-runtime.md`.
+- Integration tests cover per-action restore, refusal/retry/direct grant pages,
+  unsupported C answers, two genuine synthetic lifts/carries/hits with concurrent
+  reaction/recovery, ledger retention, source-boundary $292, contact-only warning,
+  same-map reload, forced tour and final controllable41. Isolated miss launch is
+  explicitly synthetic, not claimed as a native carry-route witness.
+- Independent data/aggregate reviews found and fixed ambiguous exit anchors,
+  post-reload box collision selection, erased forced-motion ownership and
+  counter/consumption inconsistency. Follow-up reviews confirmed these fixes.
+  Box actor roster also remains pre-opening until the reconstruction boundary.
+- Verification: strict all-target core Clippy; dependency-free no_std Wasm build;
+  all five explicitly enabled private core fixture suites; six unchanged host
+  room_preview tests including the authenticated fresh-house route. No browser or
+  new aggregate native route/pacing acceptance is claimed by this issue.
+- Parent/navigation still supply qualified new geometry/contact/presentation
+  samples and own compiler/transport/render acceptance. Missing cue data fail
+  atomically, never with guessed pacing. Keep this issue open until those gates.
