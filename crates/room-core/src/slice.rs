@@ -6,8 +6,8 @@ use crate::{
 use alloc::{vec, vec::Vec};
 use core::fmt;
 
-/// Semantic profile version; v7 adds ordinary animation and directional doorway poses.
-pub const PROFILE_VERSION: u8 = 7;
+/// Semantic profile version; v8 adds the six-room shared sheet and atomic wooden door.
+pub const PROFILE_VERSION: u8 = 8;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,7 +33,7 @@ impl Exit {
         let tile = |v: u16| ((v >> 4) & 255) as u8;
         tile(x).wrapping_sub(self.0[0]) < self.0[2] && tile(y).wrapping_sub(self.0[1]) < self.0[3]
     }
-    fn fine(self, x: u16, y: u16) -> bool {
+    pub(crate) fn fine(self, x: u16, y: u16) -> bool {
         self.0[2] != 0
             && self.0[3] != 0
             && x.wrapping_sub(u16::from(self.0[0]) * 16) < u16::from(self.0[2]) * 16 - 15
@@ -50,37 +50,101 @@ pub struct NewGameData {
     pub position: (u16, u16),
 }
 
-/// Immutable two-room data. Asset extraction and hashing happen outside the core.
+/// One authenticated source-compiled room and its complete ordered exit list.
+/// Collision must include qualified fresh occupancy; raw flags are not erased.
+#[derive(Debug)]
+pub struct HouseRoom {
+    /// Source map ID, one of B,C,D,F,10,11.
+    pub map_id: u16,
+    /// Immutable collision profile, compiled from ROM (not a runtime capture).
+    pub collision: Room,
+    /// Complete source order, including closed/unqualified outgoing boundaries.
+    pub exits: Vec<Exit>,
+}
+
+/// Immutable source data. Extraction, occupancy admission and hashing are external.
 #[derive(Debug)]
 pub struct GameData {
-    rooms: [Room; 2],
-    exits: [Vec<Exit>; 2],
+    rooms: Vec<HouseRoom>,
     identity: DataIdentity,
     new_game: NewGameData,
+    open_corridor: Option<Room>,
 }
 impl GameData {
-    /// Builds this narrow profile. Exit source, adjustment and spawn qualification
-    /// must be checked by the asset adapter; both first exits are validated here too.
-    /// `new_game` must be compiled from the fresh bootstrap source, not
-    /// supplied SRAM or a restored checkpoint. Intro presentation is omitted by policy.
+    /// Compatible F/10-only constructor. Does not enable door interaction.
+    /// `new_game` is compiled from fresh bootstrap sources, never supplied SRAM.
     /// # Errors
-    /// Rejects wrong room dimensions or missing/changed doorway metadata.
+    /// Rejects dimensions, bootstrap anchor, or changed first doorway records.
     pub fn new(
         rooms: [Room; 2],
         exits: [Vec<Exit>; 2],
         identity: DataIdentity,
         new_game: NewGameData,
     ) -> Result<Self, SliceError> {
-        let e = exits[0].first().ok_or(SliceError::Data)?;
-        let reverse = Exit([24, 20, 1, 1, 15, 0, 0, 6, 128, 1, 176, 0]);
-        if e.0[..4] != [24, 12, 1, 2]
-            || e.0[4..8] != [16, 0, 0, 5]
-            || u16::from_le_bytes([e.0[8], e.0[9]]) != 384
-            || u16::from_le_bytes([e.0[10], e.0[11]]) != 336
-            || new_game.position != (304, 112)
-            || exits[1].first() != Some(&reverse)
+        let [f, ten] = rooms;
+        let [f_exits, ten_exits] = exits;
+        let profiles = vec![
+            HouseRoom {
+                map_id: 15,
+                collision: f,
+                exits: f_exits,
+            },
+            HouseRoom {
+                map_id: 16,
+                collision: ten,
+                exits: ten_exits,
+            },
+        ];
+        if profiles
+            .iter()
+            .any(|p| p.exits.first() != crate::house::exits(p.map_id).and_then(|e| e.first()))
+        {
+            return Err(SliceError::Data);
+        }
+        Self::build(profiles, identity, new_game, None)
+    }
+    /// Six fresh room profiles in source ID order B,C,D,F,10,11.
+    ///
+    /// The adapter must authenticate the complete source recipe, including static
+    /// occupancy, fresh flags ($0020/$00FB only), collision attributes and visual
+    /// descriptors. Identity covers these inputs and this semantic policy. D's
+    /// hidden exterior blocker must be included; wandering AI is not simulated.
+    /// Closed C cells (8,19)/(8,20) must be $1CF2/$1CF3. The core compiles an
+    /// immutable open-C variant with $1CF6/$00F7; rendering uses the same IDs.
+    /// The variant is selected by state, not by mutating caller-owned data.
+    /// # Errors
+    /// Rejects missing/reordered rooms, changed exits, dimensions or door cells.
+    pub fn new_house(
+        rooms: [HouseRoom; 6],
+        identity: DataIdentity,
+        new_game: NewGameData,
+    ) -> Result<Self, SliceError> {
+        for (room, id) in rooms.iter().zip(crate::house::MAPS) {
+            if room.map_id != id || Some(room.exits.as_slice()) != crate::house::exits(id) {
+                return Err(SliceError::Data);
+            }
+        }
+        let c = &rooms[1].collision;
+        if c.cells().get(19 * 32 + 8) != Some(&0x1cf2)
+            || c.cells().get(20 * 32 + 8) != Some(&0x1cf3)
+        {
+            return Err(SliceError::Data);
+        }
+        let mut open = c.clone();
+        open.replace_cell(19 * 32 + 8, 0x1cf6);
+        open.replace_cell(20 * 32 + 8, 0x00f7);
+        Self::build(Vec::from(rooms), identity, new_game, Some(open))
+    }
+    fn build(
+        rooms: Vec<HouseRoom>,
+        identity: DataIdentity,
+        new_game: NewGameData,
+        open_corridor: Option<Room>,
+    ) -> Result<Self, SliceError> {
+        if new_game.position != (304, 112)
             || rooms
                 .iter()
+                .map(|p| &p.collision)
                 .chain(core::iter::once(&new_game.bedroom))
                 .any(|r| r.width() != 32 || r.height() != 64)
         {
@@ -88,12 +152,17 @@ impl GameData {
         }
         Ok(Self {
             rooms,
-            exits,
             identity,
             new_game,
+            open_corridor,
         })
     }
-    fn room(&self, id: u16, fresh: bool) -> Result<&Room, SliceError> {
+    /// Capability, not current target availability. False for the legacy wrapper.
+    #[must_use]
+    pub fn door_interaction(&self) -> bool {
+        self.open_corridor.is_some()
+    }
+    fn room(&self, id: u16, fresh: bool, door_open: bool) -> Result<&Room, SliceError> {
         if fresh {
             return if id == 15 {
                 Ok(&self.new_game.bedroom)
@@ -101,15 +170,21 @@ impl GameData {
                 Err(SliceError::Data)
             };
         }
-        match id {
-            15 => Ok(&self.rooms[0]),
-            16 => Ok(&self.rooms[1]),
-            _ => Err(SliceError::Data),
+        if id == 12 && door_open {
+            return self.open_corridor.as_ref().ok_or(SliceError::Data);
         }
+        self.rooms
+            .iter()
+            .find(|p| p.map_id == id)
+            .map(|p| &p.collision)
+            .ok_or(SliceError::Data)
     }
     fn exit(&self, id: u16, position: (u16, u16)) -> Option<(usize, Exit)> {
         let origin = (position.0.wrapping_sub(8), position.1.wrapping_sub(16));
-        self.exits[usize::from(id - 15)]
+        self.rooms
+            .iter()
+            .find(|p| p.map_id == id)?
+            .exits
             .iter()
             .copied()
             .enumerate()
@@ -125,8 +200,10 @@ pub enum SliceError {
     Data,
     /// Walking component left its qualified scope.
     Walking(Unqualified),
-    /// An exit or handoff is outside the supported semantic doorway pair.
+    /// An exit or handoff is outside the supported semantic doorways.
     Exit,
+    /// No admitted closed wooden-door target; no NPC/action fallback is attempted.
+    Interaction,
     /// Snapshot version, source identity, fields or consistency were invalid.
     Snapshot,
     /// Logical tick counter overflowed.
@@ -155,7 +232,7 @@ pub enum Phase {
 pub struct FrameOutput {
     /// Number of logical preview updates since reset.
     pub tick: u64,
-    /// Current map ID ($000F or $0010).
+    /// Current admitted source map ID.
     pub map_id: u16,
     /// Player anchor in map pixels.
     pub position: (u16, u16),
@@ -175,6 +252,7 @@ pub struct GameState {
     animation: AnimationState,
     transition: Option<Transition>,
     fresh_bedroom: bool,
+    wooden_door_open: bool,
 }
 impl GameState {
     /// Starts the authenticated ordinary bedroom checkpoint. Policy opt-in is explicit.
@@ -188,6 +266,7 @@ impl GameState {
             animation: AnimationState::standing(Direction::Down),
             transition: None,
             fresh_bedroom: false,
+            wooden_door_open: false,
         }
     }
     /// Starts the source-compiled fresh bedroom after semantic intro completion.
@@ -204,6 +283,7 @@ impl GameState {
             animation: AnimationState::standing(Direction::Down),
             transition: None,
             fresh_bedroom: true,
+            wooden_door_open: false,
         }
     }
     /// Advances one walking frame or one *logical* doorway update. While the
@@ -235,13 +315,22 @@ impl GameState {
             }
         } else {
             next.walking
-                .step(data.room(next.map_id, next.fresh_bedroom)?, input)
+                .step(
+                    data.room(next.map_id, next.fresh_bedroom, next.wooden_door_open)?,
+                    input,
+                )
                 .map_err(SliceError::Walking)?;
             next.animation.advance(next.walking.active_direction());
             if let Some((index, _)) = data.exit(next.map_id, next.walking.position()) {
-                let transition = Transition::start(next.map_id, next.walking.position())
+                let transition = Transition::select(next.map_id, index, next.walking.position())
                     .ok_or(SliceError::Exit)?;
-                if index != 0 || next.walking.active_direction() != Some(transition.direction()) {
+                if data
+                    .room(transition.source_map(), false, next.wooden_door_open)
+                    .is_err()
+                    || (!data.door_interaction() && transition.route() > 1)
+                    || (next.map_id == 12 && index == 2 && !next.wooden_door_open)
+                    || next.walking.active_direction() != Some(transition.direction())
+                {
                     return Err(SliceError::Exit);
                 }
                 // Walking no longer owns control; discard its unused history.
@@ -255,6 +344,43 @@ impl GameState {
         let output = next.output();
         *self = next;
         Ok(output)
+    }
+    /// Final shared-sheet mutation, not event0026 or a native saved-game flag.
+    #[must_use]
+    pub const fn wooden_door_open(&self) -> bool {
+        self.wooden_door_open
+    }
+
+    /// Commit the bounded C/B wooden-door action in one successful logical tick.
+    ///
+    /// Only C at (136,352), facing Up, with the door closed and no transition is
+    /// admitted. The host submits a one-shot action after releasing direction.
+    /// Native A takes control and schedules intermediate tiles/waits; this policy
+    /// commits only final $F6/$F7 and cancels delayed walking without requiring an
+    /// extra release tick. The input-history reset is semantic, not native timing.
+    /// Entry dialogue and all NPC interactions are omitted; event0026 is never set.
+    /// # Errors
+    /// Wrong data, overflow, already-open door or any other target reject atomically.
+    pub fn interact(&mut self, data: &GameData) -> Result<FrameOutput, SliceError> {
+        if self.identity != data.identity {
+            return Err(SliceError::Data);
+        }
+        if !data.door_interaction()
+            || self.map_id != 12
+            || self.fresh_bedroom
+            || self.transition.is_some()
+            || self.wooden_door_open
+            || self.walking.position() != (136, 352)
+            || self.animation.facing() != Direction::Up
+        {
+            return Err(SliceError::Interaction);
+        }
+        let tick = self.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
+        self.tick = tick;
+        self.wooden_door_open = true;
+        self.walking = WalkingState::new(136, 352);
+        self.animation = AnimationState::standing(Direction::Up);
+        Ok(self.output())
     }
     /// Current stable semantic result, without advancing simulation.
     #[must_use]
@@ -275,7 +401,7 @@ impl GameState {
             }),
         }
     }
-    /// Fixed little-endian v1 snapshot; immutable content is identified, not embedded.
+    /// Fixed 109-byte little-endian snapshot; immutable content is identified, not embedded.
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
     #[must_use]
     pub fn snapshot(&self) -> Vec<u8> {
@@ -284,7 +410,7 @@ impl GameState {
         bytes.extend(self.identity.content_sha256);
         bytes.extend(self.tick.to_le_bytes());
         bytes.extend(self.map_id.to_le_bytes());
-        bytes.push(self.transition.map_or(255, Transition::encoded));
+        bytes.push(self.transition.map_or(255, Transition::route));
         // No walking component is serialized while a doorway owns control.
         // Erasing its marker cannot turn a transition into a valid walking state.
         bytes.extend(if self.transition.is_some() {
@@ -298,13 +424,22 @@ impl GameState {
             u8::from(self.animation.is_walking()),
             self.animation.phase(),
         ]);
+        if let Some(t) = self.transition {
+            bytes.push(t.elapsed());
+            bytes.extend(t.handoff().0.to_le_bytes());
+            bytes.extend(t.handoff().1.to_le_bytes());
+        } else {
+            bytes.extend([0; 5]);
+        }
+        bytes.push(u8::from(self.wooden_door_open));
         bytes
     }
     /// Restores only a compatible, internally valid snapshot, without data or I/O.
     /// # Errors
     /// Rejects versions, identities, malformed walking state, or invalid transition ownership.
+    #[allow(clippy::too_many_lines)] // Keep the coupled ownership/schema checks together.
     pub fn restore(data: &GameData, bytes: &[u8]) -> Result<Self, SliceError> {
-        if bytes.len() != 103
+        if bytes.len() != 109
             || bytes[..8] != [b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1]
             || bytes[8..40] != data.identity.rom_sha256
             || bytes[40..72] != data.identity.content_sha256
@@ -318,10 +453,33 @@ impl GameState {
             1 if map_id == 15 => true,
             _ => return Err(SliceError::Snapshot),
         };
+        let wooden_door_open = match bytes[108] {
+            0 if map_id != 11 => false,
+            1 if data.door_interaction() && !fresh_bedroom => true,
+            _ => return Err(SliceError::Snapshot),
+        };
+        data.room(map_id, fresh_bedroom, wooden_door_open)
+            .map_err(|_| SliceError::Snapshot)?;
         let transition = if bytes[82] == 255 {
+            if bytes[103..108] != [0; 5] {
+                return Err(SliceError::Snapshot);
+            }
             None
         } else {
-            Some(Transition::restore(bytes[82]).ok_or(SliceError::Snapshot)?)
+            let handoff = (
+                u16::from_le_bytes([bytes[104], bytes[105]]),
+                u16::from_le_bytes([bytes[106], bytes[107]]),
+            );
+            let t =
+                Transition::restore(bytes[82], bytes[103], handoff).ok_or(SliceError::Snapshot)?;
+            if (!data.door_interaction() && t.route() > 1)
+                || (!wooden_door_open
+                    && (t.source_map() == 11 || (t.source_map() == 12 && t.index() == 2)))
+                || data.exit(t.source_map(), handoff).map(|(i, _)| i) != Some(t.index())
+            {
+                return Err(SliceError::Snapshot);
+            }
+            Some(t)
         };
         let walking = if let Some(t) = transition {
             if t.map_id() != map_id
@@ -333,9 +491,11 @@ impl GameState {
             let (x, y) = t.handoff();
             WalkingState::new(x, y)
         } else {
-            let walking =
-                WalkingState::decode_snapshot(data.room(map_id, fresh_bedroom)?, &bytes[83..99])
-                    .map_err(|_| SliceError::Snapshot)?;
+            let walking = WalkingState::decode_snapshot(
+                data.room(map_id, fresh_bedroom, wooden_door_open)?,
+                &bytes[83..99],
+            )
+            .map_err(|_| SliceError::Snapshot)?;
             if data.exit(map_id, walking.position()).is_some() {
                 return Err(SliceError::Snapshot);
             }
@@ -386,6 +546,7 @@ impl GameState {
             animation,
             transition,
             fresh_bedroom,
+            wooden_door_open,
         })
     }
 }
@@ -497,7 +658,10 @@ mod tests {
         }
         assert!(!fresh.fresh_bedroom);
         fresh.map_id = 15;
-        assert_eq!(data.room(15, fresh.fresh_bedroom).unwrap(), &data.rooms[0]);
+        assert_eq!(
+            data.room(15, fresh.fresh_bedroom, false).unwrap(),
+            &data.rooms[0].collision
+        );
     }
     #[test]
     fn synthetic_replay_snapshots_resume_at_every_logical_step() {
@@ -531,7 +695,7 @@ mod tests {
         let mut data = synthetic_data();
         let mut cells = vec![0; 2048];
         cells[19 * 32 + 24] = 14 << 9; // clamps the last Up step onto Y336
-        data.rooms[1] = Room::new(32, 64, cells).unwrap();
+        data.rooms[1].collision = Room::new(32, 64, cells).unwrap();
         let mut state = GameState::new(&data, Policy::SemanticPreview);
         let inputs = (0..56)
             .map(|_| Some(Direction::Left))
@@ -615,7 +779,7 @@ mod tests {
     #[test]
     fn ordered_exit_selection_does_not_fall_through_failed_fine_match() {
         let mut data = synthetic_data();
-        data.exits[0] = vec![
+        data.rooms[0].exits = vec![
             Exit([24, 12, 1, 2, 16, 0, 0, 5, 128, 1, 80, 1]),
             Exit([24, 12, 2, 2, 16, 0, 0, 5, 128, 1, 80, 1]),
         ];
@@ -648,14 +812,16 @@ mod tests {
     fn unsupported_handoffs_and_overflow_are_atomic() {
         let mut data = synthetic_data();
         let mut state = GameState::new(&data, Policy::SemanticPreview);
-        data.exits[0].push(Exit([29, 10, 1, 1, 99, 0, 0, 0, 0, 0, 0, 0]));
+        data.rooms[0]
+            .exits
+            .push(Exit([29, 10, 1, 1, 99, 0, 0, 0, 0, 0, 0, 0]));
         let before = state.snapshot();
         assert_eq!(
             state.step(&data, FrameInput::default()),
             Err(SliceError::Exit)
         );
         assert_eq!(state.snapshot(), before);
-        data.exits[0].pop();
+        data.rooms[0].exits.pop();
         state.walking = WalkingState::new(392, 210);
         let before = state.snapshot();
         assert_eq!(
@@ -710,3 +876,7 @@ mod tests {
         assert_eq!(state.walking.onset_remaining(), 0);
     }
 }
+
+#[cfg(test)]
+#[path = "house_tests.rs"]
+mod house_tests;

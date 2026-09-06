@@ -77,6 +77,11 @@ impl Room {
         &self.cells
     }
 
+    // Only the authenticated house constructor uses this on its private clone.
+    pub(crate) fn replace_cell(&mut self, index: usize, raw: u16) {
+        self.cells[index] = raw;
+    }
+
     pub(crate) fn validate_position(&self, x: u16, y: u16) -> Result<(), Unqualified> {
         if x < 8
             || y < 16

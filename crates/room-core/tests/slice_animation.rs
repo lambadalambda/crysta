@@ -96,7 +96,7 @@ fn blocked_hold_keeps_six_record_clock_and_snapshot_phase() {
             assert_eq!(state, restored);
             assert_eq!(out.position, (304, 112));
             assert_eq!(out.animation, walk(direction, (age % 54) / 9));
-            assert_eq!(&state.snapshot()[100..], &[direction as u8, 1, age % 54]);
+            assert_eq!(&state.snapshot()[100..103], &[direction as u8, 1, age % 54]);
         }
     }
 }
@@ -106,16 +106,16 @@ fn snapshot_profile_append_and_coherence_are_fail_closed() {
     let data = data(false, None);
     let mut state = GameState::new_game(&data, Policy::SemanticPreview);
     let initial = state.snapshot();
-    assert_eq!(PROFILE_VERSION, 7);
+    assert_eq!(PROFILE_VERSION, 8);
     assert_eq!(SNAPSHOT_SIZE, 16);
-    assert_eq!(initial.len(), 103);
-    assert_eq!(initial[5], 7);
+    assert_eq!(initial.len(), 109);
+    assert_eq!(initial[5], 8);
     assert_eq!(
         &initial[83..99],
         &WalkingState::new(304, 112).encode_snapshot()
     );
     assert_eq!(initial[99], 1);
-    assert_eq!(&initial[100..], &[0, 0, 0]);
+    assert_eq!(&initial[100..103], &[0, 0, 0]);
     for facing in 0..4 {
         let mut bytes = initial.clone();
         bytes[100] = facing;
@@ -215,7 +215,7 @@ fn doorway_pose_is_directional_standing_from_handoff_through_completion() {
         loop {
             assert_eq!(state.output().animation, standing(direction));
             let bytes = state.snapshot();
-            assert_eq!(&bytes[100..], &[direction as u8, 0, 0]);
+            assert_eq!(&bytes[100..103], &[direction as u8, 0, 0]);
             let mut restored = GameState::restore(&data, &bytes).unwrap();
             if state.output().phase == Phase::Walking {
                 break;

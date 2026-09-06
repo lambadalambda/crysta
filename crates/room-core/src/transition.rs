@@ -1,62 +1,82 @@
-//! Endpoint-qualified doorway preview, deliberately not a native actor scheduler.
-//!
-//! The 17+load+17 logical-update policy preserves measured endpoints. It does
-//! not reproduce loading stalls, COP scheduling or reference video-frame timing.
+//! Source-selected, endpoint-qualified 17 + load + 17 logical doorway policy.
+use crate::{
+    house::{Doorway, DOORWAYS},
+    Direction,
+};
 
-/// An explicitly opted-in semantic doorway pair, accepted only at its qualified handoff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Transition {
+    route: u8,
     elapsed: u8,
-    handoff_y: u16,
+    handoff: (u16, u16),
 }
 impl Transition {
-    pub(crate) fn start(map_id: u16, position: (u16, u16)) -> Option<Self> {
-        if !matches!(
-            (map_id, position),
-            (15, (392, 208 | 209)) | (16, (392, 336))
-        ) {
-            return None;
-        }
-        Some(Self {
+    #[cfg(test)]
+    pub(crate) fn start(map: u16, position: (u16, u16)) -> Option<Self> {
+        Self::select(map, 0, position)
+    }
+    pub(crate) fn select(map: u16, index: usize, position: (u16, u16)) -> Option<Self> {
+        let route = DOORWAYS
+            .iter()
+            .position(|s| s.source == map && s.index == index)?;
+        let spec = DOORWAYS[route];
+        let valid = match spec.direction {
+            Direction::Down => {
+                position.0 == spec.handoff.0
+                    && (spec.handoff.1..=spec.handoff.1 + 1).contains(&position.1)
+            }
+            Direction::Up => position == spec.handoff,
+            Direction::Left | Direction::Right => {
+                let exit = crate::house::exits(map)?[index];
+                position.0 == spec.handoff.0
+                    && exit.fine(position.0 - 8, position.1.checked_sub(16)?)
+            }
+        };
+        let route = u8::try_from(route).ok()?;
+        valid.then_some(Self {
+            route,
             elapsed: 0,
-            handoff_y: position.1,
+            handoff: position,
         })
     }
+    fn spec(self) -> Doorway {
+        DOORWAYS[usize::from(self.route)]
+    }
     pub(crate) fn source_map(self) -> u16 {
-        if self.handoff_y == 336 {
-            16
-        } else {
-            15
-        }
+        self.spec().source
     }
     pub(crate) fn handoff(self) -> (u16, u16) {
-        (392, self.handoff_y)
+        self.handoff
     }
-    pub(crate) fn direction(self) -> crate::Direction {
-        if self.handoff_y == 336 {
-            crate::Direction::Up
-        } else {
-            crate::Direction::Down
-        }
+    pub(crate) fn direction(self) -> Direction {
+        self.spec().direction
     }
     pub(crate) fn advance(&mut self) {
         self.elapsed = self.elapsed.saturating_add(1).min(35);
     }
     pub(crate) fn position(self) -> (u16, u16) {
-        let elapsed = u16::from(self.elapsed);
-        let y = match (self.handoff_y == 336, self.elapsed) {
-            (false, 0..=17) => self.handoff_y + elapsed,
-            (false, _) => 336 + elapsed - 18,
-            (true, 0..=17) => 336 - elapsed,
-            (true, _) => 208 - (elapsed - 18),
+        let (x, y) = if self.elapsed <= 17 {
+            self.handoff
+        } else {
+            self.spec().anchor
         };
-        (392, y)
+        let n = u16::from(if self.elapsed <= 17 {
+            self.elapsed
+        } else {
+            self.elapsed - 18
+        });
+        match self.direction() {
+            Direction::Down => (x, y + n),
+            Direction::Up => (x, y - n),
+            Direction::Left => (x - n, y),
+            Direction::Right => (x + n, y),
+        }
     }
     pub(crate) fn map_id(self) -> u16 {
         if self.elapsed <= 17 {
             self.source_map()
         } else {
-            31 - self.source_map()
+            self.spec().destination
         }
     }
     pub(crate) fn complete(self) -> bool {
@@ -65,30 +85,20 @@ impl Transition {
     pub(crate) fn elapsed(self) -> u8 {
         self.elapsed
     }
-    pub(crate) fn encoded(self) -> u8 {
-        self.elapsed
-            + match self.handoff_y {
-                336 => 64,
-                208 => 128,
-                _ => 0,
-            }
+    pub(crate) fn route(self) -> u8 {
+        self.route
     }
-    pub(crate) fn restore(encoded: u8) -> Option<Self> {
-        match encoded {
-            0..=34 => Some(Self {
-                elapsed: encoded,
-                handoff_y: 209,
-            }),
-            64..=98 => Some(Self {
-                elapsed: encoded - 64,
-                handoff_y: 336,
-            }),
-            128..=162 => Some(Self {
-                elapsed: encoded - 128,
-                handoff_y: 208,
-            }),
-            _ => None,
+    pub(crate) fn index(self) -> usize {
+        self.spec().index
+    }
+    pub(crate) fn restore(route: u8, elapsed: u8, handoff: (u16, u16)) -> Option<Self> {
+        let spec = DOORWAYS.get(usize::from(route))?;
+        let mut t = Self::select(spec.source, spec.index, handoff)?;
+        if elapsed >= 35 {
+            return None;
         }
+        t.elapsed = elapsed;
+        Some(t)
     }
 }
 
@@ -96,72 +106,43 @@ impl Transition {
 mod tests {
     use super::*;
     #[test]
-    fn explicit_preview_preserves_endpoints_not_video_cadence() {
-        let mut t = Transition::start(15, (392, 209)).unwrap();
-        for _ in 0..17 {
-            t.advance();
-        }
-        assert_eq!(t.position(), (392, 226));
-        assert_eq!(t.map_id(), 15);
-        t.advance();
-        assert_eq!(t.position(), (392, 336));
-        assert_eq!(t.map_id(), 16);
-        for _ in 0..17 {
-            t.advance();
-        }
-        assert_eq!(t.position(), (392, 353));
-        assert!(t.complete());
-        assert_eq!(t.elapsed(), 35);
-        assert!(Transition::restore(35).is_none());
-        assert_eq!(Transition::restore(18).unwrap().position(), (392, 336));
-    }
-    #[test]
-    fn reverse_doorway_preserves_qualified_endpoints_and_encoding() {
-        let mut t = Transition::start(16, (392, 336)).unwrap();
-        assert_eq!(t.source_map(), 16);
-        assert_eq!(t.handoff(), (392, 336));
-        assert_eq!(t.direction(), crate::Direction::Up);
-        for elapsed in 0..35 {
-            assert_eq!(Transition::restore(t.encoded()), Some(t));
-            assert_eq!(t.elapsed(), elapsed);
-            t.advance();
-            match elapsed + 1 {
-                17 => assert_eq!((t.map_id(), t.position()), (16, (392, 319))),
-                18 => assert_eq!((t.map_id(), t.position()), (15, (392, 208))),
-                35 => assert_eq!((t.map_id(), t.position()), (15, (392, 191))),
-                _ => (),
+    fn all_endpoints_and_every_owned_snapshot() {
+        for (route, spec) in DOORWAYS.iter().enumerate() {
+            let mut t = Transition::select(spec.source, spec.index, spec.handoff).unwrap();
+            for elapsed in 0..35 {
+                assert_eq!(
+                    Transition::restore(u8::try_from(route).unwrap(), elapsed, t.handoff()),
+                    Some(t)
+                );
+                t.advance();
+                if elapsed == 17 {
+                    assert_eq!(t.position(), spec.anchor);
+                }
             }
+            assert_eq!(t.position(), spec.endpoint);
+            assert_eq!(t.map_id(), spec.destination);
+            assert!(t.complete());
+            assert!(Transition::restore(u8::try_from(route).unwrap(), 35, t.handoff()).is_none());
         }
-        assert!(t.complete());
-        for byte in 35..64 {
-            assert!(Transition::restore(byte).is_none());
-        }
-        for byte in (99..128).chain(163..=255) {
-            assert!(Transition::restore(byte).is_none());
-        }
-        assert!(Transition::start(15, (392, 336)).is_none());
-        assert!(Transition::start(16, (392, 209)).is_none());
-        assert!(Transition::start(17, (392, 336)).is_none());
     }
     #[test]
-    fn fresh_route_hands_off_at_208_without_inventing_a_walking_frame() {
-        let mut t = Transition::start(15, (392, 208)).unwrap();
-        assert_eq!(Transition::restore(t.encoded()), Some(t));
-        for _ in 0..17 {
+    fn legacy_both_outbound_handoffs_and_reverse_are_preserved() {
+        for y in [208, 209] {
+            let mut t = Transition::start(15, (392, y)).unwrap();
+            for _ in 0..17 {
+                t.advance();
+            }
+            assert_eq!(t.position(), (392, y + 17));
             t.advance();
+            assert_eq!(t.position(), (392, 336));
+            for _ in 0..17 {
+                t.advance();
+            }
+            assert_eq!(t.position(), (392, 353));
         }
-        assert_eq!((t.map_id(), t.position()), (15, (392, 225)));
-        t.advance();
-        assert_eq!((t.map_id(), t.position()), (16, (392, 336)));
-        for _ in 0..17 {
-            t.advance();
-        }
-        assert_eq!(t.position(), (392, 353));
-        assert!(t.complete());
-    }
-    #[test]
-    fn unrelated_handoff_is_not_accepted() {
         assert!(Transition::start(15, (391, 209)).is_none());
         assert!(Transition::start(15, (392, 207)).is_none());
+        assert!(Transition::start(16, (392, 336)).is_some());
+        assert!(Transition::start(17, (392, 336)).is_none());
     }
 }
