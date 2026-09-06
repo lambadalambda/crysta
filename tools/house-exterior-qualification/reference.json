@@ -1,0 +1,1250 @@
+{
+  "export": [
+    {
+      "files": {
+        "attributes": "f9f9b75e600655258cf4f5902491faccb82097ebc5802bac323b476d0108773c",
+        "cells": "1ff4401c085ac9a20850bc28335828367c37db25ed561a3a86112d9708caa633",
+        "definitions": "ac6fb37dde4ccaae22ec1c4c29a5637ff84747774768a5451c10dba0643ab9fd",
+        "graphics": "87f09d39d71a6cd6e9c2621cc9c223d35ce07ea9dd00ec3fb914024b378fbfe2",
+        "indices": "e42b8fe246cd0b5c39a5ba66f670973330c504ba600a31c71d2a24f4bf3712e4",
+        "palette": "1cf795b6bf004bbdde30af067fe1c2936201094bcafd9d8683987f8ff832c6af",
+        "priorities": "d424358ffb721b808075af586fda49d17d39ab80a27819ba78fbe2e425642a83",
+        "rgb": "8ea11842a2540d25258ce96079e12e82dc46500c71cd5d8c5dd0fd0b5b6d7813",
+        "static-grid": "9c036fb9a9eac0d0ec26bb845997a853fbe4932949249056b5ac7d2d177a3f7f"
+      },
+      "height_cells": 80,
+      "map": 10,
+      "sources": [
+        {
+          "end": 1965543,
+          "sha256": "cd96d51709ce33fe2d09748a0d0854d9b351f6c00f7a261b5cc8a109fd378674",
+          "start": 1950182
+        },
+        {
+          "end": 3270981,
+          "sha256": "68bb56ce1c4bea316a763abc0303ea908580d5a44e11d7034d4b11ddb129c0e4",
+          "start": 3270789
+        },
+        {
+          "end": 2868020,
+          "sha256": "b74becf8aad52951ca8b0f4461f151a929371814f768287b8c6353dde185fba5",
+          "start": 2865658
+        },
+        {
+          "end": 3269821,
+          "sha256": "733f49835334622b9e3138f4aa347d969d84a0a7fa56bf182ea314c36995c735",
+          "start": 3269624
+        },
+        {
+          "end": 3312568,
+          "sha256": "e24e9c2cabf46f25db23372360c8fad1c4c55159dadc6dc9ff70d97c5545066b",
+          "start": 3312504
+        },
+        {
+          "end": 2738337,
+          "sha256": "3694b021141468a6f6d84e719ae4f51b77a7bccb510f0d0f8fc7560af3ee038e",
+          "start": 2734837
+        }
+      ],
+      "width_cells": 64
+    }
+  ],
+  "contract": {
+    "schema": 1,
+    "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+    "map": 10,
+    "sheet_pixels": [
+      1024,
+      1280
+    ],
+    "camera_bounds": [
+      0,
+      0,
+      1024,
+      1024
+    ],
+    "camera_clamp_height": 256,
+    "hardware_background": 2,
+    "tilemap_word_base": 14336,
+    "bgmode": 9,
+    "display_profile_source": 1489967,
+    "display_profile": [
+      22,
+      1,
+      130,
+      51,
+      100,
+      192,
+      9,
+      237,
+      19
+    ],
+    "sample_window_cells": [
+      29,
+      47,
+      36,
+      53
+    ],
+    "global_event_bits": [
+      32,
+      38,
+      251
+    ],
+    "passive_action_mask_clear": 80,
+    "policy": "base first BG only; bounded sample window, not whole-map actors/material admission"
+  },
+  "route_sha256": "c3088fc926d3759fc2e8f8e04379f99af7645f23228465e994b75e606d09bd22",
+  "native": [
+    {
+      "label": "landed-A",
+      "position": [
+        504,
+        769
+      ],
+      "camera": [
+        376,
+        657
+      ],
+      "files": {
+        "wram": "7c8c09364199c12207d2f6ca2a29d6185c5dd15c3e2efb2d2426096cf5c7ab43",
+        "vram": "dc4fa170fd5d303604b33995ffbc58d81e4fdb4632b90a4e589244d8fd21a0f1",
+        "cgram": "65bd75257926994b5df5887012552e8ff402f44abf3040561c6db4df53413b7a",
+        "oam": "23ebd1e02516d1e54a636cee194042110ca62c1d68c712c8c9d7304d4ef84007",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+        "pixels": "524761888db77fbc2d57b133eb9f02b4a41851be3d8d8fc73645c2f041e98b88"
+      },
+      "grid_differences": [
+        [
+          1045,
+          17,
+          32785
+        ],
+        [
+          1098,
+          30,
+          32798
+        ],
+        [
+          1185,
+          349,
+          33117
+        ],
+        [
+          1186,
+          349,
+          33117
+        ],
+        [
+          1522,
+          377,
+          33145
+        ],
+        [
+          1628,
+          30,
+          32798
+        ],
+        [
+          1700,
+          29,
+          32797
+        ],
+        [
+          1831,
+          144,
+          32912
+        ],
+        [
+          1910,
+          6375,
+          39143
+        ],
+        [
+          1921,
+          6375,
+          39143
+        ],
+        [
+          2036,
+          152,
+          32920
+        ],
+        [
+          3056,
+          2,
+          32770
+        ],
+        [
+          3242,
+          115,
+          32883
+        ],
+        [
+          3591,
+          6375,
+          39143
+        ]
+      ],
+      "changed_graphics_tiles": [
+        9,
+        10,
+        11,
+        12,
+        496,
+        497,
+        498,
+        499,
+        500,
+        501,
+        502,
+        503,
+        504,
+        505,
+        506,
+        507,
+        508,
+        509,
+        510,
+        511
+      ],
+      "palette_differences": [
+        [
+          0,
+          10445,
+          5613
+        ],
+        [
+          96,
+          5613,
+          0
+        ],
+        [
+          97,
+          0,
+          2050
+        ],
+        [
+          98,
+          9,
+          6149
+        ],
+        [
+          99,
+          208,
+          12295
+        ],
+        [
+          100,
+          407,
+          1101
+        ],
+        [
+          101,
+          606,
+          7301
+        ],
+        [
+          102,
+          4797,
+          15531
+        ],
+        [
+          103,
+          10012,
+          8399
+        ],
+        [
+          104,
+          25599,
+          11490
+        ],
+        [
+          105,
+          12292,
+          11535
+        ],
+        [
+          106,
+          13345,
+          15663
+        ],
+        [
+          107,
+          14528,
+          7555
+        ],
+        [
+          108,
+          15712,
+          15848
+        ],
+        [
+          109,
+          11681,
+          9711
+        ],
+        [
+          110,
+          7592,
+          15855
+        ],
+        [
+          111,
+          11663,
+          0
+        ],
+        [
+          112,
+          5613,
+          9808
+        ],
+        [
+          113,
+          31352,
+          31547
+        ],
+        [
+          114,
+          31417,
+          31612
+        ],
+        [
+          115,
+          31482,
+          31677
+        ],
+        [
+          116,
+          31547,
+          32767
+        ],
+        [
+          117,
+          31612,
+          31352
+        ],
+        [
+          118,
+          31677,
+          31417
+        ],
+        [
+          119,
+          32767,
+          31482
+        ]
+      ],
+      "bg2_equal_tile_words": 672,
+      "bg1_equal_tile_words": 0,
+      "high_words": 63,
+      "equal_base_index_priority_pixels": 43008,
+      "sampled_pixels": 43008,
+      "changed_palette_opaque_pixels": 0,
+      "visible_oam": [
+        {
+          "slot": 0,
+          "position": [
+            80,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 1,
+          "position": [
+            92,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 2,
+          "position": [
+            104,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 3,
+          "position": [
+            116,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 4,
+          "position": [
+            128,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 5,
+          "position": [
+            140,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 6,
+          "position": [
+            152,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 7,
+          "position": [
+            164,
+            48
+          ],
+          "size": 16,
+          "priority": 3
+        },
+        {
+          "slot": 8,
+          "position": [
+            120,
+            79
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 9,
+          "position": [
+            120,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 10,
+          "position": [
+            129,
+            96
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 11,
+          "position": [
+            120,
+            95
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 12,
+          "position": [
+            129,
+            88
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 13,
+          "position": [
+            128,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 14,
+          "position": [
+            119,
+            88
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 15,
+          "position": [
+            119,
+            96
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 16,
+          "position": [
+            128,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 17,
+          "position": [
+            120,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        }
+      ]
+    },
+    {
+      "label": "exterior-walk-down-settled",
+      "position": [
+        504,
+        815
+      ],
+      "camera": [
+        376,
+        703
+      ],
+      "files": {
+        "wram": "8679c2f776f03bb6276f6595b536f5a53d95ae136bcf93c59e138047ebef8348",
+        "vram": "9de307e3059a14c8cabcd94174c9fc6c40e423d8c0054238c277beec27c15fd1",
+        "cgram": "367436ba5c13a0f77937c8f9614fe2c80cc910020dd3c6f92ed8b73658ee449e",
+        "oam": "f9de857b20a68b80e59baf72a99d35aec386796dea0c89a54998e2fcd4dba295",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+        "pixels": "aa723f2e9696245395a47afdd1ef81cc59f01989037ad5ed849983617f5cac50"
+      },
+      "grid_differences": [
+        [
+          1045,
+          17,
+          32785
+        ],
+        [
+          1098,
+          30,
+          32798
+        ],
+        [
+          1185,
+          349,
+          33117
+        ],
+        [
+          1186,
+          349,
+          33117
+        ],
+        [
+          1521,
+          368,
+          33136
+        ],
+        [
+          1628,
+          30,
+          32798
+        ],
+        [
+          1831,
+          144,
+          32912
+        ],
+        [
+          1910,
+          6375,
+          39143
+        ],
+        [
+          1921,
+          6375,
+          39143
+        ],
+        [
+          2036,
+          152,
+          32920
+        ],
+        [
+          3056,
+          2,
+          32770
+        ],
+        [
+          3242,
+          115,
+          32883
+        ],
+        [
+          3591,
+          6375,
+          39143
+        ]
+      ],
+      "changed_graphics_tiles": [
+        9,
+        10,
+        11,
+        12,
+        496,
+        497,
+        498,
+        499,
+        500,
+        501,
+        502,
+        503,
+        504,
+        505,
+        506,
+        507,
+        508,
+        509,
+        510,
+        511
+      ],
+      "palette_differences": [
+        [
+          0,
+          10445,
+          5613
+        ],
+        [
+          96,
+          5613,
+          0
+        ],
+        [
+          97,
+          0,
+          2050
+        ],
+        [
+          98,
+          9,
+          6149
+        ],
+        [
+          99,
+          208,
+          12295
+        ],
+        [
+          100,
+          407,
+          1101
+        ],
+        [
+          101,
+          606,
+          7301
+        ],
+        [
+          102,
+          4797,
+          15531
+        ],
+        [
+          103,
+          10012,
+          8399
+        ],
+        [
+          104,
+          25599,
+          11490
+        ],
+        [
+          105,
+          12292,
+          11535
+        ],
+        [
+          106,
+          13345,
+          15663
+        ],
+        [
+          107,
+          14528,
+          7555
+        ],
+        [
+          108,
+          15712,
+          15848
+        ],
+        [
+          109,
+          11681,
+          9711
+        ],
+        [
+          110,
+          7592,
+          15855
+        ],
+        [
+          111,
+          11663,
+          0
+        ],
+        [
+          112,
+          5613,
+          9808
+        ],
+        [
+          113,
+          31352,
+          31482
+        ],
+        [
+          114,
+          31417,
+          31547
+        ],
+        [
+          115,
+          31482,
+          31612
+        ],
+        [
+          116,
+          31547,
+          31677
+        ],
+        [
+          117,
+          31612,
+          32767
+        ],
+        [
+          118,
+          31677,
+          31352
+        ],
+        [
+          119,
+          32767,
+          31417
+        ]
+      ],
+      "bg2_equal_tile_words": 672,
+      "bg1_equal_tile_words": 0,
+      "high_words": 8,
+      "equal_base_index_priority_pixels": 43008,
+      "sampled_pixels": 43008,
+      "changed_palette_opaque_pixels": 0,
+      "visible_oam": [
+        {
+          "slot": 0,
+          "position": [
+            120,
+            79
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 1,
+          "position": [
+            120,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 2,
+          "position": [
+            129,
+            96
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 3,
+          "position": [
+            120,
+            95
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 4,
+          "position": [
+            129,
+            88
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 5,
+          "position": [
+            128,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 6,
+          "position": [
+            119,
+            88
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 7,
+          "position": [
+            119,
+            96
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 8,
+          "position": [
+            128,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 9,
+          "position": [
+            120,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        }
+      ]
+    },
+    {
+      "label": "exterior-walk-settled",
+      "position": [
+        538,
+        815
+      ],
+      "camera": [
+        410,
+        703
+      ],
+      "files": {
+        "wram": "9ff66d5c97b2495ecfd6092f9f87778a73a9930605223554f77734e7f64414e5",
+        "vram": "e1f56a5eaca1744c59a19bb864f01b537e986c219d95ecbfdf9b5d5781cddf60",
+        "cgram": "3b3e3d2840422f8548353176fe652c091e4d6f631d2aa0271ce04e51b97ba77c",
+        "oam": "0af59b674fa0ee02f70ce22e4064b4dfb7a06de6b96f6b2ad816c3e933ec3831",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8",
+        "pixels": "9f094d713e7f9c3737283dc37639259a98087b588e895d7681692b817f5767e0"
+      },
+      "grid_differences": [
+        [
+          1045,
+          17,
+          32785
+        ],
+        [
+          1098,
+          30,
+          32798
+        ],
+        [
+          1185,
+          349,
+          33117
+        ],
+        [
+          1186,
+          349,
+          33117
+        ],
+        [
+          1521,
+          368,
+          33136
+        ],
+        [
+          1628,
+          30,
+          32798
+        ],
+        [
+          1702,
+          153,
+          32921
+        ],
+        [
+          1831,
+          144,
+          32912
+        ],
+        [
+          1910,
+          6375,
+          39143
+        ],
+        [
+          1921,
+          6375,
+          39143
+        ],
+        [
+          2036,
+          152,
+          32920
+        ],
+        [
+          3056,
+          2,
+          32770
+        ],
+        [
+          3242,
+          115,
+          32883
+        ],
+        [
+          3591,
+          6375,
+          39143
+        ]
+      ],
+      "changed_graphics_tiles": [
+        9,
+        10,
+        11,
+        12,
+        496,
+        497,
+        498,
+        499,
+        500,
+        501,
+        502,
+        503,
+        504,
+        505,
+        506,
+        507,
+        508,
+        509,
+        510,
+        511
+      ],
+      "palette_differences": [
+        [
+          0,
+          10445,
+          5613
+        ],
+        [
+          96,
+          5613,
+          0
+        ],
+        [
+          97,
+          0,
+          2049
+        ],
+        [
+          98,
+          9,
+          4099
+        ],
+        [
+          99,
+          208,
+          8197
+        ],
+        [
+          100,
+          407,
+          9
+        ],
+        [
+          101,
+          606,
+          5187
+        ],
+        [
+          102,
+          4797,
+          12393
+        ],
+        [
+          103,
+          10012,
+          6283
+        ],
+        [
+          104,
+          25599,
+          8353
+        ],
+        [
+          105,
+          12292,
+          8396
+        ],
+        [
+          106,
+          13345,
+          12524
+        ],
+        [
+          107,
+          14528,
+          5410
+        ],
+        [
+          108,
+          15712,
+          11622
+        ],
+        [
+          109,
+          11681,
+          7531
+        ],
+        [
+          110,
+          7592,
+          12684
+        ],
+        [
+          111,
+          11663,
+          0
+        ],
+        [
+          112,
+          5613,
+          9808
+        ],
+        [
+          113,
+          31352,
+          31612
+        ],
+        [
+          114,
+          31417,
+          31677
+        ],
+        [
+          115,
+          31482,
+          32767
+        ],
+        [
+          116,
+          31547,
+          31352
+        ],
+        [
+          117,
+          31612,
+          31417
+        ],
+        [
+          118,
+          31677,
+          31482
+        ],
+        [
+          119,
+          32767,
+          31547
+        ]
+      ],
+      "bg2_equal_tile_words": 672,
+      "bg1_equal_tile_words": 0,
+      "high_words": 8,
+      "equal_base_index_priority_pixels": 43008,
+      "sampled_pixels": 43008,
+      "changed_palette_opaque_pixels": 0,
+      "visible_oam": [
+        {
+          "slot": 0,
+          "position": [
+            120,
+            87
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 1,
+          "position": [
+            120,
+            76
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 2,
+          "position": [
+            128,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 3,
+          "position": [
+            120,
+            87
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 4,
+          "position": [
+            120,
+            95
+          ],
+          "size": 16,
+          "priority": 2
+        },
+        {
+          "slot": 5,
+          "position": [
+            128,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        },
+        {
+          "slot": 6,
+          "position": [
+            120,
+            103
+          ],
+          "size": 8,
+          "priority": 2
+        }
+      ]
+    }
+  ],
+  "source_windows": [
+    {
+      "name": "D direct exit",
+      "start": 101886,
+      "end": 101898,
+      "sha256": "af682fcfd417f0880f8695694a84d31d40e8df3cc434700b63583598ce5ebc26"
+    },
+    {
+      "name": "A map loading table entry",
+      "start": 431546,
+      "end": 431549,
+      "sha256": "75ade98a64e72d3fe2ada03081973dd881579cf815e3b684cb2a89e8f1c29ead"
+    },
+    {
+      "name": "A loading root",
+      "start": 1606480,
+      "end": 1606544,
+      "sha256": "2c5289c96c979d4347c5d0b2dde02399728fdcb5478a922e39a8bb0294fdf9cd"
+    },
+    {
+      "name": "shared audio tail",
+      "start": 1606544,
+      "end": 1606655,
+      "sha256": "52d48f1295b44be82a33e2f369928ea18aa12aff2b035452f2ccc0dbb1358a00"
+    },
+    {
+      "name": "shared resources",
+      "start": 1606044,
+      "end": 1606065,
+      "sha256": "d31df6478913d7bff3b5cfebc117c7994be333f1f1786cad73d9f4ef1f3c838a"
+    },
+    {
+      "name": "scene prefix and fallthrough records",
+      "start": 231847,
+      "end": 232075,
+      "sha256": "ae7e54ba062e6eef00aa05322e4e3e85c4c608dae43d8ad6092d05d1ba5c9416"
+    },
+    {
+      "name": "display profile lookup consumer",
+      "start": 429175,
+      "end": 429462,
+      "sha256": "830d1f06c0a1534886b3f924245a3bc436e67c7661b2cecb0c1937291e71ef31"
+    },
+    {
+      "name": "A display profile pointer",
+      "start": 1489780,
+      "end": 1489782,
+      "sha256": "237b4bf14c5c4a6ee496257235cdcf2c46358cb6160ecbb9b7a12514c61bba07"
+    },
+    {
+      "name": "A display profile",
+      "start": 1489967,
+      "end": 1489976,
+      "sha256": "e6954b0c96dafef306ea0a62d01efe70d69017b5e2eeeec9c30766f0836ab159"
+    },
+    {
+      "name": "camera bounds consumer",
+      "start": 430961,
+      "end": 431096,
+      "sha256": "e7bb463a819ce34ee0ad74f477ffab7477193637546484243e95d506b3892acf"
+    },
+    {
+      "name": "A camera record",
+      "start": 1490500,
+      "end": 1490502,
+      "sha256": "3330e5ba53cb09ab97dd287ad8ba30380b88a5aca467b6c231b0a46f261c16e1"
+    },
+    {
+      "name": "camera follow consumer",
+      "start": 495777,
+      "end": 495878,
+      "sha256": "7eb35cb537b2b9d262fe4ce4e1b0092e9c18303cf92be3885fe27d37491eb68c"
+    }
+  ],
+  "capture_provenance": {
+    "bootstrap": "Session::new empty SRAM; shared finite New Game inputs, then conversation-owned route",
+    "checkpoint_method": "oracle::save_state synchronizes before passive surfaces; state output is neither loaded nor used here",
+    "source_files": [
+      {
+        "path": "tools/house-conversation-qualification/probe.rs",
+        "sha256": "3f35b85c16d1ec32d8e3307bb72fe385f9c973ce17659534a71c9823f920b8d4"
+      },
+      {
+        "path": "tools/house-conversation-qualification/route.jsonl",
+        "sha256": "c3088fc926d3759fc2e8f8e04379f99af7645f23228465e994b75e606d09bd22"
+      },
+      {
+        "path": "tools/new-game-qualification/bootstrap.rs",
+        "sha256": "af48439cd73b26ff0584024d1b68f7d0193f370f45bcff5724a3022b0f01aeaf"
+      }
+    ],
+    "frames": {
+      "landed-A": 11853,
+      "exterior-walk-down-settled": 11945,
+      "exterior-walk-settled": 12059
+    }
+  }
+}
