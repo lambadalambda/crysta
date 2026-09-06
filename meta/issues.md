@@ -35,3 +35,4 @@
 - [ ] [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)
 - [ ] [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
 - [ ] [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
+- [ ] [Renew map-inspector fixture for completed video publication](issues/renew-map-inspector-observer-fixture.md)
