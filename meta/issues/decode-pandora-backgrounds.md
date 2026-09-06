@@ -39,3 +39,9 @@ Compile and independently qualify only the first-background resources, source ca
 - Opt-in host art compiles four separate in-memory sheets for eight required new maps, exact-sharing only after full bitmap equality. Transport retains source cameras/first-BG masks and keeps cellar palette distinct from ordinary house. Every BGR pixel/mask/camera is tested.
 - Separate `pandora_backgrounds` metadata and four exact read-only loopback routes are ready for aggregate integration; house-only capability returns404 and keeps old manifest/scene unchanged. No runtime map admission, phase patch, camera pan or frontend enablement is claimed.
 - Parent 51 host unit tests and strict workspace Clippy pass. Earlier independent native background check remains `local/map-research/pandora-background-parent.txt`; new host logs `pandora-background-host-{green,clippy}.txt` in the same directory.
+
+## Parent component acceptance
+
+- Source backgrounds/cameras/first-BG indexed composition are accepted, including inherited tour initialization and separate cellar palette. Full-grid availability still grants no movement/occupancy admission; shared-sheet patches, town fine-scroll ring alias, animation/palette timing and whole RGB limits remain explicit.
+- Parent source replay now passes the reviewed synchronous observer epoch strictly on both independently reproduced roots, normally and optimized; this supersedes earlier pending observer/source handoffs, not the fidelity limits above. Independent component reproduction and closure audit found no remaining blocker for these component criteria.
+- Issue archived. The live profile remains house-only; `port-pandora-sequence` and its navigation/story/renderer work stay open. Full map-inspector SRAM capture renewal and other unrenewed legacy wrappers remain separate, not reported green by these tests.

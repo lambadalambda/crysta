@@ -259,3 +259,11 @@ capture `local/oracle-video-qualification/replay-WKFf0d/a/journey` in normal and
 optimized Python. `local/pandora-scene-qualification/parent-root.txt` names the
 private export; `local/map-research/pandora-scene-parent.txt` retains the results.
 This does not substitute for the separate full-route observer fixture migration.
+
+### Component acceptance status
+
+The parent has independently reproduced and accepted this component and the
+strict direct Pandora source route under `headless-sync-video-v1`. This
+supersedes earlier pending observer/parent handoff statements, **not** the
+source-only coverage or fidelity/admission limits in this contract. Portable
+Pandora integration remains open and the live host stays on the house profile.

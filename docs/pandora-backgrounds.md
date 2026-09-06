@@ -232,3 +232,11 @@ shared-sheet equality, the separate cellar palette, old bundle preservation and
 exact-route rejection. Parent host tests and strict workspace Clippy pass; logs
 `local/map-research/pandora-background-host-{green,clippy}.txt`. The previously
 qualified source/native background comparisons remain the evidence boundary.
+
+### Component acceptance status
+
+The parent has independently reproduced and accepted this component and the
+strict direct Pandora source route under `headless-sync-video-v1`. This
+supersedes earlier pending observer/parent handoff statements, **not** the
+source-only coverage or fidelity/admission limits in this contract. Portable
+Pandora integration remains open and the live host stays on the house profile.

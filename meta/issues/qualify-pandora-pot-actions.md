@@ -38,3 +38,9 @@ Qualify and implement source-derived FA/FB lifting, carrying and throws sufficie
 
 - Rebuilt the source contract and projected all three original contiguous segments into `local/pandora-pots/fixtures` without changing the source route or pins. Explicit `PANDORA_POT_FIXTURES` run passes the 2184-tick native/restore comparison and all 14 focused component tests; six qualification tests pass normal/-O. Log: `local/map-research/pandora-pots-parent.txt`.
 - Runtime integration still owns persistent event gates, visit-local lifecycle, frozen throw-lane profile, response/door patches and stair handoff. Component reproduction does not enable the Pandora preview or replace the separate full-route observer gate.
+
+## Parent component acceptance
+
+- The 2184 native ticks in three separate contiguous component tests, each with portable snapshot continuation, are accepted. This is neither a continuous integrated portable route nor native restore evidence. Only exact direct-C Up lanes/contact are admitted; Left carry is source-only and general COP65/ballistics are unqualified. Parent retains story gates, launch-profile ownership, reactions and stairs.
+- Parent source replay now passes the reviewed synchronous observer epoch strictly on both independently reproduced roots, normally and optimized; this supersedes earlier pending observer/source handoffs, not the fidelity limits above. Independent component reproduction and closure audit found no remaining blocker for these component criteria.
+- Issue archived. The live profile remains house-only; `port-pandora-sequence` and its navigation/story/renderer work stay open. Full map-inspector SRAM capture renewal and other unrenewed legacy wrappers remain separate, not reported green by these tests.

@@ -239,3 +239,11 @@ or a claim that all listed directional actions are admitted**. Sprite owner owns
 composition, lift poses, held alignment, elevation and fragments. Background owner
 owns source/static grids and cameras. Existing slice/conversation/transition/house
 integration, profiles and live preview8765 are untouched.
+
+### Component acceptance status
+
+The parent has independently reproduced and accepted this component and the
+strict direct Pandora source route under `headless-sync-video-v1`. This
+supersedes earlier pending observer/parent handoff statements, **not** the
+source-only coverage or fidelity/admission limits in this contract. Portable
+Pandora integration remains open and the live host stays on the house profile.

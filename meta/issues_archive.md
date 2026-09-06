@@ -53,3 +53,8 @@
 
 - [x] [Qualify the native Pandora route and state changes](issues/qualify-pandora-route.md)
 - [x] [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)
+
+- [x] [Decode the required Pandora route backgrounds](issues/decode-pandora-backgrounds.md)
+- [x] [Decode the required Pandora progression dialogue](issues/decode-pandora-dialogue.md)
+- [x] [Qualify and implement bounded cellar pot actions](issues/qualify-pandora-pot-actions.md)
+- [x] [Decode the required Pandora actors and carrying poses](issues/decode-pandora-scene-art.md)

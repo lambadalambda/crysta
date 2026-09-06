@@ -42,3 +42,9 @@ Compile source-derived presentation for required town/map13/cellar/box/tutorial 
 
 - Parent independently re-exported all 482 rasters and ran strict source/native checks plus six phase mutation controls normal/-O against its rebuilt fixed-observer journey. All pass; logs `local/map-research/pandora-scene-parent.txt`, export pointer `local/pandora-scene-qualification/parent-root.txt`. Owned-ROM Pandora asset tests also pass explicitly (no silent ignored-test skip).
 - Opt-in host atlas retains old 38 actor rasters, appends 482 and transports all 33 finite scene phases with explicit source endpoints/ties/priority/limits. Every pixel/anchor is tested; unknown/map-mismatched phase selection fails. Live host remains house-only; this adapter does not claim script timing, carrying animation, priority3 browser compositing or Pandora gameplay integration.
+
+## Parent component acceptance
+
+- The 482 mirrored source rasters, 18 native OAM witnesses and 24 phase witnesses are accepted at their stated coverage. Not every record has a native witness. Source-only transients, frozen town/finite endpoints, actor exclusions, C color math/opening white palette and unimplemented script timing/compositing remain explicit.
+- Parent source replay now passes the reviewed synchronous observer epoch strictly on both independently reproduced roots, normally and optimized; this supersedes earlier pending observer/source handoffs, not the fidelity limits above. Independent component reproduction and closure audit found no remaining blocker for these component criteria.
+- Issue archived. The live profile remains house-only; `port-pandora-sequence` and its navigation/story/renderer work stay open. Full map-inspector SRAM capture renewal and other unrenewed legacy wrappers remain separate, not reported green by these tests.

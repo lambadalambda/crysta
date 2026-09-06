@@ -227,3 +227,11 @@ native navigation or independently reproduce these totals. Review found and
 closed the dynamic-geometry/resource-order documentation issues and the native
 orchestration coverage gap. The parent has since corrected the AE50 wording in the source owner's
 progression document; this task did not edit outside its ownership.
+
+### Component acceptance status
+
+The parent has independently reproduced and accepted this component and the
+strict direct Pandora source route under `headless-sync-video-v1`. This
+supersedes earlier pending observer/parent handoff statements, **not** the
+source-only coverage or fidelity/admission limits in this contract. Portable
+Pandora integration remains open and the live host stays on the house profile.
