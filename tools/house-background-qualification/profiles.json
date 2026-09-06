@@ -1,0 +1,161 @@
+{
+  "schema": 1,
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "width_cells": 32,
+  "height_cells": 64,
+  "base_grid_sha256": "18b85caa2d23a51a941d296cc7b6c1eb8caa1c0c4efe6b88a2cff291900ab9db",
+  "global_event_bits": [
+    32,
+    251
+  ],
+  "hardware_background": 2,
+  "bgmode": 9,
+  "resident_policy": "frozen source setup, not native AI",
+  "door_policy": "baseclosed; apply navigation-owned qualified shared-sheet patch separately",
+  "passive_action_mask_clear": 80,
+  "profiles": [
+    {
+      "name": "0b-baseclosed-source-setup",
+      "map": 11,
+      "camera": [
+        0,
+        0
+      ],
+      "fixed_sources": [
+        8620960,
+        8620967
+      ],
+      "resident_sources": [
+        8620950
+      ],
+      "added_bit15_cells": [
+        199,
+        203,
+        267
+      ],
+      "grid_sha256": "c7316362a83de8bdc19d4fadbab3b51c51f55d4a56237c7d8e81d19004cdbfef",
+      "history": "ordinary-load"
+    },
+    {
+      "name": "0c-baseclosed-source-setup",
+      "map": 12,
+      "camera": [
+        0,
+        256
+      ],
+      "fixed_sources": [],
+      "resident_sources": [
+        8621066,
+        8621076,
+        8621086,
+        8621096
+      ],
+      "added_bit15_cells": [
+        708,
+        710,
+        739,
+        805
+      ],
+      "grid_sha256": "297c76650ef0c2f1f9c8ccc0c948a16814a3facf77d5b9dedb8aacf8d7912fdd",
+      "history": "ordinary-load"
+    },
+    {
+      "name": "0d-baseclosed-source-setup",
+      "map": 13,
+      "camera": [
+        0,
+        512
+      ],
+      "fixed_sources": [
+        8621256
+      ],
+      "resident_sources": [
+        8621236
+      ],
+      "added_bit15_cells": [
+        1316,
+        1415
+      ],
+      "grid_sha256": "2612a9df9d57a15b780720acc1d3791829ff06a40fc256186b7f4b3b447c0252",
+      "history": "ordinary-load"
+    },
+    {
+      "name": "0f-post-intro-first-load",
+      "map": 15,
+      "camera": [
+        256,
+        0
+      ],
+      "fixed_sources": [
+        8621391
+      ],
+      "resident_sources": [],
+      "added_bit15_cells": [
+        317,
+        504
+      ],
+      "grid_sha256": "a4c86ef52fc84b6d0d24c80c288df19ffebf19e12691deabc1d1dc9e1dc3b94f",
+      "history": "post-intro-first-load"
+    },
+    {
+      "name": "0f-baseclosed-source-setup",
+      "map": 15,
+      "camera": [
+        256,
+        0
+      ],
+      "fixed_sources": [
+        8621391
+      ],
+      "resident_sources": [],
+      "added_bit15_cells": [
+        317
+      ],
+      "grid_sha256": "c5d86aec915b09ec3481d48e903bd1d94a824303f4b4eee24da19acfbf8028e1",
+      "history": "ordinary-load"
+    },
+    {
+      "name": "10-baseclosed-source-setup",
+      "map": 16,
+      "camera": [
+        256,
+        256
+      ],
+      "fixed_sources": [
+        8621478
+      ],
+      "resident_sources": [
+        8621436,
+        8621446
+      ],
+      "added_bit15_cells": [
+        731,
+        732,
+        826,
+        827
+      ],
+      "grid_sha256": "261e3b4637587b69465178667f70cddb5eb6d996650f7008c37aefbec5325eed",
+      "history": "ordinary-load"
+    },
+    {
+      "name": "11-baseclosed-source-setup",
+      "map": 17,
+      "camera": [
+        256,
+        512
+      ],
+      "fixed_sources": [
+        8621548
+      ],
+      "resident_sources": [
+        8621538
+      ],
+      "added_bit15_cells": [
+        1275,
+        1334
+      ],
+      "grid_sha256": "df995a4b649d82ba0e4ac1f5a732d7b88fa32ebb18852371cb6b4c906bdcd559",
+      "history": "ordinary-load"
+    }
+  ]
+}
