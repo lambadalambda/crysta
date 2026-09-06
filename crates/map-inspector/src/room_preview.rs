@@ -2,7 +2,7 @@
 use crate::{invalid, sha256, Result};
 use rom::Rom;
 use room_core::{
-    slice::{GameData, GameState, Phase, Policy},
+    slice::{GameData, GameState, Phase, Policy, SliceError},
     Direction, FrameInput,
 };
 use serde_json::{json, Value};
@@ -48,6 +48,16 @@ impl Preview {
         if self.error.is_some() {
             return;
         }
+        if button == 5 {
+            // A wrong target is ordinary user input. Core guarantees atomic rejection;
+            // only the unsupported interaction is harmless, not identity/overflow errors.
+            if let Err(error) = self.state.interact(&self.data) {
+                if error != SliceError::Interaction {
+                    self.error = Some(error.to_string());
+                }
+            }
+            return;
+        }
         let direction = match button {
             0 => None,
             1 => Some(Direction::Left),
@@ -78,6 +88,8 @@ impl Preview {
         let actor_key = crate::room_art::frame_key(output.animation);
         json!({"schema_version":1,"policy":"semantic-preview","map_id":output.map_id,
             "start_kind":if self.fresh_start { "new-game" } else { "saved-checkpoint" },
+            "door_interaction":self.data.door_interaction(),
+            "wooden_door_open":self.state.wooden_door_open(),
             "actor_key":actor_key,
             "scene":self.art.scene(output.map_id, &actor_key, output.position),
             "animation":{"set":match output.animation.set {
@@ -222,6 +234,120 @@ pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn owned_rom() -> Option<Rom> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        if !path.try_exists().unwrap() {
+            eprintln!("SKIP: local Japanese ROM absent");
+            return None;
+        }
+        Some(Rom::load(&std::fs::read(path).unwrap()).unwrap())
+    }
+
+    #[test]
+    fn wrong_interaction_is_atomic_noop_but_step_errors_still_latch() {
+        let Some(rom) = owned_rom() else { return };
+        let mut preview = Preview::new(&rom).unwrap();
+        assert_eq!(preview.state()["door_interaction"], true);
+        assert_eq!(preview.state()["wooden_door_open"], false);
+        let before = preview.state();
+        preview.step(5);
+        assert_eq!(preview.state(), before);
+        preview.step(2);
+        assert_eq!(preview.state.output().tick, 1);
+        preview.step(6);
+        assert!(preview.error.is_some());
+        let snapshot = preview.state.snapshot();
+        preview.step(5);
+        preview.step(2);
+        assert_eq!(preview.state.snapshot(), snapshot);
+        preview.reset();
+        assert_eq!(preview.state(), before);
+        let mut overflow = preview.state.snapshot();
+        overflow[72..80].copy_from_slice(&u64::MAX.to_le_bytes());
+        preview.state = GameState::restore(&preview.data, &overflow).unwrap();
+        preview.step(0);
+        assert_eq!(preview.error, Some(SliceError::TickOverflow.to_string()));
+        assert_eq!(preview.state.snapshot(), overflow);
+        preview.step(2);
+        assert_eq!(preview.state.snapshot(), overflow);
+    }
+
+    #[test]
+    fn navigation_route_checks_all_host_steps_and_repeated_snapshots() {
+        let Some(rom) = owned_rom() else { return };
+        let mut preview = Preview::new(&rom).unwrap();
+        let commands: Vec<Value> =
+            include_str!("../../../tools/house-navigation-qualification/core-route.jsonl")
+                .lines()
+                .map(|line| serde_json::from_str(line).unwrap())
+                .collect();
+        assert_eq!(commands.last().unwrap()["finish"], true);
+        let mut reference = Vec::new();
+        for run in 0..2 {
+            preview.new_game();
+            let mut snapshots = Vec::new();
+            let mut visited = std::collections::BTreeSet::new();
+            let mut checkpoints = 0;
+            for command in &commands[..commands.len() - 1] {
+                let button = u8::try_from(command["button"].as_u64().unwrap()).unwrap();
+                for _ in 0..command["steps"].as_u64().unwrap() {
+                    let before = preview.state.snapshot();
+                    preview.step(button);
+                    assert!(preview.error.is_none(), "{:?}", preview.error);
+                    let expected = preview.state.snapshot();
+                    preview.state = GameState::restore(&preview.data, &before).unwrap();
+                    preview.step(button);
+                    assert_eq!(preview.state.snapshot(), expected);
+                    if button == 5 {
+                        // Holding/repeating the action never adds ticks or latches an error.
+                        preview.step(5);
+                        assert_eq!(preview.state.snapshot(), expected);
+                        assert!(preview.error.is_none());
+                    }
+                    snapshots.push(expected);
+                }
+                let out = preview.state.output();
+                visited.insert(out.map_id);
+                if let Some(expected) = command.get("expect") {
+                    checkpoints += 1;
+                    assert_eq!(
+                        json!([
+                            out.map_id,
+                            out.position.0,
+                            out.position.1,
+                            format!("{:?}", out.phase),
+                            preview.state.wooden_door_open()
+                        ]),
+                        *expected,
+                        "{}",
+                        command["label"]
+                    );
+                }
+            }
+            assert_eq!(preview.state.output().tick, 2244);
+            assert_eq!(snapshots.len(), 2244);
+            assert_eq!(checkpoints, 15);
+            assert_eq!(
+                visited.into_iter().collect::<Vec<_>>(),
+                crate::house_profiles::MAPS
+            );
+            assert!(preview.state.wooden_door_open());
+            if run == 0 {
+                reference = snapshots;
+            } else {
+                assert_eq!(snapshots, reference);
+            }
+            // Inspect core output above: actor scenes for the four new rooms are parent-owned.
+            preview.reset();
+            assert_eq!(preview.state()["wooden_door_open"], false);
+            assert!(preview.error.is_none());
+            preview.new_game();
+            assert_eq!(preview.state()["wooden_door_open"], false);
+        }
+    }
+
     #[test]
     fn rom_compiled_grids_equal_the_authenticated_walking_fixture_grids() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))

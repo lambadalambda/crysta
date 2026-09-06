@@ -88,7 +88,7 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
         ("POST", "/reset", "") => Ok(Request::Reset),
         ("POST", "/new-game", "") => Ok(Request::NewGame),
         ("POST", "/step", value)
-            if value.len() == 1 && (b'0'..=b'4').contains(&value.as_bytes()[0]) =>
+            if value.len() == 1 && (b'0'..=b'5').contains(&value.as_bytes()[0]) =>
         {
             Ok(Request::Step(value.as_bytes()[0] - b'0'))
         }
@@ -249,7 +249,11 @@ mod tests {
             parse_request(&post(headers, "1"), ORIGIN).unwrap(),
             Request::Step(1)
         );
-        for body in ["", "5", "11", "-", "x"] {
+        assert_eq!(
+            parse_request(&post(headers, "5"), ORIGIN).unwrap(),
+            Request::Step(5)
+        );
+        for body in ["", "6", "11", "-", "x", "A"] {
             assert!(parse_request(&post(headers, body), ORIGIN).is_err());
         }
         for bad in [
