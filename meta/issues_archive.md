@@ -45,3 +45,5 @@
 - [x] [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)
 - [x] [Complete the fresh house scene with all residents](issues/complete-house-scene-setup.md)
 - [x] [Qualify the room B conversation and exterior progression](issues/qualify-house-conversation-progression.md)
+- [x] [Decode the required opening dialogue presentation](issues/decode-house-conversation-text.md)
+- [x] [Qualify the first exterior landing profile](issues/qualify-house-exterior-profile.md)
