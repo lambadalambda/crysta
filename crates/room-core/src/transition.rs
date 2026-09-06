@@ -4,6 +4,26 @@ use crate::{
     Direction,
 };
 
+/// Shared checked 17 departure / load / 17 arrival clock, including handoff0.
+pub(crate) fn doorway_position(
+    handoff: (u16, u16),
+    loaded: (u16, u16),
+    direction: Direction,
+    elapsed: u8,
+) -> Option<(u16, u16)> {
+    if elapsed > 35 {
+        return None;
+    }
+    let (x, y) = if elapsed <= 17 { handoff } else { loaded };
+    let n = u16::from(if elapsed <= 17 { elapsed } else { elapsed - 18 });
+    Some(match direction {
+        Direction::Down => (x, y.checked_add(n)?),
+        Direction::Up => (x, y.checked_sub(n)?),
+        Direction::Left => (x.checked_sub(n)?, y),
+        Direction::Right => (x.checked_add(n)?, y),
+    })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Transition {
     route: u8,
@@ -66,23 +86,15 @@ impl Transition {
         self.elapsed = self.elapsed.saturating_add(1).min(35);
     }
     pub(crate) fn position(self) -> (u16, u16) {
-        let (x, y) = if self.elapsed <= 17 {
-            self.handoff
-        } else {
-            self.spec().anchor
-        };
-        let n = u16::from(if self.elapsed <= 17 {
-            self.elapsed
-        } else {
-            self.elapsed - 18
-        });
-        match self.direction() {
-            Direction::Down => (x, y + n),
-            Direction::Up => (x, y - n),
-            Direction::Left => (x - n, y),
-            Direction::Right => (x + n, y),
-        }
+        doorway_position(
+            self.handoff,
+            self.spec().anchor,
+            self.direction(),
+            self.elapsed,
+        )
+        .expect("validated doorway clock")
     }
+
     pub(crate) fn map_id(self) -> u16 {
         if self.elapsed <= 17 {
             self.source_map()
@@ -116,6 +128,40 @@ impl Transition {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn checked_clock_covers_both_phases_and_all_directions() {
+        for (direction, departure, arrival) in [
+            (Direction::Down, (100, 117), (200, 217)),
+            (Direction::Up, (100, 83), (200, 183)),
+            (Direction::Left, (83, 100), (183, 200)),
+            (Direction::Right, (117, 100), (217, 200)),
+        ] {
+            for (elapsed, expected) in [
+                (0, (100, 100)),
+                (17, departure),
+                (18, (200, 200)),
+                (35, arrival),
+            ] {
+                assert_eq!(
+                    doorway_position((100, 100), (200, 200), direction, elapsed),
+                    Some(expected)
+                );
+            }
+            for elapsed in [36, 255] {
+                assert_eq!(
+                    doorway_position((100, 100), (200, 200), direction, elapsed),
+                    None
+                );
+            }
+            let edge = if matches!(direction, Direction::Up | Direction::Left) {
+                (0, 0)
+            } else {
+                (u16::MAX, u16::MAX)
+            };
+            assert_eq!(doorway_position(edge, (200, 200), direction, 1), None);
+            assert_eq!(doorway_position((100, 100), edge, direction, 19), None);
+        }
+    }
     #[test]
     fn all_endpoints_and_every_owned_snapshot() {
         for (route, spec) in DOORWAYS.iter().enumerate() {
