@@ -48,3 +48,11 @@ Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
   Bitmap-load timeout remains a deferred nonblocking robustness follow-up.
 - Parent reports shared issue-index and roadmap registration complete; these
   files remain outside this worktree's owned edits.
+- Cadence producer: [test-only canonical proof](../../docs/pandora-cadence.md)
+  now checks complete fresh offline/projected executions with continuous raw-core
+  mirrors, exact successful return frames, and every GET/non-clock boundary.
+  Red→green controls cover all non-tick snapshot bits, partial/divergent proofs,
+  concealed `Interaction` rejection and fail-closed publication. Parent-owned
+  readiness relay is consumed without altering clocks; all17 CEntry updates and
+  the BoxEntry completion must be retained. Clean-source debug/release generation,
+  independent parent rerun/review and pinning remain required before browser use.
