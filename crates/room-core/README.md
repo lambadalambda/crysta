@@ -95,7 +95,19 @@ including a 209-step revisit route and per-step snapshot restoration.
 
 `GameState::new_game` consumes the source-compiled `NewGameData`, not a saved
 checkpoint. Fresh bedroom overlays and reloaded bedroom overlays are distinct;
-slice snapshots are100 bytes and preserve that selection until first map load.
+profile6 snapshots were100 bytes and preserved that selection until first map load.
 The fresh handoff208 and saved handoff209 retain their separate departure
 endpoints. [House verification](../../docs/playable-house.md) covers441 fresh
 walking steps plus70 semantic updates through both rooms and repeated inputs.
+
+## Current house profile v8
+
+`slice::HouseRoom` and `GameData::new_house` admit source-compiled B,C,D,F,10,11
+profiles. `GameState::interact` is a one-shot atomic final wooden-door action,
+not a general interaction hook. The retained `wooden_door_open()` state selects
+the matching collision/visual patch; no NPC conversation or event0026 is granted.
+Slice snapshots are now **109 bytes, profile8**; walking snapshots remain16-byte
+v3. Legacy F/10 constructors, both208/209 handoffs, directional animation and the
+511-step route remain supported. See the complete
+[house navigation contract and reproduction](../../docs/house-navigation.md),
+including the 2,244-step source-compiled six-room replay and closed boundaries.

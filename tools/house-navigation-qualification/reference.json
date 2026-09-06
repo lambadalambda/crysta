@@ -1,0 +1,812 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "graph": [
+    {
+      "map": 11,
+      "extent": [
+        101824,
+        101837
+      ],
+      "sha256": "500e5648249562ee398d2455256f6268a9a3bc04d73f225afdf600c807b14877",
+      "exits": [
+        {
+          "source": 8490432,
+          "rectangle": [
+            7,
+            12,
+            1,
+            4
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            128,
+            336
+          ]
+        }
+      ]
+    },
+    {
+      "map": 12,
+      "extent": [
+        101837,
+        101886
+      ],
+      "sha256": "0fc117ba77530a1bfc74255aac36a5ddad7d356af9d19f7f59f8165ef6ca5b1d",
+      "exits": [
+        {
+          "source": 8490445,
+          "rectangle": [
+            7,
+            28,
+            1,
+            4
+          ],
+          "destination": 13,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            112,
+            608
+          ]
+        },
+        {
+          "source": 8490457,
+          "rectangle": [
+            14,
+            25,
+            1,
+            2
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 8,
+          "position": [
+            288,
+            416
+          ]
+        },
+        {
+          "source": 8490469,
+          "rectangle": [
+            8,
+            16,
+            1,
+            5
+          ],
+          "destination": 11,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            112,
+            176
+          ]
+        },
+        {
+          "source": 8490481,
+          "rectangle": [
+            11,
+            21,
+            1,
+            1
+          ],
+          "destination": 14,
+          "mode": 0,
+          "selector": 14,
+          "position": [
+            144,
+            864
+          ]
+        }
+      ]
+    },
+    {
+      "map": 13,
+      "extent": [
+        101886,
+        101923
+      ],
+      "sha256": "9f84469e76a856e4bc01d8be25b726d06ecffcf47590fff1a1fc9c2a863fbfb1",
+      "exits": [
+        {
+          "source": 8490494,
+          "rectangle": [
+            7,
+            44,
+            1,
+            4
+          ],
+          "destination": 10,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            496,
+            752
+          ]
+        },
+        {
+          "source": 8490506,
+          "rectangle": [
+            7,
+            32,
+            1,
+            6
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            112,
+            432
+          ]
+        },
+        {
+          "source": 8490518,
+          "rectangle": [
+            14,
+            41,
+            1,
+            2
+          ],
+          "destination": 17,
+          "mode": 0,
+          "selector": 8,
+          "position": [
+            288,
+            672
+          ]
+        }
+      ]
+    },
+    {
+      "map": 15,
+      "extent": [
+        101948,
+        101973
+      ],
+      "sha256": "3892a00a4104b13625fa277fdc71ceb432af79e48693b353afadd2b96275a580",
+      "exits": [
+        {
+          "source": 8490556,
+          "rectangle": [
+            24,
+            12,
+            1,
+            2
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            384,
+            336
+          ]
+        },
+        {
+          "source": 8490568,
+          "rectangle": [
+            27,
+            5,
+            1,
+            1
+          ],
+          "destination": 290,
+          "mode": 0,
+          "selector": 0,
+          "position": [
+            376,
+            96
+          ]
+        }
+      ]
+    },
+    {
+      "map": 16,
+      "extent": [
+        101973,
+        102010
+      ],
+      "sha256": "a3784e3b0ca4e9fdceb81bb2b8aa8639fbe21f43545c85914175c5d1da4bf2f2",
+      "exits": [
+        {
+          "source": 8490581,
+          "rectangle": [
+            24,
+            20,
+            1,
+            1
+          ],
+          "destination": 15,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            384,
+            176
+          ]
+        },
+        {
+          "source": 8490593,
+          "rectangle": [
+            17,
+            25,
+            1,
+            2
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 7,
+          "position": [
+            208,
+            416
+          ]
+        },
+        {
+          "source": 8490605,
+          "rectangle": [
+            22,
+            29,
+            1,
+            1
+          ],
+          "destination": 17,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            352,
+            592
+          ]
+        }
+      ]
+    },
+    {
+      "map": 17,
+      "extent": [
+        102010,
+        102035
+      ],
+      "sha256": "66c68b4c0beabb1b8113846065f66c1e0b2e5ce7b3d7681c2880bfe30df28062",
+      "exits": [
+        {
+          "source": 8490618,
+          "rectangle": [
+            22,
+            36,
+            1,
+            1
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            352,
+            448
+          ]
+        },
+        {
+          "source": 8490630,
+          "rectangle": [
+            17,
+            41,
+            1,
+            2
+          ],
+          "destination": 13,
+          "mode": 0,
+          "selector": 7,
+          "position": [
+            208,
+            672
+          ]
+        }
+      ]
+    }
+  ],
+  "ranges": [
+    {
+      "extent": [
+        36975,
+        37036
+      ],
+      "sha256": "e334e47620243c36265e41ffe0bf45c517193387034cf3e027d57ca1183942d6"
+    },
+    {
+      "extent": [
+        38043,
+        38149
+      ],
+      "sha256": "ff184635e90a63710c4e4696f3e31e7c558b9f972566254fc8dd0f4f70a8befc"
+    },
+    {
+      "extent": [
+        48175,
+        48224
+      ],
+      "sha256": "d9907ec7069de614a66330a15f2c7251e1731ffbd34858740178499737e228ab"
+    },
+    {
+      "extent": [
+        297425,
+        297536
+      ],
+      "sha256": "d161420c000d7e48fe96fbbd37b899df1a5062d8fce66d9f05e231211550fb5c"
+    },
+    {
+      "extent": [
+        496000,
+        496768
+      ],
+      "sha256": "a930a205a0197458d8e21e71f33e31be159dd33f4d9d4b4bd3159fe8d496867d"
+    },
+    {
+      "extent": [
+        497444,
+        497733
+      ],
+      "sha256": "18f580941f4ae173065a4392ee5a506821b0866759cfe239e9faf4399917349e"
+    },
+    {
+      "extent": [
+        509827,
+        510336
+      ],
+      "sha256": "fdd48c119df26e660a0407d0755bff764b0e60452e214d14285012f5c48ae7e6"
+    },
+    {
+      "extent": [
+        887907,
+        888033
+      ],
+      "sha256": "3e8333c9aa46475284c4267949b353f7545f1ac9d8066edad858a399a7aafcdc"
+    },
+    {
+      "extent": [
+        888312,
+        888534
+      ],
+      "sha256": "c47761d7f9fcbc7687dd7c9e94012a9b250c6e7a1fb28398e0b6f1f930e70b9a"
+    },
+    {
+      "extent": [
+        886679,
+        887225
+      ],
+      "sha256": "d9075cba7187cfbcb117b00b19cbc3ef793c6c4d6726849bb9265498c547eade"
+    },
+    {
+      "extent": [
+        63475,
+        63509
+      ],
+      "sha256": "72ed4d18c509c06bb775048f91840405ce53e468b1fd4097f6d84719279eda44"
+    },
+    {
+      "extent": [
+        296958,
+        296992
+      ],
+      "sha256": "6cd2d83836c6341110c256e98a9a79173cf2c206e604a365653b025e42b03ca7"
+    },
+    {
+      "extent": [
+        309569,
+        310317
+      ],
+      "sha256": "4b7cf0120b8a67ba0ed52e5f68cebc7bec54e3d8d3c5f195aba1c155caa01809"
+    }
+  ],
+  "source_door": {
+    "kind": "source-door",
+    "resources": [
+      {
+        "decoded_sha256": "ad57ffc7e313e0c5436c8372542845da994bf965b88195d86b068ca2f0c3f4da",
+        "extent": [
+          2800195,
+          2802950
+        ],
+        "source_sha256": "79ff0b3911c4128622d615b17d4df2363d403b3099966f6c313ee5d5c20ddea5"
+      },
+      {
+        "decoded_sha256": "f4a836fc55450d600becc83b3a8b5836de0983ef2fa63f30e8deeea262d98ede",
+        "extent": [
+          3211091,
+          3211260
+        ],
+        "source_sha256": "b676ce4175b5afedbbec2f0eb5214e2314b19030796ed99e7b85b6471a124f6a"
+      }
+    ]
+  },
+  "door": {
+    "collision": [
+      [
+        8,
+        19,
+        7410,
+        7414
+      ],
+      [
+        8,
+        20,
+        7411,
+        247
+      ]
+    ],
+    "before_wram_sha256": "4323e967873f9f41437f5c326d0144e33942b6ebd99143bd6cbc2c1d22c7cb8d",
+    "after_wram_sha256": "5eef02fc7d49dc3a324b2b64dcae986751b76412032ed8c38d0f668071fc7200",
+    "before_vram_sha256": "bbe32a2123112feb6257d7740ca9d2b2f63c21e093cebae1973c27e193fb455d",
+    "after_vram_sha256": "748413a9cafd163f63fb28f40a1a149c6556ac003a4a7992f906477856c9b711"
+  },
+  "runs": {
+    "a": {
+      "trace_sha256": "34e68188895cb50dfabc7aa2719313984e8372c9dd6ff19b46aa36536545ce3b",
+      "transitions": [
+        {
+          "source": 8490556,
+          "source_map": 15,
+          "handoff_frame": 6967,
+          "handoff": [
+            392,
+            208
+          ],
+          "destination": 16,
+          "anchor_frame": 6989,
+          "anchor": [
+            392,
+            336
+          ],
+          "settled_frame": 7018,
+          "endpoint": [
+            392,
+            353
+          ]
+        },
+        {
+          "source": 8490593,
+          "source_map": 16,
+          "handoff_frame": 7264,
+          "handoff": [
+            280,
+            416
+          ],
+          "destination": 12,
+          "anchor_frame": 7286,
+          "anchor": [
+            232,
+            432
+          ],
+          "settled_frame": 7316,
+          "endpoint": [
+            215,
+            432
+          ]
+        },
+        {
+          "source": 8490469,
+          "source_map": 12,
+          "handoff_frame": 7711,
+          "handoff": [
+            136,
+            336
+          ],
+          "destination": 11,
+          "anchor_frame": 7733,
+          "anchor": [
+            120,
+            208
+          ],
+          "settled_frame": 7762,
+          "endpoint": [
+            120,
+            191
+          ]
+        },
+        {
+          "source": 8490432,
+          "source_map": 11,
+          "handoff_frame": 7864,
+          "handoff": [
+            120,
+            209
+          ],
+          "destination": 12,
+          "anchor_frame": 7886,
+          "anchor": [
+            136,
+            336
+          ],
+          "settled_frame": 7916,
+          "endpoint": [
+            136,
+            353
+          ]
+        },
+        {
+          "source": 8490445,
+          "source_map": 12,
+          "handoff_frame": 8072,
+          "handoff": [
+            120,
+            464
+          ],
+          "destination": 13,
+          "anchor_frame": 8094,
+          "anchor": [
+            120,
+            608
+          ],
+          "settled_frame": 8124,
+          "endpoint": [
+            120,
+            625
+          ]
+        },
+        {
+          "source": 8490518,
+          "source_map": 13,
+          "handoff_frame": 8286,
+          "handoff": [
+            232,
+            672
+          ],
+          "destination": 17,
+          "anchor_frame": 8308,
+          "anchor": [
+            280,
+            688
+          ],
+          "settled_frame": 8337,
+          "endpoint": [
+            297,
+            688
+          ]
+        },
+        {
+          "source": 8490630,
+          "source_map": 17,
+          "handoff_frame": 8583,
+          "handoff": [
+            280,
+            688
+          ],
+          "destination": 13,
+          "anchor_frame": 8605,
+          "anchor": [
+            232,
+            688
+          ],
+          "settled_frame": 8635,
+          "endpoint": [
+            215,
+            688
+          ]
+        },
+        {
+          "source": 8490506,
+          "source_map": 13,
+          "handoff_frame": 9415,
+          "handoff": [
+            120,
+            608
+          ],
+          "destination": 12,
+          "anchor_frame": 9437,
+          "anchor": [
+            120,
+            464
+          ],
+          "settled_frame": 9467,
+          "endpoint": [
+            120,
+            447
+          ]
+        }
+      ]
+    },
+    "extra-a": {
+      "trace_sha256": "d6b9af6d46a029d4286f12356954568da29b209b669f6cb9f99c50dd43c58173",
+      "transitions": [
+        {
+          "source": 8490556,
+          "source_map": 15,
+          "handoff_frame": 6967,
+          "handoff": [
+            392,
+            208
+          ],
+          "destination": 16,
+          "anchor_frame": 6989,
+          "anchor": [
+            392,
+            336
+          ],
+          "settled_frame": 7018,
+          "endpoint": [
+            392,
+            353
+          ]
+        },
+        {
+          "source": 8490593,
+          "source_map": 16,
+          "handoff_frame": 7264,
+          "handoff": [
+            280,
+            416
+          ],
+          "destination": 12,
+          "anchor_frame": 7286,
+          "anchor": [
+            232,
+            432
+          ],
+          "settled_frame": 7316,
+          "endpoint": [
+            215,
+            432
+          ]
+        },
+        {
+          "source": 8490457,
+          "source_map": 12,
+          "handoff_frame": 7386,
+          "handoff": [
+            232,
+            432
+          ],
+          "destination": 16,
+          "anchor_frame": 7408,
+          "anchor": [
+            280,
+            432
+          ],
+          "settled_frame": 7437,
+          "endpoint": [
+            297,
+            432
+          ]
+        },
+        {
+          "source": 8490605,
+          "source_map": 16,
+          "handoff_frame": 7622,
+          "handoff": [
+            360,
+            480
+          ],
+          "destination": 17,
+          "anchor_frame": 7644,
+          "anchor": [
+            360,
+            592
+          ],
+          "settled_frame": 7673,
+          "endpoint": [
+            360,
+            609
+          ]
+        },
+        {
+          "source": 8490618,
+          "source_map": 17,
+          "handoff_frame": 7745,
+          "handoff": [
+            360,
+            592
+          ],
+          "destination": 16,
+          "anchor_frame": 7767,
+          "anchor": [
+            360,
+            480
+          ],
+          "settled_frame": 7796,
+          "endpoint": [
+            360,
+            463
+          ]
+        }
+      ]
+    }
+  },
+  "walking": [
+    {
+      "run": "a",
+      "checkpoint": "settledC",
+      "wram_sha256": "042d852d99e0278bdc94d8c416935bdfcb0b90ed58430a9bab163728bb2ac2b5",
+      "label": "westC",
+      "first": 7374,
+      "last": 7427,
+      "count": 54
+    },
+    {
+      "run": "a",
+      "checkpoint": "westC",
+      "wram_sha256": "719c97267144adadd193bc5c72ab99e8deb8a8bf2d5e825493b139a706b3015b",
+      "label": "northC",
+      "first": 7429,
+      "last": 7497,
+      "count": 69
+    },
+    {
+      "run": "a",
+      "checkpoint": "north-door-wait",
+      "wram_sha256": "5eef02fc7d49dc3a324b2b64dcae986751b76412032ed8c38d0f668071fc7200",
+      "label": "north-door-push",
+      "first": 7700,
+      "last": 7711,
+      "count": 12
+    },
+    {
+      "run": "a",
+      "checkpoint": "north-door-settled",
+      "wram_sha256": "c5eb2ecbe9e4e76632b014c26a7b76dcd8f245c1cb9c4d7b1da6c1748d01b056",
+      "label": "leaveB",
+      "first": 7852,
+      "last": 7864,
+      "count": 13
+    },
+    {
+      "run": "a",
+      "checkpoint": "settledD",
+      "wram_sha256": "e1f7eedc27476030fd2451696c0b6d667be2a2b9707f214f4e034a63b098efd5",
+      "label": "southD",
+      "first": 8177,
+      "last": 8207,
+      "count": 31
+    },
+    {
+      "run": "a",
+      "checkpoint": "southD",
+      "wram_sha256": "017c29b0ca4adad467cef4efcee96041b77c8a23ca4a05f26d38b2c05acaf09b",
+      "label": "eastD",
+      "first": 8209,
+      "last": 8286,
+      "count": 78
+    },
+    {
+      "run": "a",
+      "checkpoint": "wait11",
+      "wram_sha256": "ad2db7ee8825a8df8ea194b1e05c28b0d613a13d1ae7479115efed30ce34726d",
+      "label": "returnD",
+      "first": 8571,
+      "last": 8583,
+      "count": 13
+    },
+    {
+      "run": "extra-a",
+      "checkpoint": "settledC",
+      "wram_sha256": "042d852d99e0278bdc94d8c416935bdfcb0b90ed58430a9bab163728bb2ac2b5",
+      "label": "eastC",
+      "first": 7374,
+      "last": 7386,
+      "count": 13
+    },
+    {
+      "run": "extra-a",
+      "checkpoint": "returned10",
+      "wram_sha256": "5c9ad1a1126816dec12a4166b301291cd222a4ddedb9e8e49c7115fbb9208297",
+      "label": "align11",
+      "first": 7504,
+      "last": 7546,
+      "count": 43
+    },
+    {
+      "run": "extra-a",
+      "checkpoint": "aligned11",
+      "wram_sha256": "256e968a0ba0df0977e712561230f5d0e0be806547afd631dd15c88fb16e0495",
+      "label": "south-to11",
+      "first": 7588,
+      "last": 7622,
+      "count": 35
+    },
+    {
+      "run": "extra-a",
+      "checkpoint": "north11",
+      "wram_sha256": "68e4997006aa0ae70d96f5336a88a18339a298f637ef62af00b65d11be795e22",
+      "label": "back-to10",
+      "first": 7733,
+      "last": 7745,
+      "count": 13
+    }
+  ]
+}
