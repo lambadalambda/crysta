@@ -1954,3 +1954,102 @@ fn c_stair_keeps_source_selection_and_empty_pot_ownership() {
     assert_eq!(s.map_id, 0xe);
     assert!(s.pot_state().is_none());
 }
+
+// Complete Town source list $818D53..$818DBF (terminator excluded), checked
+// against the owned JP ROM. Ordinal8 is an exit predicate, not a grid extent.
+fn authentic_town_exits() -> Vec<Exit> {
+    vec![
+        Exit([0x38, 0x2e, 1, 1, 0x1d, 0, 0, 6, 0x70, 1, 0xb0, 1]),
+        Exit([0x31, 0x2e, 1, 1, 0x1e, 0, 0, 6, 0x70, 2, 0xb0, 0]),
+        Exit([0x1f, 0x2e, 1, 1, 0x0d, 0, 0, 6, 0x70, 0, 0xc0, 2]),
+        Exit([0x04, 0x27, 1, 1, 0x1f, 0, 0, 6, 0x70, 2, 0xb0, 1]),
+        Exit([0x35, 0x11, 1, 1, 0x17, 0, 0, 6, 0x80, 1, 0xc0, 1]),
+        Exit([0x1d, 0x11, 1, 1, 0x13, 0, 0, 6, 0x80, 1, 0xc0, 0]),
+        Exit([0x20, 0x0c, 1, 1, 0x15, 0, 0, 6, 0x70, 3, 0xb0, 0]),
+        Exit([0x0a, 0x0b, 1, 1, 0x1b, 0, 0, 6, 0x60, 0, 0xb0, 1]),
+        Exit([0x00, 0x3e, 0x50, 2, 3, 0, 0, 0x55, 0x10, 2, 0x10, 2]),
+    ]
+}
+fn with_authentic_town_exits() -> GameData {
+    let mut d = navigation_data();
+    let mut p = d.pandora.take().unwrap();
+    let mut nav = p.navigation.take().unwrap();
+    nav.maps[0].records = authentic_town_exits();
+    for binding in &mut nav.travels {
+        match binding.travel {
+            Travel::TownToResident => binding.exit.index = 5,
+            Travel::TownToHouse => binding.exit.index = 2,
+            _ => {}
+        }
+    }
+    nav.doors[0].exit.index = 5;
+    nav.doors[1].exit.index = 2;
+    d.pandora = Some(p.with_navigation(nav).unwrap());
+    d
+}
+#[test]
+fn authentic_overhanging_town_record_is_retained_and_unsupported_exit_is_atomic() {
+    let d = with_authentic_town_exits();
+    let records = &d
+        .pandora
+        .as_ref()
+        .unwrap()
+        .navigation
+        .as_ref()
+        .unwrap()
+        .maps[0]
+        .records;
+    assert_eq!(*records, authentic_town_exits());
+    assert_eq!(select_exit(records, (136, 1024)).unwrap().0, 8);
+    let mut s = at(&d, 0xa, (136, 1026), Direction::Up, &[0x26]);
+    for _ in 0..8 {
+        let before = s.snapshot();
+        let result = s.step(
+            &d,
+            FrameInput {
+                direction: Some(Direction::Up),
+            },
+        );
+        if result == Err(SliceError::Exit) {
+            assert_eq!(s.snapshot(), before);
+            assert_eq!(GameState::restore(&d, &before).unwrap(), s);
+            assert_eq!(s.map_id, 0xa);
+            return;
+        }
+        result.unwrap();
+        assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    }
+    panic!("source unsupported exit was not rejected");
+}
+#[test]
+fn overhanging_predicate_fine_failure_still_blocks_later_record() {
+    let mut d = with_authentic_town_exits();
+    let mut p = d.pandora.take().unwrap();
+    let mut nav = p.navigation.take().unwrap();
+    // Synthetic later predicate: fine-matches where authentic ordinal8 fails.
+    let later = Exit([8, 63, 1, 2, 3, 0, 0, 0x55, 0x10, 2, 0x10, 2]);
+    nav.maps[0].records.push(later);
+    let position = (136, 1025);
+    assert!(select_exit(&[later], position).is_some());
+    assert!(select_exit(&nav.maps[0].records, position).is_none());
+    d.pandora = Some(p.with_navigation(nav).unwrap());
+    let mut s = at(&d, 0xa, position, Direction::Up, &[0x26]);
+    replay(&mut s, &d, neutral);
+    assert_eq!(s.output().position, position);
+    assert_eq!(s.pandora_output(&d).unwrap().motion, None);
+}
+
+#[test]
+fn overhanging_exit_does_not_relax_origins_or_nonempty_dimensions() {
+    for (field, value) in [(0, 64), (1, 80), (2, 0), (3, 0)] {
+        let mut p = with_authentic_town_exits().pandora.unwrap();
+        let mut nav = p.navigation.take().unwrap();
+        nav.maps[0].records[8].0[field] = value;
+        assert!(p.with_navigation(nav).is_err());
+    }
+    // Maximum byte extents still use the existing bounded u16 fine arithmetic;
+    // they cannot overflow into a match across the wrapped coarse boundary.
+    let far = Exit([63, 79, 255, 255, 3, 0, 0, 0x55, 0x10, 2, 0x10, 2]);
+    assert!(select_exit(&[far], (8, 16)).is_none());
+    assert!(select_exit(&[far], (1016, 1280)).is_some());
+}

@@ -168,7 +168,12 @@ TownDoorSpec {
 CellPatch { cell: u16, closed: u16, open: u16 } // row-major cell
 ```
 
-Each list has1–64 nonempty, in-extent records, including unsupported targets.
+Each list has1–64 nonempty records with in-grid origins, including unsupported
+targets. Rectangle ends may overhang the grid: authentic Town ordinal8 `$818DB3`
+(`00 3E 50 02 03 00 00 55 10 02 10 02`) spans80 cells on a64-cell sheet. These are
+raw source predicates, not grid slices; never clip or omit them. The existing byte-
+wrapping coarse and bounded u16 fine arithmetic is unchanged. Player positions,
+sample halos, supported destinations and motion poses keep their separate bounds.
 The host authenticates completeness/order; core does not infer omitted source
 records. `with_pandora` checks supplied C/D lists equal the existing aggregate house
 lists. Travel bindings must name distinct valid ordinals, direct mode0 and the

@@ -125,10 +125,11 @@ impl NavigationSpec {
                 || map.records.len() > 64
                 || map.records.iter().any(|e| {
                     let [x, y, w, h, ..] = e.0;
-                    w == 0
-                        || h == 0
-                        || u16::from(x) + u16::from(w) > width
-                        || u16::from(y) + u16::from(h) > height
+                    // Source exit rectangles are predicates, not grid slices:
+                    // Town $818DB3 intentionally extends beyond the sheet width.
+                    // Keep bounded origins/nonempty byte dimensions; the shared
+                    // selector retains native wrapping and never indexes this extent.
+                    w == 0 || h == 0 || u16::from(x) >= width || u16::from(y) >= height
                 })
             {
                 return Err(SliceError::Data);

@@ -145,3 +145,19 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   full new input itinerary and native/browser aggregate acceptance remain parent/
   navigation-owned. Replaced-sheet C/$292 source-load uncertainty remains fail-closed.
   Keep this issue open; live host remains disabled.
+
+### Authentic overhanging exit rectangle correction
+
+- Parent/native compiler found authentic Town ordinal8 `$818DB3` has width80 on
+  a64-cell sheet. Ordered source predicates are not collision-grid extents: retain
+  the record unchanged, without clipping/filtering. Narrow validator correction
+  must preserve bounded player/halo/destination admission, first-coarse/fine
+  selection and atomic unsupported-record rejection. Add red/green controls,
+  independently review and sign before handoff; no host/source compiler edits.
+- Corrected rectangle-end checks only; in-grid origins and nonzero dimensions stay
+  required. Full nine-record Town list verified against owned ROM and retained in
+  regression tests, including exact ordinal8. Red→green controls cover unsupported
+  atomic rejection/restore, no fine-test fallthrough, malformed origins/extents and
+  maximum-byte arithmetic. Independent review approved; 163 core tests plus one
+  doctest with all five private fixtures, strict Clippy and Wasm passed. No API,
+  profile/schema, host or source compiler changes; live capability stays disabled.
