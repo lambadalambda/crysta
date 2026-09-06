@@ -22,11 +22,14 @@ const SOURCE_FILES: &[&str] = &[
 ];
 
 fn sha256(bytes: &[u8]) -> String {
+    use std::fmt::Write;
     rom::digests(bytes)
         .sha256
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect()
+        .fold(String::with_capacity(64), |mut hex, byte| {
+            write!(&mut hex, "{byte:02x}").expect("writing to a String");
+            hex
+        })
 }
 
 fn check_source_inventory(observer: &serde_json::Value) {
