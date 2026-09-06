@@ -485,14 +485,86 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     // Only this typed overlay can add a pot. Source roster validation is separate.
     return pot === null ? null : {key:pot,position,priority:2};
   }
+  // Host authenticates the finite source catalog; the renderer admits only its
+  // exact cell/tile pairs. Keep immutable bases and ONE mutable pair per sheet.
+  function prepareWorld(source, pixels, backgroundKeys, highMasks, backgrounds, makeRaster, updateRaster) {
+    if (source === undefined) return null;
+    const fail=()=>{ throw new Error('Invalid world background catalog/mask'); };
+    const keys=['house','exterior','town13','cellars','box','tour'];
+    const record=value=>value !== null && typeof value === 'object' && !Array.isArray(value);
+    const numeric=(key,max)=>/^(0|[1-9][0-9]*)$/.test(key) && Number(key) < max;
+    if (!exactFields(source,keys) || !keys.every(key=>pixels[key])) fail();
+    const world=Object.create(null);
+    for (const key of keys) {
+      const sheet=source[key], base=pixels[key], tiles=Object.create(null), candidates=Object.create(null);
+      if (!exactFields(sheet,['tiles','candidates']) || !record(sheet.tiles) || !record(sheet.candidates)) fail();
+      for (const [id,tile] of Object.entries(sheet.tiles)) {
+        if (!numeric(id,512) || !exactFields(tile,['rgba','high']) || !validPixels(16,16,tile.rgba,16,16) ||
+            tile.rgba.some((v,i)=>i%4 === 3 && v !== 255) || !Array.isArray(tile.high) || tile.high.length !== 256 ||
+            !tile.high.every(v=>typeof v === 'boolean')) fail();
+        tiles[id]={rgba:new Uint8ClampedArray(tile.rgba),high:tile.high.slice()};
+      }
+      for (const [cell,allowed] of Object.entries(sheet.candidates)) {
+        if (!numeric(cell,base.width*base.height/256) || !Array.isArray(allowed) || !allowed.length ||
+            !allowed.every(id=>Number.isInteger(id) && Object.hasOwn(tiles,id)) || new Set(allowed).size !== allowed.length) fail();
+        candidates[cell]=new Set(allowed);
+      }
+      const ids=Object.keys(backgroundKeys).filter(id=>backgroundKeys[id] === key), baseHigh=highMasks[ids[0]];
+      if (!baseHigh) fail();
+      for (const id of ids) {
+        if (highMasks[id].data.some((v,i)=>v !== baseHigh.data[i])) fail();
+      }
+      const high={width:base.width,height:base.height,data:new Uint8ClampedArray(baseHigh.data)};
+      const rgba=new Uint8ClampedArray(base.data), image=makeRaster(base.width,base.height,rgba);
+      // makeRaster is allowed to retain its argument (Node fakes); never expose
+      // that backing buffer as the immutable restoration source.
+      world[key]={width:base.width,base:new Uint8ClampedArray(base.data),baseHigh:baseHigh.data,high,image,tiles,candidates,patches:new Map(),updateRaster};
+      backgrounds[key]=image;
+      for (const id of ids) highMasks[id]=high;
+    }
+    return world;
+  }
+  function updateWorld(world, key, state) {
+    const fail=()=>{ throw new Error('Invalid world background patch set'); };
+    if (!exactFields(state,['key','patches']) || state.key !== key || !Object.hasOwn(world,key) || !Array.isArray(state.patches)) fail();
+    const sheet=world[key], next=new Map();
+    let previous=-1;
+    // Validate the ENTIRE complete set before changing pixels or remembered state.
+    for (const patch of state.patches) {
+      if (!exactFields(patch,['cell','tile']) || !Number.isInteger(patch.cell) || patch.cell <= previous ||
+          !Number.isInteger(patch.tile) || !Object.hasOwn(sheet.candidates,patch.cell) ||
+          !sheet.candidates[patch.cell].has(patch.tile)) fail();
+      previous=patch.cell; next.set(patch.cell,patch.tile);
+    }
+    const changed=new Set([...sheet.patches.keys(),...next.keys()]);
+    for (const cell of changed) {
+      if (sheet.patches.get(cell) === next.get(cell)) continue;
+      const tile=sheet.tiles[next.get(cell)], x=cell%(sheet.width/16)*16, y=Math.floor(cell/(sheet.width/16))*16;
+      const rgba=new Uint8ClampedArray(1024);
+      for (let p=0;p<256;p++) {
+        const at=((y+Math.floor(p/16))*sheet.width+x+p%16)*4;
+        rgba.set(tile ? tile.rgba.subarray(p*4,p*4+4) : sheet.base.subarray(at,at+4),p*4);
+        sheet.high.data.set(tile ? (tile.high[p] ? tile.rgba.subarray(p*4,p*4+4) : [0,0,0,0]) : sheet.baseHigh.subarray(at,at+4),at);
+      }
+      if (sheet.updateRaster) sheet.updateRaster(sheet.image,x,y,16,16,rgba);
+      else {
+        const ctx=sheet.image.getContext('2d'), pixels=ctx.createImageData(16,16);
+        pixels.data.set(rgba); ctx.putImageData(pixels,x,y);
+      }
+    }
+    sheet.patches=next;
+    return {image:sheet.image,foreground:null,high:sheet.high};
+  }
   // New bundles take {house:ImageData, exterior:ImageData}; legacy helper fixtures
   // may still pass one ImageData and supply the closed image to selectBackground.
-  function prepareArt(bundle, background, makeRaster) {
+  function prepareArt(bundle, background, makeRaster, updateRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
     const highMasks = Object.create(null), openHighMasks = Object.create(null);
     const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null), choiceCatalogs = Object.create(null);
     const backgrounds = Object.create(null), backgroundKeys = Object.create(null);
     const manifest = bundle.backgrounds === undefined ? null : backgroundManifest(bundle);
+    const hasWorld = bundle.world_backgrounds !== undefined;
+    if (hasWorld && !bundle.pandora_backgrounds) throw new Error('Missing world background manifest');
     const pixels = manifest ? background : {house:background};
     if (manifest) {
       for (const [key, sheet] of Object.entries(manifest)) {
@@ -500,7 +572,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         if (!data || data.width !== sheet.width || data.height !== sheet.height || data.data?.length !== sheet.width*sheet.height*4) {
           throw new Error('Invalid background pixels');
         }
-        backgrounds[key] = makeRaster(data.width,data.height,data.data);
+        if (!hasWorld) backgrounds[key] = makeRaster(data.width,data.height,data.data);
       }
     }
     if (!manifest && bundle.pandora_backgrounds !== undefined) throw new Error('Missing base background manifest');
@@ -508,7 +580,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     for (const id of Object.keys(bundle.foreground)) backgroundKeys[id] = manifest ? bundle.background_keys[id] : 'house';
     Object.assign(backgroundKeys,bundle.pandora_backgrounds?.background_keys);
     const doorBackground = 'house', house = pixels[doorBackground];
-    const door = prepareDoor(bundle.door_patches, house);
+    const door = hasWorld ? null : prepareDoor(bundle.door_patches, house);
     const openBackground = door ? makeRaster(house.width, house.height, door.pixels) : null;
     for (const [key, frame] of Object.entries(bundle.frames)) {
       const {width, height, offset, rgba} = frame;
@@ -550,9 +622,9 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           throw new Error('Invalid foreground run');
         }
         end = start + length;
-        for (let at = start * 4; at < end * 4; at++) rgba[at] = background.data[at];
+        for (let at = start * 4; at < end * 4; at++) rgba[at] = hasWorld && at%4 === 3 ? 255 : background.data[at];
       }
-      foreground[id] = makeRaster(mask.width, mask.height, rgba);
+      if (!hasWorld) foreground[id] = makeRaster(mask.width, mask.height, rgba);
       highMasks[id] = {width:mask.width,height:mask.height,data:rgba};
       if (door && backgroundKeys[id] === doorBackground) {
         const opened = new Uint8ClampedArray(rgba);
@@ -573,13 +645,15 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     }
     const pandoraScenes = prepareScenes(bundle.pandora_scenes,actors,backgroundKeys);
     const pandoraCarry = prepareCarry(bundle.pandora_carry,actors,pandoraScenes);
-    return {actors, foreground, sceneIds, pandoraScenes, pandoraCarry, highMasks, openHighMasks, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
+    const worldBackgrounds = prepareWorld(bundle.world_backgrounds,pixels,backgroundKeys,highMasks,backgrounds,makeRaster,updateRaster);
+    return {actors, foreground, sceneIds, pandoraScenes, pandoraCarry, worldBackgrounds, highMasks, openHighMasks, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
     const key = art.backgroundKeys[state.map_id];
-    if (!key || !art.foreground[state.map_id]) throw new Error('Unsupported background key');
+    if (!key || !art.highMasks[state.map_id]) throw new Error('Unsupported background key');
     const phase = selectedPhase(art,state);
+    if (art.worldBackgrounds) return updateWorld(art.worldBackgrounds,key,state.world_background);
     if (state.wooden_door_open && key === art.doorBackground) {
       if (!art.openBackground || !art.openForeground[state.map_id]) throw new Error('Missing open door art');
       return {image:art.openBackground,foreground:art.openForeground[state.map_id],high:phase ? art.openHighMasks[state.map_id] : null};
@@ -605,7 +679,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   function selectActor(art, state) {
     const actor = art.actors[state.actor_key];
-    if (!actor || !art.foreground[state.map_id]) throw new Error('Unsupported sprite or background key');
+    if (!actor || !(art.worldBackgrounds ? art.highMasks[state.map_id] : art.foreground[state.map_id])) throw new Error('Unsupported sprite or background key');
     return actor;
   }
   function selectActors(art, state) {
@@ -633,7 +707,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       const before = entries.findIndex(entry=>entry.position[1] > pot.position[1]);
       entries.splice(before < 0 ? entries.length : before,0,pot);
     }
-    return entries.map(entry => ({...art.actors[entry.key], position:entry.position,...(phase ? {priority:entry.priority} : {})}));
+    return entries.map(entry => ({...art.actors[entry.key], position:entry.position,...(phase || art.worldBackgrounds ? {priority:entry.priority ?? 2} : {})}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
   globalThis.RoomSlice = {composeObjects, backgroundManifest, createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};
