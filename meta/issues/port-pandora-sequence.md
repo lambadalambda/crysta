@@ -69,12 +69,18 @@ Implement only the maps, source assets and semantic state transitions required b
   clean debug/release reproduction: complete offline/projected arrays agree,
   181 blocking no-ops omitted and all17 C+1 Box arrivals retained. Parent verified
   actual artifact hashes and Git archive/tree linkage; see the
-  [pinned cadence proof](../../docs/pandora-cadence.md). The input-only browser
-  journey is now running against that expectation; no partial prefix is acceptance.
-  The producer bridge remains held.
-- Both module registrations are explicit in main. Producer bridge/current pins
-  and the continuous real-browser journey remain acceptance gates, not bypassed
-  by passing the offline route.
+  [pinned cadence proof](../../docs/pandora-cadence.md).
+- The continuous input-only browser journey passed11409 actual UI inputs and11410
+  full-canvas checks, all34 invocations and final controlled map41(136,208).
+  Parent reproduced the post-run evidence audit and verified the exact served HTML;
+  see [browser acceptance](../../docs/pandora-browser.md). No partial prefix is
+  acceptance. `serve-room` now selects this qualified profile; checkpoint startup,
+  explicit New Game/reset and the legacy false-profile adapter remain unchanged.
+  This one-line wiring change reuses the tested constructor/handler rather than
+  adding another factory solely for a new unit test; focused regressions cover both.
+- Both module registrations are explicit in main. Final producer bridge/current
+  pins remain required before restarting the existing house-only live service
+  and closing this issue; passing the portable route does not bypass that gate.
 
 ## Notes
 

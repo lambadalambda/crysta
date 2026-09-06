@@ -702,32 +702,40 @@ mod tests {
             return;
         }
         let rom = Rom::load(&std::fs::read(path).unwrap()).unwrap();
-        let mut preview = Preview::new(&rom).unwrap();
-        let checkpoint = preview.state();
-        let art = preview.art().to_vec();
-        assert_eq!(checkpoint["actor_key"], "0:0");
-        assert_eq!(
-            checkpoint["animation"],
-            json!({"set":"standing", "sequence":0, "record":0, "mirror_x":false})
-        );
-        preview.step(255);
-        assert!(preview.state()["error"].is_string());
-        preview.new_game();
-        let fresh = preview.state();
-        assert_eq!(fresh["start_kind"], "new-game");
-        assert_eq!(fresh["map_id"], 15);
-        assert_eq!(fresh["x"], 304);
-        assert_eq!(fresh["y"], 112);
-        assert_eq!(fresh["tick"], 0);
-        assert_eq!(fresh["phase"], "walking");
-        assert_eq!(fresh["error"], Value::Null);
-        assert_ne!(fresh["snapshot_sha256"], checkpoint["snapshot_sha256"]);
-        preview.step(2);
-        preview.new_game();
-        assert_eq!(preview.state(), fresh);
-        preview.reset();
-        assert_eq!(preview.state(), checkpoint);
-        assert_eq!(preview.art(), art);
+        for include_pandora in [false, true] {
+            let mut preview = Preview::new_profile(&rom, include_pandora).unwrap();
+            let checkpoint = preview.state();
+            let art = preview.art().to_vec();
+            assert_eq!(checkpoint["start_kind"], "saved-checkpoint");
+            assert_eq!(checkpoint["map_id"], 15);
+            assert_eq!(checkpoint["x"], 472);
+            assert_eq!(checkpoint["y"], 176);
+            assert_eq!(checkpoint["tick"], 0);
+            assert_eq!(checkpoint["error"], Value::Null);
+            assert_eq!(checkpoint["actor_key"], "0:0");
+            assert_eq!(
+                checkpoint["animation"],
+                json!({"set":"standing", "sequence":0, "record":0, "mirror_x":false})
+            );
+            preview.step(255);
+            assert!(preview.state()["error"].is_string());
+            preview.new_game();
+            let fresh = preview.state();
+            assert_eq!(fresh["start_kind"], "new-game");
+            assert_eq!(fresh["map_id"], 15);
+            assert_eq!(fresh["x"], 304);
+            assert_eq!(fresh["y"], 112);
+            assert_eq!(fresh["tick"], 0);
+            assert_eq!(fresh["phase"], "walking");
+            assert_eq!(fresh["error"], Value::Null);
+            assert_ne!(fresh["snapshot_sha256"], checkpoint["snapshot_sha256"]);
+            preview.step(2);
+            preview.new_game();
+            assert_eq!(preview.state(), fresh);
+            preview.reset();
+            assert_eq!(preview.state(), checkpoint);
+            assert_eq!(preview.art(), art);
+        }
     }
     fn assert_actor(preview: &Preview, art: &Value) {
         let output = preview.state.output();

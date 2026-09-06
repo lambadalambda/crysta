@@ -1,4 +1,4 @@
-//! Offline ROM-to-PandoraData adapter. Never called by the live host.
+//! Authenticated ROM-to-PandoraData adapter shared by qualification and the live preview.
 use crate::{invalid, pandora_navigation, pandora_navigation::source_objects, sha256, Result};
 use assets::{
     maps::{exits::ExitList, visual::pandora::PandoraBackground},

@@ -105,7 +105,9 @@ Normalizer and validator followed red→green, including every-bit identity chec
 partial/shifted/mismatched replay rejection and the raw `Interaction` negative
 control. The clean-source wrapper also has publication failure tests.
 
-**Canonical cadence proof accepted; real browser acceptance remains pending.**
+**Canonical cadence proof accepted.** The subsequent
+[continuous browser journey also passed](pandora-browser.md); it is separate
+input-only acceptance, not part of the offline proof.
 Parent clean debug/release runs at `9db17d9373740d1084983d047817d6d37c2d54d6`
 produced identical complete offline (11591 boundaries), projected (11410 boundaries)
 and qualification arrays:181 omitted inputs,17 C arrivals and1 Box arrival retained.

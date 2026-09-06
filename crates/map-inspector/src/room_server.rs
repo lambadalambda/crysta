@@ -144,7 +144,7 @@ fn respond(stream: &mut TcpStream, status: &str, kind: &str, body: &[u8]) -> std
 }
 
 pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
-    serve_preview(crate::room_preview::Preview::new(rom)?, port)
+    serve_preview(crate::room_preview::Preview::new_profile(rom, true)?, port)
 }
 
 fn serve_preview(mut preview: crate::room_preview::Preview, port: u16) -> Result<()> {
