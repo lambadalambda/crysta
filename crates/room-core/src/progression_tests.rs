@@ -146,11 +146,11 @@ fn first_grant_is_after_ack_before_choice_and_every_branch_repeats() {
             }
             assert_eq!(state.dialogue(&data).unwrap(), None);
             assert_eq!(
-                *state.event_flags(),
+                state.event_flags(),
                 crate::conversation::initial_flags(true)
             );
             assert_eq!(
-                *GameState::new_game(&data, Policy::SemanticPreview).event_flags(),
+                GameState::new_game(&data, Policy::SemanticPreview).event_flags(),
                 crate::conversation::initial_flags(false)
             );
         }
@@ -400,7 +400,7 @@ fn loaded_d_never_subscribes_to_live_flag_and_false_grant_cannot_open_gate() {
     assert!(GameState::restore(&data, &corrupt).is_err());
     // Internal-only counterfactual matching native source lifetime. There is no
     // public flag setter or acceptance warp; normal B->D loads after the grant.
-    state.flags = conversation::initial_flags(true);
+    state.flags = conversation::initial_story_flags(true);
     state.step(&data, FrameInput::default()).unwrap();
     assert_eq!(state.current_room(&data).unwrap().cells()[1415], 0x8592);
     assert_eq!(GameState::restore(&data, &state.snapshot()).unwrap(), state);
@@ -413,7 +413,7 @@ fn exterior_north_return_and_halo_edges_fail_atomically_not_as_walls() {
     let data = data();
     let mut state = resident(&data);
     state.map_id = 10;
-    state.flags = conversation::initial_flags(true);
+    state.flags = conversation::initial_story_flags(true);
     state.walking = WalkingState::new(504, 769);
     state.animation = AnimationState::standing(Direction::Down);
     for direction in [
@@ -455,7 +455,7 @@ fn retained_d_arrival_requires_the_just_selected_gate_profile() {
     for granted in [false, true] {
         let mut state = resident(&data);
         state.map_id = 12;
-        state.flags = conversation::initial_flags(granted);
+        state.flags = conversation::initial_story_flags(granted);
         state.walking = WalkingState::new(120, 464);
         state.animation = AnimationState::standing(Direction::Down);
         state.transition = Some(Transition::select(12, 0, (120, 464)).unwrap());
@@ -472,5 +472,93 @@ fn retained_d_arrival_requires_the_just_selected_gate_profile() {
             }
             state.step(&data, FrameInput::default()).unwrap();
         }
+    }
+}
+
+#[test]
+fn widened_b_preserves_unrelated_flags_and_grants_before_choice() {
+    use crate::conversation::StoryConversationSpec;
+    use crate::events::StoryFlags;
+
+    let spec = StoryConversationSpec::new(pages()).unwrap();
+    let mut bytes = *conversation::initial_story_flags(false).bytes();
+    bytes[0] = 0x80; // Unrelated low flag is not B's restore policy.
+    bytes[4] = 0; // B does not own bootstrap $20/$FB admission either.
+    bytes[31] = 0;
+    bytes[72] = 0x08; // $243
+    bytes[82] = 0x04; // $292
+    bytes[127] = 0x80;
+    let mut flags = StoryFlags::new(bytes);
+    let active = spec.begin(&mut flags);
+    assert_eq!(active.request, FIRST);
+    assert_eq!(spec.restore(FIRST, 0, &flags).unwrap(), active);
+    assert!(!flags.contains(0x26).unwrap());
+    assert!(spec.restore(FIRST, 2, &flags).is_err());
+    assert!(spec.restore(REPEAT, 0, &flags).is_err());
+    let active = spec.acknowledge(active, &mut flags).unwrap().unwrap();
+    bytes[4] |= 0x40;
+    assert_eq!(flags.bytes(), &bytes);
+    assert_eq!(
+        spec.output(active).unwrap().wait,
+        DialogueWait::Choice { catalog: 0, key: 2 }
+    );
+    assert_eq!(spec.restore(FIRST, 2, &flags).unwrap(), active);
+    assert!(spec.restore(FIRST, 0, &flags).is_err());
+    assert!(spec.restore(FIRST, 1, &flags).is_err());
+    for selection in 0..3 {
+        let mut flags = flags.clone();
+        let mut followup = Some(spec.choose(active, selection, &mut flags).unwrap());
+        while let Some(active) = followup {
+            assert_eq!(
+                spec.restore(active.request, active.cursor.position(), &flags).unwrap(),
+                active
+            );
+            followup = spec.acknowledge(active, &mut flags).unwrap();
+        }
+        let repeat = spec.begin(&mut flags);
+        assert_eq!(repeat.request, REPEAT);
+        assert_eq!(spec.restore(REPEAT, 0, &flags).unwrap(), repeat);
+        let mut followup = Some(spec.choose(repeat, selection, &mut flags).unwrap());
+        while let Some(active) = followup {
+            assert_eq!(
+                spec.restore(active.request, active.cursor.position(), &flags).unwrap(),
+                active
+            );
+            followup = spec.acknowledge(active, &mut flags).unwrap();
+        }
+        assert_eq!(flags.bytes(), &bytes);
+    }
+}
+
+#[test]
+fn authoritative_story_storage_keeps_profile9_low_range_and_admission() {
+    use crate::events::{EventFlags, StoryFlags};
+
+    let data = data();
+    let mut state = resident(&data);
+    let mut flags = *state.story_flags().bytes();
+    flags[72] = 0x18;
+    flags[82] = 0x04;
+    state.flags = StoryFlags::new(flags);
+    let low: EventFlags = state.event_flags();
+    assert_eq!(low, conversation::initial_flags(false));
+    state.interact(&data).unwrap();
+    state.acknowledge(&data).unwrap();
+    assert_eq!(&state.story_flags().bytes()[64..], &flags[64..]);
+    assert!(state.story_flags().contains(0x26).unwrap());
+    assert!(!low.contains(0x26).unwrap()); // Owned inspection, not a live borrow.
+    let snapshot = state.snapshot();
+    assert_eq!(snapshot.len(), 181);
+    assert_eq!(&snapshot[..8], b"RSLC\x01\x09\x00\x01");
+    assert_eq!(
+        &snapshot[109..173],
+        conversation::initial_flags(true).bytes()
+    );
+    let restored = GameState::restore(&data, &snapshot).unwrap();
+    assert_eq!(&restored.story_flags().bytes()[64..], &[0; 64]);
+    for byte in 109..173 {
+        let mut corrupt = snapshot.clone();
+        corrupt[byte] ^= 0x80;
+        assert!(GameState::restore(&data, &corrupt).is_err(), "{byte}");
     }
 }

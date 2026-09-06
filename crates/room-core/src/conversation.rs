@@ -1,5 +1,5 @@
 //! Fixed source-qualified B request graph, independent of font/raster decoding.
-use crate::events::{EventCursor, EventFlags, EventOp, EventSequence, EventWait};
+use crate::events::{EventCursor, EventFlags, EventOp, EventWait, FlagBlock, FlagSequence, StoryFlags};
 use crate::slice::SliceError;
 use alloc::{vec, vec::Vec};
 
@@ -33,10 +33,15 @@ pub struct ConversationPages {
     pub repeat_option2: [u32; 2],
 }
 
+/// Existing B conversation API, using the 512-bit house projection.
+pub type ConversationSpec = FlagConversationSpec<64>;
+/// B conversation over the wider story projection; not a new runtime capability.
+pub type StoryConversationSpec = FlagConversationSpec<128>;
+
 /// Immutable six-request graph. Only its first request can change an event.
 #[derive(Debug)]
-pub struct ConversationSpec {
-    sequences: [EventSequence; 6],
+pub struct FlagConversationSpec<const BYTES: usize> {
+    sequences: [FlagSequence<BYTES>; 6],
     choices: [u32; 2],
 }
 /// Current presentation/control boundary; no frontend selection is simulated.
@@ -74,11 +79,30 @@ pub(crate) fn initial_flags(granted: bool) -> EventFlags {
     bytes[31] = 8; // $00FB
     EventFlags::new(bytes)
 }
+pub(crate) fn initial_story_flags(granted: bool) -> StoryFlags {
+    let mut bytes = [0; 128];
+    bytes[..64].copy_from_slice(initial_flags(granted).bytes());
+    StoryFlags::new(bytes)
+}
+
 impl ConversationSpec {
+    /// Widen validated immutable operations once when attaching progression data.
+    pub(crate) fn into_story(self) -> StoryConversationSpec {
+        StoryConversationSpec {
+            sequences: self.sequences.map(|sequence| {
+                FlagSequence::new(sequence.ops().to_vec()).expect("house ops fit story storage")
+            }),
+            choices: self.choices,
+        }
+    }
+}
+
+impl<const BYTES: usize> FlagConversationSpec<BYTES> {
     /// Compile the fixed source graph, rejecting aliased raster identities.
     /// The caller binds these ordered keys and the decoded source into content identity.
     /// # Errors
-    /// Rejects duplicate keys; their opaque numeric values (including zero) are unrestricted.
+    /// Rejects duplicate keys or storage too small for $26; opaque key values
+    /// (including zero) are unrestricted.
     pub fn new(pages: ConversationPages) -> Result<Self, SliceError> {
         let mut keys = vec![pages.first, pages.first_choice, pages.repeat_choice];
         keys.extend(pages.first_option1);
@@ -90,7 +114,7 @@ impl ConversationSpec {
             return Err(SliceError::Data);
         }
         let followup = |keys: &[u32]| {
-            EventSequence::new(
+            FlagSequence::new(
                 keys.iter()
                     .copied()
                     .map(EventOp::ShowPage)
@@ -98,7 +122,7 @@ impl ConversationSpec {
             )
             .map_err(|_| SliceError::Data)
         };
-        let first = EventSequence::new(vec![
+        let first = FlagSequence::new(vec![
             EventOp::ShowPage(pages.first),
             EventOp::SetFlag(0x26),
             EventOp::Choose {
@@ -107,7 +131,7 @@ impl ConversationSpec {
             },
         ])
         .map_err(|_| SliceError::Data)?;
-        let repeat = EventSequence::new(vec![EventOp::Choose {
+        let repeat = FlagSequence::new(vec![EventOp::Choose {
             catalog: 1,
             branches: [REPEAT_TWO, REPEAT_ONE, REPEAT_TWO],
         }])
@@ -124,14 +148,14 @@ impl ConversationSpec {
             choices: [pages.first_choice, pages.repeat_choice],
         })
     }
-    fn sequence(&self, request: u32) -> Result<&EventSequence, SliceError> {
+    fn sequence(&self, request: u32) -> Result<&FlagSequence<BYTES>, SliceError> {
         REQUESTS
             .iter()
             .position(|key| *key == request)
             .map(|i| &self.sequences[i])
             .ok_or(SliceError::Snapshot)
     }
-    pub(crate) fn begin(&self, flags: &mut EventFlags) -> Active {
+    pub(crate) fn begin(&self, flags: &mut FlagBlock<BYTES>) -> Active {
         let request = if flags.contains(0x26).expect("bounded flag") {
             REPEAT
         } else {
@@ -160,7 +184,7 @@ impl ConversationSpec {
     pub(crate) fn acknowledge(
         &self,
         mut active: Active,
-        flags: &mut EventFlags,
+        flags: &mut FlagBlock<BYTES>,
     ) -> Result<Option<Active>, SliceError> {
         let sequence = self.sequence(active.request)?;
         sequence
@@ -172,7 +196,7 @@ impl ConversationSpec {
         &self,
         mut active: Active,
         selection: u8,
-        flags: &mut EventFlags,
+        flags: &mut FlagBlock<BYTES>,
     ) -> Result<Active, SliceError> {
         let request = self
             .sequence(active.request)?
@@ -187,7 +211,7 @@ impl ConversationSpec {
         &self,
         request: u32,
         position: u16,
-        flags: &EventFlags,
+        flags: &FlagBlock<BYTES>,
     ) -> Result<Active, SliceError> {
         let sequence = self.sequence(request)?;
         let cursor = sequence
@@ -197,7 +221,8 @@ impl ConversationSpec {
         self.output(active)?; // completion never owns dialogue
         let granted = request != FIRST
             || sequence.ops()[..usize::from(position)].contains(&EventOp::SetFlag(0x26));
-        if *flags != initial_flags(granted) {
+        // B owns only $26 consistency; full profile admission belongs to GameState.
+        if flags.contains(0x26) != Ok(granted) {
             return Err(SliceError::Snapshot);
         }
         Ok(active)

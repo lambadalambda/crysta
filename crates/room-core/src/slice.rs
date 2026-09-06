@@ -1,6 +1,8 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
-use crate::conversation::{self, Active, ConversationSpec, DialogueOutput};
-use crate::events::EventFlags;
+use crate::conversation::{
+    self, Active, ConversationSpec, DialogueOutput, StoryConversationSpec,
+};
+use crate::events::{EventFlags, StoryFlags};
 pub use crate::pandora::{Invocation, PandoraText, RequestPages};
 use crate::transition::Transition;
 use crate::{
@@ -76,7 +78,7 @@ pub struct GameData {
 }
 #[derive(Debug)]
 struct ProgressionData {
-    conversation: ConversationSpec,
+    conversation: StoryConversationSpec,
     open_d: Room,
     exterior: Room,
 }
@@ -209,7 +211,7 @@ impl GameData {
         let mut open_d = self.room(13, false, false)?.clone();
         open_d.replace_cell(1415, 0x592);
         self.progression = Some(ProgressionData {
-            conversation,
+            conversation: conversation.into_story(),
             open_d,
             exterior,
         });
@@ -327,7 +329,7 @@ pub struct GameState {
     transition: Option<Transition>,
     fresh_bedroom: bool,
     wooden_door_open: bool,
-    flags: EventFlags,
+    flags: StoryFlags,
     dialogue: Option<Active>,
     d_open_loaded: bool,
     progression_enabled: bool,
@@ -345,7 +347,7 @@ impl GameState {
             transition: None,
             fresh_bedroom: false,
             wooden_door_open: false,
-            flags: conversation::initial_flags(false),
+            flags: conversation::initial_story_flags(false),
             dialogue: None,
             d_open_loaded: false,
             progression_enabled: data.conversation_progression(),
@@ -366,7 +368,7 @@ impl GameState {
             transition: None,
             fresh_bedroom: true,
             wooden_door_open: false,
-            flags: conversation::initial_flags(false),
+            flags: conversation::initial_story_flags(false),
             dialogue: None,
             d_open_loaded: false,
             progression_enabled: data.conversation_progression(),
@@ -503,9 +505,20 @@ impl GameState {
         self.animation = AnimationState::standing(Direction::Up);
         Ok(self.output())
     }
-    /// Canonical source flags: initial $0020/$00FB, with only $0026 mutable here.
+    /// Owned low-512-bit inspection of the authoritative story flags.
+    ///
+    /// Getter compatibility: `contains()` and `bytes()` inspection is retained,
+    /// but this now returns an owned `EventFlags`, not `&EventFlags`. Callers with
+    /// explicit reference types or dereference assertions must adjust accordingly.
     #[must_use]
-    pub const fn event_flags(&self) -> &EventFlags {
+    pub fn event_flags(&self) -> EventFlags {
+        let mut bytes = [0; 64];
+        bytes.copy_from_slice(&self.flags.bytes()[..64]);
+        EventFlags::new(bytes)
+    }
+    /// Borrow the authoritative bounded story storage; no mutable flags are exposed.
+    #[must_use]
+    pub const fn story_flags(&self) -> &StoryFlags {
         &self.flags
     }
 
@@ -612,6 +625,7 @@ impl GameState {
     }
     /// Fixed 181-byte little-endian snapshot; immutable content is identified, not embedded.
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
+    /// Profile 9 persists only the low 64 flag bytes; restore zeros the upper range.
     #[must_use]
     pub fn snapshot(&self) -> Vec<u8> {
         let mut bytes = vec![b'R', b'S', b'L', b'C', 1, PROFILE_VERSION, 0, 1];
@@ -641,7 +655,8 @@ impl GameState {
             bytes.extend([0; 5]);
         }
         bytes.push(u8::from(self.wooden_door_open));
-        bytes.extend(self.flags.bytes());
+        // Profile 9 persists only the legacy low range; no story capability yet.
+        bytes.extend(&self.flags.bytes()[..64]);
         bytes.push(u8::from(self.d_open_loaded));
         bytes.extend(self.dialogue.map_or(0, |a| a.request).to_le_bytes());
         bytes.extend(
@@ -698,6 +713,8 @@ impl GameState {
         {
             return Err(SliceError::Snapshot);
         }
+        // Full legacy admission above remains unchanged; the upper range starts empty.
+        let flags = conversation::initial_story_flags(granted);
         let d_open_loaded = match bytes[173] {
             0 => false,
             1 if map_id == 13 && granted && progression_enabled => true,
