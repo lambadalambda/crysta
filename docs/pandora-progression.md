@@ -170,8 +170,11 @@ at `(472,304)`, facing Up, opens its ordinary door; subsequent Up traversal land
 at **13 `(392,207)`**. Resident **`$838EBE`**, header `$88B61E`, descriptor `$83ECC6`,
 stands at `(360,128)`. Its callback `$88B653` is registered at `$88B63B`.
 A facing Up at **`(360,144)`** admits interaction; the earlier `(360,145)` probe
-in discovery did not. This uses the existing forward-sample/actor-rectangle
-interaction rule, not a radial proximity trigger.
+in discovery did not. This is a retained input witness, **not a geometric Y145
+cutoff**: source projection still puts its far sample inside the actor rectangle.
+The failed pulse's precise cause remains unexplained. The admitted compiler keeps
+the successful exact anchor; see [navigation/contact qualification](pandora-navigation.md).
+Interaction uses forward samples/actor bounds, not radial proximity.
 
 | Phase | Source | Effect |
 |---|---|---|
@@ -260,7 +263,7 @@ counter reset on loading; `$292` persists. The old 64-byte event projection miss
 WRAM, while the source helper proves the individual event operands. It does not
 claim a complete canonical event-memory layout.
 
-### 4. Stairs, contact, warning, second contact
+### 4. Stairs, contact, warning and re-approach
 
 | Direct exit | Source rectangle | Destination/raw position | Selector | Native settled player |
 |---|---|---|---:|---|
@@ -281,13 +284,18 @@ request **`$88ADF2`** has exactly two page boundaries: **`$88AE29 D5`** and
 **`$88AE5E D3`**. The observed cursor `$88AE50` points to glyph byte `$56`, not
 an acknowledgement; see [qualified dialogue](pandora-dialogue.md). Its return and delay
 set local2 at `$88ADC5`. Holding Down while that request is pending does not open
-it. Neither does neutral waiting after the warning returns.
+it. Neutral waiting afterward also stays outside the gate at recoil Y359.
 
-A **second Down/contact** reaches `(136,368)` and admits the source proximity/
-local-flag gate. `$88AD4A` hands player control to a script, **`$88AD4F` sets `$22`**,
-and `$88AD53 COP14` reloads map21 (mode7, selector1, raw128,352). Local flags reset;
+The route's next Down approach reaches `(136,368)`. Opening is a **polling gate**
+requiring local1 AND local2 and raw inclusive X120..152/Y368..400, any facing:
+**no new Down edge or second callback is required**. First-contact callback
+geometry is separately X123..149/Y370..400; its admitted centerline witness is
+`(136,370)` before recoil. `$88AD4A` must successfully acquire script control
+(COPDF waits while `$097C & $0810 != 0`) before **`$88AD4F` sets `$22`**.
+`$88AD53 COP14` then reloads map21 (mode7, selector1, raw128,352). Local flags reset;
 player is `(136,368)`. `$045E=$FF50` is still set: an ordinary-looking idle script
-alone does **not** prove regained control.
+alone does **not** prove regained control. See the [source coordinate and readiness
+contract](pandora-navigation.md).
 
 ### 5. Mandatory first-time tour and named stable control witness
 
