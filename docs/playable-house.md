@@ -7,8 +7,9 @@ checkpoint, or original CPU execution in its simulation loop.
 **This is a limited semantic start, not a complete port of the opening.** It
 uses the default name and explicitly completes/omits intro presentation and
 conversation waits. Ark now uses ROM-derived ordinary standing/walking sprites
-over the static first background (hardware BG2). NPCs, dialogue, inventory/stats, combat and audio are not
-implemented. Doorways use endpoint-qualified logical timing, not the native
+over the static first background (hardware BG2), with one frozen ordinary-pose
+resident in room10. NPC behavior/collision, other residents, dialogue,
+inventory/stats, combat and audio are not implemented. Doorways use endpoint-qualified logical timing, not the native
 loader's video-frame schedule. The frontend still uses a native Rust host;
 the same device-free core builds for Wasm but browser Wasm glue is not yet wired.
 
@@ -126,8 +127,8 @@ Raw ROM-derived captures, screenshots and verification logs stay ignored under
 
 ## Ark rendering boundary
 
-The native adapter compiles21 ordinary ROM frames plus7 exact horizontal mirrors
-once, exposing a fixed `/art.json` route. The state supplies the frame key; the
+The native adapter compiles21 ordinary Ark ROM frames plus7 exact horizontal
+mirrors and one resident raster once, exposing a fixed `/art.json` route. The state supplies the frame key; the
 browser never derives animation from elapsed wall time or position differences.
 Frames retain source anchors and transparency. Mirrored components have native
 alternate offsets, so they are composed before browser rasterization rather than
@@ -153,6 +154,35 @@ this is not full-scene native screenshot equality.
 See [ROM sprite evidence](ark-sprites.md) and
 [ordinary animation qualification](ark-animation.md) for source ranges, native
 register/tile/palette/composition witnesses and reproducible fresh-boot commands.
+
+## First house resident
+
+Room10 now displays the resident at **(424,416)**, frozen in the source-derived
+ordinary Right-facing pose. The spawn comes from ROM record`$83:8D7C`, not a RAM
+snapshot. Its16×33 raster uses the shared component decoder with palette base208
+(Ark uses128), native signed anchor`(-8,-33)` and OBJ priority2. It is present
+only while map16 is loaded, including the explicit semantic doorway phase;
+returning to map15 removes it. The neighboring resident is not rendered yet.
+
+The host supplies an ordered `scene:[{key,position}]` alongside the player state.
+For the qualified ordinary pair, painter order uses worldY before sprite-anchor
+subtraction; equalY puts the NPC first and Ark last. The browser consumes that
+order without inventing entity simulation. Ordering on either side and the tie
+are covered synthetically; the current route stays above the NPC and does not
+claim a native overlap capture. Opaque high background pixels still cover both.
+
+**This is presentation only.** There is no NPC interaction, collision, AI,
+conversation or event-condition runtime. No NPC state enters the player snapshot.
+Initial/final snapshot hashes are unchanged from the Ark-only milestone. The
+frozen resident is the selected fresh ordinary-house policy, also used by the
+diagnostic checkpoint preview—not a reconstruction of arbitrary saved NPC state.
+
+[House NPC qualification](house-npc.md) records the complete ROM resource chain,
+source ordering and fresh hardware/image evidence. A two-boot replay in the
+integrated checkout (`local/house-npc-qualification/replay-QNlHv5`) passed all
+four settled samples, including313/313 opaque reference pixels each,256 graphics
+tiles and16 palette words. The shared compositor's large-component column15
+wrap remains unqualified, but neither selected large component uses that case.
 
 ## Verified result
 
@@ -182,3 +212,13 @@ animation `replay-59Ly6n` (827 per-step comparisons per set, twice) and sprites
 `replay-IzVj7x` (two boots, selected hardware/image evidence and28 exports).
 Logs/screenshots stay under ignored `local/map-research/ark-*`. Independent
 core, assets, native transport, frontend and browser-verifier reviews passed.
+
+The resident integration passed two identical511-step browser routes with512
+full-canvas comparisons each. Each run includes99 room10 states and30,987
+visible NPC-pixel comparisons (313 per state), checking source placement,
+membership and painter order. Browser errors were empty,390px layout had no
+overflow, and both initial/final player snapshot hashes match the Ark-only runs.
+All29 transport rasters are tested, including the pinned NPC RGBA export hash.
+Full workspace tests with required movement/house fixtures, strict Clippy,
+Wasm build, normal/optimized qualification checks and independent review pass.
+Private logs/screenshots are under `local/map-research/house-npc-*`.

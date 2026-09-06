@@ -45,3 +45,8 @@ resource caching and final scene effects still need qualification.
 - [Render Ark standing and walking in the portable house](render-ark-house-sprite.md)
 
 ROM-backed ordinary house Ark sprites and deterministic facing/walking animation are complete. This parent remains open for broader graphics/actions and classic scene behavior. See [playable scope](../../docs/playable-house.md).
+
+A first frozen room10 NPC is now ROM-decoded and rendered with source-derived
+placement/palette/order and fresh native pixel qualification; see
+[completed resident milestone](render-first-house-npc.md). Other actor families,
+NPC behavior and full scene effects remain open.
