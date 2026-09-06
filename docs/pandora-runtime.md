@@ -26,7 +26,7 @@ let game = GameState::new_game(&data, Policy::SemanticPreview);
 
 `with_pandora` requires the existing B/exterior capability, unchanged ROM identity
 and a new aggregate content identity. The compiler must authenticate/hash **all**
-old house, new text, collision/occupancy/admission, pot, motion, contact and phase
+old house, new text, raw collision/occupancy/material policies, pot, motion, contact and phase
 inputs in canonical order. Core validates structure, not source provenance or
 cryptographic hashes. No ROM pointers, captured-memory initializer, CPU execution,
 filesystem or clock enter the runtime.
@@ -39,6 +39,39 @@ opaque and globally unique across resources. Counts include non-acknowledged D4
 choice contexts. The warning has **two** pages, not an invented AE50 wait.
 `Invocation::ALL` preserves 34 direct sites, including four distinct D720
 invocations. A resource identity is never executed as an address.
+
+### Raw material policy
+
+`room_core::{MaterialRule, MaterialAlias, MaterialPolicyError}` supplies the finite
+classification seam. Install after the profile halo, without modifying source words:
+
+```rust,ignore
+let room = raw_room.with_material_policy(vec![MaterialRule {
+    bounds: [6, 53, 7, 54], // half-open cell scope, E stair only
+    direction: Some(Direction::Up),
+    alias: MaterialAlias::StairOpen29,
+}])?;
+```
+
+- `TownSolid25`: type25 as solid, scoped to authenticated Town bounds; direction
+  may be `None` (all directions) or one cardinal.
+- `ClosedDoorPartial5`: type5 as partial only Up at `(11,21)`.
+- `StairOpen29`: type29 as open only Up at `(11,21)`, `(6,53)`, or `(22,53)`.
+  The compiler binds these to C/E/20 respectively, never a global floor alias.
+
+Room validates finite scopes, grid/halo extent and same-type/direction overlap.
+`material_policy()` exposes immutable rules for hashing; policies survive clones
+and genuine tile patches. Rules need not match the current raw word, since closed
+and open door phases share a policy. The collision solver uses its **delayed resolve
+direction**, not newly submitted input. Stored old-edge slopes6/7 reject before
+bit15; the existing passive assertion then classifies bit15 as solid before aliases.
+Other unsupported types and samples outside the halo still fail atomically.
+Default rooms have no aliases. The host authenticates map membership, source table
+semantics, policy and full raw grid in the aggregate content identity.
+
+Standalone pot lane admission retains its existing exact-word contract but uses
+this same classifier internally rather than normalizing `0B81`/`3ACB` in a private
+grid. Actual consumed-pot/door patch events remain distinct from classification.
 
 ### Collision, contact and motion
 
@@ -85,9 +118,8 @@ action atomically; there are **no fallback timers, inferred stairs or teleports*
 The compiler must constrain its halo/collision to admitted movement and exits;
 this is not a general town/navigation engine. Exact `MotionSpec` anchors do not
 represent the navigation compiler's complete ordered coarse/fine exit tables.
-Likewise, ordinary `Room` sampling does not express E/20's Up-only type29 admission;
-an adapter needs an explicitly qualified typed seam, not a global type29-to-floor
-alias. These integration limits remain unresolved by the polling/sheet corrections.
+Ordered-exit/Town admission is being corrected separately; the raw classification
+seam below resolves the previous Up-only type29 limitation.
 
 The last motion sample is an explicit **completion boundary**: its pose and reload
 apply, then the graph continuation and next scene win in the same logical update.

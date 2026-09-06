@@ -5,7 +5,10 @@
 //! source objects and lane admission. No captured memory or scene initializer is
 //! used here. See `docs/pandora-pots.md` for the native/source proof boundary.
 
-use crate::{Direction, FrameInput, MovementOutput, Room, Unqualified, WalkingState};
+use crate::{
+    Direction, FrameInput, MaterialAlias, MaterialRule, MovementOutput, Room, Unqualified,
+    WalkingState,
+};
 
 /// A source pot cell and its fully decoded replacement collision word.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -150,7 +153,7 @@ impl Admission<'_> {
         }
         Ok(())
     }
-    fn collision(&self, consumed: u64, up: bool) -> Room {
+    fn collision(&self, consumed: u64) -> Result<Room, Error> {
         let mut room = self.room.clone();
         for (i, object) in self.objects.iter().enumerate() {
             if consumed & (1 << i) != 0 {
@@ -158,18 +161,34 @@ impl Admission<'_> {
                 room.replace_cell(cell, object.replacement | (room.cells()[cell] & 0x8000));
             }
         }
-        if self.cellar_up_lanes && up && room.width() > 11 && room.height() > 21 {
+        let admitted_cell = room.sample_halo().is_none_or(|[left, top, right, bottom]| {
+            left <= 11 && top <= 21 && 11 < right && 21 < bottom
+        });
+        if self.cellar_up_lanes && admitted_cell && room.width() > 11 && room.height() > 21 {
             let cell = 21 * usize::from(room.width()) + 11;
-            // Private collision classifiers, NEVER source words/patch events.
-            // Type5 is P16 here. Type29 is Open only for admitted Up: Right
-            // S-first's type29 entry differs, so a global alias would be wrong.
-            match room.cells()[cell] {
-                0x0b81 => room.replace_cell(cell, 16 << 9),
-                0x3acb => room.replace_cell(cell, 0),
-                _ => {} // BACB remains flagged solid; unknown words fail closed.
+            // Preserve standalone POT1's exact-word qualification, but classify
+            // raw words through the same delayed-direction solver as Pandora.
+            let alias = match room.cells()[cell] {
+                0x0b81 => Some(MaterialAlias::ClosedDoorPartial5),
+                0x3acb => Some(MaterialAlias::StairOpen29),
+                _ => None, // BACB remains flagged solid; no inferred aliases.
+            };
+            if let Some(alias) = alias {
+                let rule = MaterialRule {
+                    bounds: [11, 21, 12, 22],
+                    direction: Some(Direction::Up),
+                    alias,
+                };
+                if !room.material_policy().contains(&rule) {
+                    let mut rules = room.material_policy().to_vec();
+                    rules.push(rule);
+                    room = room
+                        .with_material_policy(rules)
+                        .map_err(|_| Error::Source)?;
+                }
             }
         }
-        room
+        Ok(room)
     }
 }
 
@@ -426,10 +445,7 @@ impl PotState {
                 }
                 Phase::Empty | Phase::Held => {
                     let held = self.phase == Phase::Held;
-                    let collision = a.collision(
-                        self.consumed,
-                        self.walking.delayed_direction() == Some(Direction::Up),
-                    );
+                    let collision = a.collision(self.consumed)?;
                     out.movement = Some(next.walking.step_with_cadence(
                         &collision,
                         FrameInput {
@@ -540,5 +556,50 @@ impl PotState {
             return Err(Error::Snapshot);
         }
         Ok(state)
+    }
+}
+
+#[cfg(test)]
+mod raw_policy_tests {
+    use super::*;
+    #[test]
+    fn preinstalled_rules_and_outside_halo_do_not_add_duplicate_admission() {
+        let mut cells = alloc::vec![0; 32 * 64];
+        cells[21 * 32 + 11] = 0x3acb;
+        let room = Room::new_passive(32, 64, cells).unwrap();
+        let rule = MaterialRule {
+            bounds: [11, 21, 12, 22],
+            direction: Some(Direction::Up),
+            alias: MaterialAlias::StairOpen29,
+        };
+        for source in [
+            room.clone()
+                .with_material_policy(alloc::vec![rule])
+                .unwrap(),
+            room.with_sample_halo([0, 0, 10, 10]).unwrap(),
+        ] {
+            let a = Admission {
+                room: &source,
+                objects: &[],
+                cellar_up_lanes: true,
+                door_hit_enabled: false,
+            };
+            assert_eq!(a.collision(0).unwrap(), source);
+        }
+    }
+    #[test]
+    fn lane_admission_classifies_without_rewriting_raw_words() {
+        for raw in [0x0b81, 0x3acb, 0xbacb] {
+            let mut cells = alloc::vec![0; 32 * 64];
+            cells[21 * 32 + 11] = raw;
+            let room = Room::new_passive(32, 64, cells).unwrap();
+            let a = Admission {
+                room: &room,
+                objects: &[],
+                cellar_up_lanes: true,
+                door_hit_enabled: false,
+            };
+            assert_eq!(a.collision(0).unwrap().cells(), room.cells());
+        }
     }
 }

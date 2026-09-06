@@ -119,3 +119,9 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   frozen owner coordinates and immutable prefix constraints validate restore.
   Schema4/profile12 retains 320 bytes and adds an active-motion witness to prevent
   erasing a preserve-only motion into its graph wait. No profile9 changes.
+
+- Raw material classification implemented in `73f51ff` (integrated `100ff27`):
+  immutable bounded typed rules, delayed direction, old-edge slopes before bit15,
+  no raw normalization. Ten focused tests and independent review passed. Standalone
+  pot lane classification now uses that same seam rather than private raw aliases;
+  its exact-word and Up-only admission remains unchanged.
