@@ -39,3 +39,7 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
 - API and evidence boundaries are recorded in `docs/pandora-runtime.md`.
 - Navigation/contact/forced pacing remains compiler-owned; no guessed core geometry.
 - Issue remains open; no browser/native aggregate acceptance claimed.
+- Unified flag storage committed with unchanged profile9 bytes and all five private
+  old fixture suites passing; B highflag preservation tested at both widths.
+- Fixed graph component red → green, independently reviewed. Review's forced-tour
+  ownership restore defect fixed with regression tests. Aggregate wiring follows.

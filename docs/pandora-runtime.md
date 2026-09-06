@@ -35,3 +35,20 @@ getter compatibility change, not a second synchronized flag store.
 Foundation tests are synthetic structural tests. They do not establish native
 navigation, forced-sequence timing, whole-screen fidelity or browser acceptance.
 Those acceptance gates remain with the parent and navigation/compiler owners.
+
+## Fixed graph foundation
+
+The private graph is now implemented, not yet wired to aggregate actions. It uses
+separate control, request and typed presentation-cue nodes. Request returns never
+pretend to be a new acknowledgement. Cooperating reaction color-worker boundaries
+are explicit. Map loads reset exactly the low32 local bits plus the door counter,
+including same-map reconstruction; no highflags are cleared.
+
+Synthetic graph tests cover map13 refusal/retry/direct, C's atomic unsupported
+answers, exact grant pages, real-hit callback stages, warning/delay/second contact,
+and uninterrupted forced tour ownership through the distinct final grants. The
+four-byte graph continuation validates map/stage/cursor/local/counter/persistent
+flag consistency. It is only a component; the aggregate must additionally bind
+identity, collision, pot recovery and motion ownership. Independent review caught
+and fixed a malformed restore that could otherwise claim control outside the tour
+with `$22` set. No host/runtime capability is enabled by this graph foundation.

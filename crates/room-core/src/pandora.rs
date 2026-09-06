@@ -265,3 +265,6 @@ impl PandoraText {
             .pages
     }
 }
+
+#[allow(dead_code)] // Fixed graph is wired into the aggregate in the next topical change.
+mod graph;
