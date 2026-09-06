@@ -97,8 +97,9 @@ uses bounding origin `Ark+(-8,-16)` and first coarse match followed by fine
 exclusive deltas; D's exact X alignment is Ark X120 and eligible Y720..768.
 Selector5 queues raw destination plus `(0,-16)`, then loader/arrival scheduling
 produce the actual position; do not teleport directly to the record's spawn.
-Native spawned/settled/walking endpoint qualification remains in progress and
-is outside this initial source contract.
+Native spawned/settled/walking endpoint evidence is below. The queued coordinate
+is `(496,736)`, initialized Ark is `(504,752)`, and settled Ark is `(504,769)`.
+These are three different stages, not alternative names for one spawn.
 
 ## Source reproduction
 
@@ -111,3 +112,121 @@ python3 -B tools/house-conversation-qualification/source.py \
 operands, not raw scripts or dialogue. `source.py` is deliberately not a general
 actor interpreter. The separate dialogue task owns requests, page boundaries,
 choice text/layout and font decoding; the exterior task owns assets/collision.
+
+## One retained, fresh input-only journey
+
+`route.jsonl` runs after the existing 6800-frame new-game bootstrap. The process
+uses `Session::new` (empty SRAM), real buttons only, no patch/warp/state load.
+It ran **once**, streamed incrementally without reboots while discovering the
+conversation. `save_state` synchronizes each retained checkpoint; WRAM/PPU/OAM
+observations after that are passive. The final command flushes and uses
+`process::exit(0)` rather than attempting another session/core teardown.
+
+All 78 checkpoints (boot plus 77 commands), opaque states and captures remain
+local; the checker selects 31 semantic checkpoints and hashes the complete
+per-frame log. No original script/text/capture payload is committed. Command
+labels record exploratory intentions, **not asserted game phases**: e.g.
+`first-complete` was still a page wait, and `exit-spawn` was still loading.
+Use `reference.json`/the tables below for actual observations.
+
+### Acknowledgements, choices and negative controls
+
+All positions in this table are Ark `(120,128)`, except B entry `(120,191)`.
+Text cursors are **native wait positions**, not font-decoder page-key APIs.
+`$0DC2=$FFFF` identifies a choice wait; low bank `$88` identifies active text;
+zero identifies an inactive request (the old cursor remains in memory).
+
+| Checkpoint / completed frame | Native phase / cursor | Global events |
+|---|---|---|
+| `north-door-settled` 7848 | B entry `$888FEF`, not progression conversation | `$20,$FB` |
+| `entry-no-ack` 8028 | Entry gone after Up180; reached resident; inactive | `$20,$FB` |
+| `entry-after-A` 8149 | First interaction, `$889027` acknowledgement wait | `$20,$FB` |
+| `first-no-ack` 8389 | Right240: same wait and position, **no early grant** | `$20,$FB` |
+| `first-A1` 8390 | A pulse admitted; still no immediate frame-level grant | `$20,$FB` |
+| first changed frame **8409** | Remaining first-request presentation completes after A | **`$20,$26,$FB`** |
+| `first-page2` 8570 | Choice0, `$889047`, selected option1 | `$20,$26,$FB` |
+| `choice-no-confirm` 8750 | Neutral180: choice remains; flag is already set | same |
+| `first-followup` 8931 | A accepts option1; follow-up `$8890F8` | same |
+| `followup-no-ack` 9051 | Down120: no movement/page advance | same |
+| `first-complete` 9172 | B pulse + wait: still `$8890F8`, **B is not page ack** | same |
+| `repeat-wrong-wait` 9263 | A advances to `$889126`; still first follow-up | same |
+| `repeat-start` 9444 | A advances to `$889155`; still first follow-up | same |
+| `followup-closed` 9565 | X pulse + wait: still `$889155`, **X is not page ack** | same |
+| `wrong-facing-settled` 9666 | A closes final first-option follow-up | same |
+| `repeat-page` 9853 | New interaction: repeat choice1, `$88917E` | same |
+| `repeat-choice-second` 9914 | Down moves selection to option2 | same |
+| `repeat-cancel-page` 10095 | B cancels choice → `$8891EB` follow-up wait | same |
+| `repeat-after-L` 10216 | L advances follow-up to `$889217` | same |
+| `repeat-after-A` 10337 | A closes follow-up; no extra events | same |
+| `away-negative` 10439 | Down-facing A: no request; position unchanged | same |
+| `repeat2-choice` 10631 | Turn Up, A: repeat choice1 again | same |
+| `repeat2-followup` 10812 | L accepts option1 → `$8891AA` | same |
+| `repeat2-page2` 10993 | A advances to `$8891D5` | same |
+| `repeat2-closed` 11114 | A closes repeat option1 | same |
+
+Thus native first-option follow-up has three acknowledgement waits, repeat
+option1 and cancel/option2 follow-ups have two each. First option2/cancel's
+`$88905A` follow-up is **source-routed but not separately replayed**; the dialogue
+owner supplies its exact page metadata. This journey does not pretend to cover
+all combinations by loading old states. The checker rejects missing choices,
+B-as-ack, early/deferred grants, wrong repeat branches and extra event changes.
+
+Grant timing is semantic, not “wait 19 portable frames”: acknowledge `$889027`,
+finish the remaining first request, execute the source write, then enter choice0.
+The flag persists even while that choice/follow-up is unfinished. Preserve the
+choice and its follow-up for real user interaction; do not silently dismiss it
+because the exit is now eligible.
+
+### Gate, departure, initialized spawn, settled endpoint and real walking
+
+After leaving B normally, the same journey enters D at `open-D` frame11466:
+Ark `(120,625)`, camera `(0,512)`, cell1415 `$0592`, and no linked actor with gate
+continuation `$88A9BC`. The checker walks the actual native linked list, excluding
+stale nonzero slots. The earlier closed-gate native witness is deliberately
+reused from the existing census/background qualifications; this journey does
+not revisit the pre-grant state. No already-loaded event mutation is performed.
+
+| Completed frame / checkpoint | Map | Ark position | Meaning |
+|---|---|---|---|
+| 11673 `exit-trigger` | D | `(120,721)` | Fine exit match; last direct Down input |
+| 11674 | D | `(120,722)` | Departure resume `$84B975` after input release |
+| 11690 | A | `(120,738)` | Current-map store, **old departure coordinates**, not arrival |
+| 11723 | A | `(0,0)` | Actor-loader clearing, not a playable frame |
+| 11724 | A | **`(504,752)`** | Initialized player, source entry `$84A12E` |
+| 11760 | A | **`(504,769)`** | Arrival complete, free-player `$84A258` |
+| 11853 `landed-A` | A | `(504,769)` | Retained settled checkpoint, camera `(376,657)` |
+| 11945 `exterior-walk-down-settled` | A | `(504,815)` | Down32 + neutral60; camera `(376,703)` |
+| 12059 `exterior-walk-settled` | A | **`(538,815)`** | Right24 + neutral90; camera `(410,703)` |
+
+The semantic walking segment is **Down from the house landing, then Right** on
+A, without another transition or new event. Native held endpoints are
+`(504,814)` / `(537,815)` before residual settling. A portable movement model
+need not reproduce those scheduler/residual details to represent this segment;
+it must start on A, admit real input, move through the qualified exterior
+collision data and remain on A. Exterior art/collision belongs to its separate
+qualification task, not to this tool's positional evidence.
+
+## Reproduce / check retained evidence
+
+```sh
+# Fresh input-only replay: ONE boot/process; no supplied saves needed.
+sh tools/house-conversation-qualification/replay.sh \
+  'local/Tenchi Souzou (Japan).sfc'
+
+# No new boot: verify the retained discovery journey in this task worktree.
+python3 -B tools/house-conversation-qualification/check.py \
+  'local/Tenchi Souzou (Japan).sfc' local/house-conversation-qualification/journey
+python3 -O -B tools/house-conversation-qualification/test_check.py
+```
+
+The replay wrapper is provided for reproduction; qualification did not rerun
+the entire journey per feature. The native probe was built and the single
+streamed journey exited successfully. Source/native checkers passed in ordinary
+and optimized Python. Sixteen ROM-free checker tests passed in both modes;
+replacing the validator with a no-op produced 15 expected mutation failures
+before restoring green. No portable core, host, assets or tracker files changed.
+
+For the parent: the issue's source/native criteria are supported by this evidence
+and the explicitly reused pre-grant gate witness. Tracker closure remains with
+the parent (this task does not own tracker edits). Independent reviews precede
+both the source-contract and native-evidence signed commits.
