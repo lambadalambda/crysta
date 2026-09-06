@@ -320,3 +320,45 @@ inline helpers and compares all 57,344 pixels in each of 16 canvas cases, then
 checks a distinct precomposed mirror/anchor. It does not change live host state.
 The existing inline initialization harness also tests additive image loading,
 phase/roster rejection and visible pause, while retaining the old house tests.
+
+## Bounded carry overlay adapter
+
+[Open issue](../meta/issues/render-pandora-carrying.md). The opt-in art bundle adds
+`pandora_carry`: sixteen immutable motion/facing pairs (each with both FA/FB pot
+keys), plus the two Up-flight list60 keys. Compilation follows authenticated
+`PandoraSprites` loading and requires every referenced record0 raster. No new
+atlas pixels, native duration scheduling or priority overrides are introduced.
+
+Parent host wiring (not implemented by this component):
+
+```rust,ignore
+let carry = game.pot_state().map(|pot| {
+    art.carry(map_id, room_art::CarryInput::from_state(pot, game.pot_slots(data)?))
+}).transpose()?.flatten();
+let actor_key = carry.as_ref().map_or(ordinary_key.as_str(), |c| c.actor_key.as_str());
+let scene = art.scene_phase(map_id, scene_phase, actor_key, (x, y))?;
+// Serialize actor_key and scene normally, and carry.as_ref().map(|c| &c.overlay)
+// as state.carry. Do NOT add a pot actor to scene yourself.
+```
+
+The pure host input contains phase, phase_tick, facing, explicit queued motion,
+Ark world position, hand slot, reserved slot and optional core flight. Empty
+returns no override. Held standing/walking uses `walking().delayed_direction()`
+(queued-input semantic presentation, not a claim about the most recent resolved
+movement or native animation). Lift/held/throw choose exact `carry_pose` pairs at
+record0, preserving independent precomposed mirrors. Every pot pose uses the
+same Ark world position while held: source anchors already contain elevation.
+
+Release at tick18 removes hand ownership but retains the FA=098A/FB=098F
+reservation. Flight accepts only the core sample at Up `(136|184,368)`: list60
+at `(x,357-3*(tick-18))`, ticks18..26 for136 or18..21 for184. This comparison
+validates the supplied sample; it never generates a missing sample. Reservation
+and pot rendering end at27/22 respectively, while Ark's throw record0 remains
+through tick31. Break fragments are not drawn. Directional pre-release source
+poses are available without broadening the core's Up-only throw admission.
+
+All carry objects remain priority2. Equal-world-Y pot-after-Ark ordering is an
+explicit finite semantic policy, not newly qualified native transient OAM order
+or priority. Source residents and their ties remain unchanged. Parent still owns
+live GameState wiring, BG patches and acceptance; this section does not enable
+the capability or claim a continuous Pandora journey.

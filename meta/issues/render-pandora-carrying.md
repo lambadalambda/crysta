@@ -24,3 +24,23 @@ Connect the accepted pot component's read-only phase/ownership/flight projection
 - Focused red → green source-key/ownership/phase tests, actual nonvacuous canvas composition checks and existing frontend/host regressions pass.
 - Independent correctness/architecture review approves the narrow host/core/renderer contract.
 - Parent can select the overlay from existing public GameState/PotState getters without exposing private state or loading captures.
+
+## Work boundary
+
+Alice owns the pure carry adapter, minimal art hooks, narrow frontend overlay validation,
+and focused tests/docs only. Parent owns live wiring, finite BG patches and aggregate
+acceptance. Keep this issue open; do not enable the capability. Planned host seam:
+`CarryInput::from_state(&PotState, (hand, reservation))`, then `Art::carry(map, input)`
+returns an optional exact Ark key plus typed overlay; source NPC scenes remain unchanged.
+
+### Host adapter checkpoint
+
+- Red: six public API/type references absent (focused suite initially did not compile).
+  Green: six focused tests pass, including all 32 source pairs, complete phase tick /
+  both-slot lifetimes, bad lanes/samples and actual public PotState lift→walk→throw→
+  recovery projection. ROM-backed opt-in catalog completeness/nonempty raster checks
+  run with the own local ROM symlink. Strict all-target host Clippy passes.
+- Independent host correctness/architecture review approved the pure contract.
+  Its suggested reservation mutations and actual-core throw projection were added
+  and pass. Native transient priority fidelity is explicitly excluded, not deferred
+  into this patch. Frontend/evidence acceptance remains in progress.

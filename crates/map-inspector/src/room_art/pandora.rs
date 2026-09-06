@@ -53,7 +53,7 @@ impl Presentation {
 pub(super) fn compile(
     rom: &rom::Rom,
     frames: &mut serde_json::Map<String, Value>,
-) -> Result<(Presentation, Value)> {
+) -> Result<(Presentation, Value, Value)> {
     let sprites = PandoraSprites::from_rom(rom.image())?;
     for art in sprites.art() {
         for list in art.lists() {
@@ -98,7 +98,11 @@ pub(super) fn compile(
             })).collect::<Vec<_>>()
         }));
     }
-    Ok((Presentation { scenes }, Value::Object(manifest)))
+    Ok((
+        Presentation { scenes },
+        Value::Object(manifest),
+        super::carry::compile(frames)?,
+    ))
 }
 
 #[cfg(test)]

@@ -1,6 +1,7 @@
 //! Immutable, bounded art adapter for the ordinary house preview.
 
 mod backgrounds;
+mod carry;
 mod door;
 mod pandora;
 
@@ -10,6 +11,7 @@ use assets::{
     maps::visual::{StaticBackground, VisualResource},
     sprites::{ArkSprites, HouseGraphicsKey, HousePoseKey, HouseScenes, SpriteFrame, SpritePixel},
 };
+pub(crate) use carry::{CarryInput, CarryPresentation};
 use room_core::{AnimationFrame, AnimationSet};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -37,6 +39,15 @@ pub(super) struct Art {
     extra_backgrounds: BTreeMap<&'static str, Vec<u8>>,
 }
 impl Art {
+    /// Parent-owned live wiring may use public PotState/GameState projections.
+    #[allow(dead_code)]
+    pub(super) fn carry(&self, map: u16, input: CarryInput) -> Result<Option<CarryPresentation>> {
+        if self.pandora.is_none() {
+            return Err(invalid("Pandora carry art capability absent").into());
+        }
+        carry::select(map, input)
+    }
+
     pub(super) fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
         self.extra_backgrounds.get(key).map(Vec::as_slice)
     }
@@ -316,8 +327,8 @@ pub(super) fn compile_profile(rom: &rom::Rom, include_pandora: bool) -> Result<A
         .map(|&map| (map, if map == 10 { "exterior" } else { "house" }))
         .collect();
     let (pandora, phase_manifest) = if include_pandora {
-        let (presentation, manifest) = pandora::compile(rom, &mut frames)?;
-        (Some(presentation), Some(manifest))
+        let (presentation, manifest, carry) = pandora::compile(rom, &mut frames)?;
+        (Some(presentation), Some((manifest, carry)))
     } else {
         (None, None)
     };
@@ -327,8 +338,9 @@ pub(super) fn compile_profile(rom: &rom::Rom, include_pandora: bool) -> Result<A
             "door_patches":door::compile(rom.image(), &bedroom)?,
             "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests,
             "dialogue_choice_contexts":dialogue.choice_contexts});
-    if let Some(manifest) = phase_manifest {
+    if let Some((manifest, carry)) = phase_manifest {
         bundle["pandora_scenes"] = manifest;
+        bundle["pandora_carry"] = carry;
     }
     let extra_backgrounds = if include_pandora {
         backgrounds::append(rom, &mut bundle)?
