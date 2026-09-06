@@ -14,6 +14,7 @@ enum Request {
     Viewer,
     Map,
     ExteriorMap,
+    ExtraMap(&'static str),
     Art,
     State,
     Step(u8),
@@ -85,6 +86,10 @@ fn parse_request(bytes: &[u8], origin: &str) -> Result<Request> {
         ("GET", "/", "") => Ok(Request::Viewer),
         ("GET", "/map.bmp", "") => Ok(Request::Map),
         ("GET", "/exterior.bmp", "") => Ok(Request::ExteriorMap),
+        ("GET", "/town13.bmp", "") => Ok(Request::ExtraMap("town13")),
+        ("GET", "/cellars.bmp", "") => Ok(Request::ExtraMap("cellars")),
+        ("GET", "/box.bmp", "") => Ok(Request::ExtraMap("box")),
+        ("GET", "/tour.bmp", "") => Ok(Request::ExtraMap("tour")),
         ("GET", "/art.json", "") => Ok(Request::Art),
         ("GET", "/state", "") => Ok(Request::State),
         ("POST", "/reset", "") => Ok(Request::Reset),
@@ -159,6 +164,15 @@ pub(super) fn serve(rom: &rom::Rom, port: u16) -> Result<()> {
                 "image/bmp",
                 preview.exterior_bitmap(),
             ),
+            Ok(Request::ExtraMap(key)) => match preview.extra_bitmap(key) {
+                Some(bitmap) => respond(&mut stream, "200 OK", "image/bmp", bitmap),
+                None => respond(
+                    &mut stream,
+                    "404 Not Found",
+                    "text/plain",
+                    b"Background capability absent",
+                ),
+            },
             Ok(Request::Art) => respond(&mut stream, "200 OK", "application/json", preview.art()),
             Ok(request) => {
                 match request {
@@ -197,6 +211,36 @@ mod tests {
         format!("{method} {path} HTTP/1.1\r\nHost: 127.0.0.1:1234\r\n{headers}\r\n{body}")
             .into_bytes()
     }
+    #[test]
+    fn pandora_sheets_are_exact_bodyless_gets_not_arbitrary_paths() {
+        for (path, key) in [
+            ("/town13.bmp", "town13"),
+            ("/cellars.bmp", "cellars"),
+            ("/box.bmp", "box"),
+            ("/tour.bmp", "tour"),
+        ] {
+            assert_eq!(
+                parse_request(&request("GET", path, "", ""), ORIGIN).unwrap(),
+                Request::ExtraMap(key)
+            );
+            for (method, route, headers, body) in [
+                (
+                    "POST",
+                    path.to_owned(),
+                    "Origin: http://127.0.0.1:1234\r\n",
+                    "",
+                ),
+                ("GET", format!("{path}?map=19"), "", ""),
+                ("GET", format!("{path}/../ROM"), "", ""),
+                ("GET", path.to_owned(), "Content-Length: 1\r\n", "0"),
+                ("GET", path.to_owned(), "Host: evil.invalid\r\n", ""),
+            ] {
+                assert!(parse_request(&request(method, &route, headers, body), ORIGIN).is_err());
+            }
+        }
+        assert!(parse_request(&request("GET", "/map19.bmp", "", ""), ORIGIN).is_err());
+    }
+
     #[test]
     fn art_is_an_exact_bodyless_get_with_loopback_host() {
         assert_eq!(

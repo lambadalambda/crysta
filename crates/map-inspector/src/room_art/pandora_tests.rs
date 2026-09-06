@@ -29,6 +29,20 @@ fn opt_in_atlas_preserves_house_and_every_pandora_source_pixel() {
         assert_eq!(old[key], new[key], "unchanged house field: {key}");
     }
     assert!(old.get("pandora_scenes").is_none());
+    assert!(old.get("pandora_backgrounds").is_none());
+    assert_eq!(
+        new["pandora_backgrounds"]["background_keys"]
+            .as_object()
+            .unwrap()
+            .len(),
+        8
+    );
+    for key in ["town13", "cellars", "box", "tour"] {
+        assert!(house.extra_bitmap(key).is_none());
+        assert!(compiled.extra_bitmap(key).unwrap().starts_with(b"BM"));
+    }
+    assert!(compiled.extra_bitmap("../ROM").is_none());
+
     assert_eq!(new["frames"].as_object().unwrap().len(), 38 + 482);
     assert_eq!(new["pandora_scenes"].as_object().unwrap().len(), 33);
     let sprites = PandoraSprites::from_rom(rom.image()).unwrap();

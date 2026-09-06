@@ -1,5 +1,6 @@
 //! Immutable, bounded art adapter for the ordinary house preview.
 
+mod backgrounds;
 mod door;
 mod pandora;
 
@@ -33,8 +34,12 @@ pub(super) struct Art {
     pub(super) bytes: Vec<u8>,
     rooms: BTreeMap<u16, RoomActors>,
     pandora: Option<pandora::Presentation>,
+    extra_backgrounds: BTreeMap<&'static str, Vec<u8>>,
 }
 impl Art {
+    pub(super) fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
+        self.extra_backgrounds.get(key).map(Vec::as_slice)
+    }
     pub(super) fn scene(&self, map: u16, key: &str, position: (u16, u16)) -> Value {
         self.scene_phase(map, None, key, position)
             .expect("game map has a compiled scene")
@@ -325,10 +330,16 @@ pub(super) fn compile_profile(rom: &rom::Rom, include_pandora: bool) -> Result<A
     if let Some(manifest) = phase_manifest {
         bundle["pandora_scenes"] = manifest;
     }
+    let extra_backgrounds = if include_pandora {
+        backgrounds::append(rom, &mut bundle)?
+    } else {
+        BTreeMap::new()
+    };
     Ok(Art {
         bytes: serde_json::to_vec(&bundle)?,
         rooms,
         pandora,
+        extra_backgrounds,
     })
 }
 
@@ -349,6 +360,7 @@ mod tests {
         let art = Art {
             bytes: Vec::new(),
             pandora: None,
+            extra_backgrounds: BTreeMap::new(),
             rooms: BTreeMap::from([
                 (
                     15,
@@ -410,6 +422,7 @@ mod tests {
         let art = Art {
             bytes: Vec::new(),
             pandora: None,
+            extra_backgrounds: BTreeMap::new(),
             rooms: BTreeMap::from([
                 (
                     15,

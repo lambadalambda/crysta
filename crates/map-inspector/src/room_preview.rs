@@ -55,6 +55,9 @@ impl Preview {
     pub(super) fn exterior_bitmap(&self) -> &[u8] {
         &self.exterior_bitmap
     }
+    pub(super) fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
+        self.art.extra_bitmap(key)
+    }
     pub(super) fn step(&mut self, button: u8) {
         if self.error.is_some() {
             return;

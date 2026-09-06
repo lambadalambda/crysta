@@ -208,3 +208,27 @@ also added and passes.
 The public camera is a transport: `settled_origin` expects its unmodified
 source-derived bounds (documented panic precondition for manually manufactured
 invalid bounds).
+
+## Opt-in preview sheet transport
+
+The host's opt-in art profile compiles four additional bitmaps directly in memory:
+`town13` (1024×512), `cellars` (512×1024), `box` (256×512), and `tour` (512×512).
+E/20 and 41–44 reuse their respective sheet **only after complete rendered bitmap
+byte equality**, not an assumed common map/grid. E/20 do not reuse `/map.bmp`:
+their source palette differs from the ordinary house. Per-map masks preserve
+opaque-high first-BG coverage, and camera metadata retains the source bounds,
+256-pixel vertical clamp extent, hardware BG identity and mode.
+
+The additive `pandora_backgrounds` artifact remains separate from the live
+house manifest pending runtime/frontend admission. Exact loopback-only bodyless
+GET routes `/town13.bmp`, `/cellars.bmp`, `/box.bmp`, `/tour.bmp` serve only those
+in-memory capabilities; the current house-only profile returns **404**. No file
+lookup, query selector, alternate origin, mutation endpoint or CPU execution is
+added. Host visual policy remains natural palette/checkerboard transparency,
+not native whole RGB; phase patches and transition camera pans are not inferred.
+
+TDD covers every emitted BGR pixel, high mask and camera for all eight maps,
+shared-sheet equality, the separate cellar palette, old bundle preservation and
+exact-route rejection. Parent host tests and strict workspace Clippy pass; logs
+`local/map-research/pandora-background-host-{green,clippy}.txt`. The previously
+qualified source/native background comparisons remain the evidence boundary.
