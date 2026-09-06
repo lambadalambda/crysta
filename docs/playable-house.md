@@ -203,6 +203,34 @@ flag-before-choice assertions and nonblank dialogue/choice canvas pixels:
 agent-browser eval '({status:CONVERSATION_BROWSER_RUN.status,error:CONVERSATION_BROWSER_RUN.error,result:CONVERSATION_BROWSER_RUN.result})'
 ```
 
+<a id="accepted-talk-and-leave-evidence"></a>
+### Accepted talk-and-leave evidence
+
+The default conversation recipe passed **two identical real-browser runs**, each
+with1,671 logical steps,20 semantic checkpoints and1,683 complete room-canvas
+checks (initial/per-step plus wrong-input dialogue observations). Both runs used
+actual New Game, movement, Interact, Continue and choice controls—not movement API
+calls. They matched at the first page tick919, grant/choice0 tick920, repeat choices
+925/929, reloaded D tick1217, outdoor landing1465 and final A`(538,815)` tick1671.
+The final camera is`(410,703)`; events are exactly`[32,38,251]`.
+
+Each run measured44,250 nonblank font/choice ink pixels across the14 visited
+rasters. The repeat run additionally retained133,500 visible exterior Ark pixels. All14 original page contracts and
+four source choice crops were validated; entry text and the three first
+cancel/option2 follow-up pages remain source-only in this browser itinerary.
+Native raster evidence and its separate limits remain in [house-dialogue.md](house-dialogue.md).
+These counts establish source composition, not native whole-scene RGB fidelity.
+
+The integrated host also passed the existing511-step/512-canvas and full
+2,244-step/2,245-canvas browser routes, all336 workspace tests with required core
+and fresh-house fixtures, strict workspace Clippy, a Wasm core build, browser
+controller and15 verifier tests, and repository safety/tracker checks. At390px
+viewport width the layout had no horizontal overflow; browser errors were empty.
+Compiler, runtime transport and cross-component independent reviews had no
+remaining blockers. Raw accepted results are retained under ignored
+`local/map-research/conversation-{browser-journey,browser-journey-repeat,house2244,house511}.json`;
+regression output is`conversation-host-regression.txt` in the same directory.
+
 Raw ROM-derived captures, screenshots and verification logs stay ignored under
 `local/`; only source, selected numeric metadata and hashes are committed.
 

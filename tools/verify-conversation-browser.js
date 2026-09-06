@@ -1,12 +1,12 @@
-// Proposed input-only acceptance recipe. DO NOT run against the old house host.
-// After backend integration, on the real room page:
+// Input-only acceptance recipe, twice verified against the integrated profile9 host.
+// On the integrated real room page:
 // { echo 'globalThis.HOUSE_BROWSER_HELPERS_ONLY=true;'; cat tools/verify-house-browser.js;
 //   echo '; globalThis.CONVERSATION_BROWSER_READY=true;'; cat tools/verify-conversation-browser.js;
 // } | agent-browser eval --stdin
 // Returns immediately; inspect CONVERSATION_BROWSER_RUN.status/result/error later.
 // The retained .promise also resolves to the result; do not long-await it over CLI.
 // Parent may override motion spans via CONVERSATION_BROWSER_MOTION, not source
-// expectations. In particular Up100/release20 and B->D->A handoffs need live verification.
+// expectations. The default1671-step route qualifies Up100/release20 and B->D->A.
 (() => {
   'use strict';
   const insist=(ok,message)=> { if (!ok) throw new Error(message); };
@@ -234,13 +234,13 @@
       };
       async function motion(chunks,granted) {
         for(const [command,steps] of chunks) for(let i=0;i<steps;i++) {
-          await step(command);checkEvents(state,granted);insist(state.dialogue===null,'Unexpected dialogue during motion (route handoff needs parent verification)');
+          await step(command);checkEvents(state,granted);insist(state.dialogue===null,'Unexpected dialogue during motion');
         }
       }
       await motion(run.motion.toB,false);checkpoint('B-entry',11,120,191);
       await motion(run.motion.target,false);checkpoint('resident-Up-target',11,120,128);
       // Re-press Up into the source resident collision boundary is part of the
-      // proposed target recipe, not a position injection or radial NPC admission.
+      // verified target recipe, not a position injection or radial NPC admission.
       for (const expected of conversationPlan()) {
         await step(expected.command);checkConversationState(state,expected);
         run.checkpoints.push({label:expected.key || 'followup-closed',state:structuredClone(state)});
@@ -260,7 +260,7 @@
       insist(run.arkPixels>0 && run.exteriorArkPixels>0,'Missing nonvacuous Ark composition evidence');
       run.result={kind:'real-ui-conversation-source-composition',initial:run.initial,final:state,checkpoints:run.checkpoints,
         visualChecks:run.visualChecks,rasterEvidence:run.rasterEvidence,motion:run.motion,
-        limits:'Source composition only, not native whole RGB outside: no secondary BG/color math, shadows, transient overlays or outdoor NPCs. Fourteen page metadata/raster contracts validated; actual pixels only for visited pages and both choice catalogs. Entry and first cancel/option2 pages are source-only, not replayed. Halo checks observe player envelope, not backend collision probe admission. Motion recipe requires parent live qualification; logical callbacks are not native scheduler frames.'};
+        limits:'Source composition only, not native whole RGB outside: no secondary BG/color math, shadows, transient overlays or outdoor NPCs. Fourteen page metadata/raster contracts validated; actual pixels only for visited pages and both choice catalogs. Entry and first cancel/option2 pages are source-only, not replayed. Halo checks observe player envelope, not backend collision probe admission. Default motion recipe passed two identical live1671-step runs; logical callbacks are not native scheduler frames.'};
       run.status='passed';return run.result;
     } catch(error) {
       try {controls.release();pause();} catch (_) { /* retain the original failure */ }

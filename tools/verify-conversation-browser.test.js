@@ -84,7 +84,7 @@ test('one-shot latch stores last tick; duplicate busy renders do not ack; skips 
   assert.throws(()=>latch.observe(6),/Unsolicited/);
   latch.arm();assert.throws(()=>latch.observe(7),/Non-sequential/);
 });
-test('proposed motion preserves first15 house chunks and pins resident/exterior recipe',()=> {
+test('motion preserves first15 house chunks and pins resident/exterior recipe',()=> {
   const recipe=motionRecipe();
   const original=require('node:fs').readFileSync(`${__dirname}/house-navigation-qualification/core-route.jsonl`,'utf8').trim().split('\n').slice(0,15).map(JSON.parse);
   assert.deepEqual(recipe.toB,original.map(({button,steps})=>[button,steps]));
