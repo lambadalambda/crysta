@@ -30,29 +30,31 @@ Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
 - Independent correctness and compactness review precedes signed topical commits.
 - An isolated enabled host passes the retained-promise real-browser journey.
 
-## Notes
+## Acceptance evidence
 
-- Open: isolated8877 enabled; actual New Game and904 continuous UI commands /
-  independent canvas checks matched the parent fresh replay's full states and raw
-  snapshots. Stopped at first paused movement905 without omitting any input.
-- Parent resolves the source-backed C/Box arrival conflict through read-only
-  `dialogue_ready`, preserving visible requests and the core timeline. The
-  verifier adapts only blocking/ready input and inspection checks; no production
-  or cadence-producer ownership transfers. See
-  [verifier contract/evidence](../../docs/pandora-browser.md).
-- Full acceptance remains gated on the independently qualified canonical proof
-  and updated isolated host/UI relay. No further input to8877 until then;904 is
-  historical partial evidence only. Parent's181/18 observational counts are not
-  assumed omission permissions. Final producer pin remains held.
-- All17 synthetic tests (32 combined) pass after red→green readiness adaptation.
-  Bitmap-load timeout remains a deferred nonblocking robustness follow-up.
-- Parent reports shared issue-index and roadmap registration complete; these
-  files remain outside this worktree's owned edits.
-- Cadence producer: [test-only canonical proof](../../docs/pandora-cadence.md)
-  now checks complete fresh offline/projected executions with continuous raw-core
-  mirrors, exact successful return frames, and every GET/non-clock boundary.
-  Red→green controls cover all non-tick snapshot bits, partial/divergent proofs,
-  concealed `Interaction` rejection and fail-closed publication. Parent-owned
-  readiness relay is consumed without altering clocks; all17 CEntry updates and
-  the BoxEntry completion must be retained. Clean-source debug/release generation,
-  independent parent rerun/review and pinning remain required before browser use.
+- **Continuous browser acceptance passed** on the parent's authorized8877 host
+  in named session `pandora-journey-alice`, after reload and actual New Game.
+  Signed verifier `b897899` emitted11409 UI inputs with11410 full-canvas checks;
+  all projected GET fields/raw snapshot hashes matched, with187 checkpoints saved.
+- The reviewed proof computed181 blocking-dialogue no-op omissions from11590
+  offline actions. All18 visible-unready arrival updates and every manual action
+  remained. No state injection, POST bypass, hidden request or forced ack occurred.
+- All34 direct invocations, source grants, pot miss/two hits/recovery, persistent
+  patches/reloads and final four-direction movement passed. Required backgrounds,
+  door/pot patches and typed carry/flight had nonvacuous visible-pixel evidence.
+- Final UI tick11409: map`$0041`,(136,208), owner/player and walking, no dialogue or
+  error. Raw snapshot SHA256:
+  `8aab7a37cb0c1115438e8f177c7213fabb0cee14f94d7eaed0cf58635c7484d5`.
+  A subsequent GET and paused DOM independently matched the saved endpoint.
+- Complete private result: `local/pandora-browser/full-result.json`; proof/input
+  pins and audit are documented in [browser acceptance](../../docs/pandora-browser.md).
+  The earlier904 prefix remains historical failed/partial evidence, not a pass.
+- All17 synthetic tests (32 combined) pass. Bitmap-load timeout remains a deferred
+  nonblocking robustness follow-up, not part of this acceptance claim.
+- Parent owns final producer pinning and shared index/archive follow-through;
+  no production, parent issue or shared-index files were edited here.
+- The [test-only canonical proof](../../docs/pandora-cadence.md) was accepted
+  after independent source/log review and parent clean debug/release reproduction,
+  full-array comparison and actual artifact/hash/Git-linkage checks. Continuous
+  fresh raw-core mirrors reject concealed input failure; only the global tick is
+  erased in read-only continuation hashing. The pinned proof is expectation only.

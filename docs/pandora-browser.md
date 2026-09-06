@@ -4,37 +4,84 @@
 This is a bounded semantic-preview acceptance tool, not a native-frame replay.
 The production host/controller/compiler remain parent-owned.
 
-## Status and gate
+## Accepted continuous browser journey
 
-Synthetic projection/control/composition tests pass. **Full browser acceptance is
-not yet claimed.** The enabled isolated host at8877 was assigned exclusively to
-browser session `pandora-journey-alice`; live8765 is forbidden. Its actual New Game
-button initializes tick0/map15/(304,112), not the host's saved-checkpoint startup.
-The parent's reviewed11590-state export is expected observation data only.
+**The authorized New Game → final controllable map41 browser run passed.** The
+named session `pandora-journey-alice` reloaded the parent's reviewed readiness UI
+at `http://127.0.0.1:8877/` and clicked actual New Game. The saved-checkpoint startup
+was not used. Live8765 and production files were untouched. The browser retained
+its promise; CLI eval returned immediately. No state initialization, direct POST,
+forced acknowledgement, inferred flag or disabled dialogue pause was used.
 
-A real **unprojected prefix diagnostic** then emitted904 consecutive actual UI
-commands, matching every parent state field and raw snapshot hash and performing
-904 independent full-canvas comparisons. It stopped on command905, the first
-movement in the dialogue-paused `[2,60]` span. **No omission was made** and the
-run's status is failed/stopped, not full acceptance. Private retained evidence:
-`local/pandora-browser/prefix-result-cli.json`, `prefix-final-state.json`, and
-`prefix-eval.js`; the named browser retains `PANDORA_PREFIX_RUN.promise`.
-All76 Pandora source rasters also independently matched the committed indexed
-hashes in the parent export. This does not mean all76 were displayed.
+| Measured acceptance | Result |
+|---|---|
+| Original / projected inputs | 11590 / **11409** |
+| Proved blocking-dialogue omissions | **181**:60 Right +121 neutral |
+| Retained visible-unready updates | **18**: C17 + Box1 |
+| Full-canvas comparisons | **11410**, including fresh tick0 |
+| Saved semantic-change/readiness checkpoints | **187** |
+| Direct source invocation order | **34**, including all repeated D720 requests |
+| Explicit manual inputs retained |6 Interacts,80 acknowledgements,4 choices,6 pot actions |
+| Visible distinct rasters |81 text keys across house/Pandora +8 choice crops |
+| Source-only Pandora raster hashes checked |All76, including unvisited retry resources |
+| Final controlled position |Map`$0041`,(136,208), walking/player, no dialogue/error |
+
+Every emitted result matched **all** projected GET fields, including its exact raw
+snapshot hash. Fixed grant timing, ordinary35-tick transfers, pot miss/hits and
+recovery, persistent patches/reloads, all mandatory acknowledgements, and final
+left/up/right/down movement checks remained active. A post-run GET independently
+matched the saved final state; DOM showed11409/`$0041`/`136, 208` and **Resume**,
+with no error and the promise still retained. This is one continuous browser run,
+not a second native replay or optional refusal/retry acceptance.
+
+Nonvacuous visible pixels include Ark **4,060,990**; all six backgrounds; all
+required wooden, damaged/open cellar and three consumed-pot patches. Carry
+counts are lifting10,902, standing255,348, walking44,736, throwing8,532,
+miss-flight774 and hit-flight206. Counts are accumulated visible samples, not
+unique source pixels. Cellar-sheet patch samples that remained offscreen scored
+zero and are **not** claimed as visible; their retained state still matched GET.
+
+### Reproduction pins and private evidence
+
+The run used signed verifier commit **`b897899`**, unchanged during execution.
+The parent independently qualified the two fresh cadence replays and authorized
+this exact expectation-only proof:
+
+- Proof: `/Users/lainsoykaf/repos/terranigma/local/pandora-cadence-qualification/parent-reviewed/debug/proof.json`
+- Proof SHA256: `e5342dc5e6965d298e4e9a6d142e55a2161fac0ab247f143a098016c97465ab6`
+- Producer source: `9db17d9373740d1084983d047817d6d37c2d54d6`
+- Source tree: `705afd0220bff8d9a30faf14e633a7770c2f3401`
+- Compiler content: `c6613fd4b30db083deb229964cd035bbd30d27f2d47a72d6f70530d919237be4`
+- **Projected final snapshot**: `8aab7a37cb0c1115438e8f177c7213fabb0cee14f94d7eaed0cf58635c7484d5`
+
+Private files under this worktree's `local/pandora-browser/`:
+
+- `full-result.json`: complete retained result/checkpoints/pixel/raster/omission
+  evidence; SHA256`93e899c58198646ab89b96f1507869c5f2a18e9313e31424306c0f74b3e0075b`.
+- `full-final-get.json`, `full-final-dom.json`: independently inspected paused
+  endpoint; `full-progress.jsonl`: read-only monitor observations.
+- `full-manifest.json`: exact proof, evaluator, helper, route/reference and served
+  HTML hashes. Served HTML SHA256 is
+  `d4103bcfee965378ced16ee9bc74b2c04f0b1a7794e4802a877cb4c354744271`.
+- `full-eval.js`: exact launched script; `served-room.html`: observed UI source;
+  `audit.js` / `full-audit.json`: post-run consistency checks and artifact hashes,
+  **not another browser run**. Every saved checkpoint equals its fresh projected
+  expectation, and all manual-input counts are unchanged.
 
 The17 Pandora synthetic tests and32 combined house/conversation/Pandora tests
-pass, including red→green readiness adaptation tests. Independent
-correctness/compactness review approved the original staged verifier after an
-initialization-failure regression was fixed. The parent reports shared
-index/roadmap registration complete; those files remain parent-owned.
-Nonblocking follow-up: bitmap image loading has no timeout yet (before any input).
+pass, including red→green readiness adaptation tests. Parent owns final producer
+pinning and shared issue-index/archive follow-through. Nonblocking follow-up:
+bitmap image loading has no timeout yet (before any input).
 
-The historical prefix above predates the readiness contract. **No further input
-to8877 or full journey attempt is permitted until the parent relays both the
-independently qualified canonical proof and the updated isolated host/UI.**
-Final producer pinning remains held.
+### Historical prefix and readiness resolution
 
-Source inspection and that export expose a visibility/readiness distinction:
+The earlier unprojected diagnostic stopped after904 successful actual UI/state/
+canvas comparisons, before blocked movement905. It remains failed/partial
+historical evidence (`prefix-result-cli.json`, `prefix-final-state.json`,
+`prefix-eval.js`), **not** the accepted run or an extra pass. Reloading for the
+accepted run replaced that page's old promise.
+
+Source inspection exposed a visibility/readiness distinction:
 
 - Offline5706 loads C and requests `CEntry` while the doorway is still arriving
   at(120,464);5707 moves to(120,463) with visible dialogue. Seventeen arrival
@@ -55,10 +102,11 @@ commands and uses the existing transition-neutral UI driver; it neither hides
 requests nor disables ready-dialogue pauses. Legacy undefined readiness retains
 the old blocking behavior; enabled browser acceptance requires the boolean.
 
-The parent's observational scan reports181 unchanged blocking-dialogue inputs
-and17 C-arrival plus1 Box-completion update. These numbers are **not omission
-permissions** and are not hardcoded in projection; the canonical producer must
-prove the actual omissions and independently replay every retained input.
+The canonical proof and accepted browser run confirmed181 unchanged
+blocking-dialogue omissions and17 C-arrival plus1 Box-completion update retained
+(offline5707..5723 and9764). These counts are **not omission permissions** and
+remain absent from projection logic; each omission requires its own unchanged
+continuation/observation proof and a separate fresh replay of retained inputs.
 
 ## Explicit cadence projection API
 
