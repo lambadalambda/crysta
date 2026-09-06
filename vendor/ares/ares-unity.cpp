@@ -9,6 +9,7 @@
 // (ares/ares.cpp.in + the sfc core), reorganized to exclude the debug
 // server and include exactly the pieces the Oracle needs.
 #include <ares/ares.hpp>
+static_assert(!ares::Video::Threaded, "oracle requires synchronous video publication");
 #include <ares/debug/debug.cpp>
 #include <ares/node/node.cpp>
 #include <ares/resource/resource.cpp>

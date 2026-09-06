@@ -59,7 +59,13 @@ namespace ares {
   }
 
   namespace Video {
+    // Project-local ISC configuration patch: headless completed publication.
+    // See docs/oracle-video-publication.md; upstream default remains threaded.
+    #if defined(ARES_ORACLE_SYNCHRONOUS_VIDEO) && ARES_ORACLE_SYNCHRONOUS_VIDEO
+    static constexpr bool Threaded = false;
+    #else
     static constexpr bool Threaded = true;
+    #endif
   }
 
   namespace Constants {

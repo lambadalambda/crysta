@@ -47,6 +47,8 @@ fn main() {
         .flag_if_supported("-Wno-empty-body")
         .flag_if_supported("-Wno-comma")
         .flag_if_supported("-Wno-unknown-warning-option")
+        // Complete video callbacks on the caller before returning a frame event.
+        .define("ARES_ORACLE_SYNCHRONOUS_VIDEO", "1")
         .define("SLJIT_HAVE_CONFIG_PRE", "1")
         .define("SLJIT_HAVE_CONFIG_POST", "1")
         .include(&vendor)
