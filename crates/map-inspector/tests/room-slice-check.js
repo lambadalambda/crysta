@@ -10,7 +10,7 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1);
 const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
-const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors} = sandbox.RoomSlice;
+const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0], door_interaction:true});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
@@ -453,3 +453,35 @@ async function main() {
   console.log('PASS: New Game, serialized start precedence, paused input cleanup, checkpoint reset/demo, pacing, bindings, errors, sprite anchors/mirroring, and drawing');
 }
 main().catch(error => { console.error(error); process.exitCode = 1; });
+
+// An open door replaces every background pixel AND clears the old foreground.
+{
+  const width=48,height=48,data=new Uint8ClampedArray(width*height*4).fill(255);
+  const patches=[[8,8],[24,24]].map((position,i)=>({position,rgba:Array(256).fill([3+i,4,5,255]).flat(),high:Array(256).fill(false)}));
+  patches[1].high[0]=true;
+  const bundle={schema_version:1,frames:{},scene_ids:{11:['ark'],12:['ark']},
+    foreground:{11:{width,height,runs:[0,width*height]},12:{width,height,runs:[0,width*height]}},door_patches:patches};
+  const make=(width,height,rgba)=>({width,height,rgba:Array.from(rgba)});
+  const background={width,height,data},art=prepareArt(bundle,background,make),image={};
+  for(const map_id of [12,11]) {
+    const closed=selectBackground(art,{map_id,wooden_door_open:false},image);
+    assert.equal(closed.image,image);
+    const open=selectBackground(art,{map_id,wooden_door_open:true},image);
+    for(let y=0;y<height;y++) for(let x=0;x<width;x++) {
+      const patch=patches.find(p=>x>=p.position[0]&&x<p.position[0]+16&&y>=p.position[1]&&y<p.position[1]+16);
+      const i=patch?(y-patch.position[1])*16+x-patch.position[0]:0,at=(y*width+x)*4;
+      const pixel=patch?patch.rgba.slice(i*4,i*4+4):[255,255,255,255];
+      assert.deepEqual(open.image.rgba.slice(at,at+4),pixel);
+      assert.deepEqual(open.foreground.rgba.slice(at,at+4),patch&&!patch.high[i]?[0,0,0,0]:pixel);
+      assert.deepEqual(closed.foreground.rgba.slice(at,at+4),[255,255,255,255]);
+    }
+    assert.equal(selectBackground(art,{map_id,wooden_door_open:false},image).foreground,closed.foreground,'reset selects closed foreground');
+  }
+  assert.throws(()=>selectBackground(art,{map_id:12,wooden_door_open:1},image),/door/i);
+  for(const mutate of [p=>p.pop(),p=>p[0].position=[-1,0],p=>p[1].position=[8,8],p=>p[0].rgba.pop(),p=>p[0].high[0]=1]) {
+    const bad=JSON.parse(JSON.stringify(patches));mutate(bad);
+    assert.throws(()=>prepareArt({...bundle,door_patches:bad},background,make),/door/i);
+  }
+  const legacy=prepareArt({...bundle,door_patches:undefined},background,make);
+  assert.throws(()=>selectBackground(legacy,{map_id:12,wooden_door_open:true},image),/door/i);
+}

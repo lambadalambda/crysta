@@ -30,12 +30,12 @@ dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 14px;margin:0}d
 Choose <strong>New Game</strong>, then <strong>Resume</strong> to explore the supported house paths.
 This semantic start uses the default name and skips the intro and dialogue; it does not play the original opening.
 Ordinary walking, partial furniture and passive flagged walls are supported; rapid same-direction double taps trigger an unsupported dash error.
-Actions and other exits remain unsupported.
-Ark uses ROM-derived standing/walking sprites. One room10 resident is shown in a frozen ordinary pose; no NPC behavior, collision or dialogue yet. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
+The six fresh house rooms are connected. The wooden door is the only supported action; exterior and cellar progression stay closed.
+Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroom table object use frozen source-setup poses. Source-setup occupancy is solid; NPC movement, interactions and dialogue are not simulated. No combat or audio. Only the static first background (hardware BG2) is shown; other layers, windows and scene effects are omitted. Idle gestures and doorway animation use ordinary standing by policy.</p>
 <div class="layout">
 <section class="panel" aria-label="Room preview">
 <canvas id="room" width="256" height="224" aria-label="Room background with ROM-derived Ark standing and walking sprites">Canvas is required for the preview.</canvas>
-<p class="legend">ROM-derived Ark and one frozen room10 resident, with natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
+<p class="legend">ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.</p>
 <div class="actions">
 <button id="new-game" disabled>New Game</button>
 <button id="pause" disabled>Resume</button><button id="step" disabled>Single-step (neutral)</button>
@@ -50,7 +50,7 @@ Ark uses ROM-derived standing/walking sprites. One room10 resident is shown in a
 </div>
 <p><strong>Arrow keys / WASD</strong>, one direction at a time. Press Resume first.
 Release before changing direction. Escape pauses.
-Space/Enter or Interact opens the qualified wooden door only; release movement first. Interaction pauses the preview. Touch and hold a cardinal button; sliding outside releases it.</p>
+Space/Enter or Interact opens the qualified wooden door only; release movement first. Face Up against the wooden door in the upper part of the western middle room. Interaction pauses the preview; Resume to continue. Touch and hold a cardinal button; sliding outside releases it.</p>
 </section>
 <section class="panel" aria-labelledby="inspector-heading">
 <h2 id="inspector-heading">Host state inspector</h2>
@@ -258,9 +258,30 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   // Decode once, not per tick. Mirrored native compositions have alternate
   // component offsets/anchors, so the host supplies their exact raster too.
+  function prepareDoor(patches, background) {
+    if (patches === undefined) return null;
+    if (!Array.isArray(patches) || patches.length !== 2) throw new Error('Invalid door patches');
+    const pixels = new Uint8ClampedArray(background.data), writes = new Map();
+    for (const patch of patches) {
+      const {position, rgba, high} = patch || {};
+      if (!Array.isArray(position) || position.length !== 2 || !position.every(Number.isInteger) ||
+          position[0] < 0 || position[1] < 0 || position[0]+16 > background.width || position[1]+16 > background.height ||
+          !Array.isArray(rgba) || rgba.length !== 1024 || !rgba.every(v => Number.isInteger(v) && v >= 0 && v <= 255) ||
+          !Array.isArray(high) || high.length !== 256 || !high.every(v => typeof v === 'boolean')) throw new Error('Invalid door patch');
+      for (let i = 0; i < 256; i++) {
+        const at = (position[1]+Math.floor(i/16))*background.width+position[0]+i%16;
+        if (writes.has(at)) throw new Error('Overlapping door patches');
+        pixels.set(rgba.slice(i*4,i*4+4),at*4);
+        writes.set(at,high[i]);
+      }
+    }
+    return {pixels,writes};
+  }
   function prepareArt(bundle, background, makeRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
-    const actors = Object.create(null), foreground = Object.create(null);
+    const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null);
+    const door = prepareDoor(bundle.door_patches, background);
+    const openBackground = door ? makeRaster(background.width, background.height, door.pixels) : null;
     for (const [key, frame] of Object.entries(bundle.frames)) {
       const {width, height, offset, rgba} = frame;
       if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 64 || height > 64 ||
@@ -284,6 +305,13 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         for (let at = start * 4; at < end * 4; at++) rgba[at] = background.data[at];
       }
       foreground[id] = makeRaster(mask.width, mask.height, rgba);
+      if (door) {
+        const opened = new Uint8ClampedArray(rgba);
+        for (const [at, high] of door.writes) {
+          opened.set(high ? door.pixels.subarray(at*4,at*4+4) : [0,0,0,0],at*4);
+        }
+        openForeground[id] = makeRaster(mask.width, mask.height, opened);
+      }
     }
     const sceneIds = Object.create(null);
     for (const id of Object.keys(foreground)) {
@@ -293,7 +321,15 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds};
+    return {actors, foreground, sceneIds, openBackground, openForeground};
+  }
+  function selectBackground(art, state, image) {
+    if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
+    if (state.wooden_door_open) {
+      if (!art.openBackground || !art.openForeground[state.map_id]) throw new Error('Missing open door art');
+      return {image:art.openBackground,foreground:art.openForeground[state.map_id]};
+    }
+    return {image,foreground:art.foreground[state.map_id]};
   }
   function selectActor(art, state) {
     const actor = art.actors[state.actor_key];
@@ -314,7 +350,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     return scene.map(entry => ({...art.actors[entry.key], position:entry.position}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors};
+  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
@@ -328,6 +364,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       $('tick').textContent = String(state.tick); $('phase').textContent = state.phase;
       $('actor-key').textContent = state.actor_key || 'unavailable';
       canvas.dataset.scene = JSON.stringify(state.scene);
+      canvas.dataset.woodenDoorOpen = String(state.wooden_door_open === true);
     }
     $('error').textContent = assetError || error || '';
     $('status').textContent = note + (busy ? ' Waiting for host…' : '');
@@ -342,7 +379,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
     if (ready && state) {
       try {
-        drawScene(ctx, image, state, selectActors(art, state), art.foreground[state.map_id]);
+        const background = selectBackground(art, state, image);
+        drawScene(ctx, background.image, state, selectActors(art, state), background.foreground);
         assetError = null; $('error').textContent = error || '';
       }
       catch (failure) {

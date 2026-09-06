@@ -60,7 +60,7 @@ pub(super) fn export(rom: &Rom, id: u16) -> Result<PathBuf> {
     fs::write(directory.join("index.html"), render_html(&metadata))?;
     Ok(directory.canonicalize()?.join("index.html"))
 }
-fn pixel_rgb(index: u8, scene: &StaticBackground, x: usize, y: usize) -> [u8; 3] {
+pub(super) fn pixel_rgb(index: u8, scene: &StaticBackground, x: usize, y: usize) -> [u8; 3] {
     if index == 0 {
         checker(x, y)
     } else {

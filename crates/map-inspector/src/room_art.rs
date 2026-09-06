@@ -1,5 +1,7 @@
 //! Immutable, bounded art adapter for the ordinary house preview.
 
+mod door;
+
 use crate::{invalid, Result};
 use assets::{
     graphics::{Bgr555, IndexedPixel, Tile4bpp},
@@ -254,7 +256,8 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
     }
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
-            "scene_ids":membership(&rooms),"actors":actors,"foreground":masks}))?,
+            "scene_ids":membership(&rooms),"actors":actors,"foreground":masks,
+            "door_patches":door::compile(rom.image(), &bedroom)?}))?,
         rooms,
     })
 }
