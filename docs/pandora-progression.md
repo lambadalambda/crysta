@@ -267,7 +267,9 @@ Map21 box source **`$83928F → $88ACF5/$88ACFA`**, origin `(136,384)`, has a co
 callback at **`$88AD69`**, not the ordinary resident COP21 interaction. Entry
 controller `$88AD89` requests `$88ADCB` (boundary `$88ADF1`). Walking Down into the
 box sets local1, stamps its occupancy and bumps Ark to **`(136,359)`**. Controller
-request **`$88ADF2`** has boundaries **`AE29, AE50, AE5E`**. Its return and delay
+request **`$88ADF2`** has exactly two page boundaries: **`$88AE29 D5`** and
+**`$88AE5E D3`**. The observed cursor `$88AE50` points to glyph byte `$56`, not
+an acknowledgement; see [qualified dialogue](pandora-dialogue.md). Its return and delay
 set local2 at `$88ADC5`. Holding Down while that request is pending does not open
 it. Neither does neutral waiting after the warning returns.
 
