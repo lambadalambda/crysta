@@ -8,7 +8,7 @@
   const insist = (ok,message) => { if (!ok) throw new Error(message); };
   const uint = (n,max=0xffffff) => Number.isInteger(n) && n >= 0 && n <= max;
   const pair = value => Array.isArray(value) && value.length === 2 && value.every(Number.isInteger);
-  const MAPS = [11,12,13,15,16,17];
+  const MAPS = [10,11,12,13,15,16,17];
   // Independent source census: docs/house-scene.md setup table and native ties.
   // Never derive expected instances, positions or order from /art.json or state.scene.
   const ROSTER = [
@@ -87,25 +87,65 @@
         Array.isArray(frame.rgba) && frame.rgba.length===frame.width*frame.height*4 &&
         frame.rgba.every((v,i)=>uint(v,255) && (i%4!==3 || v===0 || v===255)),`Invalid raster ${key}`);
     }
-    insist(art.scene_ids && membersEqual(Object.keys(art.scene_ids),MAPS.map(String)),'Expected exactly six scene_ids');
-    insist(art.foreground && membersEqual(Object.keys(art.foreground),MAPS.map(String)),'Expected exactly six foreground masks');
+    insist(art.scene_ids && membersEqual(Object.keys(art.scene_ids),MAPS.map(String)),'Expected exactly seven scene_ids');
+    insist(art.foreground && membersEqual(Object.keys(art.foreground),MAPS.map(String)),'Expected exactly seven foreground masks');
     for (const map of MAPS) {
       insist(membersEqual(art.scene_ids[map],['ark',...ROSTER.filter(a=>a.map_id===map).map(a=>a.id)]),`Source scene membership differs for map ${map}`);
       const mask=art.foreground[map];
-      insist(mask && mask.width===512 && mask.height===1024 && Array.isArray(mask.runs) && mask.runs.length%2===0,`Invalid mask ${map}`);
+      insist(mask && mask.width===(map===10?1024:512) && mask.height===(map===10?1280:1024) && Array.isArray(mask.runs) && mask.runs.length%2===0,`Invalid mask ${map}`);
       let end=0;
       for (let i=0; i<mask.runs.length; i+=2) {
         const [start,length]=mask.runs.slice(i,i+2);
-        insist(uint(start) && uint(length) && length>0 && start>=end && start+length<=512*1024,`Invalid mask run ${map}`);
+        insist(uint(start) && uint(length) && length>0 && start>=end && start+length<=mask.width*mask.height,`Invalid mask run ${map}`);
         end=start+length;
       }
     }
+    validateBackgrounds(art);
     insist(Array.isArray(art.door_patches) && art.door_patches.length===2 &&
       membersEqual(art.door_patches.map(p=>JSON.stringify(p.position)),['[128,304]','[128,320]']),'Invalid door patch positions');
     for (const patch of art.door_patches) {
       insist(Array.isArray(patch.rgba) && patch.rgba.length===1024 && patch.rgba.every((v,i)=>uint(v,255) && (i%4!==3 || v===255)) &&
         Array.isArray(patch.high) && patch.high.length===256 && patch.high.every(v=>typeof v==='boolean'),'Invalid full metatile door patch');
     }
+  }
+
+  function validateBackgrounds(art) {
+    const expected={house:{url:'/map.bmp',width:512,height:1024},exterior:{url:'/exterior.bmp',width:1024,height:1280}};
+    insist(art.backgrounds && membersEqual(Object.keys(art.backgrounds),Object.keys(expected)),'Expected separate source backgrounds');
+    for (const [key,fields] of Object.entries(expected)) for (const [field,value] of Object.entries(fields)) {
+      insist(art.backgrounds[key]?.[field]===value,`Invalid background ${key} ${field}`);
+    }
+    insist(art.background_keys && membersEqual(Object.keys(art.background_keys),MAPS.map(String)),'Expected seven background keys');
+    for (const map of MAPS) insist(art.background_keys[map]===(map===10?'exterior':'house'),`Invalid background key ${map}`);
+    insist(art.door_background==='house','Door patches must belong only to house');
+  }
+
+  function expandMasks(art) {
+    return Object.fromEntries(Object.entries(art.foreground).map(([id,mask])=> {
+      const bytes=new Uint8Array(mask.width*mask.height);
+      for (let i=0; i<mask.runs.length; i+=2) bytes.fill(1,mask.runs[i],mask.runs[i]+mask.runs[i+1]);
+      return [id,bytes];
+    }));
+  }
+
+  async function loadBackgrounds(art) {
+    validateBackgrounds(art);
+    return Object.fromEntries(await Promise.all(Object.entries(art.backgrounds).map(async ([key,descriptor])=> {
+      const image=new Image();
+      await new Promise((resolve,reject)=> { image.onload=resolve; image.onerror=reject; image.src=descriptor.url; });
+      insist(image.width===descriptor.width && image.height===descriptor.height,`Invalid source bitmap dimensions ${key}`);
+      const sheet=document.createElement('canvas'); sheet.width=image.width; sheet.height=image.height;
+      const ctx=sheet.getContext('2d'); ctx.drawImage(image,0,0);
+      return [key,{width:sheet.width,height:sheet.height,rgba:ctx.getImageData(0,0,sheet.width,sheet.height).data}];
+    })));
+  }
+
+  function compositionInputs(art,backgrounds,masks,view) {
+    const backgroundKey=art.background_keys[view.map], sheet=backgrounds[backgroundKey];
+    insist(sheet && pair(view.camera) && view.camera[0]>=0 && view.camera[1]>=0 &&
+      view.camera[0]+256<=sheet.width && view.camera[1]+224<=sheet.height,'Invalid UI position/camera');
+    return {background:sheet.rgba,sheetWidth:sheet.width,mask:masks[view.map],
+      doorPatches:art.door_patches,doorOpen:view.door && backgroundKey===art.door_background,camera:view.camera};
   }
 
   function expectedScene(map,position,key) {
@@ -207,10 +247,13 @@
   }
 
   // CommonJS is only a bounded helper test seam; browser eval returns the promise.
+  const helpers={compileRoute,validateArt,validateBackgrounds,expectedScene,compareCanvas,createControls,createTickDriver,requireCoverage,expandMasks,loadBackgrounds,compositionInputs};
   if (typeof module!=='undefined' && module.exports && typeof document==='undefined') {
-    module.exports={compileRoute,validateArt,expectedScene,compareCanvas,createControls,createTickDriver,requireCoverage};
+    module.exports=helpers;
     return;
   }
+  globalThis.HouseBrowserHelpers=helpers;
+  if (globalThis.HOUSE_BROWSER_HELPERS_ONLY) return 'HouseBrowserHelpers ready (no live inputs)';
   return (async () => {
     const route=compileRoute(globalThis.HOUSE_BROWSER_ROUTE);
     const $=id=>document.getElementById(id);
@@ -227,18 +270,8 @@
     const initial=await (await fetch('/state')).json();
     insist(initial.start_kind==='new-game' && initial.tick===0 && initial.error===null,'Host did not acknowledge a clean fresh New Game');
     const art=await (await fetch('/art.json')).json();
-    validateArt(art); // Complete six-scene contract, including on the old511 route.
-    const image=new Image();
-    await new Promise((resolve,reject)=> { image.onload=resolve; image.onerror=reject; image.src='/map.bmp'; });
-    insist(image.width===512 && image.height===1024,'Expected 512x1024 closed background');
-    const sheet=document.createElement('canvas'); sheet.width=image.width; sheet.height=image.height;
-    const ctx=sheet.getContext('2d'); ctx.drawImage(image,0,0);
-    const background=ctx.getImageData(0,0,sheet.width,sheet.height).data;
-    const masks=Object.fromEntries(Object.entries(art.foreground).map(([id,mask])=> {
-      const bytes=new Uint8Array(mask.width*mask.height);
-      for (let i=0; i<mask.runs.length; i+=2) bytes.fill(1,mask.runs[i],mask.runs[i]+mask.runs[i+1]);
-      return [id,bytes];
-    }));
+    validateArt(art); // Complete seven-scene contract, including on the old511 route.
+    const backgrounds=await loadBackgrounds(art), masks=expandMasks(art);
     const visualKeys=new Set(), visitedMaps=new Set(), actorEvidence=Object.fromEntries(['ark',...ROSTER.map(a=>a.id)].map(id=>
       [id,{sceneChecks:0,visibleChecks:0,viewportPixels:0,highOccludedPixels:0,actorOccludedPixels:0,pixels:0}]));
     let visualChecks=0;
@@ -247,7 +280,7 @@
       insist(door==='true' || door==='false','Missing boolean canvas woodenDoorOpen');
       const position=$('position').textContent.split(', ').map(Number), camera=$('camera').textContent.split(', ').map(Number);
       const map=parseInt($('map').textContent.slice(1),16);
-      insist(pair(position) && pair(camera) && camera[0]>=0 && camera[1]>=0 && camera[0]+256<=512 && camera[1]+224<=1024,'Invalid UI position/camera');
+      insist(pair(position) && pair(camera),'Invalid UI position/camera');
       return {map,position,camera,phase:$('phase').textContent,door:door==='true',key:$('actor-key').textContent};
     }
     function checkPixels(view) {
@@ -256,7 +289,7 @@
       const actualScene=JSON.parse($('room').dataset.scene);
       insist(Array.isArray(actualScene) && same(actualScene.map(({id,key,position})=>({id,key,position})),scene),'Canvas scene identity/membership/position/native painter order differs');
       const counts=compareCanvas({actual:$('room').getContext('2d').getImageData(0,0,256,224).data,
-        background,sheetWidth:sheet.width,mask:masks[view.map],doorPatches:art.door_patches,doorOpen:view.door,camera:view.camera,
+        ...compositionInputs(art,backgrounds,masks,view),
         sprites:scene.map(entry=>({...entry,frame:art.frames[entry.key]}))});
       for (const entry of scene) {
         visualKeys.add(entry.key);

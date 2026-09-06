@@ -2,7 +2,7 @@
 // Bounded synthetic verifier tests. No browser, host, ROM or production oracle.
 const {test} = require('node:test');
 const assert = require('node:assert/strict');
-const {compileRoute, validateArt, expectedScene, compareCanvas, createControls, createTickDriver, requireCoverage} = require('./verify-house-browser.js');
+const {compileRoute, validateArt, expectedScene, compareCanvas, createControls, createTickDriver, requireCoverage, compositionInputs, expandMasks} = require('./verify-house-browser.js');
 
 function fixture() {
   // Independently transcribed docs/house-scene.md setup roster, not verifier output.
@@ -29,9 +29,11 @@ function fixture() {
     ...Array.from({length:18},(_,i)=>`${i+3}:0`), ...Array.from({length:6},(_,i)=>`${i+15}:1`)];
   return {schema_version:1,actors,
     frames:Object.fromEntries([...keys,...actors.map(a=>a.key)].map(k=>[k,structuredClone(frame)])),
-    scene_ids:{11:['ark','house:838b96'],12:['ark','house:838c0a','house:838c14','house:838c1e','house:838c28'],
+    scene_ids:{10:['ark'],11:['ark','house:838b96'],12:['ark','house:838c0a','house:838c14','house:838c1e','house:838c28'],
       13:['ark','house:838cb4'],15:['ark','house:88d618'],16:['ark','house:838d7c','house:838d86'],17:['ark','house:838de2']},
-    foreground:Object.fromEntries([11,12,13,15,16,17].map(id=>[id,{width:512,height:1024,runs:[]}])),
+    foreground:Object.fromEntries([10,11,12,13,15,16,17].map(id=>[id,{width:id===10?1024:512,height:id===10?1280:1024,runs:[]}])),
+    backgrounds:{house:{url:'/map.bmp',width:512,height:1024},exterior:{url:'/exterior.bmp',width:1024,height:1280}},
+    background_keys:{10:'exterior',11:'house',12:'house',13:'house',15:'house',16:'house',17:'house'},door_background:'house',
     door_patches:[304,320].map(y=>({position:[128,y],rgba:Array(1024).fill(255),high:Array(256).fill(false)})),
   };
 }
@@ -67,6 +69,10 @@ test('complete independent roster required even when running default511', () => 
     a=>a.frames['0:0'].rgba[3]=128, a=>delete a.foreground[11],
     a=>a.foreground[11].runs=[524287,2],
     a=>a.door_patches[0].position=[128,305], a=>a.door_patches[1].high[0]=1,
+    a=>delete a.scene_ids[10], a=>a.scene_ids[10].push('house:838b96'),
+    a=>a.foreground[10].height=1024, a=>a.foreground[10].runs=[1024*1280-1,2],
+    a=>a.backgrounds.exterior.url='/map.bmp', a=>a.background_keys[10]='house',
+    a=>a.background_keys[11]='exterior', a=>a.door_background='exterior',
   ];
   for(const mutate of mutations) { const art=fixture(); mutate(art); assert.throws(()=>validateArt(art)); }
 });
@@ -149,4 +155,20 @@ test('tick driver waits for sequential command ack before Resume and next input'
   const count=events.length;
   assert.throws(()=>skipped(2),/Non-sequential UI tick 0 -> 2/);
   assert.equal(events.length,count);
+});
+
+test('A is Ark-only with its own full-size mask/sheet; open indoor door never patches outdoors', () => {
+  const art=fixture(); art.foreground[10].runs=[1024*1280-1,1];
+  validateArt(art);
+  assert.deepEqual(expectedScene(10,[538,815],'0:0'),[{id:'ark',key:'0:0',position:[538,815]}]);
+  const masks=expandMasks(art);
+  assert.equal(masks[10].length,1024*1280);
+  assert.equal(masks[10].at(-1),1);
+  const backgrounds={house:{width:512,height:1024,rgba:[1]},exterior:{width:1024,height:1280,rgba:[2]}};
+  const outdoor=compositionInputs(art,backgrounds,masks,{map:10,door:true,camera:[410,703]});
+  assert.equal(outdoor.doorOpen,false); assert.equal(outdoor.sheetWidth,1024);
+  assert.equal(outdoor.background,backgrounds.exterior.rgba);
+  assert.equal(outdoor.mask,masks[10]);
+  assert.equal(compositionInputs(art,backgrounds,masks,{map:12,door:true,camera:[0,0]}).doorOpen,true);
+  assert.throws(()=>compositionInputs(art,backgrounds,masks,{map:12,door:true,camera:[410,703]}),/camera/);
 });
