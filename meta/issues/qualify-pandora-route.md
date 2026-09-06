@@ -29,3 +29,9 @@ Identify and reproduce the minimum original-game path from the accepted fresh ho
 
 - Parent: [Open Pandora’s Box in the portable slice](open-pandora-portable-slice.md).
 - RE discovery may precede executable tests; retained evidence/checker development must still demonstrate red → green mutation controls.
+
+## Qualification in progress
+
+- Isolated source task owns only this detail, `tools/pandora-qualification/` and `docs/pandora-progression.md`; parent owns tracker closure and portable integration.
+- Start from the accepted conversation route's 77 commands, preserving every synchronizing capture, omit its finish command, then extend the same empty-SRAM process. Independent replay must preserve that observation schedule.
+- Historical scenario inventory establishes no accepted Pandora endpoint. C → E → 20 → 21 is a source-discovery hypothesis, not an admitted route or proof of the box location. No fixture state may replace fresh progression.
