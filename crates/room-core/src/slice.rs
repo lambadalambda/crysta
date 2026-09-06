@@ -22,7 +22,7 @@ pub use shared_sheet::{CellarDoorPatch, SharedSheetOutput};
 
 /// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
 pub const PROFILE_VERSION: u8 = 9;
-/// Opt-in Pandora policy; v12 adds source-preserving cue pose operations.
+/// Opt-in Pandora policy; v13 adds ordered source exits and Town door admission.
 pub const PANDORA_PROFILE_VERSION: u8 = 13;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
@@ -710,7 +710,7 @@ impl GameState {
             ),
         }
     }
-    /// Little-endian snapshot: profile9 is 181 bytes; Pandora schema4 is 320 bytes.
+    /// Little-endian snapshot: profile9 is 181 bytes; Pandora schema5 is 320 bytes.
     /// Immutable content is identified, not embedded.
     /// Bytes include profile/schema and RNG-policy versions (0 means no RNG).
     /// Profile 9 persists only the low 64 flag bytes; restore zeros the upper range.

@@ -125,3 +125,23 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   no raw normalization. Ten focused tests and independent review passed. Standalone
   pot lane classification now uses that same seam rather than private raw aliases;
   its exact-word and Up-only admission remains unchanged.
+
+### Bounded compiler seams completed
+
+- Shared checked ordinary-door clock `26210f2` (integrated `ab9be33`) and Town/
+  ordered exit admission `b69d358` (integrated `c2093fe`) are signed and independently
+  reviewed. Builder/API, source operand constraints and 35-sample clock are in
+  docs/pandora-runtime.md. Complete source lists select once before exact witness
+  qualification; unsupported selected records cannot fall through.
+- Town doors now require real Interact, keep source words/occupancy separate from
+  patches, and reset on actual reconstruction. PandoraData also rejects material
+  rules assigned to the wrong profile. Schema5/profile13 remains320 bytes with
+  Town mask at303; old profile9 unchanged.
+- Merged verification: 160 core tests plus one doctest, all five private fixture
+  suites enabled; strict core all-target Clippy, Wasm, and six unchanged host
+  room_preview tests including fresh-house route passed. Reviews fixed idle exit
+  ownership and forged arrival controls before handoff.
+- All four requested core seams are implemented. Compiler source authentication,
+  full new input itinerary and native/browser aggregate acceptance remain parent/
+  navigation-owned. Replaced-sheet C/$292 source-load uncertainty remains fail-closed.
+  Keep this issue open; live host remains disabled.

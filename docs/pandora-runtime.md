@@ -19,15 +19,16 @@ let pandora = PandoraData::new(
     opening_gate,      // BoxOpeningGate { raw_bounds: [120,368,152,400] }
     source_pots,       // sorted Vec<pots::SourceObject>, maximum64
     cellar_up_lanes,   // explicit compiler qualification assertion
-)?;
+)?.with_navigation(navigation)?; // NavigationSpec below
 let data = old_house_data.with_pandora(pandora, aggregate_identity)?;
 let game = GameState::new_game(&data, Policy::SemanticPreview);
 ```
 
 `with_pandora` requires the existing B/exterior capability, unchanged ROM identity
 and a new aggregate content identity. The compiler must authenticate/hash **all**
-old house, new text, raw collision/occupancy/material policies, pot, motion, contact and phase
-inputs in canonical order. Core validates structure, not source provenance or
+old house, new text, raw collision/occupancy/material policies, pots, motions,
+contacts, phases, ordered exit lists/bindings and Town patch operands/witnesses
+in canonical order. Core validates structure, not source provenance or
 cryptographic hashes. No ROM pointers, captured-memory initializer, CPU execution,
 filesystem or clock enter the runtime.
 
@@ -66,8 +67,10 @@ and open door phases share a policy. The collision solver uses its **delayed res
 direction**, not newly submitted input. Stored old-edge slopes6/7 reject before
 bit15; the existing passive assertion then classifies bit15 as solid before aliases.
 Other unsupported types and samples outside the halo still fail atomically.
-Default rooms have no aliases. The host authenticates map membership, source table
-semantics, policy and full raw grid in the aggregate content identity.
+Default rooms have no aliases. `PandoraData::new` additionally checks profile
+membership: TownSolid25 only in Town, ClosedDoorPartial5 only in the four C profiles,
+and StairOpen29 only at the corresponding C/E/20 cell. The host authenticates source
+table semantics, policy and full raw grid in the aggregate content identity.
 
 Standalone pot lane admission retains its existing exact-word contract but uses
 this same classifier internally rather than normalizing `0B81`/`3ACB` in a private
@@ -116,10 +119,8 @@ samples. Load motions contain exactly one explicit reload marker, even for 21→
 Map membership and pose bounds are checked. Missing cue motions reject the whole
 action atomically; there are **no fallback timers, inferred stairs or teleports**.
 The compiler must constrain its halo/collision to admitted movement and exits;
-this is not a general town/navigation engine. Exact `MotionSpec` anchors do not
-represent the navigation compiler's complete ordered coarse/fine exit tables.
-Ordered-exit/Town admission is being corrected separately; the raw classification
-seam below resolves the previous Up-only type29 limitation.
+this is not a general town/navigation engine. Exact motion anchors are bounded
+post-selection witnesses, never substitutes for the ordered source tables below.
 
 The last motion sample is an explicit **completion boundary**: its pose and reload
 apply, then the graph continuation and next scene win in the same logical update.
@@ -139,7 +140,72 @@ ordinary grounded walking/neutral and warning subset preserves that readiness
 certificate. The compiler authenticates this closed-subset assertion; core does
 not infer readiness from elapsed time, proximity, or the installed Down facing.
 Missing readiness data still fail closed. This API/schema change requires a new
-aggregate content identity; profile11 snapshots are intentionally not accepted.
+aggregate content identity; previous Pandora profile snapshots are intentionally
+not accepted by profile13.
+
+## Ordered exits and Town doors
+
+Attach once with `PandoraData::with_navigation(NavigationSpec) -> Result<Self, SliceError>`.
+`new()` keeps its existing arity. Without navigation, new travel has no exact-trigger
+fallback and Town interaction fails closed. Types below are reexported by
+`room_core::slice`; `Exit` retains the twelve raw source bytes:
+
+```rust,ignore
+NavigationSpec {
+    maps: Vec<MapExits>,       // A,13,C,D,E,20, exactly this order
+    travels: Vec<TravelExit>,  // six unique Travel bindings, any order
+    doors: [TownDoorSpec; 2],  // North, then Home
+}
+MapExits { map_id: u16, records: Vec<Exit> }
+ExitKey { map_id: u16, index: u16 } // zero-based source ordinal
+TravelExit { travel: Travel, exit: ExitKey }
+TownDoorSpec {
+    door: TownDoor, // North | Home
+    exit: ExitKey,
+    interaction: Anchor,
+    patches: [CellPatch; 2], // upper, then lower
+}
+CellPatch { cell: u16, closed: u16, open: u16 } // row-major cell
+```
+
+Each list has1–64 nonempty, in-extent records, including unsupported targets.
+The host authenticates completeness/order; core does not infer omitted source
+records. `with_pandora` checks supplied C/D lists equal the existing aggregate house
+lists. Travel bindings must name distinct valid ordinals, direct mode0 and the
+expected destination/selector; the mandatory motion witness must select that same
+record. One shared selector projects Ark by `(-8,-16)`, finds the **first coarse
+match**, and fine-tests **only that record**. A failed fine test does not fall
+through. A selected unsupported record, wrong witness/delayed direction or unmet
+door/story prerequisite rejects the entire input atomically, without checking a
+later record or alternate navigator.
+
+A→13,13→A,A→D retain immutable motion catalogs validated against the **same checked
+17 departure / load / 17 arrival clock used by existing house transitions**.
+Exactly35 samples: indices0–16 depart, index17 reloads, indices18–34 arrive.
+Cursor0 represents the selected handoff before any sample. Selector5 Down loads at
+raw destination+(8,0); selector6 Up at raw+(8,32). These incorporate the source
+selector adjustment, not COP14's distinct raw+(8,16) convention. No hold sample or
+trailing frame is inserted. C→E→20→21 require selector14/Up and retain separately
+source-qualified stair motions, not the ordinary-door clock.
+
+Town starts closed. Real `interact` at the qualified witness opens only that door's
+two cells, preserving current occupancy and position; it resets walking history,
+increments one logical tick and grants no flag or travel. Wrong witness/facing,
+repeated interaction, conflicting ownership and overflow reject atomically. This
+is the existing **final-patch semantic interaction policy**, not native door
+animation timing. The immutable Town base must remain closed.
+
+| Door | Source Interact witness | Upper/lower cells | Travel handoff |
+|---|---|---|---|
+| North →13 | `(472,304)` Up | `(29,16)` / `(29,17)` | `(472,288)` Up |
+| Home →D | `(504,768)` Up | `(31,45)` / `(31,46)` | `(504,752)` Up |
+
+The compiler supplies/authenticates these operands and source-list ordinals. Core
+checks Up approach16 pixels south of the linked handoff, adjacent vertical cells,
+matching source-closed words, and `[1CF2,1CF3] → [1CF6,00F7]` patch shape. Opening one
+door does not open the other. The separate two-bit Town state survives departure
+until actual reload, then clears; A→13→A rebuilds both closed. `effective_room`
+composes these patches, while `current_room` stays the closed base.
 
 ## Host actions and presentation
 
@@ -162,7 +228,8 @@ let removed_cells = game.consumed_pots(&data)?;
 `motion: Option<(MotionKey, u16)>` (number of applied samples), room `locals` and
 actual `door_counter`, plus `sheet: SharedSheetOutput { resident, cellar, consumed }`.
 `cellar` is `CellarDoorPatch::{Closed, Damaged, Open}`; `consumed` is a source-catalog
-`u64` bitset. `wooden_door_open()` remains the sole wooden-door boolean.
+`u64` bitset. `wooden_door_open()` remains the sole shared-house wooden-door boolean.
+The separate `town_open: u8` output has North=1/Home=2 (`TownDoor::mask()`).
 No new map delegates to missing house art. Host must use
 `scene.key()` rather than derive phase from flags. No interpolated actor positions
 or inventory/equipment output are emitted. Art composition, record scheduling and
@@ -227,7 +294,7 @@ map41, **not** equipment acquisition, free inventory-room transitions or world r
 ## Canonical snapshots
 
 Disabled data retain the exact **181-byte version1/profile9** encoding. Opt-in data
-use **320-byte version4/profile12**, bound to the same aggregate identity and tick:
+use **320-byte version5/profile13**, bound to the same aggregate identity and tick:
 
 | Byte range | Meaning |
 |---|---|
@@ -243,7 +310,7 @@ use **320-byte version4/profile12**, bound to the same aggregate identity and ti
 | 300 | Resident-sheet boolean |
 | 301 | Cellar patch: Closed0 / Damaged1 / Open2 |
 | 302 | Visit-baseline cellar patch |
-| 303 | Reserved zero |
+| 303 | Town open mask: North1 / Home2; zero outside A and on reconstructed arrival |
 | 304..312 | Parked consumed ledger, LE u64; zero while PotState owns it |
 | 312..320 | Visit consumed baseline, LE u64 |
 
@@ -255,7 +322,9 @@ invalid versions/identities, stage/flag/local/counter combinations, choice/page
 cursors, erased motion ownership, inappropriate launch profiles and fewer consumed
 source objects than recorded hits. Sheet identity, parked/active ledger exclusivity,
 visit baselines and patch/counter consistency are validated separately; persistent
-flags do not reconstruct discarded mutations. The opened box collision profile is selected
+flags do not reconstruct discarded mutations. Travel restores revalidate ordered
+source selection and Town-open admission before load; arrival resets may not retain
+Town bits or forge a closed D load gate. The opened box collision profile is selected
 at the actual reload sample, not delayed to motion completion. Canonical structural
 restoration is **not proof of snapshot provenance** or authorization for a native
 qualification restore.
@@ -269,6 +338,10 @@ concurrent `$292`/recovery, preserved consumption and final controllable41. The
 isolated miss test deliberately seeds a held launch; it is not a native carry-route
 witness. Independent reviews caught and fixed ambiguous exit admission, box reload
 profile timing, erased forced-motion ownership and counter/ledger inconsistency.
+The integration corrections add delayed raw-policy negative controls, preserved
+cue/flight poses, real Town interactions, ordered first-match/fine-failure tests,
+unsupported-record atomicity and every ordinary transfer sample's restoration.
+Independent review also caught and fixed idle exit ownership and forged arrivals.
 
 All five enabled private core fixture suites and the old host's authenticated
 fresh-house route tests pass. Core strict all-target Clippy and no_std Wasm build
