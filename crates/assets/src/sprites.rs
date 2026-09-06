@@ -1,4 +1,6 @@
-//! Bounded ROM-backed Ark standing/walking frames, not a sprite VM or scene renderer.
+//! Bounded ROM-backed Ark and house actor sprites, not a sprite VM or scene renderer.
+mod house;
+pub use house::{HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseScenes};
 mod house_npc;
 pub use house_npc::HouseNpc;
 
@@ -28,7 +30,7 @@ impl From<GraphicsError> for SpriteError {
     }
 }
 
-/// One player-only sample. Priority is retained, not interpreted against BG layers.
+/// One actor-only sample. Priority is retained, not interpreted against BG layers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SpritePixel {
     /// No component covers the coordinate with a nonzero color.

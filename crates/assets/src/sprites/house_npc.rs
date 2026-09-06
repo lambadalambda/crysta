@@ -1,224 +1,94 @@
-//! One source-derived house resident, with an explicit frozen ordinary pose.
-
-use super::{SpriteError, SpriteFrame, bank_range, take, word};
-use crate::{
-    compression,
-    graphics::{Bgr555, Tile4bpp, decode_tiles_4bpp},
-};
+//! Compatibility wrapper for the first room-10 resident, using the shared house loader.
+use super::{HouseActor, HouseGraphicsKey, HousePoseKey, HouseScenes, SpriteError, SpriteFrame};
+use crate::graphics::{Bgr555, Tile4bpp};
 use std::ops::Range;
 
-/// The first ordinary resident in room $10. No AI, dialogue, collision or clock.
-/// Caller authenticates the Japanese ROM. This is a frozen presentation, not an
-/// evaluator for the conditional spawn list or the resident's interaction script.
+/// The original first-resident API. New scene assembly should use `HouseScenes`.
 #[derive(Debug)]
 pub struct HouseNpc {
-    position: [u16; 2],
-    pose_key: (u32, u16),
+    actor: HouseActor,
     graphics_packet: u32,
-    source_frame: SpriteFrame,
-    frame: SpriteFrame,
-    graphics: Vec<Tile4bpp>,
-    palette: [Bgr555; 16],
-    ranges: Vec<Range<usize>>,
+    pose_key: (u32, u16),
 }
 impl HouseNpc {
-    /// Follow the room's spawn/header/resource pointers and decode animation 2.
-    /// Only the witnessed ordinary right-facing, palette-5, OBJ2 family is accepted.
+    /// Decode the original first room-10 resident through the shared source loader.
     ///
     /// # Errors
-    /// Rejects changed branch/list/descriptor shapes, unsupported pose attributes,
-    /// malformed packets, bank crossings, missing tiles and truncated source data.
-    #[allow(clippy::too_many_lines)] // One bounded pointer chain, kept in source load order.
+    /// Rejects malformed or changed qualified source records/resources.
     pub fn from_rom(image: &[u8]) -> Result<Self, SpriteError> {
-        let mut ranges = Vec::new();
-        let mut read = |at, len| {
-            let bytes = take(image, at, len)?;
-            ranges.push(at..at + len);
-            Ok::<_, SpriteError>(bytes)
-        };
-        if read(0x2_8020, 2)? != [0, 0] {
-            return Err(SpriteError::Invalid("changed house actor table branch"));
-        }
-        let entry = read(0x3_8020, 2)?;
-        let list = pointer(&[entry[0], entry[1], 0x83])?;
-        bank_range(list, 29)?;
-        if read(list, 19)?
-            != [
-                0, 6, 0xfd, 0x18, 6, 0, 0x29, 0xa1, 0x84, 0xfa, 0xac, 1, 0x85, 0xea, 0xfa, 0x96, 1,
-                0xaf, 0x8d,
-            ]
         {
-            return Err(SpriteError::Invalid("changed house ordinary spawn prefix"));
+            let actor = HouseScenes::legacy_first(image)?;
+            let HouseGraphicsKey::Compressed(graphics_packet) = actor.graphics_key();
+            let HousePoseKey::Compressed { packet, offset } = actor.setup_frame().key() else {
+                return Err(SpriteError::Invalid("legacy pose is not compressed"));
+            };
+            Ok(Self {
+                actor,
+                graphics_packet,
+                pose_key: (packet, offset),
+            })
         }
-        let spawn = read(list + 19, 10)?;
-        if spawn[0] != 1 || spawn[3] != 0 {
-            return Err(SpriteError::Invalid("changed house resident spawn flags"));
-        }
-        let position = [u16::from(spawn[1]) * 16 + 8, u16::from(spawn[2]) * 16];
-        let header = pointer(&spawn[4..7])?;
-        bank_range(header, 0x37)?;
-        if read(header, 5)? != [2, 0, 0x51, 0, 0] {
-            return Err(SpriteError::Invalid("changed house resident header"));
-        }
-        let ordinary = header + 0x2a;
-        let script = read(ordinary, 13)?;
-        if script[..2] != [2, 0x23]
-            || usize::from(word(script, 2)) != ordinary & 0xffff
-            || script[4..] != [2, 0xb6, 2, 0x80, 2, 2, 0x8e, 0x80, 0xf3]
-        {
-            return Err(SpriteError::Invalid("changed house ordinary pose script"));
-        }
-        let descriptor = pointer(&spawn[7..10])?;
-        bank_range(descriptor, 13)?;
-        let desc = read(descriptor, 13)?;
-        if desc[3..] != [0x20, 0, 0x81, 2, 2, 0x0a, 0, 0, 0xc0, 3] {
-            return Err(SpriteError::Invalid(
-                "unsupported house resource descriptor",
-            ));
-        }
-        let composition_start = pointer(&desc[..3])?;
-        let palette_start = pointer(read(0xfc75, 3)?)? + 0x20;
-        let graphics_pointer = read(0xfda7, 3)?;
-        let graphics_start = pointer(graphics_pointer)?;
-        let graphics_packet = u32::from_le_bytes([
-            graphics_pointer[0],
-            graphics_pointer[1],
-            graphics_pointer[2],
-            0,
-        ]);
-        bank_range(palette_start - 0x20, 0x40)?;
-        let colors = read(palette_start, 32)?;
-        let palette = std::array::from_fn(|i| Bgr555::new(word(colors, i * 2)));
-        let decoded = packet(image, composition_start, &mut ranges)?;
-        let sequence = usize::from(word(take(&decoded, 4, 2)?, 0));
-        let record = take(&decoded, sequence, 6)?;
-        if record[..2] != [0, 3] || record[4..] != [0xff, 0xff] {
-            return Err(SpriteError::Invalid("changed house ordinary frame list"));
-        }
-        let anchor = usize::from(word(record, 2));
-        let count = usize::from(take(&decoded, anchor, 17)?[16]);
-        let raw = take(&decoded, anchor, 17 + count * 7)?;
-        let source_frame = SpriteFrame::decode(raw)?;
-        let mut adjusted = raw.to_vec();
-        for (i, c) in source_frame.components().iter().enumerate() {
-            if c.word() & 0x3e00 != 0x2200
-                || usize::from(c.word() & 511) + if c.size() == 16 { 17 } else { 0 } >= 256
-            {
-                return Err(SpriteError::Invalid(
-                    "unsupported house component palette/priority/tile",
-                ));
-            }
-            // Native $80:FE8F replaces palette 1 with palette 5. Source tile IDs
-            // remain unchanged; the later OAM +$100 VRAM relocation is NOT applied.
-            let word = (c.word() & !0x0e00) | 0x0a00;
-            adjusted[22 + i * 7..24 + i * 7].copy_from_slice(&word.to_le_bytes());
-        }
-        let frame = SpriteFrame::decode(&adjusted)?;
-        let graphics_bytes = packet(image, graphics_start, &mut ranges)?;
-        if graphics_bytes.len() != 0x2000 {
-            return Err(SpriteError::Invalid("changed house graphics extent"));
-        }
-        let graphics = decode_tiles_4bpp(&graphics_bytes)?;
-        let decoded_pointer = u16::try_from(anchor + 4)
-            .map_err(|_| SpriteError::Invalid("oversized house composition offset"))?;
-        let pose_key = (
-            u32::from_le_bytes([desc[0], desc[1], desc[2], 0]),
-            decoded_pointer,
-        );
-        Ok(Self {
-            position,
-            pose_key,
-            graphics_packet,
-            source_frame,
-            frame,
-            graphics,
-            palette,
-            ranges,
-        })
     }
-    /// Qualified map; remove this presentation in every other room.
+    /// Qualified map ID.
     #[must_use]
     pub const fn map_id(&self) -> u16 {
-        0x10
+        self.actor.map_id()
     }
-    /// Source spawn coordinates, not a runtime snapshot or collision bounds.
+    /// Source spawn position.
     #[must_use]
     pub const fn position(&self) -> [u16; 2] {
-        self.position
+        self.actor.position()
     }
-    /// (CPU compressed-packet address, decoded composition offset). Not additive.
+    /// Original (compressed packet CPU address, decoded composition offset) key.
     #[must_use]
     pub const fn pose_key(&self) -> (u32, u16) {
         self.pose_key
     }
-    /// CPU address of the descriptor-selected compressed graphics resource.
+    /// Source compressed graphics packet address.
     #[must_use]
     pub const fn graphics_packet(&self) -> u32 {
         self.graphics_packet
     }
-    /// Qualified native facing byte: 3 = right.
+    /// Native facing: 3/right.
     #[must_use]
     pub const fn facing(&self) -> u8 {
-        3
+        self.actor.facing()
     }
-    /// Ordinary script explicitly clears horizontal mirroring.
+    /// Ordinary horizontal mirror: false.
     #[must_use]
     pub const fn hflip(&self) -> bool {
-        false
+        self.actor.hflip()
     }
-    /// Original decompressed composition, before native palette relocation.
+    /// Original composition before native palette relocation.
     #[must_use]
     pub const fn source_composition(&self) -> &SpriteFrame {
-        &self.source_frame
+        self.actor.setup_frame().source_composition()
     }
-    /// Shared compositor with native palette relocation applied. Effective Y
-    /// already accounts for OAM Y+1. No additional tile-slot relocation is needed.
+    /// Shared effective-pixel composition, palette relocated but no VRAM tile offset.
     #[must_use]
     pub const fn composition(&self) -> &SpriteFrame {
-        &self.frame
+        self.actor.setup_frame().composition()
     }
-    /// Source-indexed 256-tile resource from the descriptor's graphics packet.
+    /// Source-indexed graphics.
     #[must_use]
     pub fn graphics(&self) -> &[Tile4bpp] {
-        &self.graphics
+        self.actor.graphics()
     }
-    /// CGRAM base for indexing `palette_index - palette_base()` from `SpritePixel`.
+    /// CGRAM palette base 208.
     #[must_use]
     pub const fn palette_base(&self) -> u8 {
-        208
+        self.actor.palette_base()
     }
-    /// Sixteen natural BGR555 colors; color zero is transparent.
+    /// Natural BGR555 colors.
     #[must_use]
     pub const fn palette(&self) -> &[Bgr555; 16] {
-        &self.palette
+        self.actor.palette()
     }
-    /// Exact headerless ROM extents read, including compressed packet boundaries.
+    /// Exact headerless source ranges; legacy ordering is retained.
     #[must_use]
     pub fn source_ranges(&self) -> &[Range<usize>] {
-        &self.ranges
+        self.actor.source_ranges()
     }
-}
-fn pointer(p: &[u8]) -> Result<usize, SpriteError> {
-    let bank = p[2];
-    let offset = word(p, 0);
-    if bank < 0x80 || (bank < 0xc0 && offset < 0x8000) {
-        return Err(SpriteError::Invalid("unsupported house ROM pointer"));
-    }
-    Ok((usize::from(bank & 63) << 16) | usize::from(offset))
-}
-fn packet(
-    image: &[u8],
-    start: usize,
-    ranges: &mut Vec<Range<usize>>,
-) -> Result<Vec<u8>, SpriteError> {
-    let end = ((start >> 16) + 1) << 16;
-    let bytes = image
-        .get(start..end.min(image.len()))
-        .ok_or(SpriteError::Invalid("truncated house packet"))?;
-    let decoded = compression::decode(bytes, 0xffff)
-        .map_err(|_| SpriteError::Invalid("invalid house compressed packet"))?;
-    ranges.push(start..start + decoded.consumed);
-    Ok(decoded.data)
 }
 
 #[cfg(test)]
@@ -260,6 +130,8 @@ mod tests {
         put(&mut r, 0xfc75, &[0x0c, 0x2b, 0xcc]);
         put(&mut r, 0xfda7, &[0xf9, 0x96, 0xbf]);
         let mut frame = vec![0; 0x60];
+        put(&mut frame, 0, &[0x10, 0]);
+        put(&mut frame, 14, &[0x20, 0]);
         put(&mut frame, 4, &[0x10, 0]);
         put(&mut frame, 0x10, &[0, 3, 0x20, 0, 0xff, 0xff]);
         put(&mut frame, 0x20, &[8, 8, 16, 0]);
