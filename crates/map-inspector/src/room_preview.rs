@@ -14,7 +14,7 @@ pub(super) struct Preview {
     bitmap: Vec<u8>,
     exterior_bitmap: Vec<u8>,
     art: crate::room_art::Art,
-    cameras: BTreeMap<u16, [u16; 2]>,
+    cameras: BTreeMap<u16, crate::room_camera::Camera>,
     error: Option<String>,
     fresh_start: bool,
 }
@@ -25,7 +25,10 @@ impl Preview {
         let art = crate::room_art::compile(rom)?;
         let cameras = crate::house_profiles::MAPS
             .into_iter()
-            .map(|id| crate::house_profiles::camera(rom.image(), id).map(|camera| (id, camera)))
+            .chain(std::iter::once(10))
+            .map(|id| {
+                crate::room_camera::Camera::compile(rom.image(), id).map(|camera| (id, camera))
+            })
             .collect::<Result<BTreeMap<_, _>>>()?;
         let viewer = crate::visual_export::export(rom, 15)?;
         let bitmap = std::fs::read(viewer.with_file_name("map.bmp"))?;
@@ -104,7 +107,7 @@ impl Preview {
                 "sequence":output.animation.sequence,"record":output.animation.record,"mirror_x":output.animation.mirror_x},
             "x":output.position.0,"y":output.position.1,"tick":output.tick,
             "phase":match output.phase{Phase::Walking=>"walking",Phase::Departing=>"departing",Phase::Arriving=>"arriving"},
-            "camera":self.cameras[&output.map_id],"error":self.error,
+            "camera":self.cameras[&output.map_id].at(output.position),"error":self.error,
             "snapshot_sha256":sha256(&self.state.snapshot())})
     }
 }
