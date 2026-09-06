@@ -1,0 +1,645 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "route_sha256": "8bba424978bfb2178b0645536c7a93c3e278cfb51ff2045104552e50f5e033cf",
+  "frame_log_sha256": "c2321d3b2c2a760871e576bbec88843c0a30701b7656eee8aedfe7398bdd52ab",
+  "final_frame": 48259,
+  "tutorial_map_path": [
+    65,
+    68,
+    66,
+    67,
+    65
+  ],
+  "points": {
+    "cellar-without28-blocked": {
+      "map": 12,
+      "position": [
+        184,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 13974,
+      "events": [
+        1,
+        32,
+        38,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 44276,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 160,
+      "hit_counter": 0,
+      "door_cells": [
+        7552,
+        2945
+      ],
+      "hashes": {
+        "state": "5494bd535cffe49a325284dd657147450ceb2a42c9655781898b6fca768b81fc",
+        "wram": "4a775945a4532af49eba65c017c877f3cbaf8a0a5c46547deae9bfafd879eff7",
+        "vram": "03c282006620592502e3aac966d5154b83458d65fd0f45a496dd1aac1ffc5eb7",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "pixels": "36f44c5eb4a416068a78b43030fbc0e6a0dc3404b695e0fafc70df5fefcf48a2",
+        "oam": "4cc64eee047784fc3d63440b71f0534a6751e3ef2a459ea79407d93a2c6f1376",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "resident13-choice-no-confirm": {
+      "map": 19,
+      "position": [
+        360,
+        144
+      ],
+      "camera": [
+        256,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 17658,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 65535,
+      "cursor": 46868,
+      "phase": "choice",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 160,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "ddfe947ccb26e40097f657464e2820fa5b86abde42218ced25d7a90004ff6f08",
+        "wram": "a2cd07f31c5efd8fdc017ffb1a1b186a6a54f135fc2bfd345d442b73b78497ae",
+        "vram": "756049e68fd4c5959fe6306485127cb33cd41e6e99301e53ab9582d4739bed05",
+        "cgram": "8d11d3949cda96604888efda12a6c2bca676895dd19b72cae1a95342f811c573",
+        "pixels": "f5aaafdbf946f2335e0b213e7bf7c8cbd400536b36afc1402c0cc0a308e05a52",
+        "oam": "fe0c840ea075d01eb9c4b51000e758ed3f758c8cdce8ea5b52371ba78c4f9da7",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "resident13-refused": {
+      "map": 19,
+      "position": [
+        360,
+        144
+      ],
+      "camera": [
+        256,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 18141,
+      "events": [
+        1,
+        32,
+        38,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 47149,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 160,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "0a54073aaa7f227d47f508224e4ff5b0b8f20ad33c4a750ee7ca92a7848e8319",
+        "wram": "8b3507a0e620ad10aa7f280dd0caccf49c18515bd7b61a11412e5b15a265ee0a",
+        "vram": "4967000ce06c09a240c0292a2b0637dcf5d1dbe2ef30fddf789474c6ac906d5e",
+        "cgram": "8d11d3949cda96604888efda12a6c2bca676895dd19b72cae1a95342f811c573",
+        "pixels": "49a7a7335db2d4d57588ba26a29edff9621cbc33fde315847965567aa54440d5",
+        "oam": "fe0c840ea075d01eb9c4b51000e758ed3f758c8cdce8ea5b52371ba78c4f9da7",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "resident13-granted28": {
+      "map": 19,
+      "position": [
+        360,
+        144
+      ],
+      "camera": [
+        256,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 19287,
+      "events": [
+        1,
+        32,
+        38,
+        40,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 47074,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 160,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "a2ec6d7b28d0bd294e8c4bd8929f629db87710cf4b98b605e9a25ec29290444b",
+        "wram": "d7df4a5d4723b671b8b45258e8ee0e1f61a83263fe7d70159ce5b8dd601a33e8",
+        "vram": "ce3e242282e3f38e4cbae3c10c924680252a0e8f4f47c9fafa13069a57047af3",
+        "cgram": "8d11d3949cda96604888efda12a6c2bca676895dd19b72cae1a95342f811c573",
+        "pixels": "3a435d8320e8bebb02d631ccb069d2ede40e7213ad4bcf02de2651a35795a0d5",
+        "oam": "fe0c840ea075d01eb9c4b51000e758ed3f758c8cdce8ea5b52371ba78c4f9da7",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "door-dash2-rest": {
+      "map": 12,
+      "position": [
+        184,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692635,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 26830,
+      "events": [
+        11,
+        32,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 23688,
+      "cursor": 44131,
+      "phase": "ack",
+      "boundary": {
+        "source": 8957027,
+        "opcode": 211
+      },
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 160,
+      "hit_counter": 0,
+      "door_cells": [
+        7552,
+        2945
+      ],
+      "hashes": {
+        "state": "29ace384810db02bdfe1a0c0ba5cb95d17ab443584a29f76d917c5dc4761f84d",
+        "wram": "a396bd9fa3ce4e92e873bfefec7a0b92356a266c76a4ccb4c325640e391f130d",
+        "vram": "ab29fa2c8de2f9aced7305ee3f32c3726fee2b8ab437e3b157cde4184799b228",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "pixels": "44115f5055fb79ceef7ad1d40ed07f2915165a81de1a29dac304f753dd2b7873",
+        "oam": "040c900a83e5716e9d03e305fc7f8ed0688974a0aa0e8549ef2359a7592b525e",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "throw-pot-impact": {
+      "map": 12,
+      "position": [
+        185,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 28585,
+      "events": [
+        1,
+        11,
+        32,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 23688,
+      "cursor": 44161,
+      "phase": "ack",
+      "boundary": {
+        "source": 8957057,
+        "opcode": 211
+      },
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 1,
+      "door_cells": [
+        7591,
+        2945
+      ],
+      "hashes": {
+        "state": "8009dab7fea33a31193c89b34840387c8610fc9baa320017c71ad01ac5062653",
+        "wram": "f128b037235d132a242fa629807fff0e710d8b6acd15c8e66c9c73d00bbb7a37",
+        "vram": "439a0d937804b366ebed0fb9645dc8c61f24a48071edca35ee3264aeeaa5615d",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "pixels": "d6bfdd75f4c3b853a6f3654fa4872aa50f450a112824f7117585df2c9fb68e9f",
+        "oam": "2815707acaedbe2c6f65870e6c4f7865e83477480b4158981003c595b840667f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "second-impact": {
+      "map": 12,
+      "position": [
+        136,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 29693,
+      "events": [
+        1,
+        11,
+        32,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 44161,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 251,
+      "hit_counter": 1,
+      "door_cells": [
+        7591,
+        2945
+      ],
+      "hashes": {
+        "state": "56b26414798cdc1ad5ecd48518c3ac14e6f98c68b3a4f24c1747edf7ccde9a83",
+        "wram": "1158788b90706fb5ce1955eeabb5151979abedd2d50a05a37b595f5dfa230260",
+        "vram": "3ee54cf36cdf446d8136886431885885f5f4ed06d75bd8da17aff4c535d21db5",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "pixels": "cbed243b320da1f4ac82095cc63fddfdb8db91970282f99270be0793c609a35f",
+        "oam": "57f828c44d5e9edb8a1426d8e6ef95e0b07c10a4fbbf7f6f1b58392952f0b7ea",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "door-second-hit": {
+      "map": 12,
+      "position": [
+        184,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 30481,
+      "events": [
+        1,
+        2,
+        11,
+        32,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        658
+      ],
+      "input_disable": 0,
+      "text_bank": 23688,
+      "cursor": 44200,
+      "phase": "ack",
+      "boundary": {
+        "source": 8957096,
+        "opcode": 211
+      },
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 2,
+      "door_cells": [
+        40182,
+        47819
+      ],
+      "hashes": {
+        "state": "f92f4bfc57d664f23b538741efc8fbc58afa03b152b38322c54b34864e4d5d01",
+        "wram": "7f6d88de7a0ce1daf680c6b9ef4ab689a416367a09fb1ead8195c4102895e801",
+        "vram": "aa8e14de21829bdbb6b56e7cb74d3b6908f9b70a7cd465686b9829db23eefb44",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "pixels": "e8d25de27fbb25a12cb4b819e9871c69fc79bac247e7eb16927f42293694f272",
+        "oam": "daa636085940fbad9d76482b7c5e743d062aa9adf947f6126f3a1b3d46ff9c80",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "21-warning-complete-neutral": {
+      "map": 33,
+      "position": [
+        136,
+        359
+      ],
+      "camera": [
+        0,
+        247
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 0,
+      "flags": 1045,
+      "frame": 33587,
+      "events": [
+        1,
+        2,
+        32,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        658
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 44638,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "fe13f43a32aae45d8928bcac55318b9b18fac32e29b40393f567b097cb5d88f9",
+        "wram": "506fa847dddcdbb6bbce9caa2e2d6f667c9e6ac11f3edf56a68174966a60ecc9",
+        "vram": "0cec5fbf3df867a90cf2b13934b0ddab3fe68325a82ecc1aad1f758ee5123227",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "pixels": "7fb975fd28238061b748c245f48f08b6963b53774c64342896ce0db9db85101d",
+        "oam": "553852d32ab192b385135574f42e09e6db2d0c5dcf2716f58d05abd10c699a0e",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "21-opening-wait": {
+      "map": 33,
+      "position": [
+        136,
+        368
+      ],
+      "camera": [
+        0,
+        256
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 0,
+      "flags": 1044,
+      "frame": 34202,
+      "events": [
+        32,
+        34,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        658
+      ],
+      "input_disable": 65360,
+      "text_bank": 0,
+      "cursor": 44638,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "dbd326f82c8a6033eab61b042070ec0b3829136634d7f3f6a0c2d47e7eceaa9e",
+        "wram": "093f0c09323d7667a6f6f88d394330043ffeb3295f2297d85532dcfa091aecd5",
+        "vram": "93b5b2b1cdab04c8d86129232710aea833ae09e4d9c56d9c81d39e56fede0861",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "pixels": "b4969ccdceba0e41253ffc1c8c8f408445866cd4dfd2546106df1bc86aac75bd",
+        "oam": "e7583ed56907f4d014a708083e4141888a4a09bd9c8f3dcd07db3956cb9de69d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "inside-box-neutral": {
+      "map": 65,
+      "position": [
+        136,
+        208
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1044,
+      "frame": 47093,
+      "events": [
+        32,
+        34,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        579,
+        580,
+        658
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 55232,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "240ec0d059ffa38e37cb00b18338d62ee0e5283575126d117c06477267b66d88",
+        "wram": "a30d2ab0de57e92f1166b8876ae4c2a378b53c32f445fa97da8c3c75efd80149",
+        "vram": "72b55b41f25caf23d48aa77ed9250539b249429ce1c4cef30f37fdad4c80e6bd",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "pixels": "f236f696f42962b745f222b60e704d0850aa23b08c497844b10ec8f4c63421b9",
+        "oam": "665bad1f923e9d00d19c05816b78f018c1112164a046786e030dad1d4a2e928a",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "inside-box-left-rest": {
+      "map": 65,
+      "position": [
+        120,
+        208
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 2,
+      "flags": 1045,
+      "frame": 47225,
+      "events": [
+        32,
+        34,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        579,
+        580,
+        658
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 55232,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "8dc50a9a5dddf31bfdec7765b938ff51d7fd88b48aad2f8e1f1aa48abaf2abdc",
+        "wram": "5ca5af2184e0505883155600d35e9767cf8de45c92592616503e3c515348946a",
+        "vram": "6634fa5337f44cc062b33fda5751a02aca0cba1967ca82296d69ca4d02e48e0f",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "pixels": "464d18b2a0a858e8c73c80ab5c9d15738c62a35c38452762b0034aa363d2644c",
+        "oam": "66ff931af61031620648ffe1a0e3fd3c7472a6ea4efdfcf1a389a4667ce91878",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "inside-box-up-rest": {
+      "map": 65,
+      "position": [
+        120,
+        192
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "control": 0,
+      "facing": 1,
+      "flags": 1045,
+      "frame": 47357,
+      "events": [
+        32,
+        34,
+        38,
+        39,
+        40,
+        47,
+        63,
+        66,
+        251,
+        579,
+        580,
+        658
+      ],
+      "input_disable": 0,
+      "text_bank": 0,
+      "cursor": 55232,
+      "phase": "idle",
+      "boundary": null,
+      "selection": 0,
+      "held_slot": 0,
+      "held_kind": 250,
+      "hit_counter": 0,
+      "door_cells": null,
+      "hashes": {
+        "state": "de853b96cddc70bd56af08c88a6abdd195626ed15610189a07cec81fad1fc638",
+        "wram": "5d12f19cb013940409ccad776831af630dbca767f53fe5628ca4b0a8e625e678",
+        "vram": "72b55b41f25caf23d48aa77ed9250539b249429ce1c4cef30f37fdad4c80e6bd",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "pixels": "eb8cb0a291cf70f2f96cc0ecc3f710fcd42910941b08a3c0962f5994cd0d5459",
+        "oam": "2050cd30cab70c8086b3008ab9a71f2e3257e0228f46443af11580aeb3b9fc1e",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    }
+  },
+  "observer_source_hashes": {
+    "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+    "vendor/ares/shims.cpp": "0f7abb6af4f7aaa08519aa7ae0f821bab98794c33a96c74c7455847053e0f82c",
+    "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4"
+  },
+  "provenance": {
+    "house-conversation-qualification/probe.rs": "3f35b85c16d1ec32d8e3307bb72fe385f9c973ce17659534a71c9823f920b8d4",
+    "house-conversation-qualification/build.sh": "398bd15717fa61985ad509f6724756c97e5674ae5261b28f472af9cfd1265d0c",
+    "new-game-qualification/bootstrap.rs": "af48439cd73b26ff0584024d1b68f7d0193f370f45bcff5724a3022b0f01aeaf"
+  },
+  "observation_policy": "one-empty-SRAM-Session; bootstrap6800; save_state-sync-at-boot-and-every-command; no-restore; finish-flush-exit"
+}

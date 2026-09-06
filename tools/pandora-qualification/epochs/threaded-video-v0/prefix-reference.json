@@ -1,0 +1,1151 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "route_sha256": "c3088fc926d3759fc2e8f8e04379f99af7645f23228465e994b75e606d09bd22",
+  "bootstrap_sha256": "af48439cd73b26ff0584024d1b68f7d0193f370f45bcff5724a3022b0f01aeaf",
+  "frame_log_sha256": "9ea47f1b977e26dea9e426330cdcc6da24a4145d52b32ae8fae2f0ec755eb9bc",
+  "first_grant": {
+    "frame": 8409,
+    "label": "first-page2"
+  },
+  "transition": [
+    {
+      "frame": 11674,
+      "map": 13,
+      "position": [
+        120,
+        722
+      ],
+      "script": 8698229
+    },
+    {
+      "frame": 11690,
+      "map": 10,
+      "position": [
+        120,
+        738
+      ],
+      "script": 8698229
+    },
+    {
+      "frame": 11723,
+      "map": 10,
+      "position": [
+        0,
+        0
+      ],
+      "script": 0
+    },
+    {
+      "frame": 11724,
+      "map": 10,
+      "position": [
+        504,
+        752
+      ],
+      "script": 8692014
+    },
+    {
+      "frame": 11760,
+      "map": 10,
+      "position": [
+        504,
+        769
+      ],
+      "script": 8692312
+    }
+  ],
+  "checkpoints": {
+    "boot": {
+      "label": "boot",
+      "frame": 6800,
+      "map": 15,
+      "position": [
+        304,
+        112
+      ],
+      "camera": [
+        256,
+        0
+      ],
+      "script": 8692387,
+      "facing": 0,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 39080,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "2018f52422b9d770ed08b2a0bf2f980ba557afb875979a88f39cad21140320b6",
+      "hashes": {
+        "state": "98919f9274fab65d566c50c1808c16b10a062449ccf064f14a95392b838458ad",
+        "wram": "c02d3c837f535ed3ca00cac25fadab2098d38840f586af0d202068979c7dfcf2",
+        "vram": "6f3d0b6a209adb17fb55b0ed5b5c3c3b5a33068b8a321a2e450503d098e16799",
+        "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+        "pixels": "8cd0093d7c3a6d6fcffeafb7bafe83ad6ce500d28ee8470cca1a8c1dc50c2a0e",
+        "oam": "eb7269c9cfae9312395d4450d732e6f27d68a8bf9de453c8067d30255e0ccf5b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "north-door-settled": {
+      "label": "north-door-settled",
+      "frame": 7848,
+      "map": 11,
+      "position": [
+        120,
+        191
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "page",
+      "cursor": 36847,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "6c99931e98569ed3404cb0200008a43cd0ecfee6ff4aac0b1fc86bab14416685",
+      "hashes": {
+        "state": "d2ae2e0e6c75092c4659c25099cabd2c4218f7cbee4b54bd70fdf31ab827116b",
+        "wram": "c5eb2ecbe9e4e76632b014c26a7b76dcd8f245c1cb9c4d7b1da6c1748d01b056",
+        "vram": "2107beac92dd3a5505bf2fa90787dd750436e7c8ed0e6b5edbbb6be52ec8980d",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "5819d67e79202663e732065cbb5b6908e37c22167f639954f5646d928eaa6d6b",
+        "oam": "a45b97690170c8084bbe9a97b4193a895df61833acaa62a1aef1bbf3a711da24",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "entry-no-ack": {
+      "label": "entry-no-ack",
+      "frame": 8028,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 36847,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "target": {
+        "position": [
+          120,
+          112
+        ],
+        "policy": 512,
+        "rectangle": [
+          65528,
+          16,
+          65520,
+          16
+        ]
+      },
+      "hashes": {
+        "state": "ef39bca825996bda9535a14e0d04eabd084e0bb889772ca1f027c5596f4b2be6",
+        "wram": "1ea4cec7ad70ac792fa9f734f896f2c3e785ca2f668c90c8036b57814b529b62",
+        "vram": "29c735e30883e196ef85fbe61b3a8147c0d79a2c1af2e2524d934c00cc591b57",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "5b6368e11c4dc3943506160fc0e35b8e17924a20afe57fc7d7fc53bdeb325880",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "entry-after-A": {
+      "label": "entry-after-A",
+      "frame": 8149,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "page",
+      "cursor": 36903,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "hashes": {
+        "state": "90927912c6f5955a943fee0e85fd75c101d7d323e3da63e17bf6590e35dbc55a",
+        "wram": "505d29871f0f85e296e679bd1691dcd3046ad92e8adea3aed2dcfd5eb563d2b5",
+        "vram": "dc68bf184f432ac6cbb50dff13b29a0bb6c6f59682b7cc358389a8b9252f1f85",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "93c245a4a2317d1cd466c220961edc275638d4fe13ef1a78326d1a7a76d01cce",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "first-no-ack": {
+      "label": "first-no-ack",
+      "frame": 8389,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "page",
+      "cursor": 36903,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "hashes": {
+        "state": "8eca3d6549d83b4250fdeb7087398810ababc3cb304b465676acdbc64bd60568",
+        "wram": "e4298bb9dfbd85f36b44786384a138ae1884a0194d3cb3c2e519da7fc304803f",
+        "vram": "8229be4bd3ae190e6f606527ede1225cb74ee91069b471599b1f3a0b247f9546",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "d35cc14ba9bf4462eed1383c08da77d9319c70bf85d0f43ca52cfe10c9562e41",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "first-A1": {
+      "label": "first-A1",
+      "frame": 8390,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        251
+      ],
+      "phase": "page",
+      "cursor": 36903,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "hashes": {
+        "state": "739b6ed7cbc9f9f132c2648feab17d01731a7d4400157646aafc8947ec5258ab",
+        "wram": "5abeae29d5d15dd63a1f845deb6e1bf36280aeb175d9d316b6855b232add5afc",
+        "vram": "8229be4bd3ae190e6f606527ede1225cb74ee91069b471599b1f3a0b247f9546",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "d35cc14ba9bf4462eed1383c08da77d9319c70bf85d0f43ca52cfe10c9562e41",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "first-page2": {
+      "label": "first-page2",
+      "frame": 8570,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "choice",
+      "cursor": 36935,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "hashes": {
+        "state": "ac75241c9474323f49e9bd7e6595c35ad382d967842e9adfcbcacdac17a165cf",
+        "wram": "2eb9d9316b404d37d3dd5720638455be394ed424255312435b0fcbc11ec3aa42",
+        "vram": "a1ccb13fb2607f43651a32aacc8129678964e3f9834dcaddbd72c8012c0109dd",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "3b889f1a0f2e3a1d721e78b6fb3eaa0300e649a881909b4d4e8f2387dfb21a29",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "choice-no-confirm": {
+      "label": "choice-no-confirm",
+      "frame": 8750,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692583,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "choice",
+      "cursor": 36935,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "0a081014d37049b70a42d4ec0738086fedeeea20a8ffeeaffaf7637e4538c8b0",
+      "hashes": {
+        "state": "5a137a58267ea12530fbe636c75334abb388abfb49c0b2d5c69f539e0ac75b2d",
+        "wram": "2412471a72484ccfde11248fed32cee728dd78c54adeadd14294bb250ebdddfe",
+        "vram": "48bcadb0a17db9228bb4dde13b17ebd53680853985b7b590c11139e8c318f5cd",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "3b889f1a0f2e3a1d721e78b6fb3eaa0300e649a881909b4d4e8f2387dfb21a29",
+        "oam": "f0d11fccc8b9058b8b83dbe9dd8e4e1f8d62440ca6948cf459aac98c77514b8f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "first-followup": {
+      "label": "first-followup",
+      "frame": 8931,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37112,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "f520cb25d180177bfe39b41adfb9b744cd9ed562b7e2293b16909e2c4dae8523",
+        "wram": "df687d18ca46b7f9a991c3020a3a4e0528d9334382d8a62bebca708b835b7ffc",
+        "vram": "9013443382f501dd9ad1fbe5a6b73a84303a10c7c4659cc875466332583aedb7",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "d5d0bac5671e2116033f75781e387d5a0aba27f82e1b6d740a06081fc1818c5e",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "followup-no-ack": {
+      "label": "followup-no-ack",
+      "frame": 9051,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37112,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "e13a8ffecdd954ac8d7f28bb005cf528077ed3d1b228ea68480a3d8a9821805f",
+        "wram": "976843c8977ed2562e76f23c83c1f3a14e6debff41389ff2fabb0f7602fa52b2",
+        "vram": "79f4619ba53b4ab242c0ee9451076a04c8cd59adf935d945939b0e57748585d2",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "fbc3b52e608d7f21fa30da1613f473fb1d5450d93a3cebda01cf035e55b07911",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "first-complete": {
+      "label": "first-complete",
+      "frame": 9172,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37112,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "64b060b5e87927552874fd4e26deec62ffed60d5f8d557b8b60890663c9363c2",
+        "wram": "a88ed48892c5acd7ceda26ad7ba44f70bd9fe87d7ffad0174b848e7237f083e3",
+        "vram": "6703dff13d314da733681600189467a26acf3815482772038139296b0e570eac",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "3f69d6dd4191ed36430f51f0bbcb9ed9c6e31519a03459a617d841521130344b",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-wrong-wait": {
+      "label": "repeat-wrong-wait",
+      "frame": 9263,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37158,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "ac968afb7cfc93f0be072253ffd3438c47ea7ad2bf59020117a5e60ac8c12df2",
+        "wram": "aabc312e80151436157d4b515c973b6f33891c1e8a61d03e3d1ec43a71999e4d",
+        "vram": "dc4b9de567dfa643af0007731ca8c474fcc186b2c38baa47052543396e70824a",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "1fad6f91fbbc123814fd2df489bb057dcd9c54a6a86ee5aee885e804e423aa11",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-start": {
+      "label": "repeat-start",
+      "frame": 9444,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37205,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "d9a6ea863b10ae9d48d6dcd69ad2a8b14a5530fde93fcc29ae2367c8968a4525",
+        "wram": "9d993566b5b025556bb7d0ae491b5f68c31d3dcfd21dddfaab1412d98f6baea0",
+        "vram": "d15c617aaa38d0c97f11b83a94f15c771ad611f002ba436d277d1004e508f6c6",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "52ab29e821c2bc611904c87db7c143b35527ea4dd6e9f9149c5e2fc28b922235",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "followup-closed": {
+      "label": "followup-closed",
+      "frame": 9565,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37205,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "d9802b93bb5002a5e2666d2051e01d1752c163ba14c41116ff4440e51956741f",
+      "hashes": {
+        "state": "3cc749d345e7850f8c34b320b0f84ecbeeaef25da58697e17d81bfdbfc7e569a",
+        "wram": "34ec9a1d1d53c25c69bcd85f70e10e18b8d26f7107cdad0888384e9a54be08a1",
+        "vram": "d15c617aaa38d0c97f11b83a94f15c771ad611f002ba436d277d1004e508f6c6",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "52ab29e821c2bc611904c87db7c143b35527ea4dd6e9f9149c5e2fc28b922235",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "wrong-facing-settled": {
+      "label": "wrong-facing-settled",
+      "frame": 9666,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37205,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "d764b33d5fa0d215a034d8d469a213997edd7b9aa74479f4c09863100c6a3b7a",
+        "wram": "99910f3c11ef8bf6d5d2d05794415fb58c6291b0f0b412bbcc3b4347aaafa21d",
+        "vram": "8a14d3c5f5b0b774f003b67187fc8842cf289f33d68ed90e803f650444c63513",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "6427c4e5efaf3e8a2af8ae7ea297fbdfba935045964129b72af84ce4d01d050d",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-page": {
+      "label": "repeat-page",
+      "frame": 9853,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "choice",
+      "cursor": 37246,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "2e01de270880e992b5c2b885da4cd60b2f670fdafe0adff731190a44caf5c577",
+        "wram": "61bc10f77b3bf99a98753124c6424cfc354cfca1eeb9b353a59da40c3dada996",
+        "vram": "d03d147a6c99b8edba77e25ec6201f814793d10827b95b60bd28c50ad2722d1a",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "e395370b8eeb8a432ef44ce0d5d79df46e9eda86dd9d6f291a072ff0ec266e7b",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-choice-second": {
+      "label": "repeat-choice-second",
+      "frame": 9914,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "choice",
+      "cursor": 37246,
+      "selection": 1,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "bcc68671e3cd6021239ade232d7ea3c2d96094156c8cbc1ff5eaf5c4caaeb0bc",
+        "wram": "99d18a932c3f7d37d2b11d9182b89b25e1b244020d53be243688b0ded202ef72",
+        "vram": "470ea3c882a36c0ee06756f410564896d1419a94afc1158d353973690f529313",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "c80ec4b2453020d940967af34bfc577651326934d66daa0f561523a635aecb79",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-cancel-page": {
+      "label": "repeat-cancel-page",
+      "frame": 10095,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37355,
+      "selection": 1,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "9579193f7143bf9c89bb61d70be9c99f0b87b918fc019633fc87de3fc0662b80",
+        "wram": "07cd9f2d1ad86af7d6b2a5b215b8bf2b56914109a47aa5167075e4ee1fc51f8f",
+        "vram": "efb3727089e387dbb0c178f39e95942af753d97c284ae11cb4bbf27101cedc19",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "e5b184e96be0632743832363667dadc1408ef02cf2ed06193abeb6972755da6f",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-after-L": {
+      "label": "repeat-after-L",
+      "frame": 10216,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37399,
+      "selection": 1,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "70d917914634f83caa806e555db9b84355041f64a05b3d9852ad65bfd13e52b3",
+        "wram": "4fa6e472fb5c2b5d9a4655dd06a9b793ba6e8322b6a23b0f1bd5c1910fc99623",
+        "vram": "fc8486b459e5d9756679d48c6709db6a1f6b6bad1c60c732ff51115b7a6c8f36",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "46100a2cc616dc10f2e6c557fa52c8f536475b44c4dddd1938880e12d2d824fa",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat-after-A": {
+      "label": "repeat-after-A",
+      "frame": 10337,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37399,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "64415878286413b9c89b6f70b263d622636a8a580720908f6d445799b0a71dae",
+        "wram": "2e5fdb895c7c242f0363c1c6257bde0bd80f0bb6db223dcb6935049635e6d898",
+        "vram": "9c52aa3f8112b26c94a93fd7e24c1137f1e4f34cf2fbf4e67cf2eb5221339750",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "6427c4e5efaf3e8a2af8ae7ea297fbdfba935045964129b72af84ce4d01d050d",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "away-negative": {
+      "label": "away-negative",
+      "frame": 10439,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37399,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "df4f71f0aecbf418cc3034ec85ee3afab3d62fa7ab5ef085187aabcc27531b80",
+      "hashes": {
+        "state": "d501d7e80332c061fa1eaecd0d36b290ccb41b23fadd197ec49fe1b85d8e4034",
+        "wram": "b2bd67b7efea0d15af699c8e28f325c780384061bff0aee03e7c3ffb9a364c43",
+        "vram": "12145ff6dfb54979dd7768c3e9c15da6173689a790da220bf94feb67f5095a0b",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "14201e9dba03e6770862b8eb2c61f082f6b307f23bb53a7a05447a3f337cbf3c",
+        "oam": "29833198043c0d74701944d76c88fabefe8c5df4582c8128ce927198431bb6fe",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat2-choice": {
+      "label": "repeat2-choice",
+      "frame": 10631,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "choice",
+      "cursor": 37246,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "bcc0cb4d4e1c96de1166f65ac549bcb9b329f7be8159eba9981c68360728a62e",
+        "wram": "2f288fdad2938ec463f2573f37ec240ff34a4d942f8bd83086f4d7a3b781ea50",
+        "vram": "e555b2f06789f2754ced8538e290b6dfe90bc05bb0a403f64f60cc599d6d7a4d",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "e395370b8eeb8a432ef44ce0d5d79df46e9eda86dd9d6f291a072ff0ec266e7b",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat2-followup": {
+      "label": "repeat2-followup",
+      "frame": 10812,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37290,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "11aecab31151aa6e8445c9be613157258fd36f2762c550e37fe2e43d30ea91c3",
+        "wram": "8f70c68818599549d0dc6f1c18aebd032900908230a91933c0262663626a7bec",
+        "vram": "5d6c566d35fca8df40b38359a4307a73222e3d5b58e9e3a744bf02fea9239bb8",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "a9908684370fc503d2596420b59bb0a169bc8c20044a53f86a1cfe762115e7fe",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat2-page2": {
+      "label": "repeat2-page2",
+      "frame": 10993,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "page",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "63417da6f81adb72d4e465082d3974cb491afdba9db945c6bee402f96bb38a79",
+        "wram": "ddb5204a0172940e23caa716c6ca378aad6e8f6a383d220c6a249857b7fd25be",
+        "vram": "206fb68a6b8e2ef4744d9d96439a4966d71f0fce9a32eb7e4bdb2d36fdc17d2c",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "7e489e7382d41dec4533345db651a5e4ae70fdd4511dfab87a0d799b16b6c70a",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "repeat2-closed": {
+      "label": "repeat2-closed",
+      "frame": 11114,
+      "map": 11,
+      "position": [
+        120,
+        128
+      ],
+      "camera": [
+        0,
+        0
+      ],
+      "script": 8692312,
+      "facing": 1,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "7c313627e33dbfe0b43925a05b3f17735008b2d5546a7dd7407897578be49e86",
+      "hashes": {
+        "state": "99461bb315a4230cc7d0a2378a29d4fe4ff44f310189a167cb02b1e4e23ede4a",
+        "wram": "def798f9305725e5addb2529d142220b06fa5a1ce80ecb59c2dedf101b596773",
+        "vram": "4465958ec786600772cdaa060cd5b6e19cab498e707c8164091eae2e63c64a72",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "pixels": "6427c4e5efaf3e8a2af8ae7ea297fbdfba935045964129b72af84ce4d01d050d",
+        "oam": "3ca5dfa324b6249782d63614ef2cd587fe38aecf9ed81cc65863893e1c9decd6",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "open-D": {
+      "label": "open-D",
+      "frame": 11466,
+      "map": 13,
+      "position": [
+        120,
+        625
+      ],
+      "camera": [
+        0,
+        512
+      ],
+      "script": 8692312,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "40dbc4fb867f50e7c737b58a72aa36b527e1cdf6d17e8654cb70b7c1a4b36965",
+      "hashes": {
+        "state": "0fc3aacabb03ba9a24d55d5bd810e8a30ec5322d97de042af85d3245d5d8dc49",
+        "wram": "3c5c45772af27bd48ff5b71adc29b0f1dca0d4aeaeeb74b31737410ae1a9d4c5",
+        "vram": "018cc88d1084619182156357433954e5669c64adf77ab4cc8f8b949373e5478e",
+        "cgram": "8ac85ca62f8c9726a9def024ac01c14937e9ebefac042f1a2148c6b40462dba0",
+        "pixels": "d9d8c9ca5adc4dbd3e2331680038568c1a665fa0ccc001f5d1d764c12ab607a4",
+        "oam": "ebf134d056fe6424377f9ebcd6a46df9380dca68dfd305454f0ad15c6857bf8d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "exit-trigger": {
+      "label": "exit-trigger",
+      "frame": 11673,
+      "map": 13,
+      "position": [
+        120,
+        721
+      ],
+      "camera": [
+        0,
+        512
+      ],
+      "script": 8692561,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 1426,
+      "gate_continuation_present": false,
+      "linked_sha256": "cddb84eaded39e17ad8ac552e9228a0bbfd8a33e6eafb2b4cfd72c0bd9ef4792",
+      "hashes": {
+        "state": "f7163bd5da73795892254f859d4152533eecb03348e38317943e03a245f359ae",
+        "wram": "1da4ea47500ac5465c609e10201b461c2547a6acffab04729e6d8a840654a3b9",
+        "vram": "cd617c595535fcb15aac26578fadae04050f0f55995ee47fa4830022d741d4cf",
+        "cgram": "8ac85ca62f8c9726a9def024ac01c14937e9ebefac042f1a2148c6b40462dba0",
+        "pixels": "607c3c398ae9a635f6478cfd301ce4d25e6947817d9ce0cb6686d4ccc3188ec0",
+        "oam": "6e607ff74cb29a61896d3f497d1355adca9176926991a3a4462766f20a582f4c",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "exit-loading": {
+      "label": "exit-loading",
+      "frame": 11698,
+      "map": 10,
+      "position": [
+        120,
+        738
+      ],
+      "camera": [
+        0,
+        512
+      ],
+      "script": 8698229,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 201,
+      "gate_continuation_present": false,
+      "linked_sha256": "6bd258fa091c8405f2b73668f47c727c84a7ed376a664fb55f9385f2ebe3928d",
+      "hashes": {
+        "state": "a540262af03c19e21295fe0e8716def8786dd2cf3b42c100486b4fad74cadf32",
+        "wram": "9108eabd9f7af21941f21f9922bd0c4d90f93e29f14f2f8da634c5b2484f8c3a",
+        "vram": "ada1604676996466d3002806008576a64666364bffebf102eda16af91e81de2b",
+        "cgram": "8ac85ca62f8c9726a9def024ac01c14937e9ebefac042f1a2148c6b40462dba0",
+        "pixels": "ca02793076b8845454d3cc4d949bda5bc49fe16d063e310331f86318ed644ba7",
+        "oam": "9607d439d69a11f6ddcd010804bd331419637bbe83f44118d909aa269abfdbb3",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "landed-A": {
+      "label": "landed-A",
+      "frame": 11853,
+      "map": 10,
+      "position": [
+        504,
+        769
+      ],
+      "camera": [
+        376,
+        657
+      ],
+      "script": 8692312,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 201,
+      "gate_continuation_present": false,
+      "linked_sha256": "5f1bcb8d5d28c5d694bb36d2fc6ffea4081836b8d18184f3c2981113a1de0e60",
+      "hashes": {
+        "state": "bfa31a25270e96ab6635392ddf060785818eddd4b1b5222db385a80d267ff59c",
+        "wram": "7c8c09364199c12207d2f6ca2a29d6185c5dd15c3e2efb2d2426096cf5c7ab43",
+        "vram": "dc4fa170fd5d303604b33995ffbc58d81e4fdb4632b90a4e589244d8fd21a0f1",
+        "cgram": "65bd75257926994b5df5887012552e8ff402f44abf3040561c6db4df53413b7a",
+        "pixels": "524761888db77fbc2d57b133eb9f02b4a41851be3d8d8fc73645c2f041e98b88",
+        "oam": "23ebd1e02516d1e54a636cee194042110ca62c1d68c712c8c9d7304d4ef84007",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "exterior-walk-down-settled": {
+      "label": "exterior-walk-down-settled",
+      "frame": 11945,
+      "map": 10,
+      "position": [
+        504,
+        815
+      ],
+      "camera": [
+        376,
+        703
+      ],
+      "script": 8692312,
+      "facing": 0,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 201,
+      "gate_continuation_present": false,
+      "linked_sha256": "a34b81256c411d6b40714de245d72d1fcd95b7d122840612e810b02e7aec0b08",
+      "hashes": {
+        "state": "a0ea65efbac70aa62d55906c4a923b3de9039443a3a790734961ab5710b3b100",
+        "wram": "8679c2f776f03bb6276f6595b536f5a53d95ae136bcf93c59e138047ebef8348",
+        "vram": "9de307e3059a14c8cabcd94174c9fc6c40e423d8c0054238c277beec27c15fd1",
+        "cgram": "367436ba5c13a0f77937c8f9614fe2c80cc910020dd3c6f92ed8b73658ee449e",
+        "pixels": "aa723f2e9696245395a47afdd1ef81cc59f01989037ad5ed849983617f5cac50",
+        "oam": "f9de857b20a68b80e59baf72a99d35aec386796dea0c89a54998e2fcd4dba295",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    "exterior-walk-settled": {
+      "label": "exterior-walk-settled",
+      "frame": 12059,
+      "map": 10,
+      "position": [
+        538,
+        815
+      ],
+      "camera": [
+        410,
+        703
+      ],
+      "script": 8692312,
+      "facing": 3,
+      "events": [
+        32,
+        38,
+        251
+      ],
+      "phase": "idle",
+      "cursor": 37333,
+      "selection": 0,
+      "gate_cell": 201,
+      "gate_continuation_present": false,
+      "linked_sha256": "56dc122c2e3a1c6ea96a24a868e7f44f7b3e7bf786a9fccf8abaedb00fe4cbf5",
+      "hashes": {
+        "state": "a23ea0ec282a02dc25ec27a01e1d8b3da39bc05690759f21c0f64f66c08fd557",
+        "wram": "9ff66d5c97b2495ecfd6092f9f87778a73a9930605223554f77734e7f64414e5",
+        "vram": "e1f56a5eaca1744c59a19bb864f01b537e986c219d95ecbfdf9b5d5781cddf60",
+        "cgram": "3b3e3d2840422f8548353176fe652c091e4d6f631d2aa0271ce04e51b97ba77c",
+        "pixels": "9f094d713e7f9c3737283dc37639259a98087b588e895d7681692b817f5767e0",
+        "oam": "0af59b674fa0ee02f70ce22e4064b4dfb7a06de6b96f6b2ad816c3e933ec3831",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    }
+  }
+}
