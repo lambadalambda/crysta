@@ -26,3 +26,6 @@ Compile and independently qualify only the first-background resources, source ca
 
 - Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
 - Source contract: [Pandora progression](../../docs/pandora-progression.md). Parent fresh replay is an independent source acceptance gate.
+- Owned by Alice in `task/pandora-backgrounds`; implementation confined to visual assets, dedicated background qualification tooling and this detail/doc.
+- In progress: separate source compiler preserving the existing nine-map static allowlist. Full attributed initialization is not route admission or dynamic occupancy.
+- Acceptance blocked pending diagnosis of the parent replay's failed exact source checker. Both existing capture sets will be compared independently; neither is a production initializer.
