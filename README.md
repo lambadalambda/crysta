@@ -33,9 +33,10 @@ palettes and metatiles, with runtime resource and representative pixel equality.
 It shows natural-palette terrain, not sprites or final scene effects.
 Broader map behavior and collision qualification remain.
 
-A genuine Crysta bedroom doorway is now qualified, both room backgrounds can
-be decoded, and a CPU-free native-hosted browser preview demonstrates bounded
-walking and a semantic doorway transition. The core also builds for Wasm.
+A CPU-free native-hosted [house preview](docs/playable-house.md) now covers six
+fresh rooms, nine frozen source-setup residents, the bedroom table object and
+a persistent wooden-door interaction. Walking and internal doorway endpoints
+are source/reference-qualified. The core also builds for Wasm.
 There is no **complete playable port** yet; transition pacing is explicitly
 endpoint-qualified preview behavior, not classic frame fidelity.
 

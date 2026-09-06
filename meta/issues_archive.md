@@ -43,3 +43,4 @@
 - [x] [Qualify complete house background profiles](issues/qualify-house-background-profiles.md)
 - [x] [Decode the complete ordinary house actor set](issues/decode-house-scene-actors.md)
 - [x] [Qualify navigation through all fresh house rooms](issues/qualify-house-room-navigation.md)
+- [x] [Complete the fresh house scene with all residents](issues/complete-house-scene-setup.md)

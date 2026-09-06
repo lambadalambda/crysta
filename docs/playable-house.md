@@ -7,9 +7,10 @@ checkpoint, or original CPU execution in its simulation loop.
 **This is a limited semantic start, not a complete port of the opening.** It
 uses the default name and explicitly completes/omits intro presentation and
 conversation waits. Ark now uses ROM-derived ordinary standing/walking sprites
-over the static first background (hardware BG2), with one frozen ordinary-pose
-resident in room10. NPC behavior/collision, other residents, dialogue,
-inventory/stats, combat and audio are not implemented. Doorways use endpoint-qualified logical timing, not the native
+over the static first background (hardware BG2), with **nine frozen fresh-setup
+residents and F's table object across six rooms**. Source-setup occupancy remains
+solid, but NPC movement, interactions and dialogue are not simulated.
+Inventory/stats, combat and audio are not implemented. Doorways use endpoint-qualified logical timing, not the native
 loader's video-frame schedule. The frontend still uses a native Rust host;
 the same device-free core builds for Wasm but browser Wasm glue is not yet wired.
 
@@ -25,11 +26,19 @@ turning; Escape, blur and hidden tabs pause and release controls. Ordinary
 release/repress and reversals are supported. Very rapid same-direction double
 taps select an unimplemented dash and report an error; New Game starts cleanly.
 
-The covered area is **bedroom F and adjoining house room10**, with their shared
-doorway traversable both ways. Other exits remain explicit scope errors; this
-is not all house interiors, outdoor Crysta, or the Pandora opening. Partial
-furniture and passive flagged walls use source-qualified collision responses.
-Pushing, attacks and collision action hooks are outside the cardinal-only policy.
+The covered fresh area is **B,C,D,F,10,11**, with the source-qualified internal
+doorways traversable both ways. To open C's wooden door, face Up against it at
+`(136,352)`, release movement, then press **Space/Enter** or **Interact**. The
+one-shot action pauses; choose Resume to continue. The final ROM metatiles and
+collision patch persist across the house and reset with New Game/Checkpoint Reset.
+This does not grant story event`$0026` or trigger NPC dialogue.
+
+Exterior D/A and cellar C/E progression remain closed; attached E/20/21 scenes
+and exceptional F/122 are not admitted. Unsupported exits remain scope errors,
+not free warps. Partial furniture and passive flagged walls use source-qualified
+collision responses. Pushing, attacks and general action hooks are unsupported.
+See [the census](house-scene.md), [background profiles](house-backgrounds.md) and
+[navigation contract](house-navigation.md) for the full graph and policies.
 
 **Checkpoint Reset** and **Checkpoint doorway demo** deliberately retain the
 older saved-position diagnostic start `(472,176)`. They are not New Game and
@@ -96,12 +105,13 @@ qualified separately:17 departure updates end225 or226, respectively, followed
 by spawn336 and settled353. The reference6968 sample already belongs to the
 transition; it must not be admitted as another walking frame.
 
-Profile7 slice snapshots are103 bytes. Byte99 identifies the fresh
-bedroom overlay; bytes100–102 retain animation facing, walking ownership and phase; invalid room/transition combinations reject. Transition-owned
-snapshots contain no walking component, preventing marker erasure from creating
-walking ownership. Walking encoding remains16-byte v3. Source/content identity
-includes the startup projection and all three room profiles. Animation ownership,
-direction and cadence must be coherent with walking or the doorway policy.
+Profile8 slice snapshots are109 bytes. Byte99 selects the fresh bedroom overlay;
+bytes100–102 retain animation. The final six bytes encode doorway progress,
+handoff and the persistent wooden-door flag. Profile7 snapshots reject rather
+than silently migrating. Source/content identity covers all six compiled room
+profiles, fresh startup, source exits, navigation and door policy. The core
+retains16-byte v3 walking state and validates walking/transition ownership.
+See [snapshot layout](house-navigation.md).
 
 ## Actual browser verification
 
@@ -110,6 +120,16 @@ With the host running, use the `agent-browser` skill workflow, then:
 ```sh
 agent-browser open http://127.0.0.1:8765/
 agent-browser eval --stdin < tools/verify-house-browser.js
+# Full six-room route; retain results so long runs cannot lose them to CLI timeout:
+node <<'JS' | agent-browser eval --stdin
+const fs=require('node:fs');
+const route=fs.readFileSync('tools/house-navigation-qualification/core-route.jsonl','utf8').trim().split(/\r?\n/).map(JSON.parse);
+console.log('globalThis.HOUSE_BROWSER_ROUTE='+JSON.stringify(route)+';globalThis.HOUSE_BROWSER_RESULT=null;');
+console.log('('+fs.readFileSync('tools/verify-house-browser.js','utf8')+').then(result=>{globalThis.HOUSE_BROWSER_RESULT={ok:true,result}},error=>{globalThis.HOUSE_BROWSER_RESULT={ok:false,error:String(error)}}); "started";');
+JS
+# Once the page pauses at tick2244, read the retained result:
+agent-browser eval 'globalThis.HOUSE_BROWSER_RESULT'
+# Clear HOUSE_BROWSER_ROUTE before repeating the default511 route.
 ```
 
 The harness clicks the actual New Game button, observes the real host's fresh
@@ -120,7 +140,13 @@ route checkpoints, the final live state, and absence of scope-error pauses. An
 independent pixel compositor checks the actual canvas at all512 states (including
 initial), using the decoded sprite pixels, signed bounds, camera and high-opaque
 background mask. It does not call the page renderer to produce expectations.
-The result is511 real host steps with New Game origin retained.
+The default route is511 real host steps with New Game origin retained. The
+full itinerary has2,244 steps and15 pinned checkpoints across all six rooms;
+it exercises the actual Interact button and explicit Resume after its reply.
+Both modes validate the complete fixed source roster, exact room membership,
+world-Y/tie order and canvas pixels; the full route additionally requires
+nonvacuous visible evidence for every resident. Open-door pixels and foreground
+replacement are composed independently from the transported source patches.
 
 Raw ROM-derived captures, screenshots and verification logs stay ignored under
 `local/`; only source, selected numeric metadata and hashes are committed.
@@ -128,7 +154,7 @@ Raw ROM-derived captures, screenshots and verification logs stay ignored under
 ## Ark rendering boundary
 
 The native adapter compiles21 ordinary Ark ROM frames plus7 exact horizontal
-mirrors and one resident raster once, exposing a fixed `/art.json` route. The state supplies the frame key; the
+mirrors and ten instance-keyed setup rasters once, exposing a fixed `/art.json` route. The state supplies the frame key; the
 browser never derives animation from elapsed wall time or position differences.
 Frames retain source anchors and transparency. Mirrored components have native
 alternate offsets, so they are composed before browser rasterization rather than
@@ -146,7 +172,7 @@ idle gesture at fresh frame6800.
 
 The selected OBJ components all use priority2. In the qualified house mode1,
 opaque high-priority pixels of the first background cover Ark; Ark covers its
-low-priority pixels, while transparent background pixels never cover him. Both
+low-priority pixels, while transparent background pixels never cover him. All six
 rooms share the same decoded full background sheet. Other hardware layers,
 windows, sunlight/color math, shadows and equipment effects remain omitted;
 this is not full-scene native screenshot equality.
@@ -155,38 +181,61 @@ See [ROM sprite evidence](ark-sprites.md) and
 [ordinary animation qualification](ark-animation.md) for source ranges, native
 register/tile/palette/composition witnesses and reproducible fresh-boot commands.
 
-## First house resident
+## Complete fresh house presentation
 
-Room10 now displays the resident at **(424,416)**, frozen in the source-derived
-ordinary Right-facing pose. The spawn comes from ROM record`$83:8D7C`, not a RAM
-snapshot. Its16×33 raster uses the shared component decoder with palette base208
-(Ark uses128), native signed anchor`(-8,-33)` and OBJ priority2. It is present
-only while map16 is loaded, including the explicit semantic doorway phase;
-returning to map15 removes it. The neighboring resident is not rendered yet.
+The source roster has B1,C4,D1,F0,10two,11one residents, plus F's table child.
+Positions, selected first-list-record poses, palettes, actor mirrors and stable
+source identities come from `HouseScenes`, not captured RAM. D deliberately
+uses its source creation origin `(72,672)` and setup pose rather than a later
+wandering capture. C/11 list timing is retained by the decoder but not scheduled.
+The same frozen fresh presentation is used for the diagnostic checkpoint; it
+is not a reconstruction of arbitrary saved NPC state.
 
-The host supplies an ordered `scene:[{id,key,position}]` alongside the player state.
-The immutable art manifest declares per-room `scene_ids`; the browser requires
-exact unique actor membership while allowing different actors to share a raster.
-For the qualified ordinary pair, painter order uses worldY before sprite-anchor
-subtraction; equalY puts the NPC first and Ark last. The browser consumes that
-order without inventing entity simulation. Ordering on either side and the tie
-are covered synthetically; the current route stays above the NPC and does not
-claim a native overlap capture. Opaque high background pixels still cover both.
+The host supplies ordered `scene:[{id,key,position}]` entries and an immutable
+`scene_ids` manifest. Unique actor membership is separate from raster identity.
+World Y precedes the explicit source draw-list tie rank; Ark is last at equal Y.
+The browser consumes this order without inventing entity simulation. All admitted
+objects use OBJ2; opaque high BG2 pixels cover them, transparent pixels never do.
+Shadow, secondary layers, transient labels, windows, sunlight and color math
+remain omitted. In particular C's seated lower bodies and F's right-side final
+layer/effect composition are not full-frame fidelity claims.
 
-**This is presentation only.** There is no NPC interaction, collision, AI,
-conversation or event-condition runtime. No NPC state enters the player snapshot.
-Initial/final snapshot hashes are unchanged from the Ark-only milestone. The
-frozen resident is the selected fresh ordinary-house policy, also used by the
-diagnostic checkpoint preview—not a reconstruction of arbitrary saved NPC state.
+`/art.json` also provides two complete source-decoded wooden-door replacement
+rasters and their per-pixel priority. The page prepares both closed/open sheet
+variants once, replacing old foreground pixels as well as background pixels.
+It selects only the core's `wooden_door_open` state; the page does not invent
+door events or collision.
 
-[House NPC qualification](house-npc.md) records the complete ROM resource chain,
-source ordering and fresh hardware/image evidence. A two-boot replay in the
-integrated checkout (`local/house-npc-qualification/replay-QNlHv5`) passed all
-four settled samples, including313/313 opaque reference pixels each,256 graphics
-tiles and16 palette words. The shared compositor's large-component column15
-wrap remains unqualified, but neither selected large component uses that case.
+[House scene qualification](house-scene.md) records all ten actors, 28 bounded
+list records and source/native checks. Parent fresh replays passed at ignored
+`local/house-scene-qualification/art-rA75pW`,
+`local/house-background-qualification/run-a76GGH` and
+`local/house-navigation-qualification/replay-xF3xFu`. The first resident's prior
+313-pixel raster remains byte-identical through the shared decoder.
 
-## Verified result
+## Complete-house acceptance
+
+Two fresh actual-browser **2,244-step** runs produced identical complete results:
+**2,245 full-canvas comparisons per run**, all six rooms,15 checkpoints, and
+**1,626,662 visible resident/table pixels**. Every one of the ten instances had
+nonvacuous visible evidence; no hidden-actor exemption was used. Final state was
+room10 `(360,463)`, door open, paused, no error. The legacy511 route also passed
+with512 full-canvas comparisons and ended F `(392,191)`, door closed.
+
+The final suite passed287 workspace tests with required ordinary walking,
+admission, material and fresh-house fixtures; strict all-target workspace
+Clippy; native/Wasm core builds; Node UI and seven browser-verifier tests;
+source-qualification negative controls; safety and tracker checks. Independent
+component and final cross-component reviews found no remaining blockers.
+The390px layout had no horizontal overflow and browser errors were empty.
+
+Retained browser JSON is ignored under `local/map-research/whole-house-browser-`
+`{green,repeat,legacy511}.json`; desktop/mobile screenshots are local only.
+The long full-route CLI initially hit its socket read limit after the browser
+continued to completion; accepted runs use the retained in-page result, not
+an inferred success from the final coordinates.
+
+## Earlier milestone verification
 
 The earlier marker baseline passed two actual-browser511-step runs with
 byte-identical checkpoint/final JSON, ending F392,191 with no errors. The UI also starts cleanly at304,112 at390px
