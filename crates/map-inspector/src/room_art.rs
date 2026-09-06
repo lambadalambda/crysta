@@ -4,6 +4,7 @@ mod backgrounds;
 mod carry;
 mod door;
 mod pandora;
+mod world_patches;
 
 use crate::{invalid, Result};
 use assets::{
@@ -37,8 +38,18 @@ pub(super) struct Art {
     rooms: BTreeMap<u16, RoomActors>,
     pandora: Option<pandora::Presentation>,
     extra_backgrounds: BTreeMap<&'static str, Vec<u8>>,
+    world: Option<world_patches::World>,
 }
 impl Art {
+    /// Complete current low-nine-bit diff from `GameState::effective_room()`.
+    /// Live opt-in profile wiring is a separate acceptance gate.
+    #[allow(dead_code)]
+    pub(super) fn world_background(&self, map: u16, effective: &room_core::Room) -> Result<Value> {
+        self.world
+            .as_ref()
+            .ok_or_else(|| invalid("world patch art capability absent"))?
+            .state(map, effective)
+    }
     /// Parent-owned live wiring may use public PotState/GameState projections.
     #[allow(dead_code)]
     pub(super) fn carry(&self, map: u16, input: CarryInput) -> Result<Option<CarryPresentation>> {
@@ -347,11 +358,15 @@ pub(super) fn compile_profile(rom: &rom::Rom, include_pandora: bool) -> Result<A
     } else {
         BTreeMap::new()
     };
+    let world = include_pandora
+        .then(|| world_patches::append(rom, &mut bundle))
+        .transpose()?;
     Ok(Art {
         bytes: serde_json::to_vec(&bundle)?,
         rooms,
         pandora,
         extra_backgrounds,
+        world,
     })
 }
 
@@ -373,6 +388,7 @@ mod tests {
             bytes: Vec::new(),
             pandora: None,
             extra_backgrounds: BTreeMap::new(),
+            world: None,
             rooms: BTreeMap::from([
                 (
                     15,
@@ -435,6 +451,7 @@ mod tests {
             bytes: Vec::new(),
             pandora: None,
             extra_backgrounds: BTreeMap::new(),
+            world: None,
             rooms: BTreeMap::from([
                 (
                     15,

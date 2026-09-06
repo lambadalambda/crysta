@@ -61,6 +61,33 @@ pure `composeObjects` resolves the winning opaque OBJ **before** comparing it
 with high BG, so a hidden front OBJ2 cannot reveal a rear OBJ3. Carry and source
 phase code are reused, not duplicated.
 
+## Host source atlas and projection
+
+The opt-in host compiler authenticates the owned ROM through the navigation
+compiler, unions low-nine-bit profile deltas across the shared house/cellar
+family, and uses the same admitted `SourceObject` catalog as the core adapter.
+It adds the existing authenticated wooden-door writes through a shared raster
+helper; no second progression model or whole-sheet pot scan is introduced.
+
+`Art::world_background(map, &game.effective_room(data)?)` projects the complete
+sorted sparse state against the original bitmap tile grid. Occupancy/material
+attributes alone do not alter pixels. Unknown cell/tile differences and wrong
+extents fail closed. Use the effective room, **not** `current_room()`'s selected
+immutable collision profile. Town atlas candidates do not infer opened doors;
+only source-backed effective core writes can select them.
+
+Host tests cover every immutable navigation profile, family union, separate
+palettes, occupancy-only changes, restoration and unauthorized changes. All
+**5,120 candidate cell/palette pixel samples** match source RGBA and masks.
+These admitted replacements are all opaque low BG; high/transparent replacement
+behavior is covered by the synthetic renderer controls, not claimed as a native
+candidate witness. The cracked door uses tile **0x1A7**, not 0xA7.
+
+The navigation module registration changes the whole-file observer producer pin.
+No capture recipe changed and no pixel pin is being renewed; separate producer
+revalidation must preserve the original migration descriptor/evidence. Full
+GameState→host→continuous browser acceptance remains a separate integration gate.
+
 ## Focused verification
 
 ```sh

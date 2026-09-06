@@ -55,3 +55,27 @@ acceptance. Frontend evidence does not complete those acceptance criteria.
 - Source mutation/candidate/diff tests and every admitted replacement pixel/mask pass under both palettes.
 - Actual pixel tests cover high↔low, transparency, restoration, shared-sheet retention, occupancy-only changes and overlapping OBJ2/3.
 - Existing host/frontend regressions and independent correctness/architecture review pass; final runtime/browser route remains parent-owned.
+
+## Integration contract (in progress)
+
+- Opt-in `art.world_backgrounds[key]` contains `tiles[tile_id] = {rgba, high}` and
+  `candidates[cell] = [replacement tile IDs]`, with six finite sheet keys. Town
+  atlas availability does not itself qualify a Town runtime write.
+- `Art::world_background(map, &game.effective_room(data)?)` returns the complete
+  sorted `state.world_background = {key, patches:[{cell,tile}]}`. The caller must
+  use the effective room, not its immutable selected collision profile.
+- This capability consolidates wooden-door rendering into the same sparse path;
+  `wooden_door_open` remains inspection metadata, not a competing visual selector.
+  Legacy bundles retain their existing two-tile door transport unchanged.
+- Host red tests were recorded before implementing projection and atlas; raw
+  source discovery precedes those tests. Four host world tests now pass, including
+  5,120 source candidate/palette pixel/mask samples (all opaque low BG). Synthetic
+  frontend controls separately exercise high/transparent replacements.
+- Parent reproduced the 13-tile/52-write/6-full-canvas world checks and 160 carry
+  full-canvas comparisons; source atlas export was independently rebuilt by the
+  parent. Host units pass (65, with 3 explicit diagnostic tests ignored), strict
+  workspace Clippy passes. Rust independent static review found no actionable
+  defects. Full GameState→host→browser route remains pending.
+- Registering the reusable navigation module changes the whole-file `main.rs`
+  observer pin. That gate is intentionally not repinned yet: unchanged capture
+  recipe/source and freshly reproduced outputs must be independently revalidated.

@@ -14,6 +14,7 @@ mod house_progression;
 mod house_profiles;
 mod new_game;
 mod opening_qualification;
+pub mod pandora_navigation;
 mod qualification;
 mod room_art;
 mod room_camera;

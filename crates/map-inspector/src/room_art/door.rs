@@ -6,8 +6,8 @@ use assets::{
 };
 use serde_json::{json, Value};
 
-pub(super) fn compile(image: &[u8], background: &StaticBackground) -> Result<Value> {
-    let mut patches = Vec::new();
+pub(super) fn replacements(image: &[u8], background: &StaticBackground) -> Result<Vec<(u16, u16)>> {
+    let mut replacements = Vec::new();
     // COP44 final writes; high operand byte is a delay, not a tile attribute.
     // Source placement is (136,336) with signed zero offsets; the second
     // instruction targets the metatile immediately above. See house-navigation.
@@ -28,28 +28,41 @@ pub(super) fn compile(image: &[u8], background: &StaticBackground) -> Result<Val
         {
             return Err(invalid("door visual/collision source differs").into());
         }
-        let position = [(cell % 32) * 16, (cell / 32) * 16];
-        let mut rgba = Vec::new();
-        let mut high = Vec::new();
-        for y in 0..16 {
-            for x in 0..16 {
-                let pixel =
-                    sample_metatile(&background.metatiles()[tile], background.tiles(), x, y)?;
-                let index = match pixel {
-                    IndexedPixel::Transparent => 0,
-                    IndexedPixel::Opaque { palette_index, .. } => palette_index,
-                };
-                rgba.extend(crate::visual_export::pixel_rgb(
-                    index,
-                    background,
-                    position[0] + x,
-                    position[1] + y,
-                ));
-                rgba.push(255);
-                high.push(super::occludes(pixel));
-            }
+        replacements.push((u16::try_from(cell)?, u16::try_from(tile)?));
+    }
+    Ok(replacements)
+}
+
+/// Cells are 16-aligned, matching the 16-pixel preview checker period. The
+/// tile-local raster therefore works at every admitted cell on the same sheet.
+pub(super) fn tile_pixels(background: &StaticBackground, tile: u16) -> Result<Value> {
+    let metatile = background
+        .metatiles()
+        .get(usize::from(tile))
+        .ok_or_else(|| invalid("missing replacement metatile"))?;
+    let mut rgba = Vec::new();
+    let mut high = Vec::new();
+    for y in 0..16 {
+        for x in 0..16 {
+            let pixel = sample_metatile(metatile, background.tiles(), x, y)?;
+            let index = match pixel {
+                IndexedPixel::Transparent => 0,
+                IndexedPixel::Opaque { palette_index, .. } => palette_index,
+            };
+            rgba.extend(crate::visual_export::pixel_rgb(index, background, x, y));
+            rgba.push(255);
+            high.push(super::occludes(pixel));
         }
-        patches.push(json!({"position":position,"rgba":rgba,"high":high}));
+    }
+    Ok(json!({"rgba":rgba,"high":high}))
+}
+
+pub(super) fn compile(image: &[u8], background: &StaticBackground) -> Result<Value> {
+    let mut patches = Vec::new();
+    for (cell, tile) in replacements(image, background)? {
+        let mut patch = tile_pixels(background, tile)?;
+        patch["position"] = json!([(cell % 32) * 16, (cell / 32) * 16]);
+        patches.push(patch);
     }
     Ok(json!(patches))
 }
