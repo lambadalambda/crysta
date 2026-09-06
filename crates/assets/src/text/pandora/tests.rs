@@ -36,13 +36,27 @@ fn owned_rom_preserves_required_requests_and_page_identities() {
     assert!(text.choice(0).is_none());
     assert!(text.choice(2).is_none());
     assert_eq!(text.choice(1).unwrap().catalog, 1);
-    assert_eq!(text.requests().len(), 32);
+    assert_eq!(text.requests().len(), 33);
     assert_eq!(
         text.requests()
             .iter()
             .map(|r| r.pages().len())
             .sum::<usize>(),
-        74
+        76
+    );
+    let refusal = text.request(0x88_b7e3).unwrap();
+    assert_eq!(text.requests().last().unwrap().source(), refusal.source());
+    assert_eq!(refusal.choice_catalog(), None);
+    assert_eq!(refusal.pages().len(), 2);
+    assert_eq!(refusal.page_id(0), Some(0x088b_7e30));
+    assert_eq!(refusal.page_id(1), Some(0x088b_7e31));
+    assert_eq!(
+        refusal.pages()[0].acknowledgement(),
+        super::super::Acknowledgement::Next
+    );
+    assert_eq!(
+        refusal.pages()[1].acknowledgement(),
+        super::super::Acknowledgement::End
     );
     assert_eq!(DIRECT_INVOCATIONS.len(), 34);
     assert_eq!(DIRECT_INVOCATIONS.last(), Some(&(0x89_d48b, 0x89_d735)));

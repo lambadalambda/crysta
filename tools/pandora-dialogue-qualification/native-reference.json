@@ -589,7 +589,9 @@
         }
       ],
       "source_only_page_ids": [
-        143356448
+        143356448,
+        143359536,
+        143359537
       ]
     },
     "discovery": {
@@ -1113,6 +1115,22 @@
           "foreground_pixels": 1712,
           "wram_sha256": "6a6148a4e72663853c4842ab50ed3ca65e2b4ad4ba9e2bc46be0707fb64f1f13",
           "vram_sha256": "2abdb25c1e680125872d199bfda9a40f09fefd562fa0723efb130f345df138b7"
+        },
+        {
+          "label": "resident13-refusal",
+          "page_id": 143359536,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1417,
+          "wram_sha256": "184a7f8228f2db229563eb98fa7057d54df94eaf389ea25c8e2cbc40cbd872e3",
+          "vram_sha256": "b9b7ff59febf14b9b74ee655c587a91cd29e0d9eab901a1e815c7e7267da0a3e"
+        },
+        {
+          "label": "resident13-refusal-next",
+          "page_id": 143359537,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1542,
+          "wram_sha256": "17a7fce32041d06d3770ac392110027379d5bf157dee033c78dafaf4f39b6104",
+          "vram_sha256": "17f42ee83d9f365a695942da2eb8e1ab296affb673247aa037bd98e748930a84"
         }
       ],
       "source_only_page_ids": [
@@ -1715,7 +1733,9 @@
         }
       ],
       "source_only_page_ids": [
-        143356448
+        143356448,
+        143359536,
+        143359537
       ]
     }
   },

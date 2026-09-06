@@ -209,6 +209,22 @@ class ExportTests(unittest.TestCase):
         self.assertGreater(len(report['pages']), 0)
         self.assertGreater(len(report['requests']), 0)
 
+    def test_map13_refusal_appends_without_changing_existing_pages_or_direct_route(self):
+        report = self.run_check(FIXTURE[0].read_bytes(), FIXTURE[1])
+        self.assertEqual(len(report['requests']), 33)
+        self.assertEqual(len(report['pages']), 76)
+        self.assertEqual(len(report['invocations']), 34)
+        self.assertFalse(any(r['source'] == 0x88B7E3 for r in report['invocations']))
+        self.assertEqual(sha256(json.dumps(report['pages'][:74], sort_keys=True).encode()).hexdigest(),
+                         '82215b329e8e0fec1c6962724351f8254d0d5fcbe65ea513118d69dff3671fbc')
+        self.assertEqual(report['requests'][-1], dict(source=0x88B7E3, choice_catalog=None,
+                                                    page_ids=[0x88B7E30,0x88B7E31]))
+        self.assertEqual([(p['boundary_source'],p['acknowledgement']) for p in report['pages'][-2:]],
+                         [(8960007, 'next'), (8960045, 'end')])
+        rom = FIXTURE[0].read_bytes()
+        self.assertEqual([int.from_bytes(rom[p:p+2], 'little') for p in (0x8B68B,0x8B68D,0x8B68F)],
+                         [0xB691,0xB69C,0xB691])  # cancel/result2 enter the same refusal site
+
     def test_mid_reveal_cursor_is_not_a_page_boundary(self):
         rom = FIXTURE[0].read_bytes()
         pages = reconstruct(rom, 0x88ADF2)

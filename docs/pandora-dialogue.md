@@ -33,9 +33,10 @@ let grant_pages = text.pages(0x88_b758).unwrap();
 ```
 
 Requests/pages are immutable and have source-order identities independent of
-which native captures happen to exist. `requests()` enumerates **32 distinct
-resources / 74 pages**: first direct-use order followed by the separately admitted
-map13 retry choice context `$88B722`. It is **not playback order**.
+which native captures happen to exist. `requests()` enumerates **33 distinct
+resources / 76 pages**: first direct-use order followed by the separately admitted
+map13 retry choice context `$88B722`, then refusal `$88B7E3` (appended to preserve
+all previous resource/page identities). It is **not playback order**.
 `DIRECT_INVOCATIONS` contains **34 ordered event sites/text sources**, including
 four separate invocations of the same `$89D720` resource, and puts `$89D735` last.
 The parent event compiler owns playback, not this resource enumeration. Index zero starts each source request;
@@ -114,7 +115,17 @@ Map13 `$88B6C7` has a D5 page then retained D4 context; catalog1 is entered at
 retry context `$88B722` is D4-only; choice site `$88B685` uses that same table.
 C `$889EFC` has three D5 pages then a retained D4 context; choice sites
 `$889B17/$889B40` use catalog1/table `$889D80` (0/2→`$889D86`, 1→`$889DA9`).
-The second refusal choice is not admitted. C's alternative staging sites
+Map13's result0/2 request **`$88B691 → $88B7E3`** is also admitted: page0 ends at
+**`$88B807 D5`**, page1 at **`$88B82D D3`**, logical IDs `$088B7E30/$088B7E31`.
+The event owner may route cancel/result2 → refusal → local1 → retry `$88B722`,
+then result1 → four-page grant `$88B758` → `$28`. Refusal has no choice catalog
+and does not grant `$28`; this compiler does not perform the local1 write or
+any branching. `DIRECT_INVOCATIONS` remains the original 34 direct invocations,
+not this optional retry path. The two added native samples are discovery's
+button-free `resident13-refusal` and `resident13-refusal-next` checkpoints,
+matching 12,288 font-cell pixels including 2,959 foreground pixels.
+
+C's second refusal choice / `$2F` branch is not admitted. C's alternative staging sites
 `$889B24/$889B3A` request the same `$889EE3/$889EFC` resources; they do not get
 new resource/page identities.
 
@@ -158,7 +169,7 @@ The selected retained roots for this qualification were:
 including repeated invocations and bitmap hashes. The independent Python walker
 resolves requests from the actual COP1B operands and choices from COP1A operands,
 checks dispatch targets and initializer instruction shapes, reconstructs all
-74 complete bitmaps from original font planes, and compares dimensions, mode,
+76 complete bitmaps from original font planes, and compares dimensions, mode,
 placements, boundaries, choices, identities, and exact bytes against the Rust
 export. Reference equality is an additional check, not a replacement for decoding.
 No Unicode strings, font cells, text bodies or raw bitmaps are committed.
@@ -170,13 +181,13 @@ hashes, exact pixel/foreground counts, and each set's source-only page IDs:
 | --- | ---: | ---: | ---: |
 | Original direct | 73 | 380,672 | 97,371 |
 | Parent fresh direct | 73 | 380,672 | 97,371 |
-| Discovery (supplemental) | 65 | 343,680 | 89,475 |
+| Discovery (supplemental) | 67 | 355,968 | 92,434 |
 
-Both direct sets leave **only retry `$88B722` page0 source-only**. Discovery
-supplies that retained choice context; it leaves direct answer `$889FA9` pages0–1
+Both direct sets leave **retry `$88B722` page0 and refusal `$88B7E3` pages0–1
+source-only**. Discovery supplies that retained context and both refusal pages; it leaves direct answer `$889FA9` pages0–1
 and the seven first/second-hit reaction resources source-only (`$88A15F`,
 `$88A17B`, `$889DC3`, `$889DEB`, `$88A295`, `$88A420`, `$889E0A`, each page0).
-The union covers all **74 pages across 32 resources**, but discovery is never a substitute
+The union covers all **76 pages across 33 resources**, but discovery is never a substitute
 for a failing direct sample. A source-only page still has independent full ROM
 reconstruction; “source-only” here means no selected native raster **in that set**.
 Repeated `$89D720` invocations reuse a qualified page; this is not a pixel witness
@@ -196,7 +207,7 @@ hash must match the **explicitly named** reference set; missing or mismatching
 captures fail rather than triggering alternate selection.
 
 Verification was run normally and under optimized Python, using only existing
-captures. The 19 Python tests include synthetic planar/layout/control tests,
+captures. The 20 Python tests include synthetic planar/layout/control tests,
 22 ROM-export mutations, native foreground/blank/cursor/ack mutations, and native
 orchestration tests for uncompared-byte hash tampering, missing/unknown sets,
 changed controller defaults, and incorrect coverage inventories. Deliberately
@@ -204,7 +215,9 @@ removing the native reference-equality guard caused two orchestration failures;
 restoring it returned green. Replacing source/native comparison functions with
 no-ops caused failures under both normal and optimized Python. A Rust transparent
 font no-op was also killed by its synthetic test. The owned-ROM Rust test pins
-32 resources, 74 pages, repeated invocation order and the two-page warning.
+33 resources, 76 pages, repeated invocation order, the two-page warning and
+the two-page refusal. A frozen metadata/bitmap-hash digest protects all previous
+74 page identities/pixels against changes.
 The original house tests and independent 14-page/two-catalog source check remain
 unchanged; their 67,904 selected native font-cell pixels still match.
 
@@ -212,5 +225,5 @@ Independent static reviews covered decoder correctness/architecture and
 qualification correctness/architecture/pixel nonvacuity. They did not execute
 native navigation or independently reproduce these totals. Review found and
 closed the dynamic-geometry/resource-order documentation issues and the native
-orchestration coverage gap. The conflicting AE50 wording in the source owner's
-progression document was reported, not edited outside this task's ownership.
+orchestration coverage gap. The parent has since corrected the AE50 wording in the source owner's
+progression document; this task did not edit outside its ownership.

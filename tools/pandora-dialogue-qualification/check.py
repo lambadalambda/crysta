@@ -15,6 +15,7 @@ INVOCATION_SITES = (
     0x89D470, 0x89D4A4, 0x89D4AE, 0x89D4C9, 0x89D4D3, 0x89D4EE, 0x89D4F8, 0x89D48B,
 )
 RETRY_SITE = 0x88B67F
+REFUSAL_SITE = 0x88B691  # map13 result0/2, not a direct-route invocation
 CHOICE_SITES = {0x88B6C7:0x88B679, 0x889EFC:0x889B17, 0x88B722:0x88B685}
 DISPATCH = {0xC0:0x95BD, 0xC1:0x960D, 0xC2:0x982D, 0xC4:0x98B7, 0xC5:0x98CF,
             0xC6:0x98FE, 0xC7:0x9930, 0xC8:0x9956, 0xCA:0x99F4,
@@ -190,7 +191,7 @@ def invocation(rom, site):
 
 def requests(rom):
     records = []
-    for site in (*INVOCATION_SITES, RETRY_SITE):
+    for site in (*INVOCATION_SITES, RETRY_SITE, REFUSAL_SITE):
         source = invocation(rom, site)['source']
         if source not in [r['source'] for r in records]:
             pages = reconstruct(rom, source)

@@ -404,6 +404,14 @@
       "page_ids": [
         143356448
       ]
+    },
+    {
+      "source": 8959971,
+      "choice_catalog": null,
+      "page_ids": [
+        143359536,
+        143359537
+      ]
     }
   ],
   "pages": [
@@ -1294,6 +1302,30 @@
       "background_index": 3,
       "glyph_count": 36,
       "sha256": "cf750c9ab8d4dfb405f7ed71e9198ad8da418472fdf98bde45d9fd78f4bd3767"
+    },
+    {
+      "text_source": 8959971,
+      "index": 0,
+      "page_id": 143359536,
+      "boundary_source": 8960007,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 31,
+      "sha256": "0efa7c5f13e6fb98f4ae09dc6e3a08d3ae74dd96ba80cd5e5112a64c745fd546"
+    },
+    {
+      "text_source": 8959971,
+      "index": 1,
+      "page_id": 143359537,
+      "boundary_source": 8960045,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 33,
+      "sha256": "b672609b25965b6e47a2b7e6d60a4507f84a25402adabab4eec633789707fd03"
     }
   ]
 }

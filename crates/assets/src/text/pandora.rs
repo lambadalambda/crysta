@@ -103,7 +103,7 @@ impl DialogueRequest {
     }
 }
 
-/// Required direct-route resources only; the original `HouseDialogue` is unchanged.
+/// Bounded direct-route and map13 retry-path resources; `HouseDialogue` is unchanged.
 #[derive(Debug)]
 pub struct PandoraDialogue {
     requests: Vec<DialogueRequest>,
@@ -125,7 +125,7 @@ impl PandoraDialogue {
                 for source in DIRECT_INVOCATIONS
                     .iter()
                     .map(|(_, source)| *source)
-                    .chain([0x88_b722])
+                    .chain([0x88_b722, 0x88_b7e3])
                 {
                     if requests
                         .iter()
@@ -144,7 +144,8 @@ impl PandoraDialogue {
         })
     }
     /// Distinct resources in first direct-use order, followed by the retry choice
-    /// context. Use `DIRECT_INVOCATIONS` for execution order including repeats.
+    /// context and its map13 refusal resource. Use `DIRECT_INVOCATIONS` for direct
+    /// execution order including repeats; enumeration is not retry-path playback.
     #[must_use]
     pub fn requests(&self) -> &[DialogueRequest] {
         &self.requests
