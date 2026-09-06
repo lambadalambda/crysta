@@ -1,0 +1,2266 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "graph": [
+    {
+      "map": 11,
+      "table": 8486934,
+      "extent": [
+        101824,
+        101837
+      ],
+      "sha256": "500e5648249562ee398d2455256f6268a9a3bc04d73f225afdf600c807b14877",
+      "exits": [
+        {
+          "source": 8490432,
+          "rectangle": [
+            7,
+            12,
+            1,
+            4
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            128,
+            336
+          ]
+        }
+      ]
+    },
+    {
+      "map": 12,
+      "table": 8486936,
+      "extent": [
+        101837,
+        101886
+      ],
+      "sha256": "0fc117ba77530a1bfc74255aac36a5ddad7d356af9d19f7f59f8165ef6ca5b1d",
+      "exits": [
+        {
+          "source": 8490445,
+          "rectangle": [
+            7,
+            28,
+            1,
+            4
+          ],
+          "destination": 13,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            112,
+            608
+          ]
+        },
+        {
+          "source": 8490457,
+          "rectangle": [
+            14,
+            25,
+            1,
+            2
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 8,
+          "position": [
+            288,
+            416
+          ]
+        },
+        {
+          "source": 8490469,
+          "rectangle": [
+            8,
+            16,
+            1,
+            5
+          ],
+          "destination": 11,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            112,
+            176
+          ]
+        },
+        {
+          "source": 8490481,
+          "rectangle": [
+            11,
+            21,
+            1,
+            1
+          ],
+          "destination": 14,
+          "mode": 0,
+          "selector": 14,
+          "position": [
+            144,
+            864
+          ]
+        }
+      ]
+    },
+    {
+      "map": 13,
+      "table": 8486938,
+      "extent": [
+        101886,
+        101923
+      ],
+      "sha256": "9f84469e76a856e4bc01d8be25b726d06ecffcf47590fff1a1fc9c2a863fbfb1",
+      "exits": [
+        {
+          "source": 8490494,
+          "rectangle": [
+            7,
+            44,
+            1,
+            4
+          ],
+          "destination": 10,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            496,
+            752
+          ]
+        },
+        {
+          "source": 8490506,
+          "rectangle": [
+            7,
+            32,
+            1,
+            6
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            112,
+            432
+          ]
+        },
+        {
+          "source": 8490518,
+          "rectangle": [
+            14,
+            41,
+            1,
+            2
+          ],
+          "destination": 17,
+          "mode": 0,
+          "selector": 8,
+          "position": [
+            288,
+            672
+          ]
+        }
+      ]
+    },
+    {
+      "map": 14,
+      "table": 8486940,
+      "extent": [
+        101923,
+        101948
+      ],
+      "sha256": "e18b984bd2e181203ab5ee2ea67d847b3a135b92aafb36087678392d8e7ecdc4",
+      "exits": [
+        {
+          "source": 8490531,
+          "rectangle": [
+            9,
+            53,
+            1,
+            1
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 13,
+          "position": [
+            176,
+            352
+          ]
+        },
+        {
+          "source": 8490543,
+          "rectangle": [
+            6,
+            53,
+            1,
+            1
+          ],
+          "destination": 32,
+          "mode": 0,
+          "selector": 14,
+          "position": [
+            400,
+            864
+          ]
+        }
+      ]
+    },
+    {
+      "map": 15,
+      "table": 8486942,
+      "extent": [
+        101948,
+        101973
+      ],
+      "sha256": "3892a00a4104b13625fa277fdc71ceb432af79e48693b353afadd2b96275a580",
+      "exits": [
+        {
+          "source": 8490556,
+          "rectangle": [
+            24,
+            12,
+            1,
+            2
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            384,
+            336
+          ]
+        },
+        {
+          "source": 8490568,
+          "rectangle": [
+            27,
+            5,
+            1,
+            1
+          ],
+          "destination": 290,
+          "mode": 0,
+          "selector": 0,
+          "position": [
+            376,
+            96
+          ]
+        }
+      ]
+    },
+    {
+      "map": 16,
+      "table": 8486944,
+      "extent": [
+        101973,
+        102010
+      ],
+      "sha256": "a3784e3b0ca4e9fdceb81bb2b8aa8639fbe21f43545c85914175c5d1da4bf2f2",
+      "exits": [
+        {
+          "source": 8490581,
+          "rectangle": [
+            24,
+            20,
+            1,
+            1
+          ],
+          "destination": 15,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            384,
+            176
+          ]
+        },
+        {
+          "source": 8490593,
+          "rectangle": [
+            17,
+            25,
+            1,
+            2
+          ],
+          "destination": 12,
+          "mode": 0,
+          "selector": 7,
+          "position": [
+            208,
+            416
+          ]
+        },
+        {
+          "source": 8490605,
+          "rectangle": [
+            22,
+            29,
+            1,
+            1
+          ],
+          "destination": 17,
+          "mode": 0,
+          "selector": 5,
+          "position": [
+            352,
+            592
+          ]
+        }
+      ]
+    },
+    {
+      "map": 17,
+      "table": 8486946,
+      "extent": [
+        102010,
+        102035
+      ],
+      "sha256": "66c68b4c0beabb1b8113846065f66c1e0b2e5ce7b3d7681c2880bfe30df28062",
+      "exits": [
+        {
+          "source": 8490618,
+          "rectangle": [
+            22,
+            36,
+            1,
+            1
+          ],
+          "destination": 16,
+          "mode": 0,
+          "selector": 6,
+          "position": [
+            352,
+            448
+          ]
+        },
+        {
+          "source": 8490630,
+          "rectangle": [
+            17,
+            41,
+            1,
+            2
+          ],
+          "destination": 13,
+          "mode": 0,
+          "selector": 7,
+          "position": [
+            208,
+            672
+          ]
+        }
+      ]
+    },
+    {
+      "map": 32,
+      "table": 8486976,
+      "extent": [
+        102325,
+        102350
+      ],
+      "sha256": "d79797d7684ee4b607d555e4af50c37581ea4c0ae975d7005058e87980c9570c",
+      "exits": [
+        {
+          "source": 8490933,
+          "rectangle": [
+            25,
+            53,
+            1,
+            1
+          ],
+          "destination": 14,
+          "mode": 0,
+          "selector": 13,
+          "position": [
+            96,
+            864
+          ]
+        },
+        {
+          "source": 8490945,
+          "rectangle": [
+            22,
+            53,
+            1,
+            1
+          ],
+          "destination": 33,
+          "mode": 0,
+          "selector": 14,
+          "position": [
+            128,
+            112
+          ]
+        }
+      ]
+    },
+    {
+      "map": 33,
+      "table": 8486978,
+      "extent": [
+        102350,
+        102363
+      ],
+      "sha256": "fdc4c1aa3ce5c2aca1c0cd548f72ee8b5e3f345c10f8c1036d6a25b440f5afc9",
+      "exits": [
+        {
+          "source": 8490958,
+          "rectangle": [
+            8,
+            6,
+            1,
+            1
+          ],
+          "destination": 32,
+          "mode": 0,
+          "selector": 13,
+          "position": [
+            352,
+            864
+          ]
+        }
+      ]
+    }
+  ],
+  "source_roster": [
+    {
+      "map": 11,
+      "list": 8620924,
+      "records": [
+        {
+          "source": 8620926,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "a7102ac1100c8f9c3423d40e836c7b9c5ad4e3b16fb65a288c024a19ab52ce67",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            136,
+            208
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8620950,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "1eadc15999baddc19e2064a0a9cd9f751ebd9525fee88482844fe82c3d5e8ab8",
+          "header": 8949323,
+          "entry": 8949328,
+          "header_sha256": "9f81e9d62942525a8cbc2266b4d438ccba7b661a4cf2618d3c695da365a951cd",
+          "initial_selector": 6,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            120,
+            112
+          ],
+          "parameter": 0,
+          "descriptor": 8646015,
+          "descriptor_sha256": "02177bae2abde0ca2a8f22028713d050c6b57dac2138b185ea2e4f36dc7f1c7b",
+          "composition_packet": 13908683
+        },
+        {
+          "source": 8620960,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "554ebb7efea7ae1bb4e0fcb63b005cde7ced453a68fec9ea1900ccdf3ca0ab61",
+          "header": 8951432,
+          "entry": 8951437,
+          "header_sha256": "f97a3bdb3d734d3a495ec54df0618f25767cba5d24ea59fe9aa33bf4790432f4",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            512
+          ],
+          "position": [
+            184,
+            112
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8620967,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "47778c74e3341b2148312a4efd83f2a95dd08654909ce29cfee2b15cc9245bfc",
+          "header": 8951432,
+          "entry": 8951437,
+          "header_sha256": "f97a3bdb3d734d3a495ec54df0618f25767cba5d24ea59fe9aa33bf4790432f4",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            512
+          ],
+          "position": [
+            184,
+            144
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8620974,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8620984,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8620985
+        }
+      ]
+    },
+    {
+      "map": 12,
+      "list": 8621040,
+      "records": [
+        {
+          "source": 8621042,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "712a888c3301fe065344eedae966de588463b02922dad3fe964b6af3e9cbd484",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            136,
+            352
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621066,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "52a2184df07531ba50532b55c5a1f161ce5de7be1b9194342b882b11e018ab97",
+          "header": 8954657,
+          "entry": 8954662,
+          "header_sha256": "0f2bbedae0af91cf3c722f61ff36f33a79ac46585ea4558a8c737c1e97a95d02",
+          "initial_selector": 1,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            88,
+            416
+          ],
+          "parameter": 0,
+          "descriptor": 8645978,
+          "descriptor_sha256": "d4b3a9f698e2ec2b57b31586a841c1cb1ffcfc762426a5eb024d332806a86174",
+          "composition_packet": 14044023
+        },
+        {
+          "source": 8621076,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "30229e08751a90cc4d39c1c9d30ace12ae6d998f38510bc2cae20ee4e081832c",
+          "header": 8955115,
+          "entry": 8955120,
+          "header_sha256": "cb88a98116a265a8e4ae406488d4938518e5142c60604dc61d7e5fc80493abb3",
+          "initial_selector": 2,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            56,
+            384
+          ],
+          "parameter": 0,
+          "descriptor": 0
+        },
+        {
+          "source": 8621086,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "f1597baec72b5603b81f56f2fc98239d03f02a7200a2ac58d2bd058f73dad702",
+          "header": 8952426,
+          "entry": 8952431,
+          "header_sha256": "a6d51bb76a7904ae10b158df15bd147c9837c1f2950c22ae963bc51e56716a2d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            72,
+            368
+          ],
+          "parameter": 0,
+          "descriptor": 8646004,
+          "descriptor_sha256": "68b5ec3c48705e36753a809bb3a54c24d0f948731d4d320b2b5507259f48e5a2",
+          "composition_packet": 14050181
+        },
+        {
+          "source": 8621096,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "c9b99b827984c037ad563e49d879b840d1eeed74d4a1e33a797c622ab7b323f9",
+          "header": 8954276,
+          "entry": 8954281,
+          "header_sha256": "a6d51bb76a7904ae10b158df15bd147c9837c1f2950c22ae963bc51e56716a2d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            104,
+            368
+          ],
+          "parameter": 0,
+          "descriptor": 8646136,
+          "descriptor_sha256": "a0594ee6cb3f394a58d7ee88f5058573566b766ae2f5ab3d948c2de1d1e87864",
+          "composition_packet": 14159906
+        },
+        {
+          "source": 8621106,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "4454bb20303f9f4c76c422583c5c0c41b7b91139a3c1b210ee4a3236a47cfb00",
+          "header": 8956649,
+          "entry": 8956654,
+          "header_sha256": "10f187e4bb79ce843b582bb7916db62615ca0be7916d249f11ace2102c27df1d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            8192
+          ],
+          "position": [
+            184,
+            352
+          ],
+          "parameter": 128,
+          "descriptor": 0
+        },
+        {
+          "source": 8621116,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621126,
+          "kind": "FE",
+          "disposition": "H",
+          "source_sha256": "37b19cb5e5c23da5a11355ffcc7a4061296ead07e908213cae5e63a16d952e15",
+          "header": 8957097,
+          "entry": 8957102,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621131,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621132
+        }
+      ]
+    },
+    {
+      "map": 13,
+      "list": 8621217,
+      "records": [
+        {
+          "source": 8621219,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "499dcb53af484d8034c96b6c29b91f8cd9ba3e81ec730c19e9659df6f7ad7aeb",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            120,
+            624
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621236,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "e4972e9d8816673d75f9de83b8466225f2ce005d9e240981bfe66e6aa37b2505",
+          "header": 8955959,
+          "entry": 8955964,
+          "header_sha256": "b8a80828c86e44f60dbce5ecc0a841446d9111205a9d90abf776b1a3a1df1e8d",
+          "initial_selector": 3,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            72,
+            672
+          ],
+          "parameter": 0,
+          "descriptor": 8646123,
+          "descriptor_sha256": "fafcc4b4513273e53b78e01677aa8729fa6b12c72743f956b7c66f6fc31e0b38",
+          "composition_packet": 14159906
+        },
+        {
+          "source": 8621246,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "049bf56286a96eac94c1169c107d631cf00510960b7904b765ec6173c595e822",
+          "header": 8948715,
+          "entry": 8948720,
+          "header_sha256": "0f2bbedae0af91cf3c722f61ff36f33a79ac46585ea4558a8c737c1e97a95d02",
+          "initial_selector": 1,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            120,
+            720
+          ],
+          "parameter": 0,
+          "descriptor": 8646044,
+          "descriptor_sha256": "88dea9e9b7a4a7cd437063c6c3834e9055f08bd98adf399485be58fcbdef3926",
+          "composition_packet": 13908683
+        },
+        {
+          "source": 8621256,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "66c65c838e24057b985b3a8d53bf2f15246583ff0b124a6341ca09d7e7aa5476",
+          "header": 8956335,
+          "entry": 8956340,
+          "header_sha256": "34db652b17190701bdf7a02e1aac3e3deb1b73ccd6c1df1d4965251804f7a36c",
+          "initial_selector": 0,
+          "initial_flags": [
+            49152,
+            4096
+          ],
+          "position": [
+            120,
+            720
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621263,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621273,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621274
+        }
+      ]
+    },
+    {
+      "map": 14,
+      "list": 8621306,
+      "records": [
+        {
+          "source": 8621308,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "881884e808beae41571aac86673e1924e2405a0e725d1c6cfdbf5f5dd11f8c31",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            136,
+            880
+          ],
+          "parameter": 1,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621315,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "a4f996d4ea5bba596c839735af708d9a473d6cde0d4e9a78691706b3a2c869c5",
+          "header": 8954657,
+          "entry": 8954662,
+          "header_sha256": "0f2bbedae0af91cf3c722f61ff36f33a79ac46585ea4558a8c737c1e97a95d02",
+          "initial_selector": 1,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            168,
+            896
+          ],
+          "parameter": 0,
+          "descriptor": 8645978,
+          "descriptor_sha256": "d4b3a9f698e2ec2b57b31586a841c1cb1ffcfc762426a5eb024d332806a86174",
+          "composition_packet": 14044023
+        },
+        {
+          "source": 8621325,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621335,
+          "kind": "FE",
+          "disposition": "E",
+          "source_sha256": "244f415f0bb5fbf945053c2f51d3524eece2bcc94b8b4eee0f85ea7033ba986f",
+          "header": 8945757,
+          "entry": 8945762,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621340,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621341
+        }
+      ]
+    },
+    {
+      "map": 15,
+      "list": 8621342,
+      "records": [
+        {
+          "source": 8621344,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "d5ef28fc520a77743668f6e12d2e49566ffbbce9ddf67039be91e468b5f00c29",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            312,
+            112
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621361,
+          "kind": "FB",
+          "disposition": "C",
+          "source_sha256": "e1d8eb22a90957ebddff9d3614aab39acaba2ed0c5b2f69c0ec5decaa012316e",
+          "header": 8886504,
+          "entry": 8886507,
+          "header_sha256": "d3a064592dc6bda7ad009a53d77dc197fd15e0fd3b291f30eb8ab37862e2fc95",
+          "parameter": 15
+        },
+        {
+          "source": 8621366,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "c78ffddad8e9af8bf445477e91fa99f136554a92c0535e0a33266966eb64632e",
+          "header": 8951634,
+          "entry": 8951639,
+          "header_sha256": "cb88a98116a265a8e4ae406488d4938518e5142c60604dc61d7e5fc80493abb3",
+          "initial_selector": 2,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            328,
+            112
+          ],
+          "parameter": 0,
+          "descriptor": 8648833,
+          "descriptor_sha256": "78488652dff87650eb279428aa3fd34f49b61c3729aa66eda97ed02996ebb5a9",
+          "composition_packet": 14040699
+        },
+        {
+          "source": 8621376,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621386,
+          "kind": "FE",
+          "disposition": "H",
+          "source_sha256": "7104cf2e5e3603e7f3350d71fcb8508db96b8e4b016c356bc5392b6e8543afc8",
+          "header": 8948405,
+          "entry": 8948410,
+          "header_sha256": "34db652b17190701bdf7a02e1aac3e3deb1b73ccd6c1df1d4965251804f7a36c",
+          "initial_selector": 0,
+          "initial_flags": [
+            49152,
+            4096
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621391,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "24cdedf410e13cd52ea2b4b4e46cf9aa079a354e0a84f46b5dcdc4c860e4639b",
+          "header": 8967693,
+          "entry": 8967698,
+          "header_sha256": "236bf30ba7ec513715c2e43e972303c564ed20edde180522d65e354430beaf9e",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            256
+          ],
+          "position": [
+            472,
+            160
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621398,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621399
+        }
+      ]
+    },
+    {
+      "map": 16,
+      "list": 8621417,
+      "records": [
+        {
+          "source": 8621419,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "9e2940a6dcd3854fe230bdbee77443ed3ea4f6efb92f163e82196b38a5aff1f5",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            392,
+            96
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621436,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "67e8264ad87e236e0ac7dc87b47f1954ce806c5f87fcfb2dddcf1ffcb0ceb0d6",
+          "header": 8951977,
+          "entry": 8951982,
+          "header_sha256": "cb88a98116a265a8e4ae406488d4938518e5142c60604dc61d7e5fc80493abb3",
+          "initial_selector": 2,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            424,
+            416
+          ],
+          "parameter": 0,
+          "descriptor": 8645978,
+          "descriptor_sha256": "d4b3a9f698e2ec2b57b31586a841c1cb1ffcfc762426a5eb024d332806a86174",
+          "composition_packet": 14044023
+        },
+        {
+          "source": 8621446,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "d1adc32360b89d025b4e20cd5f5684960e691c6b2f4e7de7fcbf70a56efa574f",
+          "header": 8952209,
+          "entry": 8952214,
+          "header_sha256": "cb88a98116a265a8e4ae406488d4938518e5142c60604dc61d7e5fc80493abb3",
+          "initial_selector": 2,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            440,
+            416
+          ],
+          "parameter": 0,
+          "descriptor": 8646004,
+          "descriptor_sha256": "68b5ec3c48705e36753a809bb3a54c24d0f948731d4d320b2b5507259f48e5a2",
+          "composition_packet": 14050181
+        },
+        {
+          "source": 8621456,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621466,
+          "kind": "FB",
+          "disposition": "C",
+          "source_sha256": "e1d8eb22a90957ebddff9d3614aab39acaba2ed0c5b2f69c0ec5decaa012316e",
+          "header": 8886504,
+          "entry": 8886507,
+          "header_sha256": "d3a064592dc6bda7ad009a53d77dc197fd15e0fd3b291f30eb8ab37862e2fc95",
+          "parameter": 15
+        },
+        {
+          "source": 8621478,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "4c1f4a0bc34b70fd3c88ef23b25c951bb5e4095c01c4f541bb3296226aa99298",
+          "header": 8952390,
+          "entry": 8952395,
+          "header_sha256": "628aa49e955795bb6c66e7baffdd9dc558a7b941efd697e47e2b713f17da80ed",
+          "initial_selector": 1,
+          "initial_flags": [
+            53504,
+            512
+          ],
+          "position": [
+            440,
+            368
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621485,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621486
+        }
+      ]
+    },
+    {
+      "map": 17,
+      "list": 8621519,
+      "records": [
+        {
+          "source": 8621521,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "317e9b763d69a2fcb81880e98fbe9328c4bd52b95ffc39e8499f443f5d428333",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            216,
+            432
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621538,
+          "kind": "O",
+          "disposition": "R",
+          "source_sha256": "6cc32f29090dc4a65e473dd464e1a72a998801691139af7186375eafc59d3584",
+          "header": 8956349,
+          "entry": 8956354,
+          "header_sha256": "835c4e418d0ff08d0f9b015ccde1265546a374c276fc03a287386ec97c3a1f42",
+          "initial_selector": 4,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            440,
+            640
+          ],
+          "parameter": 0,
+          "descriptor": 8645806,
+          "descriptor_sha256": "216c111cceaeea3c7b17f1ae4cdca481384f71ee7aa533f6bb58d5831557149d",
+          "composition_packet": 14048930
+        },
+        {
+          "source": 8621548,
+          "kind": "FD",
+          "disposition": "H",
+          "source_sha256": "e99956728140b846030ea7afc7060a9d29d6d7a9d8f64983ccee661a7d457630",
+          "header": 8964238,
+          "entry": 8964243,
+          "header_sha256": "f97a3bdb3d734d3a495ec54df0618f25767cba5d24ea59fe9aa33bf4790432f4",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            512
+          ],
+          "position": [
+            360,
+            672
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8621555,
+          "kind": "FB",
+          "disposition": "C",
+          "source_sha256": "e3714023dbd51e6dc71526a7f09df41e628607e31d2fe687f650c58373d927b7",
+          "header": 8886504,
+          "entry": 8886507,
+          "header_sha256": "d3a064592dc6bda7ad009a53d77dc197fd15e0fd3b291f30eb8ab37862e2fc95",
+          "parameter": 17
+        },
+        {
+          "source": 8621560,
+          "kind": "FB",
+          "disposition": "C",
+          "source_sha256": "3c296fb36f3d3251c4791c8cf607ba71f5e7f2d3a981fca566709898fd293a7f",
+          "header": 8886463,
+          "entry": 8886466,
+          "header_sha256": "d3a064592dc6bda7ad009a53d77dc197fd15e0fd3b291f30eb8ab37862e2fc95",
+          "parameter": 7
+        },
+        {
+          "source": 8621565,
+          "kind": "FB",
+          "disposition": "C",
+          "source_sha256": "a3ecfccd1a992d19c70ab233c627414118a5dc61611a44dc1d27a39abcf92c4f",
+          "header": 8886504,
+          "entry": 8886507,
+          "header_sha256": "d3a064592dc6bda7ad009a53d77dc197fd15e0fd3b291f30eb8ab37862e2fc95",
+          "parameter": 16
+        },
+        {
+          "source": 8621570,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8621580,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8621581
+        }
+      ]
+    },
+    {
+      "map": 32,
+      "list": 8622650,
+      "records": [
+        {
+          "source": 8622652,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "5e1493c247c3fb3ec8540cce1840fe24850a39aa98644743610b5f9405849a50",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            408,
+            880
+          ],
+          "parameter": 1,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622659,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6d2887585ee289bea508142fd43b7c57a8a4628530f5548350fe107e9e8b18c8",
+          "header": 8952426,
+          "entry": 8952431,
+          "header_sha256": "a6d51bb76a7904ae10b158df15bd147c9837c1f2950c22ae963bc51e56716a2d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            376,
+            912
+          ],
+          "parameter": 0,
+          "descriptor": 8645991,
+          "descriptor_sha256": "ba90f5f93efaebb9c0666c526e950a830036f940910b4a75466ab1729e4c6630",
+          "composition_packet": 14050181
+        },
+        {
+          "source": 8622669,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "ec590c97384a87af7e4e52e2e24eace023f3497e0d00a3526b2e8644c5623fc3",
+          "header": 8954276,
+          "entry": 8954281,
+          "header_sha256": "a6d51bb76a7904ae10b158df15bd147c9837c1f2950c22ae963bc51e56716a2d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            424,
+            928
+          ],
+          "parameter": 0,
+          "descriptor": 8646136,
+          "descriptor_sha256": "a0594ee6cb3f394a58d7ee88f5058573566b766ae2f5ab3d948c2de1d1e87864",
+          "composition_packet": 14159906
+        },
+        {
+          "source": 8622679,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8622689,
+          "kind": "FE",
+          "disposition": "E",
+          "source_sha256": "244f415f0bb5fbf945053c2f51d3524eece2bcc94b8b4eee0f85ea7033ba986f",
+          "header": 8945757,
+          "entry": 8945762,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622694,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8622695
+        }
+      ]
+    },
+    {
+      "map": 33,
+      "list": 8622696,
+      "records": [
+        {
+          "source": 8622698,
+          "kind": "FD",
+          "disposition": "P",
+          "source_sha256": "cf17729f6df54db2803df7e5009ec2a55e5bd090b7d61a06a0be4749b372c21f",
+          "header": 8692009,
+          "entry": 8692014,
+          "header_sha256": "061bdbe0daf81e146bcbfebb922152e3e3c560017b22483c7153c3f86f30935d",
+          "initial_selector": 0,
+          "initial_flags": [
+            17428,
+            33857
+          ],
+          "position": [
+            136,
+            128
+          ],
+          "parameter": 1,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622705,
+          "kind": "O",
+          "disposition": "H",
+          "source_sha256": "f8c69e990f45ed51f84c1d4790e0d95e0b1cd9741f772ef774a2b8d8e543c56c",
+          "header": 8958714,
+          "entry": 8958719,
+          "header_sha256": "cb88a98116a265a8e4ae406488d4938518e5142c60604dc61d7e5fc80493abb3",
+          "initial_selector": 2,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            120,
+            272
+          ],
+          "parameter": 0,
+          "descriptor": 8648846,
+          "descriptor_sha256": "64328422202834a5bca3e95dd8c9aa12ec32500b087487e69effe5639657c582",
+          "composition_packet": 14040699
+        },
+        {
+          "source": 8622715,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "5492b2e46863e177a1df937a5f52606569fb3938ad96c398fa508108eb79bd22",
+          "header": 8957624,
+          "entry": 8957629,
+          "header_sha256": "a6d51bb76a7904ae10b158df15bd147c9837c1f2950c22ae963bc51e56716a2d",
+          "initial_selector": 0,
+          "initial_flags": [
+            20736,
+            0
+          ],
+          "position": [
+            136,
+            384
+          ],
+          "parameter": 0,
+          "descriptor": 8648896,
+          "descriptor_sha256": "05239c65023c0c016e1f9c995a991eb51fa9209719fe987f71405ba6419fc3a6",
+          "composition_packet": 13899318
+        },
+        {
+          "source": 8622725,
+          "kind": "FE",
+          "disposition": "X",
+          "source_sha256": "b91b9d831dd27f6bd175b08fb9846e7f955234687cec2910e77e249278f96b6b",
+          "header": 8957535,
+          "entry": 8957540,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622735,
+          "kind": "O",
+          "disposition": "V",
+          "source_sha256": "b61b8a753bb2a019518de5f84c564416c94e95c26c8f959454f94bb51f6e55f4",
+          "header": 8957173,
+          "entry": 8957178,
+          "header_sha256": "6f1d8eef6093d369cd579dd15d6711975783dc65c738f26cdaed4d7966f37db0",
+          "initial_selector": 3,
+          "initial_flags": [
+            21024,
+            0
+          ],
+          "position": [
+            136,
+            384
+          ],
+          "parameter": 0,
+          "descriptor": 8649092,
+          "descriptor_sha256": "b9035756b5b731be6a9be2a67e76fd67e7ef17d25cb5cacc1702f3a07df78a8d",
+          "composition_packet": 16318464
+        },
+        {
+          "source": 8622750,
+          "kind": "FE",
+          "disposition": "X",
+          "source_sha256": "244f415f0bb5fbf945053c2f51d3524eece2bcc94b8b4eee0f85ea7033ba986f",
+          "header": 8945757,
+          "entry": 8945762,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622755,
+          "kind": "O",
+          "disposition": "X",
+          "source_sha256": "6cbdc8f76a2bb6229fb6acdd9e29026ace3d24a24519689d63f177dc5f529241",
+          "header": 8945720,
+          "entry": 8945725,
+          "header_sha256": "c1ce5e1cb5ab46449ccfc8bf3708bfb74395b753c47756be684fc00959f4123a",
+          "initial_selector": 0,
+          "initial_flags": [
+            53504,
+            0
+          ],
+          "position": [
+            8,
+            16
+          ],
+          "parameter": 0,
+          "descriptor": 8645967,
+          "descriptor_sha256": "846d380dcc9eba9bef0ab556f952cd646dbd19acdb3190daabef11eb08f9c759",
+          "composition_packet": 13895928
+        },
+        {
+          "source": 8622765,
+          "kind": "FE",
+          "disposition": "H",
+          "source_sha256": "1eb791850ae2e18d6a195e659fb50b3e4b8631eb6c3b21ffa5900a4271a1c5fc",
+          "header": 8957316,
+          "entry": 8957321,
+          "header_sha256": "6228b445a4458beec985b702b7c49a2bed2b536db74de5aae8cc28f2137b1741",
+          "initial_selector": 0,
+          "initial_flags": [
+            53248,
+            0
+          ],
+          "position": [
+            8,
+            0
+          ],
+          "parameter": 0,
+          "implicit_animation_base": 10145792
+        },
+        {
+          "source": 8622770,
+          "kind": "FF",
+          "disposition": "T",
+          "source_sha256": "a8100ae6aa1940d0b663bb31cd466142ebbdbd5187131b92d93818987832eb89",
+          "entry": 8749064,
+          "text_source": 8622771
+        }
+      ]
+    }
+  ],
+  "captures": [
+    {
+      "label": "boot",
+      "map": 15,
+      "camera": [
+        256,
+        0
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [],
+      "linked_entities": 12,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "9ab4586ffc3baa63f8c9c1cb5738c09b602fbf7cfa042c6a117eb75154f8f8be",
+      "hashes": {
+        "wram": "49ab74b6af5283a4fb8151e56cdafc27339276213eaa7f1e997fe65e55b0ea82",
+        "vram": "6f3d0b6a209adb17fb55b0ed5b5c3c3b5a33068b8a321a2e450503d098e16799",
+        "cgram": "1b1902ad7bddd1d46e87ce86e3bc53bed3407283caa02cf4f35a89d41e75296d",
+        "oam": "eb7269c9cfae9312395d4450d732e6f27d68a8bf9de453c8067d30255e0ccf5b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "room10",
+      "map": 16,
+      "camera": [
+        256,
+        256
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621436,
+          "slot": 4160,
+          "position": [
+            424,
+            416
+          ],
+          "facing": 3,
+          "native_composition": 8286568,
+          "selector": 2,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 3
+        },
+        {
+          "source": 8621446,
+          "slot": 4224,
+          "position": [
+            440,
+            416
+          ],
+          "facing": 2,
+          "native_composition": 8287384,
+          "selector": 2,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 13,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "708dc8684b5f8cc8835cf3c710fc2e84562c80c9cbceddbfda1fb0b97bb03957",
+      "hashes": {
+        "wram": "e21bc39ac7349446bf4de7d37bddb48072b644dfbd7291662f9ad9c247192560",
+        "vram": "4ba56006265f72cb089ee4ce06cf24bef933454fa3706c943a7c608de1ffe65f",
+        "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+        "oam": "2d4a2f910911b594cd7de5eeea1f5b4f4ca90ee353d11ed418a76125eb412a5b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "settledC",
+      "map": 12,
+      "camera": [
+        0,
+        256
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621066,
+          "slot": 4160,
+          "position": [
+            88,
+            416
+          ],
+          "facing": 1,
+          "native_composition": 8286467,
+          "selector": 4,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 5
+        },
+        {
+          "source": 8621076,
+          "slot": 4224,
+          "position": [
+            56,
+            384
+          ],
+          "facing": 3,
+          "native_composition": 8286568,
+          "selector": 5,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 4
+        },
+        {
+          "source": 8621086,
+          "slot": 4288,
+          "position": [
+            72,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8287224,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 3
+        },
+        {
+          "source": 8621096,
+          "slot": 4352,
+          "position": [
+            104,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8287948,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 15,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "d0d7dc6fefc8bdbb7f00935aef77bac132f885dcae5bfdef9fdeb58be809849f",
+      "hashes": {
+        "wram": "042d852d99e0278bdc94d8c416935bdfcb0b90ed58430a9bab163728bb2ac2b5",
+        "vram": "8c0cd669e429acf2a2e5cf1aae331a5f8ec697e0c560bf23e38ed6c12f2f4d84",
+        "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+        "oam": "d2e8072ee945c2df623fa029abdd67cb07f8fe7fb6745a567802f2174926e438",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "north-door-settled",
+      "map": 11,
+      "camera": [
+        0,
+        0
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8620950,
+          "slot": 4160,
+          "position": [
+            120,
+            112
+          ],
+          "facing": 0,
+          "native_composition": 8287351,
+          "selector": 6,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 3
+        }
+      ],
+      "linked_entities": 13,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "d4b70a969cddaefdde3016d27cd6c85d5657695a9da34f47eb059836ba041eec",
+      "hashes": {
+        "wram": "c5eb2ecbe9e4e76632b014c26a7b76dcd8f245c1cb9c4d7b1da6c1748d01b056",
+        "vram": "2107beac92dd3a5505bf2fa90787dd750436e7c8ed0e6b5edbbb6be52ec8980d",
+        "cgram": "6251286d9213e6f6a16ad5f9103668e5b296517dcef49972da5e8a363cb183d9",
+        "oam": "a45b97690170c8084bbe9a97b4193a895df61833acaa62a1aef1bbf3a711da24",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "settledD",
+      "map": 13,
+      "camera": [
+        0,
+        512
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621236,
+          "slot": 4160,
+          "position": [
+            72,
+            672
+          ],
+          "facing": 1,
+          "native_composition": 8286438,
+          "selector": 1,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 3
+        }
+      ],
+      "linked_entities": 13,
+      "auxiliary_oam": [
+        {
+          "slot": 0,
+          "x": 104,
+          "y": 48,
+          "tile": 176,
+          "palette": 2,
+          "priority": 3,
+          "size": 16
+        },
+        {
+          "slot": 1,
+          "x": 116,
+          "y": 48,
+          "tile": 178,
+          "palette": 2,
+          "priority": 3,
+          "size": 16
+        },
+        {
+          "slot": 2,
+          "x": 128,
+          "y": 48,
+          "tile": 180,
+          "palette": 2,
+          "priority": 3,
+          "size": 16
+        },
+        {
+          "slot": 3,
+          "x": 140,
+          "y": 48,
+          "tile": 182,
+          "palette": 2,
+          "priority": 3,
+          "size": 16
+        }
+      ],
+      "hardware_census_sha256": "f8427cdff67daacbbde5a039f4dfa0ab001e9c6198584091f4e2a897170ab9a1",
+      "hashes": {
+        "wram": "e1f7eedc27476030fd2451696c0b6d667be2a2b9707f214f4e034a63b098efd5",
+        "vram": "dbf1022e443fc32b9c5d40645d70c791d7c586519b650f87e2bd0024013aebf7",
+        "cgram": "8ac85ca62f8c9726a9def024ac01c14937e9ebefac042f1a2148c6b40462dba0",
+        "oam": "b3110f403c68745524eef89c1d27f0f74478bc44cdea950c014f278bb50e9224",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "settled11",
+      "map": 17,
+      "camera": [
+        256,
+        512
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621538,
+          "slot": 4160,
+          "position": [
+            440,
+            640
+          ],
+          "facing": 1,
+          "native_composition": 8286673,
+          "selector": 4,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 12,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "210d76dc77c786fc1fdb39e1230ee4ee73d4c3dc06cca37e63f502217c27708d",
+      "hashes": {
+        "wram": "bf62f814ddf10d02444feee678ff9ff426b140037789a86bc0240357762cd97a",
+        "vram": "95708b0096ceeb50183914687280ddc49329f286aa9bf857ecb4b8d8aafe7a83",
+        "cgram": "b036e697f5aba5343af2c992d31db8679b88dccdae2a9503522b22bd4457778e",
+        "oam": "a31e74a898dd202968d60279c2cb19e4704af2f27760a884feb38f9aeabdcd4a",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "wait11",
+      "map": 17,
+      "camera": [
+        256,
+        512
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621538,
+          "slot": 4160,
+          "position": [
+            440,
+            640
+          ],
+          "facing": 1,
+          "native_composition": 8286409,
+          "selector": 4,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 12,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "745cf38b5700d04f90fb57c7bc07a34f96a26fb8c4d2add16bb564034c554b42",
+      "hashes": {
+        "wram": "ad2db7ee8825a8df8ea194b1e05c28b0d613a13d1ae7479115efed30ce34726d",
+        "vram": "e16da72f37e1b622015cdad17b7f046f7887cc6ac1a797607ed8afb74a4fcfda",
+        "cgram": "b036e697f5aba5343af2c992d31db8679b88dccdae2a9503522b22bd4457778e",
+        "oam": "2cef624e281a46f99bea3ebaab136bffd259a929a70e2171195a2e17862b9e7f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "front-settled",
+      "map": 13,
+      "camera": [
+        0,
+        512
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621236,
+          "slot": 4160,
+          "position": [
+            104,
+            672
+          ],
+          "facing": 0,
+          "native_composition": 8286358,
+          "selector": 0,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 12,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "478fd753d53d45db7de0274a7439fc44800eee444690ca1eab86362d1ae51c45",
+      "hashes": {
+        "wram": "8ede3314acdd61c48d34641335577c8597d1e146533e79009815af9fbf800474",
+        "vram": "9e54029df536095e39d8278d63c032923e8bf04b38979e62c2ba6d6419f03af4",
+        "cgram": "8ac85ca62f8c9726a9def024ac01c14937e9ebefac042f1a2148c6b40462dba0",
+        "oam": "2964b6ef7650be8c7220a7df121de57fb23c8199dea3cc8662e9ff26920bb1dd",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "cellar-blocked",
+      "map": 12,
+      "camera": [
+        0,
+        256
+      ],
+      "event_bits": [
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621066,
+          "slot": 4160,
+          "position": [
+            88,
+            416
+          ],
+          "facing": 1,
+          "native_composition": 8286759,
+          "selector": 4,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 5
+        },
+        {
+          "source": 8621076,
+          "slot": 4224,
+          "position": [
+            56,
+            384
+          ],
+          "facing": 3,
+          "native_composition": 8286905,
+          "selector": 5,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 4
+        },
+        {
+          "source": 8621086,
+          "slot": 4288,
+          "position": [
+            72,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8287415,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 3
+        },
+        {
+          "source": 8621096,
+          "slot": 4352,
+          "position": [
+            104,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8288153,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        }
+      ],
+      "linked_entities": 15,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "f5231922f469062e69ba1ac6ac42fd39cc846facf92f7d75ed24c747d4319db0",
+      "hashes": {
+        "wram": "93e87b4619ffe22679b2c4fd9be852e922e06e8533964e48087c396627504731",
+        "vram": "ce36a5f07dd5a0777eceeb5ff75e2eab6c929f8d008b21519381b0558076a9d2",
+        "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+        "oam": "9d9f562dc8da1bcfae1ab94f2958311d4de96b17cdae41b903f28266f67692e4",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "cellar-final",
+      "map": 12,
+      "camera": [
+        0,
+        256
+      ],
+      "event_bits": [
+        1,
+        32,
+        251
+      ],
+      "residents": [
+        {
+          "source": 8621066,
+          "slot": 4160,
+          "position": [
+            88,
+            416
+          ],
+          "facing": 1,
+          "native_composition": 8286467,
+          "selector": 4,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 4
+        },
+        {
+          "source": 8621076,
+          "slot": 4224,
+          "position": [
+            56,
+            384
+          ],
+          "facing": 3,
+          "native_composition": 8286568,
+          "selector": 5,
+          "palettes": [
+            5
+          ],
+          "linked_ordinal": 3
+        },
+        {
+          "source": 8621086,
+          "slot": 4288,
+          "position": [
+            72,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8287224,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 2
+        },
+        {
+          "source": 8621096,
+          "slot": 4352,
+          "position": [
+            104,
+            368
+          ],
+          "facing": 0,
+          "native_composition": 8287948,
+          "selector": 3,
+          "palettes": [
+            4
+          ],
+          "linked_ordinal": 1
+        }
+      ],
+      "linked_entities": 14,
+      "auxiliary_oam": [],
+      "hardware_census_sha256": "b0ed762e55a578aa2c86a69d7c2a42ec8f35adfad97e3ae07617931de929c1a4",
+      "hashes": {
+        "wram": "437f2cc08249617612c0a4864fce77ef5bad50506ca56b55456fb2263942e857",
+        "vram": "5ae41083cbd7db4969ff8d71d3d63eacc093ac8e11a964cb592d319f318db656",
+        "cgram": "85c0e45763fe4837e9bb792864754af1306439e88f30285286b2d37e9168ce56",
+        "oam": "4cc64eee047784fc3d63440b71f0534a6751e3ef2a459ea79407d93a2c6f1376",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    }
+  ],
+  "exceptional_exit_diagnostic_sha256": "efb885c3b6c38e9715e8ee07d486498488d4bc85b85d55bf823e6aa705178ce3",
+  "sources": [
+    {
+      "start": 62449,
+      "end": 63488,
+      "sha256": "d010c4f11a605195bfede5c91bd577f3e2a3b02a2f701e8d88bd967796e8be4f"
+    },
+    {
+      "start": 60134,
+      "end": 60753,
+      "sha256": "7143bbad5c1cc7e4d5c978a4c60a97fed6cc2cacc2031ae59a87707f8c9a4e88"
+    },
+    {
+      "start": 360456,
+      "end": 360659,
+      "sha256": "3a10a16f67ba73568e9674d64db5664be96d3bb1378e5fcdb821287311eef262"
+    },
+    {
+      "start": 362070,
+      "end": 362312,
+      "sha256": "145d8a43be773819716faef0a2a25b6496c4f07046bf66137182aacca3a62cbc"
+    },
+    {
+      "start": 364693,
+      "end": 364793,
+      "sha256": "0de29361846d20449ede9e776b7274eef49505d01102882ddb7f41178bba666e"
+    },
+    {
+      "start": 560715,
+      "end": 560908,
+      "sha256": "e592aeccd2f4cc3f9d21a814ee6d7252f2a357f1d7c9be681ab5d39989385f65"
+    },
+    {
+      "start": 567351,
+      "end": 567446,
+      "sha256": "a2d887a9563a546c4f4bbcaad595e33510d3ab5551ffff21c1eb15a2be5cef89"
+    },
+    {
+      "start": 567727,
+      "end": 567741,
+      "sha256": "da492d28b2b23b921f8f811bb03cda6ac6c6c28fef3b3ea25144b619175243ab"
+    },
+    {
+      "start": 568041,
+      "end": 568144,
+      "sha256": "a62c02f833bdc6f7bc2d4b20adcb13b8a6e415318f791e0c3a48cd90ee97798a"
+    },
+    {
+      "start": 568489,
+      "end": 568531,
+      "sha256": "2e4a8c33fd76dd1b9b7c99f2f8d64c319dec8951c8b09db15ff5844ceb92822d"
+    },
+    {
+      "start": 579085,
+      "end": 579162,
+      "sha256": "9319cad0db394fa67ffa5101f1b796ac9bd1995a33d00f94aaa87ffdfb785e2f"
+    },
+    {
+      "start": 303401,
+      "end": 303520,
+      "sha256": "6fd01f9d9320aefbb5fa55c70954e82bf82d11e565894866c84d674a3fa01f0e"
+    },
+    {
+      "start": 899137,
+      "end": 899360,
+      "sha256": "9f6b15367ab42bd429fbc16275c609496b2a77b640c2b9219b17de0844303d6e"
+    }
+  ],
+  "itinerary_sha256": "0c1a955e6cc5c4dcb229a22a23e9b05b0ee0559bec98c43807a38f4fa20631e1",
+  "exception_itinerary_sha256": "a9bf261568a1d8d54288c1e9304a05ec1af50af3fbe208eecd82e66bd9b8a89c"
+}
