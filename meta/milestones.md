@@ -134,6 +134,7 @@ qualification remain open.
 ### Issues
 
 - [Implement the classic renderer](issues/classic-renderer.md)
+- [Render the first NPC in the adjoining house room](issues/render-first-house-npc.md)
 - [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
 - [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
