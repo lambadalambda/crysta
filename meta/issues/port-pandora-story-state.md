@@ -85,3 +85,21 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   encode the full ordered exit tables, and ordinary Room sampling cannot express
   E/20's Up-only type29 admission. Do not substitute guessed exits or globally
   classify type29 as floor.
+
+### Shared-sheet correction completed
+
+- Implemented in `051771b` (integrated here as `a2a6afe`), with TDD and independent
+  correctness/architecture review. Finite AFCBB3 patches and consumed ledger survive
+  B/C/D/E/20 and ROM-confirmed F/10/11 loads; scene occupancy/locals/counter rebuild.
+  Replaced sheets discard patches; no off-screen cache or flag-inferred reopening.
+- Public effective_room supplies owned patched geometry; current_room remains the
+  borrowed base. PandoraOutput.sheet exposes resident/cellar/consumed state; the
+  constructor remains unchanged, but all four C profiles require source-closed
+  wooden cells. Exact API and schema3/profile11/320-byte layout are documented in
+  docs/pandora-runtime.md; old profile9 remains unchanged.
+- Merged verification passed: 131 core tests plus one doctest with all five private
+  fixture suites enabled, strict all-target Clippy, no_std Wasm, and six unchanged
+  host room_preview tests including the authenticated fresh-house route.
+- Replaced-sheet C reentry with292 remains deliberately unsupported pending source
+  load effects. This issue remains open for parent aggregate acceptance; no new
+  native itinerary or browser acceptance is claimed.

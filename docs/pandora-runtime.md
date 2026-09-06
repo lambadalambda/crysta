@@ -115,7 +115,10 @@ let removed_cells = game.consumed_pots(&data)?;
 
 `PandoraOutput` provides `scene`, typed `invocation`, pending `cue`, `owner`,
 `motion: Option<(MotionKey, u16)>` (number of applied samples), room `locals` and
-actual `door_counter`. No new map delegates to missing house art. Host must use
+actual `door_counter`, plus `sheet: SharedSheetOutput { resident, cellar, consumed }`.
+`cellar` is `CellarDoorPatch::{Closed, Damaged, Open}`; `consumed` is a source-catalog
+`u64` bitset. `wooden_door_open()` remains the sole wooden-door boolean.
+No new map delegates to missing house art. Host must use
 `scene.key()` rather than derive phase from flags. No interpolated actor positions
 or inventory/equipment output are emitted. Art composition, record scheduling and
 transport remain parent-owned.
@@ -125,7 +128,7 @@ non-walking bucket under this new opt-in capability. Use `PandoraOutput::owner` 
 distinguish visible dialogue, presentation, transitions and pot recovery. A pot
 can continue flying/recovering while a story request is visible or its cue advances.
 
-## Flags, graph and per-visit pots
+## Flags, graph and resident-sheet pots
 
 There is exactly one authoritative `StoryFlags` block. The generic B conversation
 runs directly on it and retains `$26` **after the first page, before the choice**.
@@ -143,13 +146,32 @@ second direct-answer return grant `$2E`. C cancel/result2 rejects atomically: no
 silent direct continuation and no `$2F`.
 
 The existing `PotState` owns movement/carry history and the consumed-cell ledger
-for the entire C visit. Consumption and A attempts never increment hits. Only its
-exact `door_hit` output advances the counter. The launch collision key remains
-frozen through recovery, independently of first-hit/second-hit door patches and
-`$292`; concurrent story presentation cannot invalidate the launch lane. Forced
-empty-handed motion rebases the walker without losing consumed cells. Reconstruction
-alone discards the ledger. `current_room()` returns the immutable story variant;
-consumed-cell overlays are private to pot collision and exposed separately for art.
+while active. When absent, the finite resident-sheet state parks that ledger;
+there is never a second mutable ledger authority. Consumption and A attempts never
+increment hits. Only exact `door_hit` output advances the per-load counter. The
+launch collision key remains frozen through recovery, independently of door patches
+and `$292`; concurrent story presentation cannot invalidate the launch lane.
+Forced empty-handed motion rebases the walker without losing consumed cells.
+
+AFCBB3 tile/attribute patches survive B/C/D/E/20 loads (also F/10/11, whose common
+source load operand was verified against the ROM). Removed pots and damaged/open
+cellar and wooden doors survive; locals, counter, action state and scene occupancy
+do not. A/13/21 replace the sheet without an off-screen mutation cache. A→D rebuilds
+the wooden door closed even with persistent `$26`; idle empty-handed pot ownership
+permits reopening it without losing the sheet ledger. All four supplied C profiles
+must contain source-closed wooden cells `(8,19)=$1CF2`, `(8,20)=$1CF3`.
+
+`current_room()` remains the borrowed immutable base view. Use
+`effective_room(&data) -> Result<Room, SliceError>` for owned scene geometry with
+retained patches; Pandora movement uses this effective view. Patching preserves the
+**current scene's** occupancy bit rather than copying departed actors. In particular,
+C's departed `(7,31)` actor stamp is not retained in E/20. `consumed_pots()` remains
+available without an active pot controller. Visit baselines distinguish old sheet
+mutations from new hits after counter reset.
+
+After sheet replacement, persistent `$292` alone does not authorize reapplying open
+cellar tiles. A→D with `$292` restores on a new closed sheet, but subsequent D→C
+reconstruction fails atomically until a source-qualified load effect is supplied.
 
 The warning requires two acknowledgements, its qualified return/delay cue, then a
 facing-independent proximity poll and successful COPDF handoff. Opening sets `$22` before reload. The mandatory tour owns control
@@ -160,7 +182,7 @@ map41, **not** equipment acquisition, free inventory-room transitions or world r
 ## Canonical snapshots
 
 Disabled data retain the exact **181-byte version1/profile9** encoding. Opt-in data
-use **300-byte version2/profile11**, bound to the same aggregate identity and tick:
+use **320-byte version3/profile11**, bound to the same aggregate identity and tick:
 
 | Byte range | Meaning |
 |---|---|
@@ -172,13 +194,21 @@ use **300-byte version2/profile11**, bound to the same aggregate identity and ti
 | 292 | Frozen launch collision key;255 means none |
 | 293..296 | Reserved zero |
 | 296..300 | Frozen graph-owned anchor when no motion/legacy owner supplies it |
+| 300 | Resident-sheet boolean |
+| 301 | Cellar patch: Closed0 / Damaged1 / Open2 |
+| 302 | Visit-baseline cellar patch |
+| 303 | Reserved zero |
+| 304..312 | Parked consumed ledger, LE u64; zero while PotState owns it |
+| 312..320 | Visit consumed baseline, LE u64 |
 
 The walking component is erased when a dialogue, transition, graph or pot owns its
 continuation. Motion-owned poses are reconstructed from immutable samples; graph
 wait anchors and pot poses have canonical consistency checks. Restore rejects
 invalid versions/identities, stage/flag/local/counter combinations, choice/page
 cursors, erased motion ownership, inappropriate launch profiles and fewer consumed
-source objects than recorded hits. The opened box collision profile is selected
+source objects than recorded hits. Sheet identity, parked/active ledger exclusivity,
+visit baselines and patch/counter consistency are validated separately; persistent
+flags do not reconstruct discarded mutations. The opened box collision profile is selected
 at the actual reload sample, not delayed to motion completion. Canonical structural
 restoration is **not proof of snapshot provenance** or authorization for a native
 qualification restore.
@@ -199,13 +229,3 @@ pass. These are **not** new native aggregate navigation/pacing or browser accept
 Source-qualified new motion/contact data, host compiler/transport/render integration
 and final aggregate acceptance remain parent/navigation-owned. The capability must
 remain disabled on the live host until those gates pass. The owned issue stays open.
-
-### Correction-in-progress: shared-sheet lifetime
-
-Navigation e98a7cc also corrects the old per-visit patch model: AFCBB3 remains
-resident across B/C/D/E/20. Its tile/attribute patches and pot removals must survive
-those scene loads, while locals/counter and occupancy reset. A/13/21 replace the
-resident sheet; A→D rebuilds the wooden door closed. The separate cache correction
-follows the polling correction; do not use the prior per-visit ledger description
-as an adapter contract. Source load effects after replacement with persistent292
-must be authenticated rather than inferred from that event alone.
