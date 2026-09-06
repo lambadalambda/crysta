@@ -77,7 +77,7 @@ impl VisualResource {
     }
 }
 
-/// Qualified first background for Japanese maps $000B–$000D, $000F–$0011 and $0128.
+/// Qualified first background for Japanese maps $000A–$000D, $000F–$0011 and $0128.
 ///
 /// Preserves raw cells, definition words and natural ROM colors. Does not apply
 /// animation, sprites, windows, color math, brightness or layer composition.
@@ -104,7 +104,7 @@ impl StaticBackground {
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
         let (loads, graphics_size) = match map_id {
             0x128 => (cavern_loads(image)?, 0x4000),
-            0x000B..=0x000D | 0x000F..=0x0011 => (room_loads(image, map_id)?, 0x6000),
+            0x000A..=0x000D | 0x000F..=0x0011 => (room_loads(image, map_id)?, 0x6000),
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
@@ -318,6 +318,26 @@ struct RoomSpan {
     bytes: &'static [u8],
     pointers: &'static [usize],
 }
+// Map $000A starts at the root, without a flagged call or deferred stream.
+// FE operands are skipped; F8 falls through at root. It then falls through the
+// same audited audio alternatives as rooms, ending in shared subscript $0010.
+const EXTERIOR_ROOT: RoomSpan = RoomSpan {
+    offset: 0x18_8350,
+    bytes: &[
+        8, 0xfe, 0x59, 0, // $98:8350 FE, opaque operand
+        0x40, 0, 0x60, 0x20, 0, 0, 0, // palette, CGRAM $20..$7F
+        8, 0xfe, 0x6c, 0, // $98:835B FE, opaque operand
+        0x10, 1, 0, 0, 0, // first logical layer
+        0x10, 2, 0, 0, 0, // second logical layer (omitted)
+        0x80, 0, 0x30, 3, 0, 0, 0, 0, 0, // 768 tiles, VRAM word $0000
+        0x20, 0, 0x40, 0, 1, 0, 0, 0, // first definitions
+        0x20, 0, 8, 0, 0x81, 0, 0, 0, // first attributes
+        8, 0xf8, // $98:8382 return inside a call, otherwise fall through
+        0x20, 0, 0x40, 0, 2, 0, 0, 0, // second definitions (omitted)
+        8, 0xfe, 6, 0, // $98:838C falls through to ROOM_AUDIO
+    ],
+    pointers: &[8, 17, 22, 29, 39, 47, 57],
+};
 const ROOM_ROOT: RoomSpan = RoomSpan {
     offset: 0x18_8496,
     bytes: &[
@@ -444,6 +464,7 @@ const ROOM_SUBSCRIPTS: &[(usize, u32)] = &[
 fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
     let entry: u32 = match id {
+        0xa => 0x98_8350,
         0xb => 0x98_8401,
         0xc => 0x98_8446,
         0xd => 0x98_844d,
@@ -457,6 +478,9 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         return Err(invalid());
     }
     for &(index, entry) in ROOM_SUBSCRIPTS {
+        if id == 0xa && index == 1 {
+            continue; // Exterior falls through its own loads; no deferred room subscript.
+        }
         let at = 0x06_a28c + index * 3;
         if image.get(at..at + 3) != Some(&entry.to_le_bytes()[..3]) {
             return Err(invalid());
@@ -473,12 +497,17 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         },
         pointers: &[],
     };
-    for span in [
-        if id == 0xf { &ROOM_ROOT } else { &root },
-        &ROOM_COMMON,
-        &ROOM_AUDIO,
-        &ROOM_SHARED,
-    ] {
+    let spans: &[&RoomSpan] = if id == 0xa {
+        &[&EXTERIOR_ROOT, &ROOM_AUDIO, &ROOM_SHARED]
+    } else {
+        &[
+            if id == 0xf { &ROOM_ROOT } else { &root },
+            &ROOM_COMMON,
+            &ROOM_AUDIO,
+            &ROOM_SHARED,
+        ]
+    };
+    for span in spans {
         let bytes = image
             .get(span.offset..span.offset + span.bytes.len())
             .ok_or_else(invalid)?;
@@ -508,12 +537,17 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         }
     }
     // Fixed offsets into validated windows; never discover instruction boundaries.
+    let offsets = if id == 0xa {
+        [0x18_8369, 0x18_8354, 0x18_8372, 0x18_837a, 0x18_835f]
+    } else {
+        [0x18_841e, 0x18_8405, 0x18_8427, 0x18_842f, 0x18_8410]
+    };
     [
-        (ResourceKind::Graphics, 0x18_841e, 4, 9),
-        (ResourceKind::Palette, 0x18_8405, 4, 7),
-        (ResourceKind::Metatiles, 0x18_8427, 5, 8),
-        (ResourceKind::Metatiles, 0x18_842f, 5, 8),
-        (ResourceKind::Layer, 0x18_8410, 2, 5),
+        (ResourceKind::Graphics, offsets[0], 4, 9),
+        (ResourceKind::Palette, offsets[1], 4, 7),
+        (ResourceKind::Metatiles, offsets[2], 5, 8),
+        (ResourceKind::Metatiles, offsets[3], 5, 8),
+        (ResourceKind::Layer, offsets[4], 2, 5),
         (ResourceKind::Palette, 0x18_81a5, 4, 7),
     ]
     .into_iter()
@@ -619,6 +653,115 @@ mod tests {
             image[at..at + 3].copy_from_slice(&pointer.to_le_bytes()[..3]);
         }
         image
+    }
+
+    fn exterior_fixture() -> Vec<u8> {
+        let mut image = room_fixture();
+        image[0x06_95ba..0x06_95bd].copy_from_slice(&[0x50, 0x83, 0x98]);
+        // Same transfer modes, different sources and a root-only F8 fallthrough.
+        let script = [
+            8, 0xfe, 0x59, 0, 0x40, 0, 0x60, 0x20, 0, 0, 0, 8, 0xfe, 0x6c, 0, 0x10, 1, 0, 0, 0,
+            0x10, 2, 0, 0, 0, 0x80, 0, 0x30, 3, 0, 0, 0, 0, 0, 0x20, 0, 0x40, 0, 1, 0, 0, 0, 0x20,
+            0, 8, 0, 0x81, 0, 0, 0, 8, 0xf8, 0x20, 0, 0x40, 0, 2, 0, 0, 0, 8, 0xfe, 6, 0,
+        ];
+        image[0x18_8350..0x18_8390].copy_from_slice(&script);
+        for (to, from) in [
+            (0x18_8358, 0x18_8409),
+            (0x18_8361, 0x18_8412),
+            (0x18_836d, 0x18_8422),
+            (0x18_8377, 0x18_842c),
+            (0x18_837f, 0x18_8434),
+        ] {
+            let pointer: [u8; 3] = image[from..from + 3].try_into().unwrap();
+            image[to..to + 3].copy_from_slice(&pointer);
+        }
+        let packet = compression::encode(&vec![0; 10240]).unwrap();
+        image[0x24_8000..0x24_8002].copy_from_slice(&[4, 5]);
+        image[0x24_8002..0x24_8002 + packet.len()].copy_from_slice(&packet);
+        image
+    }
+
+    #[test]
+    fn exterior_decodes_own_full_sheet_without_indoor_dimensions() {
+        let image = exterior_fixture();
+        let scene = StaticBackground::from_rom(&image, 0xa).unwrap();
+        assert_eq!((scene.layer().width(), scene.layer().height()), (64, 80));
+        assert_eq!(scene.tiles().len(), 768);
+        assert_eq!(
+            scene.pixel(0, 0).unwrap(),
+            IndexedPixel::Opaque {
+                palette_index: 33,
+                priority: false,
+            }
+        );
+        assert_eq!(scene.pixel(1023, 1279).unwrap(), IndexedPixel::Transparent);
+        assert!(scene.pixel(1024, 0).is_err());
+        assert!(scene.pixel(0, 1280).is_err());
+        for resource in scene.resources() {
+            assert_eq!(resource.source_bytes(), &image[resource.source_range()]);
+        }
+    }
+
+    #[test]
+    fn exterior_rejects_changed_recipe_and_malformed_resources() {
+        let good = exterior_fixture();
+        for span in [&EXTERIOR_ROOT, &ROOM_AUDIO, &ROOM_SHARED] {
+            for i in 0..span.bytes.len() {
+                if span.pointers.iter().any(|&p| (p..p + 3).contains(&i)) {
+                    continue;
+                }
+                let mut image = good.clone();
+                image[span.offset + i] ^= 1;
+                assert!(
+                    StaticBackground::from_rom(&image, 0xa).is_err(),
+                    "at {:x}",
+                    span.offset + i
+                );
+            }
+            assert!(
+                StaticBackground::from_rom(&good[..span.offset + span.bytes.len() - 1], 0xa)
+                    .is_err()
+            );
+        }
+        for at in [0x06_95ba, 0x06_a28c + 6 * 3, 0x06_a28c + 0xcf * 3] {
+            let mut image = good.clone();
+            image[at] ^= 1;
+            assert!(StaticBackground::from_rom(&image, 0xa).is_err());
+        }
+        // Omitted secondary layer/definitions still require valid source starts.
+        for at in [0x18_8366, 0x18_8389] {
+            let mut image = good.clone();
+            image[at..at + 3].copy_from_slice(&[0, 0, 0x73]);
+            assert!(StaticBackground::from_rom(&image, 0xa).is_err());
+        }
+        for (at, size, word) in [
+            (0x20_8000, 0x4000, 0_u16),
+            (0x22_8000, 0x1000, 0x200),
+            (0x24_8002, 10240, 0x200),
+        ] {
+            let mut image = good.clone();
+            let mut data = vec![0; size];
+            data[..2].copy_from_slice(&word.to_le_bytes());
+            let packet = compression::encode(&data).unwrap();
+            image[at..at + packet.len()].copy_from_slice(&packet);
+            assert!(StaticBackground::from_rom(&image, 0xa).is_err());
+        }
+        // Priority belongs to the definition, not the collision word.
+        let mut image = good;
+        let mut definitions = vec![0; 4096];
+        definitions[..2].copy_from_slice(&0x2801_u16.to_le_bytes());
+        let packet = compression::encode(&definitions).unwrap();
+        image[0x22_8000..0x22_8000 + packet.len()].copy_from_slice(&packet);
+        assert_eq!(
+            StaticBackground::from_rom(&image, 0xa)
+                .unwrap()
+                .pixel(0, 0)
+                .unwrap(),
+            IndexedPixel::Opaque {
+                palette_index: 33,
+                priority: true
+            }
+        );
     }
 
     #[test]
