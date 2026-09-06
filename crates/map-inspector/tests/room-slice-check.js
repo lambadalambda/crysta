@@ -107,6 +107,37 @@ async function main() {
   assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
   assert.match(stalled.element('error').textContent, /timed out/i);
   assert.equal(stalled.element('pause').disabled,true);
+  // Dialogue owns control; each acknowledgement is one paced command, never autoplay.
+  const talk=harness(); await talk.start();
+  const page = (key,tick) => ({...initial(),tick,phase:'dialogue',dialogue:{key},dialogue_acknowledgement:true});
+  talk.controller.resume(); talk.controller.press('prior-held',2); await talk.fire();
+  await talk.reply({...page('test:1',1),phase:'walking'});
+  assert.equal(talk.views.at(-1).paused,true);
+  assert.equal(talk.views.at(-1).walking,false);
+  assert.equal(talk.timers.size,0);
+  talk.controller.resume(); talk.controller.press('held',2); talk.controller.stepOnce();
+  assert.equal(talk.timers.size,0,'movement and neutral stepping cannot advance dialogue');
+  talk.controller.acknowledge(); talk.controller.acknowledge();
+  assert.equal(talk.timers.size,1); await talk.fire();
+  assert.equal(talk.calls.at(-1).body,'6');
+  talk.controller.acknowledge(); assert.equal(talk.timers.size,0,'busy ack cannot replay');
+  await talk.reply(page('test:2',2));
+  assert.equal(talk.timers.size,0); assert.equal(talk.views.at(-1).paused,true);
+  talk.controller.interact(); await talk.fire(); assert.equal(talk.calls.at(-1).body,'6');
+  await talk.reply({...initial(),tick:3,dialogue:null,dialogue_acknowledgement:true});
+  assert.equal(talk.views.at(-1).paused,true); assert.equal(talk.views.at(-1).walking,true);
+  talk.controller.acknowledge(); assert.equal(talk.timers.size,0);
+  talk.controller.resume(); await talk.fire(); assert.equal(talk.calls.at(-1).body,'0','held movement from dialogue was discarded');
+  await talk.reply(page('test:3',4)); talk.controller.acknowledge(); talk.controller.newGame();
+  assert.equal(talk.timers.size,0,'New Game cancels a pending page acknowledgement'); await talk.reply(newGameState());
+  const noAck=harness(); await noAck.start(); noAck.controller.resume(); await noAck.fire();
+  await noAck.reply({...page('test:1',1),dialogue_acknowledgement:undefined});
+  noAck.controller.acknowledge(); noAck.controller.interact(); assert.equal(noAck.timers.size,0,'ack capability is required');
+  const resetAck=harness(); await resetAck.start(); resetAck.controller.resume(); await resetAck.fire();
+  await resetAck.reply(page('test:1',1)); resetAck.controller.acknowledge(); await resetAck.fire();
+  resetAck.controller.reset(); await resetAck.reply(page('test:2',2));
+  assert.equal(resetAck.calls.at(-1).url,'/reset'); await resetAck.reply(initial());
+  assert.equal(resetAck.timers.size,0); assert.equal(resetAck.views.at(-1).dialogue,false);
   // Door interaction is one paced command, never a held direction or autoplay.
   const door = harness(); await door.start(); door.controller.interact();
   assert.equal(door.calls.length,1); door.controller.interact(); door.controller.stepOnce();

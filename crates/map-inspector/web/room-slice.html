@@ -81,6 +81,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (!state || state.policy !== 'semantic-preview' || !Number.isInteger(state.map_id) ||
         !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
         !(state.start_kind === undefined || typeof state.start_kind === 'string') ||
+        !(state.dialogue === undefined || state.dialogue === null || (typeof state.dialogue === 'object' && typeof state.dialogue.key === 'string' && state.dialogue.key.length > 0 && state.dialogue.key.length <= 128)) ||
         typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
         !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
       throw new Error('Invalid host state or policy. Choose New Game or Checkpoint Reset; no input was queued.');
@@ -104,9 +105,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     const held = new Map();
     // The protocol leaves phase names open. Learn the normal phase only at a
     // known new-game start or saved checkpoint, never a mid-session response.
-    const transition = () => state && state.phase !== walkingPhase;
+    const dialogue = () => !!state?.dialogue;
+    const transition = () => state && !dialogue() && state.phase !== walkingPhase;
     const view = () => ({state, error, paused, busy: busy || pendingCommand !== null || pendingStart !== null, mode, demoIndex, note,
-      canDrive: walkingPhase !== null, walking: !!state && !transition()});
+      canDrive: walkingPhase !== null, walking: !!state && !transition() && !dialogue(), dialogue: dialogue()});
     const notify = () => render(view());
     function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
     function stop(message) { paused = true; pendingCommand = null; held.clear(); clearTimer(); if (message) note = message; }
@@ -116,7 +118,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (pendingStart) pendingStart.demo = false;
     }
     function arm() {
-      if (timer !== null || busy || (paused && pendingCommand === null) || hidden || error || !state || pendingStart) return;
+      if ((dialogue() && pendingCommand !== 6) || timer !== null || busy || (paused && pendingCommand === null) || hidden || error || !state || pendingStart) return;
       const remaining = Math.max(0, interval - (now() - lastStepAt));
       timer = schedule(() => {
         timer = null;
@@ -154,6 +156,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           if (!paused) note = `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.`;
           if (demoIndex === 115) { mode = 'live'; stop('Checkpoint doorway demo complete — paused.'); }
         }
+        if (dialogue()) stop('Dialogue — acknowledge each page to continue.');
         if (state.error !== null) reject(state.error || 'Unsupported host step.');
       } catch (failure) { if (!pendingStart) reject(`Host request failed: ${failure.message || failure}`); }
       finally {
@@ -179,7 +182,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     return {
       init() { if (!initialized) { initialized = true; transact('/state'); } },
       press(token, direction) {
-        if (paused || mode === 'demo' || transition() || error || pendingStart || hidden) return;
+        if (paused || mode === 'demo' || transition() || dialogue() || error || pendingStart || hidden) return;
         if (![1, 2, 3, 4].includes(direction)) { reject('Unsupported input. Use one cardinal direction.'); return; }
         held.set(token, direction);
         if (new Set(held.values()).size > 1) reject('Only one direction at a time is supported. Choose New Game or Checkpoint Reset to continue.');
@@ -187,13 +190,18 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       release(token) { held.delete(token); },
       pause(message = 'Paused — controls released.') { cancelAutoplay(); stop(message); notify(); },
       resume() {
-        if (!state || walkingPhase === null || error || hidden || pendingStart) return;
+        if (!state || dialogue() || walkingPhase === null || error || hidden || pendingStart) return;
         pendingCommand = null; clearTimer(); paused = false; note = mode === 'demo' ? `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.` : 'Running — Arrow/WASD or touch cardinal controls.';
         notify(); arm();
       },
       setHidden(value) { hidden = value; if (hidden) this.pause('Tab hidden — paused and controls released.'); },
-      stepOnce() { manualStep(0, 'Single neutral logical step — paused.'); },
+      stepOnce() { if (!dialogue()) manualStep(0, 'Single neutral logical step — paused.'); },
+      acknowledge() {
+        if (!dialogue() || state.dialogue_acknowledgement !== true || mode === 'demo') return;
+        manualStep(6, 'Dialogue acknowledged — paused. Resume when the conversation ends.');
+      },
       interact() {
+        if (dialogue()) { this.acknowledge(); return; }
         if (!state || state.door_interaction !== true || mode === 'demo' || transition()) return;
         if (held.size) { note = 'Release movement before interacting.'; notify(); return; }
         manualStep(5, 'Wooden-door interaction — paused. Resume to continue.');
