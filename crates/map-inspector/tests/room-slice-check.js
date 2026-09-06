@@ -103,6 +103,21 @@ async function main() {
   assert.match(badManifest.element('error').textContent,/background/);
   assert.equal(badManifest.images.length,0,'reject additive URLs before loading even the old sheets');
 
+  const carrying=require('./pandora-carry-check.js');
+  carrying.check(sandbox.RoomSlice);
+  const carrySource=carrying.fixture();
+  const carryState=carrying.stateFor(carrySource.bundle,carrySource.state,'throwing:1',2447,18);
+  const heldPreview=browserHarness({mutateBundle:b=>Object.assign(b,carrySource.bundle),mutateState:s=>({...s,...carryState})});
+  await flush();await flush();
+  assert.equal(heldPreview.element('error').textContent,'');
+  for(const carry of [undefined,{...carryState.carry,flight:[184,356]},{...carryState.carry,priority:3}]) {
+    const bad=browserHarness({mutateBundle:b=>Object.assign(b,carrySource.bundle),mutateState:s=>({...s,...carryState,carry})});
+    await flush();await flush();
+    assert.match(bad.element('error').textContent,/carry/);
+    assert.equal(bad.element('pause').disabled,true,'invalid typed overlay visibly pauses inline page');
+    assert.equal(bad.timers.size,0,'invalid overlay cannot auto-step');
+  }
+
   const loaded = browserHarness(); await flush(); await flush();
   assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);
   assert.equal(loaded.element('error').textContent,'');

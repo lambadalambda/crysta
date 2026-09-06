@@ -422,6 +422,69 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (!phase || phase.map_id !== state.map_id) throw new Error('Unsupported source scene phase/map');
     return phase;
   }
+  function exactFields(value, fields) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value) &&
+      Object.keys(value).length === fields.length && fields.every(key=>Object.hasOwn(value,key));
+  }
+  function prepareCarry(source, actors, scenes) {
+    if (source === undefined) return null;
+    const fail = ()=>{ throw new Error('Invalid Pandora carry catalog/art'); };
+    if (!scenes || !exactFields(source,['map_id','policy','priority','tie_policy','poses','flight']) || source.map_id !== 12 ||
+        source.policy !== 'core-semantic-record0-not-native-timing' || source.priority !== 2 || source.tie_policy !== 'world-y-pot-after-ark') fail();
+    const keys=[], poses=Object.create(null), flight=Object.create(null);
+    const frame=(art,list,d)=>`pandora:${art}:${list}:0:${Number(d===2)}`;
+    // This finite validator pins source identity/pairing, never animation durations.
+    for (const [motion,art,arkLists,potLists] of [
+      ['lifting','80a261',[24,25,26],[43,44,45]], ['standing','80a24f',[3,4,5],[25,26,26]],
+      ['walking','80a255',[9,10,11],[29,29,30]], ['throwing','80a261',[15,16,17],[46,47,48]]]) {
+      for (let d=0;d<4;d++) {
+        const key=`${motion}:${d}`, p=source.poses?.[key], ark=frame(art,arkLists[Math.min(d,2)],d), pots=Object.create(null);
+        if (!exactFields(p,['ark','pots']) || p.ark !== ark || !actors[ark] || !exactFields(p.pots,['2442','2447'])) fail();
+        for (const [slot,id] of [[2442,'96e1a6'],[2447,'96e1ab']]) {
+          const pot=frame(id,potLists[Math.min(d,2)],d);
+          if (p.pots[slot] !== pot || !actors[pot]) fail();
+          pots[slot]=pot;
+        }
+        keys.push(key); poses[key]=Object.freeze({ark,pots:Object.freeze(pots)});
+      }
+    }
+    if (!exactFields(source.poses,keys) || !exactFields(source.flight,['2442','2447'])) fail();
+    for (const [slot,id] of [[2442,'96e1a6'],[2447,'96e1ab']]) {
+      const key=frame(id,60,1);
+      if (source.flight[slot] !== key || !actors[key]) fail();
+      flight[slot]=key;
+    }
+    return Object.freeze({poses:Object.freeze(poses),flight:Object.freeze(flight)});
+  }
+  function selectedCarry(art, state, phase) {
+    const c=state.carry;
+    if (c == null) {
+      // Source carry/pot/NPC rasters are not ordinary Ark keys. A missing overlay
+      // must not bypass the pair/lifetime checks simply by changing actor_key.
+      if (state.actor_key.startsWith('pandora:')) throw new Error('Missing typed carry pose');
+      return null;
+    }
+    const catalog=art.pandoraCarry, fail=()=>{ throw new Error('Unsupported core carry phase/slots/flight'); };
+    if (!phase || state.map_id !== 12 || !catalog || !exactFields(c,['pose','phase_tick','held_slot','reserved_slot','flight']) ||
+        typeof c.pose !== 'string' || !Object.hasOwn(catalog.poses,c.pose)) fail();
+    const p=catalog.poses[c.pose], [motion,d]=c.pose.split(':'), tick=c.phase_tick, hand=c.held_slot, reserved=c.reserved_slot;
+    if (p.ark !== state.actor_key || !Number.isInteger(tick) || tick < 0 ||
+        ![null,2442,2447].includes(hand) || ![null,2442,2447].includes(reserved) ||
+        phase.actors.some(a=>a.tie_rank >= phase.ark_tie_rank)) fail();
+    let position=[state.x,state.y], pot=hand === null ? null : p.pots[hand];
+    if (motion === 'throwing' && tick >= 18) {
+      if (d !== '1' || tick >= 32 || ![136,184].includes(state.x) || state.y !== 368 || hand !== null) fail();
+      const end=state.x === 184 ? 22 : 27;
+      if (tick < end) {
+        if (reserved === null || !Array.isArray(c.flight) || c.flight.length !== 2 ||
+            c.flight[0] !== state.x || c.flight[1] !== 357-3*(tick-18)) fail();
+        position=c.flight; pot=catalog.flight[reserved];
+      } else if (reserved !== null || c.flight !== null) fail();
+    } else if (hand === null || hand !== reserved || c.flight !== null ||
+        (motion === 'lifting' ? tick >= 23 : motion === 'throwing' ? tick >= 18 : tick !== 0)) fail();
+    // Only this typed overlay can add a pot. Source roster validation is separate.
+    return pot === null ? null : {key:pot,position,priority:2};
+  }
   // New bundles take {house:ImageData, exterior:ImageData}; legacy helper fixtures
   // may still pass one ImageData and supply the closed image to selectBackground.
   function prepareArt(bundle, background, makeRaster) {
@@ -509,7 +572,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       sceneIds[id] = ids.slice();
     }
     const pandoraScenes = prepareScenes(bundle.pandora_scenes,actors,backgroundKeys);
-    return {actors, foreground, sceneIds, pandoraScenes, highMasks, openHighMasks, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
+    const pandoraCarry = prepareCarry(bundle.pandora_carry,actors,pandoraScenes);
+    return {actors, foreground, sceneIds, pandoraScenes, pandoraCarry, highMasks, openHighMasks, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
@@ -546,7 +610,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   function selectActors(art, state) {
     selectActor(art, state); // Player and background remain mandatory.
-    const phase = selectedPhase(art,state);
+    const phase = selectedPhase(art,state), pot = selectedCarry(art,state,phase);
     const scene = state.scene, ids = phase ? ['ark',...phase.actors.map(actor=>actor.id)] : art.sceneIds[state.map_id];
     if (!Array.isArray(ids) || !Array.isArray(scene) || scene.length !== ids.length ||
         scene.some(entry => !entry || !ids.includes(entry.id) || typeof entry.key !== 'string' || !art.actors[entry.key] || !Array.isArray(entry.position) ||
@@ -562,7 +626,14 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           entry.position.some((v,j)=>v !== expected[i].position[j]))) throw new Error('Unsupported source scene roster/order/priority');
     } else if (scene.some(entry=>entry.priority !== undefined && entry.priority !== 2)) throw new Error('Unsupported legacy scene priority');
     // Validate source order, never sort by OBJ priority. Mirrors are precomposed.
-    return scene.map(entry => ({...art.actors[entry.key], position:entry.position,...(phase ? {priority:entry.priority} : {})}));
+    // Insert only the validated pot by world Y, after Ark/residents at equal Y.
+    // This explicit finite tie policy never reorders the source resident roster.
+    const entries = scene.slice();
+    if (pot) {
+      const before = entries.findIndex(entry=>entry.position[1] > pot.position[1]);
+      entries.splice(before < 0 ? entries.length : before,0,pot);
+    }
+    return entries.map(entry => ({...art.actors[entry.key], position:entry.position,...(phase ? {priority:entry.priority} : {})}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
   globalThis.RoomSlice = {composeObjects, backgroundManifest, createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};

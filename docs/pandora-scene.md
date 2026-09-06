@@ -362,3 +362,67 @@ explicit finite semantic policy, not newly qualified native transient OAM order
 or priority. Source residents and their ties remain unchanged. Parent still owns
 live GameState wiring, BG patches and acceptance; this section does not enable
 the capability or claim a continuous Pandora journey.
+
+### Typed frontend carry admission and evidence
+
+`state.carry` is absent/null for no override, otherwise exactly
+`{pose, phase_tick, held_slot, reserved_slot, flight}`. `pose` names one of the
+sixteen catalog entries (for example `walking:2` or `throwing:1`); slots are
+2442/2447 or null, and flight is the core `[x,y]` sample or null. The field is a
+host-generated projection, not proof of state provenance or a frontend action.
+
+`prepareArt` validates the complete catalog's exact source keys/pairs, mirrors,
+record0, map, priority and policy, then copies/freezes it. `selectActors` requires
+that typed pose's exact Ark key on a C source phase and validates tick/slot/flight
+lifetimes. No Pandora atlas key may impersonate ordinary Ark without an overlay.
+The supplied `scene` still must match the phase's exact residents, positions,
+keys, priorities and world-Y/source-tie order. It must NOT contain a pot entry.
+Only after that check does the renderer insert zero or one catalog-derived pot,
+using Ark's position in hand or the validated core point in flight. Resident
+ordering is never repaired or relaxed. Wrong fields, extra actors, missing sample,
+lingering reservation or mismatched key visibly pause the existing inline page.
+
+The unchanged compositor resolves winning OBJ before BG priority. Carry remains
+priority2; the separate renderer48 suite and its 16 browser cases cover mixed
+OBJ2/3 and the hidden-front-OBJ2/rear-OBJ3 case. Carry source rasters do not imply
+native lift/control priority transients, fragments, color math or duration timing.
+
+Focused carry verification:
+
+```sh
+node crates/map-inspector/tests/pandora-carry-check.js
+node crates/map-inspector/tests/room-slice-check.js
+node crates/map-inspector/tests/pandora-render-check.js
+node --test tools/verify-house-browser.test.js tools/verify-conversation-browser.test.js
+cargo test -p map-inspector
+cargo clippy -p map-inspector --all-targets -- -D warnings
+# Own ROM symlink under local/, and own house-only server/session (never parent8765).
+OUT="$(mktemp -d "$PWD/local/carry-evidence-XXXXXX")"
+PANDORA_CARRY_EXPORT="$OUT/art.json" cargo test -p map-inspector --bin map-inspector \
+  authenticated_catalog_is_opt_in_complete_and_requires_source_frames -- --nocapture \
+  > "$OUT/export.log" 2>&1
+# A fresh, nonempty export is mandatory: optional ROM-less test skips are not evidence.
+test -s "$OUT/art.json" && shasum -a 256 "$OUT/art.json"
+PANDORA_CARRY_EXPORT="$OUT/art.json" node crates/map-inspector/tests/pandora-carry-browser.js \
+  | agent-browser --session pandora-carry-preview eval --stdin
+```
+
+The browser checker imports the authenticated host export procedurally; it is not
+an independent ROM authenticator. It uses source NPC/carry rasters and anchors on
+a nonuniform **synthetic diagnostic BG**, with explicitly synthetic finite states.
+Its independent destination-pixel oracle compares all57,344 pixels in160 samples:
+32 motion/facing/kind choices and128 lane/kind/throw-tick choices. The run measured
+14,805 visible pot pixel-samples (FA hand6,346/flight698; FB hand6,993/flight768),
+47,922 high-BG-hidden winning OBJ samples and146 discriminating equal-Y pot/NPC
+samples excluding Ark overlap. Five mutations are detected: no pot, extra Y,
+double mirror, wrong FA/FB art and reversed pot/NPC order; the last must differ at
+an explicitly identified NPC-only pixel. These are samples, not160 distinct native
+frames. Host tests separately cover all pairs/slot lifetimes and an actual public
+PotState FA/x184 lift→walk→throw→recovery on synthetic admission geometry.
+
+Independent source correctness/architecture and evidence reviews approved this
+bounded contract. Existing15 frontend tests, renderer48/16-browser cases and
+ROM-backed host atlas/source-preservation tests pass. The live house-only page
+still hides pot controls. Parent acceptance and live GameState/real GameData
+integration remain open; there is no CPU fallback, capture-fed state or continuous
+Pandora journey claim here.

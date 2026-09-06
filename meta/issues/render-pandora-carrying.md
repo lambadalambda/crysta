@@ -44,3 +44,33 @@ returns an optional exact Ark key plus typed overlay; source NPC scenes remain u
   Its suggested reservation mutations and actual-core throw projection were added
   and pass. Native transient priority fidelity is explicitly excluded, not deferred
   into this patch. Frontend/evidence acceptance remains in progress.
+
+### Frontend/evidence checkpoint — open for parent acceptance
+
+- Red: the new overlay test returned2 actors instead of3 before implementation.
+  Green:160 finite pair/lifetime cases plus strict catalog, roster, map, slot,
+  flight, mirror and extra-field controls; inline invalid overlays visibly pause.
+  Prepared-catalog alias controls exercise both held-pose and flight entries.
+- Independent frontend correctness/architecture review approved exact source
+  roster preservation and narrow overlay insertion. Independent evidence review
+  approved the separate full-RGBA oracle and five detected mutations; follow-up
+  pins the depth mutation to actual NPC-only differing pixels. Reviews were
+  read-only source inspections, not independent reruns of owner executions.
+- Own server8876/session `pandora-carry-preview`:160×57,344 real Canvas2D pixels
+  compared,14,805 visible pot pixel-samples across FA/FB hand/flight,146 exact
+  pot/NPC depth witnesses,47,922 hidden-winning-OBJ samples, five controls detected.
+  ROM source rasters; diagnostic BG and finite states are synthetic. Not native
+  whole RGB, source timing, live GameState wiring or a continuous journey.
+- Fresh private evidence: `local/carry-evidence-wHKcN1/` (pointer in
+  `local/carry-evidence-root.txt`), non-skipped export log, browser script/result,
+  art SHA-256 `325a0dda2509b6a526b4ac12fcf8a0306960be9146967c809e2ba7bf6ea5dcdf`.
+  No raw art/capture data committed. Fresh-file check prevents ROM-less skips
+  from being used as browser evidence.
+- Regression gates passed: old15 Node frontend tests; inline page harness;
+  renderer48 pure cases plus16 full-canvas browser cases and mirror check;
+  all16 host art tests including unchanged house/482-frame source pixels;
+  full map-inspector suite (optional non-art fixtures may skip); strict Clippy.
+  House-only browser has no error and pot button remains hidden.
+- **Issue stays open.** Parent owns acceptance, real GameData/navigation, finite
+  BG patches and live wiring. No room_preview/core/assets/server/world-patch/
+  shared-index/backgrounds/door or action-controller changes were made.
