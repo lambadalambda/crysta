@@ -26,3 +26,7 @@
 - [ ] [Add enhanced and widescreen rendering](issues/enhanced-widescreen-rendering.md)
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
+- [ ] [Talk to the room B resident and leave the house](issues/talk-and-leave-house.md)
+- [ ] [Qualify the room B conversation and exterior progression](issues/qualify-house-conversation-progression.md)
+- [ ] [Decode the required opening dialogue presentation](issues/decode-house-conversation-text.md)
+- [ ] [Qualify the first exterior landing profile](issues/qualify-house-exterior-profile.md)
