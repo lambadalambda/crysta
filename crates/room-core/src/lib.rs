@@ -14,6 +14,7 @@ mod animation;
 pub mod conversation;
 pub mod events;
 mod house;
+mod pandora;
 pub mod pots;
 mod room;
 pub mod slice;

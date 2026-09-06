@@ -1,6 +1,7 @@
 //! Explicit semantic room preview over immutable data; not classic frame fidelity.
 use crate::conversation::{self, Active, ConversationSpec, DialogueOutput};
 use crate::events::EventFlags;
+pub use crate::pandora::{Invocation, PandoraText, RequestPages};
 use crate::transition::Transition;
 use crate::{
     AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,

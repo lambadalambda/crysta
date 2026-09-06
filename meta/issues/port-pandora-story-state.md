@@ -31,3 +31,11 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
 ## Notes
 
 - Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
+
+### Runtime implementation log
+
+- Foundation red → green: typed invocation identities and exact immutable text
+  catalog admission, including repeated D720 sites and corrected two-page warning.
+- API and evidence boundaries are recorded in `docs/pandora-runtime.md`.
+- Navigation/contact/forced pacing remains compiler-owned; no guessed core geometry.
+- Issue remains open; no browser/native aggregate acceptance claimed.
