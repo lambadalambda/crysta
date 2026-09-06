@@ -1,0 +1,3072 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "export_metadata_sha256": "d136a39495e739a6790552dc38d74e6c59fa4a36d62ac8218d58bf5085aebe46",
+  "art": [
+    {
+      "source": 8645604,
+      "lists": [
+        [
+          0,
+          1
+        ],
+        [
+          3,
+          4
+        ]
+      ]
+    },
+    {
+      "source": 8645758,
+      "lists": [
+        [
+          0,
+          1
+        ]
+      ]
+    },
+    {
+      "source": 8645943,
+      "lists": [
+        [
+          0,
+          2
+        ],
+        [
+          1,
+          2
+        ],
+        [
+          2,
+          2
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          4,
+          4
+        ],
+        [
+          5,
+          4
+        ],
+        [
+          6,
+          3
+        ],
+        [
+          7,
+          3
+        ],
+        [
+          8,
+          3
+        ]
+      ]
+    },
+    {
+      "source": 8645830,
+      "lists": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          1
+        ]
+      ]
+    },
+    {
+      "source": 8645978,
+      "lists": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "source": 8646004,
+      "lists": [
+        [
+          0,
+          1
+        ],
+        [
+          1,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "source": 8646136,
+      "lists": [
+        [
+          0,
+          1
+        ],
+        [
+          2,
+          1
+        ],
+        [
+          3,
+          4
+        ],
+        [
+          5,
+          4
+        ]
+      ]
+    },
+    {
+      "source": 8648896,
+      "lists": [
+        [
+          1,
+          1
+        ],
+        [
+          3,
+          16
+        ],
+        [
+          4,
+          16
+        ],
+        [
+          11,
+          17
+        ]
+      ]
+    },
+    {
+      "source": 8648872,
+      "lists": [
+        [
+          3,
+          16
+        ]
+      ]
+    },
+    {
+      "source": 8430159,
+      "lists": [
+        [
+          3,
+          1
+        ],
+        [
+          4,
+          1
+        ],
+        [
+          5,
+          1
+        ]
+      ]
+    },
+    {
+      "source": 8430165,
+      "lists": [
+        [
+          9,
+          6
+        ],
+        [
+          10,
+          6
+        ],
+        [
+          11,
+          6
+        ]
+      ]
+    },
+    {
+      "source": 8430177,
+      "lists": [
+        [
+          15,
+          4
+        ],
+        [
+          16,
+          4
+        ],
+        [
+          17,
+          4
+        ],
+        [
+          24,
+          2
+        ],
+        [
+          25,
+          2
+        ],
+        [
+          26,
+          2
+        ]
+      ]
+    },
+    {
+      "source": 8649092,
+      "lists": [
+        [
+          3,
+          8
+        ]
+      ]
+    },
+    {
+      "source": 9888166,
+      "lists": [
+        [
+          25,
+          1
+        ],
+        [
+          26,
+          1
+        ],
+        [
+          29,
+          6
+        ],
+        [
+          30,
+          6
+        ],
+        [
+          43,
+          2
+        ],
+        [
+          44,
+          2
+        ],
+        [
+          45,
+          2
+        ],
+        [
+          46,
+          2
+        ],
+        [
+          47,
+          2
+        ],
+        [
+          48,
+          2
+        ],
+        [
+          60,
+          1
+        ]
+      ]
+    },
+    {
+      "source": 9888171,
+      "lists": [
+        [
+          25,
+          1
+        ],
+        [
+          26,
+          1
+        ],
+        [
+          29,
+          6
+        ],
+        [
+          30,
+          6
+        ],
+        [
+          43,
+          2
+        ],
+        [
+          44,
+          2
+        ],
+        [
+          45,
+          2
+        ],
+        [
+          46,
+          2
+        ],
+        [
+          47,
+          2
+        ],
+        [
+          48,
+          2
+        ],
+        [
+          60,
+          1
+        ]
+      ]
+    },
+    {
+      "source": 9034233,
+      "lists": [
+        [
+          8,
+          7
+        ]
+      ]
+    }
+  ],
+  "phases": [
+    {
+      "actors": [
+        {
+          "art": 8645604,
+          "hflip": false,
+          "position": [
+            536,
+            304
+          ],
+          "position_source": 8620479,
+          "priority_override": null,
+          "selector": 3,
+          "source": 8620479,
+          "tie_rank": 5
+        },
+        {
+          "art": 8645604,
+          "hflip": false,
+          "position": [
+            552,
+            304
+          ],
+          "position_source": 8620489,
+          "priority_override": null,
+          "selector": 3,
+          "source": 8620489,
+          "tie_rank": 4
+        },
+        {
+          "art": 8645758,
+          "hflip": false,
+          "position": [
+            344,
+            272
+          ],
+          "position_source": 8620549,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8620549,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645943,
+          "hflip": false,
+          "position": [
+            456,
+            416
+          ],
+          "position_source": 8620569,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8620569,
+          "tie_rank": 2
+        },
+        {
+          "art": 8645943,
+          "hflip": false,
+          "position": [
+            632,
+            464
+          ],
+          "position_source": 8620579,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8620579,
+          "tie_rank": 1
+        },
+        {
+          "art": 8645943,
+          "hflip": false,
+          "position": [
+            568,
+            416
+          ],
+          "position_source": 8620589,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8620589,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 6,
+      "id": "town-source",
+      "limits": [
+        "SceneComposition",
+        "FrozenTown"
+      ],
+      "map": 10
+    },
+    {
+      "actors": [
+        {
+          "art": 8645830,
+          "hflip": false,
+          "position": [
+            360,
+            128
+          ],
+          "position_source": 8621758,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621758,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "resident-13",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 19
+    },
+    {
+      "actors": [
+        {
+          "art": 8645830,
+          "hflip": false,
+          "position": [
+            360,
+            128
+          ],
+          "position_source": 8621758,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8621758,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "resident-13-request",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 19
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-entry",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": true,
+          "position": [
+            120,
+            416
+          ],
+          "position_source": 8952577,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-choice",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-direct",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-first-hit",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-second-hit",
+      "limits": [
+        "SceneComposition",
+        "CellarColorMath",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-fourth-down",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 3
+        },
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            56,
+            384
+          ],
+          "position_source": 8621076,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621076,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 4,
+      "id": "c-fourth-up",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": false,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 3,
+      "id": "c-color-math",
+      "limits": [
+        "SceneComposition",
+        "CellarColorMath",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": true,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 3,
+      "id": "c-reaction-speaker",
+      "limits": [
+        "SceneComposition",
+        "CellarColorMath",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 2,
+          "source": 8621066,
+          "tie_rank": 2
+        },
+        {
+          "art": 8646004,
+          "hflip": true,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646136,
+          "hflip": true,
+          "position": [
+            216,
+            368
+          ],
+          "position_source": 8954378,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8621096,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 3,
+      "id": "c-reaction-right",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8645978,
+          "hflip": false,
+          "position": [
+            152,
+            368
+          ],
+          "position_source": 8954759,
+          "priority_override": null,
+          "selector": 0,
+          "source": 8621066,
+          "tie_rank": 1
+        },
+        {
+          "art": 8646004,
+          "hflip": true,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 2,
+      "id": "c-reaction-left",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [
+        {
+          "art": 8646004,
+          "hflip": true,
+          "position": [
+            184,
+            416
+          ],
+          "position_source": 8952528,
+          "priority_override": null,
+          "selector": 1,
+          "source": 8621086,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "c-reaction-final",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [],
+      "ark_tie_rank": 0,
+      "id": "c-departed",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 12
+    },
+    {
+      "actors": [],
+      "ark_tie_rank": 0,
+      "id": "cellar-e",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 14
+    },
+    {
+      "actors": [],
+      "ark_tie_rank": 0,
+      "id": "cellar-20",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 32
+    },
+    {
+      "actors": [
+        {
+          "art": 8649092,
+          "hflip": false,
+          "position": [
+            136,
+            384
+          ],
+          "position_source": 8622735,
+          "priority_override": null,
+          "selector": 3,
+          "source": 8622735,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "box-contact",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 33
+    },
+    {
+      "actors": [
+        {
+          "art": 8648896,
+          "hflip": false,
+          "position": [
+            136,
+            384
+          ],
+          "position_source": 8622715,
+          "priority_override": null,
+          "selector": 3,
+          "source": 8622715,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "box-opening",
+      "limits": [
+        "SceneComposition",
+        "OpeningPalette"
+      ],
+      "map": 33
+    },
+    {
+      "actors": [
+        {
+          "art": 8648896,
+          "hflip": false,
+          "position": [
+            136,
+            384
+          ],
+          "position_source": 8622715,
+          "priority_override": null,
+          "selector": 4,
+          "source": 8622715,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "box-opening-cue",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 33
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            96
+          ],
+          "position_source": 8623408,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-0",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            120
+          ],
+          "position_source": 9032436,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-1",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            64,
+            120
+          ],
+          "position_source": 9032462,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-2",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            88,
+            152
+          ],
+          "position_source": 9032488,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-3",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            152
+          ],
+          "position_source": 9032514,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-4",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            184,
+            152
+          ],
+          "position_source": 9032540,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-5",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            208,
+            120
+          ],
+          "position_source": 9032566,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-6",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            96
+          ],
+          "position_source": 9032592,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-41-7",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 65
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            392,
+            368
+          ],
+          "position_source": 8623613,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623613,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-44",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 68
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            368
+          ],
+          "position_source": 8623474,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623474,
+          "tie_rank": 1
+        },
+        {
+          "art": 9034233,
+          "hflip": false,
+          "position": [
+            72,
+            360
+          ],
+          "position_source": 9034238,
+          "priority_override": null,
+          "selector": 8,
+          "source": 8623484,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 2,
+      "id": "tour-42",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 66
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            392,
+            112
+          ],
+          "position_source": 8623552,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623552,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-43",
+      "limits": [
+        "SceneComposition",
+        "ScriptedMotion"
+      ],
+      "map": 67
+    },
+    {
+      "actors": [
+        {
+          "art": 8648872,
+          "hflip": false,
+          "position": [
+            136,
+            96
+          ],
+          "position_source": 8623408,
+          "priority_override": 3,
+          "selector": 3,
+          "source": 8623408,
+          "tie_rank": 0
+        }
+      ],
+      "ark_tie_rank": 1,
+      "id": "tour-control",
+      "limits": [
+        "SceneComposition"
+      ],
+      "map": 65
+    }
+  ],
+  "motions": [
+    {
+      "actor": 8621076,
+      "from": [
+        56,
+        384
+      ],
+      "id": "c-fourth-south",
+      "motion_operand": 136,
+      "removes_actor": false,
+      "selector": 3,
+      "source": 8955245,
+      "to": [
+        56,
+        448
+      ]
+    },
+    {
+      "actor": 8621076,
+      "from": [
+        56,
+        448
+      ],
+      "id": "c-fourth-align",
+      "motion_operand": 112,
+      "removes_actor": false,
+      "selector": 5,
+      "source": 8955256,
+      "to": [
+        120,
+        448
+      ]
+    },
+    {
+      "actor": 8621076,
+      "from": [
+        120,
+        448
+      ],
+      "id": "c-fourth-exit",
+      "motion_operand": 120,
+      "removes_actor": true,
+      "selector": 3,
+      "source": 8955267,
+      "to": [
+        120,
+        512
+      ]
+    },
+    {
+      "actor": 8621096,
+      "from": [
+        216,
+        368
+      ],
+      "id": "c-right-align",
+      "motion_operand": 112,
+      "removes_actor": false,
+      "selector": 5,
+      "source": 8954439,
+      "to": [
+        120,
+        368
+      ]
+    },
+    {
+      "actor": 8621096,
+      "from": [
+        120,
+        368
+      ],
+      "id": "c-right-exit",
+      "motion_operand": 120,
+      "removes_actor": true,
+      "selector": 3,
+      "source": 8954454,
+      "to": [
+        120,
+        496
+      ]
+    },
+    {
+      "actor": 8621066,
+      "from": [
+        152,
+        368
+      ],
+      "id": "c-left-align",
+      "motion_operand": 112,
+      "removes_actor": false,
+      "selector": 5,
+      "source": 8954847,
+      "to": [
+        120,
+        368
+      ]
+    },
+    {
+      "actor": 8621066,
+      "from": [
+        120,
+        368
+      ],
+      "id": "c-left-exit",
+      "motion_operand": 120,
+      "removes_actor": true,
+      "selector": 3,
+      "source": 8954858,
+      "to": [
+        120,
+        496
+      ]
+    },
+    {
+      "actor": 8621086,
+      "from": [
+        184,
+        416
+      ],
+      "id": "c-speaker-align",
+      "motion_operand": 96,
+      "removes_actor": false,
+      "selector": 5,
+      "source": 8952854,
+      "to": [
+        120,
+        416
+      ]
+    },
+    {
+      "actor": 8621086,
+      "from": [
+        120,
+        416
+      ],
+      "id": "c-speaker-exit",
+      "motion_operand": 104,
+      "removes_actor": true,
+      "selector": 3,
+      "source": 8952869,
+      "to": [
+        120,
+        512
+      ]
+    }
+  ],
+  "native": [
+    {
+      "label": "town-gap-up-rest",
+      "art": 8645604,
+      "slot": 4160,
+      "map": 10,
+      "palette_policy": "source-natural",
+      "selector": 3,
+      "record_indices": [
+        2
+      ],
+      "position": [
+        536,
+        304
+      ],
+      "piece": {
+        "first_oam": 22,
+        "components": 8,
+        "selected_tiles": [
+          74,
+          78,
+          91,
+          94,
+          100,
+          101,
+          116,
+          117
+        ],
+        "opaque": 379,
+        "bounds": [
+          -11,
+          -31,
+          11,
+          0
+        ],
+        "indexed_sha256": "4cc0f20a08b07defcbfe222c347b0d7349ba34160a7714b88bdc7e09a5e14302",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "80f586bfcf92b5774b09b78d4612be890c42b598ee728d534d2f8e977d103f3b",
+        "vram": "b25904dddd8e01396c45f4b8e8fae98393311464cc4360405ace8d5c47584690",
+        "cgram": "97ae8ba3f097ff653044b7e7433480f970d54f0d40549a4c9f317b303ad87e36",
+        "oam": "96e9dd66e495a84a8476e8d63922803146e9efc7dae1ea35ea8bba9aff01b22d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "town-door-ready",
+      "art": 8645758,
+      "slot": 4608,
+      "map": 10,
+      "palette_policy": "source-natural",
+      "selector": 0,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        344,
+        272
+      ],
+      "piece": {
+        "first_oam": 35,
+        "components": 10,
+        "selected_tiles": [
+          168,
+          184,
+          192,
+          203,
+          208
+        ],
+        "opaque": 432,
+        "bounds": [
+          -16,
+          -32,
+          16,
+          0
+        ],
+        "indexed_sha256": "b2c8a7385b5f82be219a0970c60855eb319dcf1ee5f108ccfc47693be4506493",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "0215450e278b9da047f095437dde9fe75e898092ec8829431b138bec22593355",
+        "vram": "748fed4d18ec0e448c16207f7f0bcf046b9fd7dc49e3ae8717baf8c78a22adf8",
+        "cgram": "5972356ffda382146ae146c8cbbe119996ef4a616380200c9ad5b85eedf3599f",
+        "oam": "2e5ab22d6ff67969827805de60e097c9f9cc29b40a341135b4b036d04473637f",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "town-gap-up-rest",
+      "art": 8645943,
+      "slot": 4736,
+      "map": 10,
+      "palette_policy": "source-natural",
+      "selector": 1,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        472,
+        416
+      ],
+      "piece": {
+        "first_oam": 0,
+        "components": 9,
+        "selected_tiles": [
+          227,
+          238,
+          239,
+          243,
+          254
+        ],
+        "opaque": 184,
+        "bounds": [
+          -8,
+          -16,
+          8,
+          0
+        ],
+        "indexed_sha256": "f67766dd6e421031636fe65bdb1749e9e550b45b645bcf4cd5920db5b1aa583f",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "80f586bfcf92b5774b09b78d4612be890c42b598ee728d534d2f8e977d103f3b",
+        "vram": "b25904dddd8e01396c45f4b8e8fae98393311464cc4360405ace8d5c47584690",
+        "cgram": "97ae8ba3f097ff653044b7e7433480f970d54f0d40549a4c9f317b303ad87e36",
+        "oam": "96e9dd66e495a84a8476e8d63922803146e9efc7dae1ea35ea8bba9aff01b22d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "13-admit",
+      "art": 8645830,
+      "slot": 4160,
+      "map": 19,
+      "palette_policy": "source-natural",
+      "selector": 0,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        360,
+        128
+      ],
+      "piece": {
+        "first_oam": 8,
+        "components": 10,
+        "selected_tiles": [
+          32,
+          46,
+          47,
+          49,
+          63
+        ],
+        "opaque": 404,
+        "bounds": [
+          -8,
+          -32,
+          8,
+          0
+        ],
+        "indexed_sha256": "00581d53c0f280ba8deddf9bd2fe2d4c602671c851b082af6c73b0a219423e2c",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "e2e9eb0180b0f7e0254576d1a8ca9100afa584046774878151d323640229d1ee",
+        "vram": "5acc798baeff472476c8170fad86473512f3e9e03a7ba9f4e0c530969717a5b2",
+        "cgram": "d27a18eb5b719530ab03a206f6e91d6ff4a8b5b0c25f61b8325a9c9106f8f69c",
+        "oam": "a57c4f81e3595078a5dcc7862c5429e30a2b12fb24d3d256351c4b9e9749289c",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "C-direct-ready",
+      "art": 8645978,
+      "slot": 4160,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 2,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        152,
+        368
+      ],
+      "piece": {
+        "first_oam": 21,
+        "components": 4,
+        "selected_tiles": [
+          162,
+          163,
+          175,
+          178,
+          179,
+          191,
+          192,
+          193,
+          208,
+          209
+        ],
+        "opaque": 313,
+        "bounds": [
+          -8,
+          -33,
+          8,
+          0
+        ],
+        "indexed_sha256": "99bd294f6d2325d329fef2732e13ac6d3e0e995023235617faf373dbecaa103c",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "d43fc1ccba09cd285d632e76dc19382017ee5bc89ba21b433410f16892b23896",
+        "vram": "6651af4434b1eef2672e83d819e58eb220754a6f4fb76ec961656924dfb41558",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "oam": "91410e742799b61f7dfc1659f766fede8f463de410ba1df3bc546d04c3d92a84",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "C-direct-ready",
+      "art": 8646004,
+      "slot": 4288,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 1,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        184,
+        416
+      ],
+      "piece": {
+        "first_oam": 8,
+        "components": 9,
+        "selected_tiles": [
+          38,
+          64,
+          65,
+          80,
+          81,
+          90,
+          91,
+          92
+        ],
+        "opaque": 436,
+        "bounds": [
+          -16,
+          -32,
+          16,
+          0
+        ],
+        "indexed_sha256": "4157836b20586b2bc887c8c0d006ef95b0611807427b82791a08ed4da5c2b851",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "d43fc1ccba09cd285d632e76dc19382017ee5bc89ba21b433410f16892b23896",
+        "vram": "6651af4434b1eef2672e83d819e58eb220754a6f4fb76ec961656924dfb41558",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "oam": "91410e742799b61f7dfc1659f766fede8f463de410ba1df3bc546d04c3d92a84",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "C-direct-ready",
+      "art": 8646136,
+      "slot": 4352,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 2,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        216,
+        368
+      ],
+      "piece": {
+        "first_oam": 25,
+        "components": 4,
+        "selected_tiles": [
+          175,
+          191,
+          192,
+          193,
+          205,
+          206,
+          208,
+          209,
+          221,
+          222
+        ],
+        "opaque": 324,
+        "bounds": [
+          -8,
+          -32,
+          8,
+          0
+        ],
+        "indexed_sha256": "07e09e446a76bf8c920b6c275bfd354930bee9de83ac6b62c7e6d42795420a36",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "d43fc1ccba09cd285d632e76dc19382017ee5bc89ba21b433410f16892b23896",
+        "vram": "6651af4434b1eef2672e83d819e58eb220754a6f4fb76ec961656924dfb41558",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "oam": "91410e742799b61f7dfc1659f766fede8f463de410ba1df3bc546d04c3d92a84",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "21-box-contact-rest",
+      "art": 8649092,
+      "slot": 4352,
+      "map": 33,
+      "palette_policy": "source-natural",
+      "selector": 3,
+      "record_indices": [
+        7
+      ],
+      "position": [
+        136,
+        384
+      ],
+      "piece": {
+        "first_oam": 0,
+        "components": 2,
+        "selected_tiles": [
+          110,
+          111,
+          126,
+          127,
+          142,
+          143,
+          158,
+          159
+        ],
+        "opaque": 180,
+        "bounds": [
+          -8,
+          -32,
+          8,
+          0
+        ],
+        "indexed_sha256": "b36806d387f81989122edde81266341fbba34a6695a68f02e73df16132d85e9c",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "d7da6daed5fa2d45d5f0168bb65313b3f061614be1676e265b581d7da2eb01e0",
+        "vram": "a9d6902ecaf5aa391e26a8bbebd2ee769292e64d0accf6c1b16871439b9249fa",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "oam": "61af5708f5b29652799dd31b02d3c831b317996d96a2a7c048d041e503e9f594",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "21-opening",
+      "art": 8648896,
+      "slot": 4224,
+      "map": 33,
+      "palette_policy": "native-white-effect-source-program-unqualified",
+      "selector": 3,
+      "record_indices": [
+        9,
+        11
+      ],
+      "position": [
+        136,
+        384
+      ],
+      "piece": {
+        "first_oam": 0,
+        "components": 4,
+        "selected_tiles": [
+          184,
+          185
+        ],
+        "opaque": 110,
+        "bounds": [
+          -8,
+          -26,
+          7,
+          -10
+        ],
+        "indexed_sha256": "0edd9489a2ebe2540e1ced9d922088f4038cb3ac2e8f26a2c82b69ed1d9e4d78",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "57d70834ca8af681655765c74bb27bedc5f6e97034b012cd8720538130317b82",
+        "vram": "9e49e802975a82c438837b7174da31d73f6206c70f619b6934b6361250f5479a",
+        "cgram": "e905dde65259c25d62514c96251d191d24f04388193666138e8c2960c608db31",
+        "oam": "df598360a94ccdcc416288110001a2fe892ac56c12c36715f73dfff2f1e579e5",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "tutorial-002",
+      "art": 8648896,
+      "slot": 4224,
+      "map": 33,
+      "palette_policy": "source-natural",
+      "selector": 4,
+      "record_indices": [
+        2
+      ],
+      "position": [
+        136,
+        384
+      ],
+      "piece": {
+        "first_oam": 0,
+        "components": 8,
+        "selected_tiles": [
+          170,
+          172,
+          186,
+          189
+        ],
+        "opaque": 171,
+        "bounds": [
+          -11,
+          -28,
+          10,
+          0
+        ],
+        "indexed_sha256": "8274caf133df124c47f82ca2b9d3663f9a339a5e2bc7333773003307bf119eb0",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "869bebdcbc5474d715557eb524891d4be7acb34d10ded6c489e9ad78d3cf5e1a",
+        "vram": "869564e4141cdd4bd1b88cdcd4addc09f710c6e0d80b66639c98943f26af7f9a",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "oam": "20aaee38ac9b85cb5ac15e252b7c05ee00fcba92249b444b3f987a3284ceeb42",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "tutorial-016",
+      "art": 8648872,
+      "slot": 4160,
+      "map": 65,
+      "palette_policy": "source-natural",
+      "selector": 3,
+      "record_indices": [
+        2
+      ],
+      "position": [
+        136,
+        120
+      ],
+      "piece": {
+        "first_oam": 8,
+        "components": 8,
+        "selected_tiles": [
+          168,
+          172,
+          184,
+          189
+        ],
+        "opaque": 166,
+        "bounds": [
+          -11,
+          -28,
+          10,
+          0
+        ],
+        "indexed_sha256": "a74de3c6b39f02404814d151885ef30307fdac849faf95a3d2b1c83ef5c78f5b",
+        "actor_override": 12288
+      },
+      "hashes": {
+        "wram": "3227a4a78452f00e63e55d0efc9006dda08936373d914f7d9216e4a775a3bbef",
+        "vram": "b30ce314ba13d07fab4eabd377b5da974f321a276a24ae59d9bd85a3d86197c0",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "87af12738d7ee5eaf4fafaf9604cd1ffab9eb530943176dd53677a972b6f3b0b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "tutorial-040",
+      "art": 9034233,
+      "slot": 4224,
+      "map": 66,
+      "palette_policy": "source-natural",
+      "selector": 8,
+      "record_indices": [
+        2,
+        4
+      ],
+      "position": [
+        72,
+        360
+      ],
+      "piece": {
+        "first_oam": 12,
+        "components": 1,
+        "selected_tiles": [
+          98
+        ],
+        "opaque": 13,
+        "bounds": [
+          -3,
+          -5,
+          5,
+          3
+        ],
+        "indexed_sha256": "2931069622b0b6838fbd7c74036d00d36a3f8aca2d83ae9b8ef331fa585f39bf",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "bde700bbac43e759370bce9356b7168f8b76940b74986a2cde603ea61056e2e1",
+        "vram": "5d5aaced27545f2c419642cf4e2b7847f32a4abee82815f6f1e2586bd0fb5d77",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "bfe068baccec8394076a9063109c64c541c1a40f73f581b3160b193485d685cb",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "left-pot-held",
+      "art": 9888166,
+      "slot": 4800,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 26,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        40,
+        352
+      ],
+      "piece": {
+        "first_oam": 21,
+        "components": 1,
+        "selected_tiles": [
+          106,
+          107,
+          122,
+          123
+        ],
+        "opaque": 153,
+        "bounds": [
+          -8,
+          -45,
+          8,
+          -29
+        ],
+        "indexed_sha256": "737348310254700cda0aa8bb6b3ff095867244b8709f0f81dc23a1d970b911a3",
+        "actor_override": 15872
+      },
+      "hashes": {
+        "wram": "89e2048e4e95dbabc9440f7935372f561a4fe831fd90415bce8a36e4abc2f6cf",
+        "vram": "f8d17348c763c9e824257df6b7574036eb39f8b2660f71e423354432292de512",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "bd041af1ce03ea0de406a2cb8b2053316c302cc16c5e8581ce4148ef1b303332",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "middle-held",
+      "art": 9888171,
+      "slot": 4800,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 26,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        88,
+        352
+      ],
+      "piece": {
+        "first_oam": 21,
+        "components": 1,
+        "selected_tiles": [
+          106,
+          107,
+          122,
+          123
+        ],
+        "opaque": 168,
+        "bounds": [
+          -8,
+          -45,
+          8,
+          -29
+        ],
+        "indexed_sha256": "51fd942c63266cdf9eaf2a3c95db7cca49407e07e209fe61140b8b5cb33a76fe",
+        "actor_override": 3584
+      },
+      "hashes": {
+        "wram": "900b02c26d2294d0ec2e3c746961c34ebbe2e9544c32267f446e8025e8ddc1f9",
+        "vram": "8e4079568f81e24d171494e4051a78e38f1460da6544ba2dbe3d9049a6983de7",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "d7b198482c007828be89173a8042856d9ee44d38a4da62c147e839a94f85cd6e",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "left-pot-held",
+      "art": 8430159,
+      "slot": 4096,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 5,
+      "record_indices": [
+        0
+      ],
+      "position": [
+        40,
+        352
+      ],
+      "piece": {
+        "first_oam": 22,
+        "components": 7,
+        "selected_tiles": [
+          4,
+          5,
+          6,
+          7,
+          20,
+          21,
+          22,
+          36,
+          37,
+          76,
+          77,
+          92,
+          93
+        ],
+        "opaque": 341,
+        "bounds": [
+          -8,
+          -35,
+          8,
+          0
+        ],
+        "indexed_sha256": "28c79462df6a9d0150a44507c7a5c6376ee92e17a260418d25e5d502d93b60cb",
+        "actor_override": 12288
+      },
+      "hashes": {
+        "wram": "89e2048e4e95dbabc9440f7935372f561a4fe831fd90415bce8a36e4abc2f6cf",
+        "vram": "f8d17348c763c9e824257df6b7574036eb39f8b2660f71e423354432292de512",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "bd041af1ce03ea0de406a2cb8b2053316c302cc16c5e8581ce4148ef1b303332",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "left-carry-down",
+      "art": 8430165,
+      "slot": 4096,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 9,
+      "record_indices": [
+        4
+      ],
+      "position": [
+        40,
+        416
+      ],
+      "piece": {
+        "first_oam": 1,
+        "components": 7,
+        "selected_tiles": [
+          6,
+          7,
+          22,
+          23,
+          98,
+          99,
+          105,
+          114,
+          115,
+          335,
+          351
+        ],
+        "opaque": 363,
+        "bounds": [
+          -10,
+          -30,
+          10,
+          0
+        ],
+        "indexed_sha256": "aec7dd6ea6f11628cd884cfd1baf76bae6c814f45ed0f6c5a528c1232fc1f30b",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "5c02593531d11d4c6dcee18dc07a33be1ed9fb68e897b3ec5b3152abca0c663c",
+        "vram": "ccbe2bb2c4ee2beed0e2c8b7f237652c2c551b4eda2c2113c2e58f6a67113c09",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "5dc9707802689c4b5e66c30f8cb5a67ef56e369e64087288feefa8d3237bccd5",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "left-carry-north",
+      "art": 8430165,
+      "slot": 4096,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 10,
+      "record_indices": [
+        4
+      ],
+      "position": [
+        136,
+        391
+      ],
+      "piece": {
+        "first_oam": 10,
+        "components": 7,
+        "selected_tiles": [
+          38,
+          39,
+          54,
+          55,
+          104,
+          120,
+          121,
+          136,
+          137,
+          366,
+          382
+        ],
+        "opaque": 384,
+        "bounds": [
+          -10,
+          -31,
+          10,
+          0
+        ],
+        "indexed_sha256": "f55366d66041698ae58a775633451f665e39203763bd6a4e4679fe81bbf6b661",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "03384459431e64f7f5d4c02ee970c9b4de9fc76860ee3e030ea42f9904589333",
+        "vram": "4d36a0bf77c26b22a8cd8dc5a7bb006b11e9711b01d7944f5402ef92503838f7",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "c727c3aac414270a14ae65e93b1f22b4f72cb946e26ec0f86c0e72a5231b030d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    },
+    {
+      "label": "left-carry-east",
+      "art": 8430165,
+      "slot": 4096,
+      "map": 12,
+      "palette_policy": "source-natural",
+      "selector": 11,
+      "record_indices": [
+        1
+      ],
+      "position": [
+        135,
+        448
+      ],
+      "piece": {
+        "first_oam": 1,
+        "components": 8,
+        "selected_tiles": [
+          70,
+          71,
+          86,
+          87,
+          128,
+          129,
+          144,
+          145,
+          160,
+          161,
+          367,
+          398,
+          399,
+          415
+        ],
+        "opaque": 328,
+        "bounds": [
+          -9,
+          -34,
+          9,
+          0
+        ],
+        "indexed_sha256": "fd33f1d71aa51a5448104933cc4536ec15f1eda708701b488e330cb9cc8e960f",
+        "actor_override": 0
+      },
+      "hashes": {
+        "wram": "08181f0f49beb11b0dcf8dbc8754aac54214a68921ab7128352cd2c705b5f9cd",
+        "vram": "489f1a7bc2733088b78af8d995b21d836e8b850967110404b7101c8a75675587",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "944247f6377290d3475fad9e514c34abd0f92b2da8d9788f18ed183ce3cd718d",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      }
+    }
+  ],
+  "phase_witnesses": [
+    {
+      "label": "C-direct-ready",
+      "phase": "c-direct",
+      "hashes": {
+        "wram": "d43fc1ccba09cd285d632e76dc19382017ee5bc89ba21b433410f16892b23896",
+        "vram": "6651af4434b1eef2672e83d819e58eb220754a6f4fb76ec961656924dfb41558",
+        "cgram": "9b36359c38d2f840221a720e30a2c48377409b8855073d256fc48585d9e8af6f",
+        "oam": "91410e742799b61f7dfc1659f766fede8f463de410ba1df3bc546d04c3d92a84",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621066,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 21,
+          "opaque": 313
+        },
+        {
+          "source": 8621076,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 17,
+          "opaque": 313
+        },
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 8,
+          "opaque": 436
+        },
+        {
+          "source": 8621096,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 25,
+          "opaque": 324
+        }
+      ]
+    },
+    {
+      "label": "cellar-sequence-002",
+      "phase": "c-color-math",
+      "hashes": {
+        "wram": "0c27c86e8f6a82412a1f6a174a8329ae48e1975e3fce2cc5d3cf3bdc7048f390",
+        "vram": "0adf99ed190ed4852f62f73dab7dee803919efab467aed0797c6d7b81193d29d",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "7b4c067f35109cf82a4ce5dfea9a6c148655aaf87f6930e0517ccfe37d51c117",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621066,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 17,
+          "opaque": 313
+        },
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 0,
+          "opaque": 436
+        },
+        {
+          "source": 8621096,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 21,
+          "opaque": 324
+        }
+      ]
+    },
+    {
+      "label": "cellar-sequence-005",
+      "phase": "c-reaction-speaker",
+      "hashes": {
+        "wram": "7daa4723932920e5b52ed6dc3744d5e2bb21795ca18ed59d1a929f380554021f",
+        "vram": "6a0b550a6722edccc998d83d9058278e23600de5c6b66f3c0410c30ef635d5b0",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "e777ead47eccfe4087540f9c4a41e961ce8748b19df802e7789252e5ee757ba9",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621066,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 17,
+          "opaque": 313
+        },
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 0,
+          "opaque": 436
+        },
+        {
+          "source": 8621096,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 21,
+          "opaque": 324
+        }
+      ]
+    },
+    {
+      "label": "cellar-sequence-006",
+      "phase": "c-reaction-right",
+      "hashes": {
+        "wram": "414ad48f33f72733177c812082f8e1a497997dc683815b4b0d5b91c6f9b4f2ac",
+        "vram": "51ec6e65bd68f21143a23cf2669a5b252ef2b49b8a757034d01b07257bddb062",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "d456f86346387af3bb4932496f7d9636af4dbb12f47d792e701e2a1f66c42b25",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621066,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 17,
+          "opaque": 313
+        },
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 0,
+          "opaque": 436
+        },
+        {
+          "source": 8621096,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 21,
+          "opaque": 416
+        }
+      ]
+    },
+    {
+      "label": "cellar-sequence-007",
+      "phase": "c-reaction-left",
+      "hashes": {
+        "wram": "6af06d4b696decab58b73626f1931d81bc9257010cd1a6d077a0c98fcd6e4f12",
+        "vram": "e74bd90b93d40097a489d168f64a56915a3fed3ae19a1c1678634b44d7243fb8",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "a26730a6c4d6ecaa075169cf4d322406b9668d957c975f4c4326ffba9ea74032",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621066,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 17,
+          "opaque": 402
+        },
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 0,
+          "opaque": 436
+        }
+      ]
+    },
+    {
+      "label": "cellar-sequence-008",
+      "phase": "c-reaction-final",
+      "hashes": {
+        "wram": "4217c790f28c021fe824b89c5fcb9c61c146b50159d2c667ef11455775028dd2",
+        "vram": "4a6f0215e1d337661ccd307bca1f89f07d2bd76542dd09d4d182604d69e144ef",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "1f848975853b240dd480eb42a322ef4338182ffb112bfc53aab1acfc7e6e3d7a",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8621086,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 0,
+          "opaque": 436
+        }
+      ]
+    },
+    {
+      "label": "door-passable",
+      "phase": "c-departed",
+      "hashes": {
+        "wram": "4e7cfa92e3fc24635d8164f2ee08c8bcb0e93a8bf56df713252d992592373b35",
+        "vram": "0dc309232cbad0e108c0b34dfd11546418ae2e413b01deb90f3e66095045a016",
+        "cgram": "aca2bed9e52cb32a8721a52ce593fc7b7a04d8ad92b9fc692c5e75ad3488876a",
+        "oam": "6d6a21640fff6bbbb803077247d123e8910fff909d606c7e453ffabdf8232b04",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": []
+    },
+    {
+      "label": "landed-E",
+      "phase": "cellar-e",
+      "hashes": {
+        "wram": "1fb512db3d58b3d5e5f163eb7df2dc1f898b5319f74c4feb9d216146e3820bd3",
+        "vram": "e022b5d8f6d05468869f9f87af7deeb036a72656f9a032beefe382be786e45ac",
+        "cgram": "36804efc51a208cbe6bb5c70876c398dde4954399a9868cb62557680d09304aa",
+        "oam": "e1899a31cb83549b4c570dd0ab628a0eddbae360115f236db2a3ae2febd358c2",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": []
+    },
+    {
+      "label": "landed-20",
+      "phase": "cellar-20",
+      "hashes": {
+        "wram": "0ac50bcea5c58854e92c4007c0f8621b503c08a738971ca999a8505fcc86e091",
+        "vram": "7ca96dc4697e118e4a70433f8110cb45f59d76675cecc04353015ac0beec2f91",
+        "cgram": "1b87687f39218d3f96ce53c95b554a476024478a4bc254972cce899bf0106a2c",
+        "oam": "e1899a31cb83549b4c570dd0ab628a0eddbae360115f236db2a3ae2febd358c2",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": []
+    },
+    {
+      "label": "21-box-contact-rest",
+      "phase": "box-contact",
+      "hashes": {
+        "wram": "d7da6daed5fa2d45d5f0168bb65313b3f061614be1676e265b581d7da2eb01e0",
+        "vram": "a9d6902ecaf5aa391e26a8bbebd2ee769292e64d0accf6c1b16871439b9249fa",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "oam": "61af5708f5b29652799dd31b02d3c831b317996d96a2a7c048d041e503e9f594",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8622735,
+          "record_indices": [
+            7
+          ],
+          "first_oam": 0,
+          "opaque": 180
+        }
+      ]
+    },
+    {
+      "label": "21-opening",
+      "phase": "box-opening",
+      "hashes": {
+        "wram": "57d70834ca8af681655765c74bb27bedc5f6e97034b012cd8720538130317b82",
+        "vram": "9e49e802975a82c438837b7174da31d73f6206c70f619b6934b6361250f5479a",
+        "cgram": "e905dde65259c25d62514c96251d191d24f04388193666138e8c2960c608db31",
+        "oam": "df598360a94ccdcc416288110001a2fe892ac56c12c36715f73dfff2f1e579e5",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8622715,
+          "record_indices": [
+            9,
+            11
+          ],
+          "first_oam": 0,
+          "opaque": 110
+        }
+      ]
+    },
+    {
+      "label": "tutorial-002",
+      "phase": "box-opening-cue",
+      "hashes": {
+        "wram": "869bebdcbc5474d715557eb524891d4be7acb34d10ded6c489e9ad78d3cf5e1a",
+        "vram": "869564e4141cdd4bd1b88cdcd4addc09f710c6e0d80b66639c98943f26af7f9a",
+        "cgram": "5dfb7d99768752bc6f7595f65e2ad080f94000f36b54c9932332e02033143bb1",
+        "oam": "20aaee38ac9b85cb5ac15e252b7c05ee00fcba92249b444b3f987a3284ceeb42",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8622715,
+          "record_indices": [
+            2
+          ],
+          "first_oam": 0,
+          "opaque": 171
+        }
+      ]
+    },
+    {
+      "label": "tutorial-014",
+      "phase": "tour-41-0",
+      "hashes": {
+        "wram": "ecd784a14acb888d729c2b6ef9117e18909665c537c0ebb19b148f920cbe415a",
+        "vram": "8f8879651a17373aae601fdb1c397171116f8337863dff577ac139c376d079a3",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "b8d5ebcbada3135484805ea45cb6ce2310a51bbc5b7ed65afe06f27c94000e4b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            9,
+            11
+          ],
+          "first_oam": 8,
+          "opaque": 110
+        }
+      ]
+    },
+    {
+      "label": "tutorial-016",
+      "phase": "tour-41-1",
+      "hashes": {
+        "wram": "3227a4a78452f00e63e55d0efc9006dda08936373d914f7d9216e4a775a3bbef",
+        "vram": "b30ce314ba13d07fab4eabd377b5da974f321a276a24ae59d9bd85a3d86197c0",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "87af12738d7ee5eaf4fafaf9604cd1ffab9eb530943176dd53677a972b6f3b0b",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            2
+          ],
+          "first_oam": 8,
+          "opaque": 166
+        }
+      ]
+    },
+    {
+      "label": "tutorial-020",
+      "phase": "tour-41-2",
+      "hashes": {
+        "wram": "921a68e89cc0c8b917881aa471e5c3cec05443603a34f5eae58096061ba0067d",
+        "vram": "3e8e6d8c709f84873d91165ce15ace2f35733ad3b302d22fd73a60b24edc0da3",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "900e1cbf65ec43298f4b10ad5a58aa47ee694313fa1104deb819a511da2e93fb",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            9,
+            11
+          ],
+          "first_oam": 8,
+          "opaque": 110
+        }
+      ]
+    },
+    {
+      "label": "tutorial-022",
+      "phase": "tour-41-3",
+      "hashes": {
+        "wram": "ef08ba53c413e6e9a6b425a86bac0025abd788ee699a2f7c5aade323f19340e7",
+        "vram": "210aad49f1e53936c9b6dda3958155dd386dc6f80f0145dd55844d7dcd2625c3",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "12078a085ed1b745243e141514c42644bd171071db1caa3b7463e1a036e30085",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            2
+          ],
+          "first_oam": 8,
+          "opaque": 166
+        }
+      ]
+    },
+    {
+      "label": "tutorial-024",
+      "phase": "tour-41-4",
+      "hashes": {
+        "wram": "67bbd4f724e0ef4c48879b2eaf69549d6698cc75e49a3a6c962274ca76b01a30",
+        "vram": "c695b00631269eeb07d0bd7a08a4ae9c1ec4eb27f3a317c706db5586172a626b",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "86e1ed397c04e0c761c9b9acd4af0a26a110f855547d04b5fbe77600b3236aec",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            10
+          ],
+          "first_oam": 8,
+          "opaque": 166
+        }
+      ]
+    },
+    {
+      "label": "tutorial-026",
+      "phase": "tour-41-5",
+      "hashes": {
+        "wram": "5899e41345b5eda719d2dbc041bb4718d08b6cf92243a2b7c18d93d4dbbe0c1b",
+        "vram": "26bf24a91ef83a3843f40d7215a98914583b60f0e0629be9ab5117bd8b813579",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "9f2b1b18a5aa168a9509b05afda4dd78da40feabf8ee97cf7a82cc6521a72cb1",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            1,
+            3
+          ],
+          "first_oam": 8,
+          "opaque": 110
+        }
+      ]
+    },
+    {
+      "label": "tutorial-028",
+      "phase": "tour-41-6",
+      "hashes": {
+        "wram": "cfbca1cd567b95a1936a382d3e65d3f6a67ca78781156972b79daad94c13cf01",
+        "vram": "e95d2d7eb73b3bf9d7cac99323a8235e95032b1f48f6e47fa01373332183f26a",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "d9ee45ea3faa06fa94525b8e658e6596ca2845bd18290d9b7ce4fc500c8f60a8",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            8
+          ],
+          "first_oam": 8,
+          "opaque": 164
+        }
+      ]
+    },
+    {
+      "label": "tutorial-030",
+      "phase": "tour-41-7",
+      "hashes": {
+        "wram": "b3392e854a9cf52e8ccd301d8c7b01fc622ac8fdd2979dadd4e7f84730617bee",
+        "vram": "89d273f2f3f671d6cfa8ade6565ca1b0968e0f71615910b0467af6d8722e28d1",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "56fc79b6f2c97810d53287bc145a4a512c634f3597d8e593e4d6e5acb76982e4",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            0
+          ],
+          "first_oam": 8,
+          "opaque": 164
+        }
+      ]
+    },
+    {
+      "label": "tutorial-031",
+      "phase": "tour-44",
+      "hashes": {
+        "wram": "0f0615ff645dd68a9316a99fa402b74e746b1188f72a5c90bc8feffe5f554a81",
+        "vram": "14369d057f70564de9e443d9313d1f5edb10460bfce78ab5a721ccd09e089453",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "04d2eeaa4a56979ff799d41c7a5becd228ce79a899ae502ce212ca5c0a6173aa",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623613,
+          "record_indices": [
+            4,
+            12
+          ],
+          "first_oam": 8,
+          "opaque": 166
+        }
+      ]
+    },
+    {
+      "label": "tutorial-040",
+      "phase": "tour-42",
+      "hashes": {
+        "wram": "bde700bbac43e759370bce9356b7168f8b76940b74986a2cde603ea61056e2e1",
+        "vram": "5d5aaced27545f2c419642cf4e2b7847f32a4abee82815f6f1e2586bd0fb5d77",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "bfe068baccec8394076a9063109c64c541c1a40f73f581b3160b193485d685cb",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623474,
+          "record_indices": [
+            9,
+            11
+          ],
+          "first_oam": 8,
+          "opaque": 110
+        },
+        {
+          "source": 8623484,
+          "record_indices": [
+            2,
+            4
+          ],
+          "first_oam": 12,
+          "opaque": 13
+        }
+      ]
+    },
+    {
+      "label": "tutorial-044",
+      "phase": "tour-43",
+      "hashes": {
+        "wram": "fc7201d29ec5a1224808f1fd3d0c9eee8d5622c5c7eabedb702b11f5a37980df",
+        "vram": "54ec6913073aa29b7f3ebdb400c70bdb60fb4f918618b07cc088a07735bdc6d8",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "04d2eeaa4a56979ff799d41c7a5becd228ce79a899ae502ce212ca5c0a6173aa",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623552,
+          "record_indices": [
+            4,
+            12
+          ],
+          "first_oam": 8,
+          "opaque": 166
+        }
+      ]
+    },
+    {
+      "label": "pandora-tour-control",
+      "phase": "tour-control",
+      "hashes": {
+        "wram": "53274a5edd5983f181bd174df2cdbc7f6bdd1a36a5e22decfd3bf3c20711718b",
+        "vram": "856c5e1c79f8541ee870788954027e4e3cbe8dd0eba67e52a6fd6a6760d339b0",
+        "cgram": "77c7393eccce3bc1923cf641575f091915d9e0e9160e73a14bbc7ee586ab87a5",
+        "oam": "aed96ddcb9028886e364c86e35965289d89445a4e36231fdae1265e5a9f9b7b7",
+        "obj": "99be5efb88ca2013bd8e4eb035fd42d5245468fe9afa70d8ba9c1c419a48c4e8"
+      },
+      "actors": [
+        {
+          "source": 8623408,
+          "record_indices": [
+            5,
+            7,
+            13,
+            15
+          ],
+          "first_oam": 8,
+          "opaque": 112
+        }
+      ]
+    }
+  ],
+  "evidence": "original journey, hardware surfaces only; no pixels"
+}
