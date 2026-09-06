@@ -39,8 +39,10 @@ None remaining; M0 is complete. Verification record:
 ### Issues
 
 None remaining; M1 is complete. The boot-to-name-entry and cursor scenarios
-run for both JP and EU. The Pandora's Box / Crysta scenario is blocked by a
-game-script desync (not an emulator defect) and is outside M1 scope.
+run for both JP and EU. The earlier claimed ares game-script desync was not
+qualified. A fresh Japanese input-only journey now reaches the house conversation
+and exterior; [Pandora qualification](issues/qualify-pandora-route.md) remains an
+M4 evidence gate, not a demonstrated emulator or game-script failure.
 Core swap: ares (ISC) replaced LakeSnes per
 [ADR 0002](../docs/adr/0002-reference-emulator.md).
 
