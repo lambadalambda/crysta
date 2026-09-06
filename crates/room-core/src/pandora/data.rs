@@ -552,6 +552,9 @@ impl PandoraData {
                     return Err(SliceError::Data);
                 }
             }
+            if room.cells()[19 * 32 + 8] != 0x1cf2 || room.cells()[20 * 32 + 8] != 0x1cf3 {
+                return Err(SliceError::Data);
+            }
             let door = match key {
                 CollisionKey::CClosed => [0x1d80, 0x0b81],
                 CollisionKey::CDamaged => [0x1da7, 0x0b81],

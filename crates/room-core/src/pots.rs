@@ -154,7 +154,8 @@ impl Admission<'_> {
         let mut room = self.room.clone();
         for (i, object) in self.objects.iter().enumerate() {
             if consumed & (1 << i) != 0 {
-                room.replace_cell(usize::from(object.cell), object.replacement);
+                let cell = usize::from(object.cell);
+                room.replace_cell(cell, object.replacement | (room.cells()[cell] & 0x8000));
             }
         }
         if self.cellar_up_lanes && up && room.width() > 11 && room.height() > 21 {
@@ -173,6 +174,30 @@ impl Admission<'_> {
 }
 
 impl PotState {
+    pub(crate) const fn ledger(self) -> u64 {
+        self.consumed
+    }
+    // Aggregate-only accounting for the admitted callback lane. Admission validates
+    // the launch; this is not a second mutable hit/event authority.
+    pub(crate) fn contact_reached(self) -> bool {
+        self.phase == Phase::Throwing && self.walking.x() == 184 && self.age >= 19
+    }
+    pub(crate) const fn idle_empty(self) -> bool {
+        matches!(self.phase, Phase::Empty) && !self.delayed_action
+    }
+    pub(crate) fn with_ledger(
+        a: &Admission<'_>,
+        walking: WalkingState,
+        facing: Direction,
+        consumed: u64,
+    ) -> Result<Self, Error> {
+        let mut state = Self::new(a, walking, facing)?;
+        if a.objects.len() < 64 && consumed >> a.objects.len() != 0 {
+            return Err(Error::Source);
+        }
+        state.consumed = consumed;
+        Ok(state)
+    }
     // Aggregate-only qualified forced motion: preserve the visit ledger, never a new pot.
     pub(crate) fn rebase(&mut self, walking: WalkingState, facing: Direction) -> Result<(), Error> {
         if self.phase != Phase::Empty || self.delayed_action {

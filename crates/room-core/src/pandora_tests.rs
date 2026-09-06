@@ -34,6 +34,8 @@ fn data() -> GameData {
             let (width, height) = key.dimensions();
             let mut cells = vec![0; usize::from(width) * usize::from(height)];
             if key.map() == 0xc {
+                cells[19 * 32 + 8] = 0x1cf2;
+                cells[20 * 32 + 8] = 0x1cf3;
                 cells[21 * 32 + 11] = 0x0b81;
                 cells[20 * 32 + 11] = 0x1d80;
                 match key {
@@ -207,7 +209,7 @@ fn at(
     s.map_id = map;
     s.walking = WalkingState::new(position.0, position.1);
     s.animation = AnimationState::standing(facing);
-    s.pandora_load();
+    s.pandora_load().unwrap();
     s.ensure_pot(data.pandora.as_ref().unwrap()).unwrap();
     s
 }
@@ -248,7 +250,7 @@ fn same_new_game_opt_in_identity_and_old_profile_remain_distinct() {
     let mut s = GameState::new_game(&d, Policy::SemanticPreview);
     assert_eq!(s.output().position, (304, 112));
     assert_eq!(s.output().tick, 0);
-    assert_eq!(&s.snapshot()[..8], b"RSLC\x02\x0b\x00\x01");
+    assert_eq!(&s.snapshot()[..8], b"RSLC\x03\x0b\x00\x01");
     assert_eq!(
         &GameState::new_game(&old, Policy::SemanticPreview).snapshot()[..8],
         b"RSLC\x01\x09\x00\x01"
@@ -278,7 +280,7 @@ fn aggregate_resident_c_choice_and_unsupported_errors_restore_per_action() {
     s.map_id = 0xc;
     s.walking = WalkingState::new(136, 352);
     s.animation = AnimationState::standing(Direction::Down);
-    s.pandora_load();
+    s.pandora_load().unwrap();
     assert!(s.flags.contains(0x27).unwrap());
     drain(&mut s, &d);
     let before = s.snapshot();
@@ -452,7 +454,7 @@ fn canonical_aggregate_rejects_erased_ownership_flags_motion_and_identity() {
     let mut s = at(&d, 0xc, (136, 352), Direction::Down, &[0x26, 0x28]);
     drain(&mut s, &d);
     let valid = s.snapshot();
-    assert_eq!(valid.len(), 300);
+    assert_eq!(valid.len(), 320);
     for (offset, value) in [
         (4, 1),
         (5, 9),
@@ -470,7 +472,7 @@ fn canonical_aggregate_rejects_erased_ownership_flags_motion_and_identity() {
         bad[offset] = value;
         assert!(GameState::restore(&d, &bad).is_err(), "offset {offset}");
     }
-    for len in [0, 8, 180, 181, 245, 299, 301] {
+    for len in [0, 8, 180, 181, 245, 299, 300, 319, 321] {
         let mut bad = valid.clone();
         bad.resize(len, 0);
         assert!(GameState::restore(&d, &bad).is_err());
@@ -770,4 +772,426 @@ fn missing_copdf_readiness_does_not_grant_or_reload() {
     let mut forged = before;
     forged[109 + 0x22 / 8] |= 1 << (0x22 % 8);
     assert!(GameState::restore(&d, &forged).is_err());
+}
+
+// Synthetic load boundaries isolate cache lifetime, not a native itinerary.
+fn load_at(s: &mut GameState, d: &GameData, map: u16, position: (u16, u16)) {
+    s.map_id = map;
+    s.walking = WalkingState::new(position.0, position.1);
+    s.animation = AnimationState::standing(Direction::Up);
+    s.pandora_load().unwrap();
+    s.ensure_pot(d.pandora.as_ref().unwrap()).unwrap();
+}
+
+#[test]
+fn sheet_survives_shared_loads_but_replacement_reconstructs_closed_wood() {
+    let d = data();
+    let mut s = at(
+        &d,
+        0xc,
+        (40, 352),
+        Direction::Right,
+        &[0x26, 0x28, 0x27, 0x2e],
+    );
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 24);
+    // A consumed empty boundary is seeded transparently; ordinary pot snapshots
+    // remain the public component format, not an aggregate initializer.
+    let mut pot = s.pot_state().unwrap().encode_snapshot();
+    pot[29..32].fill(0);
+    let spec = d.pandora.as_ref().unwrap();
+    let admission = crate::pots::Admission {
+        room: spec.room(CollisionKey::CClosed),
+        objects: &spec.objects,
+        cellar_up_lanes: true,
+        door_hit_enabled: true,
+    };
+    s.pandora.as_mut().unwrap().pot =
+        Some(crate::pots::PotState::decode_snapshot(&admission, &pot).unwrap());
+    for map in [0xd, 0xc, 0xb, 0xc] {
+        load_at(&mut s, &d, map, (136, 352));
+        let out = s.pandora_output(&d).unwrap();
+        assert!(out.sheet.resident);
+        assert_eq!(out.sheet.consumed, 1);
+        assert_eq!(out.door_counter, 0);
+        assert_eq!(out.locals, 0);
+        assert_eq!(s.consumed_pots(&d).unwrap().len(), 1);
+        assert_eq!(s.effective_room(&d).unwrap().cells()[21 * 32 + 3], 0xf8);
+        assert_eq!(
+            s.effective_room(&d).unwrap().cells()[19 * 32 + 8] & 0x7fff,
+            0x1cf6
+        );
+        assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    }
+    load_at(&mut s, &d, 0xa, (136, 208));
+    assert!(!s.pandora_output(&d).unwrap().sheet.resident);
+    assert!(s.consumed_pots(&d).unwrap().is_empty());
+    assert!(!s.wooden_door_open());
+    load_at(&mut s, &d, 0xd, (136, 600));
+    assert!(!s.wooden_door_open());
+    assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    load_at(&mut s, &d, 0xc, (136, 352));
+    assert!(s.pot_state().is_some());
+    // New sheet, then a consumed/empty boundary before reopening the rebuilt door.
+    // This deliberately synthetic seam checks that Interact does not replace the ledger.
+    s.pandora.as_mut().unwrap().pot =
+        Some(crate::pots::PotState::with_ledger(&admission, s.walking, Direction::Up, 1).unwrap());
+    replay(&mut s, &d, GameState::interact);
+    assert!(s.wooden_door_open());
+    assert_eq!(s.consumed_pots(&d).unwrap().len(), 1);
+    assert_eq!(s.effective_room(&d).unwrap().cells()[19 * 32 + 8], 0x1cf6);
+    assert_eq!(s.current_room(&d).unwrap().cells()[19 * 32 + 8], 0x1cf2);
+}
+
+// Qualified held-launch seam, not proof of the intervening native carry route.
+fn held_launch(s: &mut GameState, d: &GameData) {
+    let mut bytes = s.pot_state().unwrap().encode_snapshot();
+    let walking = WalkingState::new(184, 368);
+    bytes[4..20].copy_from_slice(&walking.encode_snapshot());
+    bytes[28] = Direction::Up as u8;
+    let spec = d.pandora.as_ref().unwrap();
+    let admission = crate::pots::Admission {
+        room: s.current_room(d).unwrap(),
+        objects: &spec.objects,
+        cellar_up_lanes: true,
+        door_hit_enabled: true,
+    };
+    s.pandora.as_mut().unwrap().pot =
+        Some(crate::pots::PotState::decode_snapshot(&admission, &bytes).unwrap());
+    s.walking = walking;
+    s.animation = AnimationState::standing(Direction::Up);
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // Keep the cross-visit action/cache regression in order.
+fn retained_damage_new_visit_throw_and_five_cell_shared_patch_lifetime() {
+    let mut d = data();
+    let spec = d.pandora.as_mut().unwrap();
+    spec.objects.push(SourceObject {
+        cell: 21 * 32 + 5,
+        raw: 0x18fa,
+        replacement: 0x00f8,
+    });
+    for profile in &mut spec.rooms {
+        if profile.key.map() == 0xc {
+            profile.room.replace_cell(21 * 32 + 5, 0x18fa);
+        }
+    }
+    // Distinct source scene rosters: the departed C stamp is not in E/20.
+    for key in [
+        CollisionKey::COpen,
+        CollisionKey::CellarE,
+        CollisionKey::Cellar20,
+    ] {
+        d.pandora.as_mut().unwrap().rooms[key as usize]
+            .room
+            .replace_cell(
+                31 * 32 + 7,
+                if key == CollisionKey::COpen {
+                    0x9ce8
+                } else {
+                    0x1ce8
+                },
+            );
+    }
+    let mut s = at(
+        &d,
+        0xc,
+        (40, 352),
+        Direction::Right,
+        &[0x26, 0x28, 0x27, 0x2e],
+    );
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 24);
+    held_launch(&mut s, &d);
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 33);
+    drain(&mut s, &d);
+    assert_eq!(s.pandora_output(&d).unwrap().door_counter, 1);
+    for map in [0xd, 0xc] {
+        load_at(&mut s, &d, map, (88, 352));
+        assert_eq!(s.pandora_output(&d).unwrap().door_counter, 0);
+        assert_eq!(s.pandora_output(&d).unwrap().locals, 0);
+        assert_eq!(
+            s.pandora_output(&d).unwrap().sheet.cellar,
+            CellarDoorPatch::Damaged
+        );
+        assert_eq!(s.effective_room(&d).unwrap().cells()[20 * 32 + 11], 0x1da7);
+        assert_eq!(s.consumed_pots(&d).unwrap().len(), 1);
+        assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    }
+    s.animation = AnimationState::standing(Direction::Left);
+    s.pandora
+        .as_mut()
+        .unwrap()
+        .pot
+        .as_mut()
+        .unwrap()
+        .rebase(s.walking, Direction::Left)
+        .unwrap();
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 24);
+    held_launch(&mut s, &d);
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 1);
+    assert_eq!(s.pandora.unwrap().frozen, Some(CollisionKey::CDamaged));
+    assert_eq!(s.pandora_output(&d).unwrap().door_counter, 0);
+    for (offset, value) in [
+        (300, 0),
+        (301, 0),
+        (302, 0),
+        (303, 1),
+        (304, 1),
+        (312, 3),
+        (292, CollisionKey::CClosed as u8),
+    ] {
+        let mut bad = s.snapshot();
+        bad[offset] = value;
+        assert!(GameState::restore(&d, &bad).is_err(), "offset {offset}");
+    }
+    frames(&mut s, &d, None, 32);
+    drain(&mut s, &d);
+    // Same-map reload still clears locals/counter, but not the cracked sheet.
+    let mut same = s.clone();
+    load_at(&mut same, &d, 0xc, (184, 368));
+    assert_eq!(same.pandora_output(&d).unwrap().door_counter, 0);
+    assert_eq!(same.pandora_output(&d).unwrap().locals, 0);
+    assert_eq!(
+        same.pandora_output(&d).unwrap().sheet.cellar,
+        CellarDoorPatch::Damaged
+    );
+    assert_eq!(GameState::restore(&d, &same.snapshot()).unwrap(), same);
+
+    s.walking = WalkingState::new(104, 352);
+    s.animation = AnimationState::standing(Direction::Left);
+    s.pandora
+        .as_mut()
+        .unwrap()
+        .pot
+        .as_mut()
+        .unwrap()
+        .rebase(s.walking, Direction::Left)
+        .unwrap();
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 24);
+    held_launch(&mut s, &d);
+    replay(&mut s, &d, GameState::pot_action);
+    frames(&mut s, &d, None, 33);
+    drain(&mut s, &d);
+    assert_eq!(s.effective_room(&d).unwrap().cells()[31 * 32 + 7], 0x9ce8);
+    let opened = s.clone();
+    for map in [0xb, 0xc, 0xd, 0xe, 0x20] {
+        load_at(&mut s, &d, map, (136, 352));
+        let out = s.pandora_output(&d).unwrap();
+        assert_eq!(out.sheet.cellar, CellarDoorPatch::Open);
+        assert_eq!(out.sheet.consumed, 7);
+        assert_eq!(out.door_counter, 0);
+        assert_eq!(out.locals, 0);
+        let room = s.effective_room(&d).unwrap();
+        for (cell, word) in [
+            (20 * 32 + 11, 0x1cf6),
+            (21 * 32 + 11, 0x3acb),
+            (21 * 32 + 3, 0xf8),
+            (21 * 32 + 4, 0xf8),
+            (21 * 32 + 5, 0xf8),
+        ] {
+            assert_eq!(room.cells()[cell], word);
+        }
+        if matches!(map, 0xe | 0x20) {
+            assert_eq!(room.cells()[31 * 32 + 7], 0x1ce8);
+        }
+        assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    }
+    for map in [0xa, 0x13, 0x21] {
+        let mut replaced = opened.clone();
+        load_at(&mut replaced, &d, map, (136, 208));
+        assert!(!replaced.wooden_door_open());
+        assert_eq!(
+            replaced.pandora_output(&d).unwrap().sheet,
+            SharedSheetOutput {
+                resident: false,
+                cellar: CellarDoorPatch::Closed,
+                consumed: 0
+            }
+        );
+        assert_eq!(
+            GameState::restore(&d, &replaced.snapshot()).unwrap(),
+            replaced
+        );
+        if map == 0xa {
+            let mut returned = replaced.clone();
+            let spec = d.pandora.as_mut().unwrap();
+            let id = u8::try_from(spec.motions.len()).unwrap();
+            // Synthetic pacing, authenticated route identity; exercise the runtime
+            // motion load seam and snapshot cursors, not a native movement claim.
+            spec.motions.push(MotionSpec {
+                key: MotionKey::Travel(Travel::TownToHouse),
+                trigger: Some(anchor((136, 208), Direction::Up)),
+                frames: [(0xa, false), (0xd, true), (0xd, false)]
+                    .into_iter()
+                    .map(|(map_id, reload)| MotionFrame {
+                        map_id,
+                        reload,
+                        anchor: anchor(
+                            if map_id == 0xa {
+                                (136, 208)
+                            } else {
+                                (136, 600)
+                            },
+                            Direction::Up,
+                        ),
+                        scene: if map_id == 0xa {
+                            ScenePhase::TownSource
+                        } else {
+                            ScenePhase::House
+                        },
+                    })
+                    .collect(),
+            });
+            returned.pandora.as_mut().unwrap().motion = Some((id, 0));
+            for _ in 0..3 {
+                replay(&mut returned, &d, neutral);
+            }
+            assert!(returned.flags.contains(0x292).unwrap());
+            assert_eq!(
+                returned.pandora_output(&d).unwrap().sheet.cellar,
+                CellarDoorPatch::Closed
+            );
+            assert_eq!(
+                GameState::restore(&d, &returned.snapshot()).unwrap(),
+                returned
+            );
+            returned.walking = WalkingState::new(120, 608);
+            returned.transition = Some(Transition::select(0xd, 1, (120, 608)).unwrap());
+            for _ in 0..17 {
+                replay(&mut returned, &d, neutral);
+            }
+            let before = returned.snapshot();
+            assert_eq!(neutral(&mut returned, &d), Err(SliceError::Exit));
+            assert_eq!(returned.snapshot(), before);
+        }
+        replaced.map_id = 0xc;
+        assert_eq!(replaced.pandora_load(), Err(SliceError::Exit));
+    }
+}
+
+#[test]
+fn persistent_words_keep_current_scene_occupancy_and_original_admission_catalog() {
+    let mut d = data();
+    let source_cell = 21 * 32 + 3;
+    // An E-only actor occupies a persistent pot cell. Never copy a previous
+    // room's bit15 and never clear this scene's bit15 when replacing the tile.
+    d.pandora.as_mut().unwrap().rooms[CollisionKey::CellarE as usize]
+        .room
+        .replace_cell(source_cell, 0x98fa);
+    let mut s = at(
+        &d,
+        0xc,
+        (136, 352),
+        Direction::Up,
+        &[0x26, 0x28, 0x27, 0x2e],
+    );
+    let spec = d.pandora.as_ref().unwrap();
+    let admission = crate::pots::Admission {
+        room: spec.room(CollisionKey::CClosed),
+        objects: &spec.objects,
+        cellar_up_lanes: true,
+        door_hit_enabled: true,
+    };
+    s.pandora.as_mut().unwrap().pot =
+        Some(crate::pots::PotState::with_ledger(&admission, s.walking, Direction::Up, 3).unwrap());
+    // Synthetic settled opened boundary; no native journey claim.
+    flag(&mut s, 0x292);
+    let state = s.pandora.as_mut().unwrap();
+    state.sheet.cellar = CellarDoorPatch::Open;
+    state.visit_cellar = CellarDoorPatch::Open;
+    state.visit_consumed = 3;
+    load_at(&mut s, &d, 0xe, (136, 864));
+    assert_eq!(s.effective_room(&d).unwrap().cells()[source_cell], 0x80f8);
+    assert_eq!(s.current_room(&d).unwrap().cells()[source_cell], 0x98fa);
+    assert_eq!(GameState::restore(&d, &s.snapshot()).unwrap(), s);
+    load_at(&mut s, &d, 0xc, (136, 352));
+    // Reentry admission still sees raw FA/FB, not the consumed effective room.
+    assert!(s.pot_state().is_some());
+    assert_eq!(s.effective_room(&d).unwrap().cells()[source_cell], 0xf8);
+    assert_eq!(s.current_room(&d).unwrap().cells()[source_cell], 0x18fa);
+    frames(&mut s, &d, None, 2);
+}
+
+fn settled_first_hit(d: &GameData) -> GameState {
+    let mut s = at(
+        d,
+        0xc,
+        (40, 352),
+        Direction::Right,
+        &[0x26, 0x28, 0x27, 0x2e],
+    );
+    replay(&mut s, d, GameState::pot_action);
+    frames(&mut s, d, None, 24);
+    held_launch(&mut s, d);
+    replay(&mut s, d, GameState::pot_action);
+    frames(&mut s, d, None, 33);
+    drain(&mut s, d);
+    s
+}
+
+#[test]
+fn snapshot_cannot_resurrect_an_already_hit_pot() {
+    let d = data();
+    let s = settled_first_hit(&d);
+    let mut bad = s.snapshot();
+    bad[281] = 2; // Held
+    bad[283] = 1; // The sole object already spent on the first hit.
+    assert!(GameState::restore(&d, &bad).is_err());
+}
+
+#[test]
+fn snapshot_baseline_damage_requires_prior_consumption() {
+    let d = data();
+    let s = settled_first_hit(&d);
+    let mut bad = s.snapshot();
+    bad[302] = 1; // Retained damage, but baseline ledger is empty.
+    assert!(GameState::restore(&d, &bad).is_err());
+}
+
+#[test]
+fn snapshot_arrival_cannot_retain_departing_visit_action() {
+    let d = data();
+    let s = settled_first_hit(&d);
+    let mut bad = s.snapshot();
+    bad[82] = 6; // D -> C, arrival already reconstructed C.
+    bad[103] = 34;
+    bad[104..106].copy_from_slice(&120_u16.to_le_bytes());
+    bad[106..108].copy_from_slice(&608_u16.to_le_bytes());
+    assert!(GameState::restore(&d, &bad).is_err());
+}
+
+#[test]
+fn retained_damage_house_reload_replays_every_owned_tick() {
+    let d = data();
+    let mut s = settled_first_hit(&d);
+    // Seed only the admitted exit onset; execute both complete doorway schedules.
+    for (map, index, handoff, facing) in [
+        (0xc, 0, (120, 464), Direction::Down),
+        (0xd, 1, (120, 608), Direction::Up),
+    ] {
+        assert_eq!(s.map_id, map);
+        s.walking = WalkingState::new(handoff.0, handoff.1);
+        s.animation = AnimationState::standing(facing);
+        if let Some(pot) = s.pandora.as_mut().unwrap().pot.as_mut() {
+            pot.rebase(s.walking, facing).unwrap();
+        }
+        s.transition = Some(Transition::select(map, index, handoff).unwrap());
+        for _ in 0..35 {
+            replay(&mut s, &d, neutral);
+        }
+        assert_eq!(s.pandora_output(&d).unwrap().door_counter, 0);
+        assert_eq!(
+            s.pandora_output(&d).unwrap().sheet.cellar,
+            CellarDoorPatch::Damaged
+        );
+        assert_eq!(s.consumed_pots(&d).unwrap().len(), 1);
+    }
+    assert_eq!(s.walking.position(), (120, 447));
+    assert_eq!(s.pot_state().unwrap().walking(), &s.walking);
 }

@@ -1,4 +1,5 @@
 //! Aggregate Pandora ownership. Source pacing/collision stay immutable compiler inputs.
+use super::shared_sheet::{self, Sheet};
 #[allow(clippy::wildcard_imports)] // Child integration shares the enclosing slice types.
 use super::*;
 use crate::pandora::{Node, Runtime};
@@ -36,6 +37,8 @@ pub struct PandoraOutput {
     pub door_counter: u8,
     /// Room locals0..31, read from the sole story projection.
     pub locals: u32,
+    /// Resident shared-sheet patches, independent of the current room visit.
+    pub sheet: SharedSheetOutput,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct State {
@@ -43,6 +46,9 @@ pub(super) struct State {
     pub motion: Option<(u8, u16)>, // immutable motion index; next sample index
     pub pot: Option<PotState>,
     pub frozen: Option<CollisionKey>,
+    pub sheet: Sheet,
+    pub visit_consumed: u64,
+    pub visit_cellar: CellarDoorPatch,
 }
 impl State {
     pub const fn new() -> Self {
@@ -51,6 +57,9 @@ impl State {
             motion: None,
             pot: None,
             frozen: None,
+            sheet: Sheet::new(true),
+            visit_consumed: 0,
+            visit_cellar: CellarDoorPatch::Closed,
         }
     }
     pub fn owns(self) -> bool {
@@ -64,9 +73,9 @@ impl State {
             0xc if has(0x27) => {
                 if self.graph.counter == 2 && self.graph.node != Node::Control {
                     CollisionKey::CReaction
-                } else if has(0x292) {
+                } else if self.sheet.cellar == CellarDoorPatch::Open {
                     CollisionKey::COpen
-                } else if self.graph.counter == 1 {
+                } else if self.sheet.cellar == CellarDoorPatch::Damaged {
                     CollisionKey::CDamaged
                 } else {
                     CollisionKey::CClosed
@@ -239,6 +248,11 @@ impl GameState {
                 .map(|(id, cursor)| (spec.motions[usize::from(id)].key, cursor)),
             owner,
             door_counter: state.graph.counter,
+            sheet: SharedSheetOutput {
+                resident: state.sheet.resident,
+                cellar: state.sheet.cellar,
+                consumed: state.consumed(),
+            },
             locals: u32::from_le_bytes(
                 self.flags.bytes()[..4]
                     .try_into()
@@ -246,7 +260,7 @@ impl GameState {
             ),
         })
     }
-    /// Read-only per-visit component: phase/tick/facing/walking and canonical ledger.
+    /// Read-only per-visit action component with the resident sheet's canonical ledger.
     /// Hand/reservation slots can be queried through `pot_slots`; no mutable access.
     #[must_use]
     pub fn pot_state(&self) -> Option<&PotState> {
@@ -261,37 +275,42 @@ impl GameState {
         let Some(pot) = state.pot else {
             return Ok((None, None));
         };
-        let a = self.pot_admission(spec, state)?;
+        let room = self.pot_room(spec, state)?;
+        let a = self.pot_admission(spec, &room);
         Ok((pot.held_slot_in(&a), pot.reserved_slot_in(&a)))
     }
-    fn pot_admission<'a>(
-        &self,
-        spec: &'a PandoraData,
-        state: State,
-    ) -> Result<pots::Admission<'a>, SliceError> {
+    fn pot_room(&self, spec: &PandoraData, state: State) -> Result<Room, SliceError> {
         let key = state
             .frozen
             .or_else(|| state.collision(self.map_id, &self.flags))
             .ok_or(SliceError::Data)?;
-        Ok(pots::Admission {
-            room: spec.room(key),
+        let mut room = spec.room(key).clone();
+        shared_sheet::wood(&mut room, self.wooden_door_open);
+        Ok(room)
+    }
+    fn pot_admission<'a>(&self, spec: &'a PandoraData, room: &'a Room) -> pots::Admission<'a> {
+        pots::Admission {
+            room,
             objects: &spec.objects,
             cellar_up_lanes: spec.cellar_up_lanes,
             door_hit_enabled: self.flags.contains(0x28) == Ok(true)
                 && self.flags.contains(0x292) == Ok(false),
-        })
+        }
     }
     pub(super) fn ensure_pot(&mut self, spec: &PandoraData) -> Result<(), SliceError> {
         let mut state = self.pandora.ok_or(SliceError::Data)?;
         if self.map_id == 0xc && self.flags.contains(0x2e) == Ok(true) && state.pot.is_none() {
+            let room = self.pot_room(spec, state)?;
             state.pot = Some(
-                PotState::new(
-                    &self.pot_admission(spec, state)?,
+                PotState::with_ledger(
+                    &self.pot_admission(spec, &room),
                     self.walking,
                     self.animation.facing(),
+                    state.sheet.parked_consumed,
                 )
                 .map_err(SliceError::Pot)?,
             );
+            state.sheet.parked_consumed = 0;
             self.pandora = Some(state);
         }
         Ok(())
@@ -305,8 +324,9 @@ impl GameState {
             .or_else(|| state.collision(self.map_id, &self.flags))
             .ok_or(SliceError::Data)?;
         let before = pot.phase();
+        let room = self.pot_room(spec, state)?;
         let output = pot
-            .step(&self.pot_admission(spec, state)?, input)
+            .step(&self.pot_admission(spec, &room), input)
             .map_err(SliceError::Pot)?;
         if before != pots::Phase::Throwing && pot.phase() == pots::Phase::Throwing {
             state.frozen = Some(key);
@@ -316,6 +336,11 @@ impl GameState {
         }
         if output.door_hit {
             state.graph.hit(&mut self.flags)?;
+            state.sheet.cellar = if state.graph.counter == 1 {
+                CellarDoorPatch::Damaged
+            } else {
+                CellarDoorPatch::Open
+            };
         }
         self.walking = *pot.walking();
         if output.movement.is_some() {
@@ -352,12 +377,11 @@ impl GameState {
         *self = next;
         Ok(self.output())
     }
-    pub(super) fn pandora_load(&mut self) {
+    pub(super) fn pandora_load(&mut self) -> Result<(), SliceError> {
         if let Some(state) = &mut self.pandora {
-            state.graph.load(self.map_id, &mut self.flags);
-            state.pot = None;
-            state.frozen = None;
+            state.load(self.map_id, &mut self.flags, &mut self.wooden_door_open)?;
         }
+        Ok(())
     }
     pub(super) fn step_pandora(
         &mut self,
@@ -395,7 +419,7 @@ impl GameState {
                 )?;
             } else {
                 next.walking
-                    .step(next.current_room(data)?, input)
+                    .step(&next.effective_room(data)?, input)
                     .map_err(SliceError::Walking)?;
                 next.animation.advance(next.walking.active_direction());
             }
@@ -419,9 +443,7 @@ impl GameState {
         self.walking = WalkingState::new(frame.anchor.position.0, frame.anchor.position.1);
         self.animation = AnimationState::standing(frame.anchor.facing);
         if frame.reload {
-            state.graph.load(self.map_id, &mut self.flags);
-            state.pot = None;
-            state.frozen = None;
+            state.load(self.map_id, &mut self.flags, &mut self.wooden_door_open)?;
             self.fresh_bedroom = false;
             self.d_open_loaded = self.map_id == 0xd && self.flags.contains(0x26) == Ok(true);
         }
@@ -607,6 +629,25 @@ impl State {
             motion,
             pot: None,
             frozen,
+            sheet: Sheet {
+                resident: match bytes[300] {
+                    0 => false,
+                    1 => true,
+                    _ => return Err(SliceError::Snapshot),
+                },
+                cellar: CellarDoorPatch::decode(bytes[301])?,
+                parked_consumed: u64::from_le_bytes(
+                    bytes[304..312]
+                        .try_into()
+                        .map_err(|_| SliceError::Snapshot)?,
+                ),
+            },
+            visit_cellar: CellarDoorPatch::decode(bytes[302])?,
+            visit_consumed: u64::from_le_bytes(
+                bytes[312..320]
+                    .try_into()
+                    .map_err(|_| SliceError::Snapshot)?,
+            ),
         };
         if bytes[252..292] != [0; 40] {
             if map != 0xc || flags.contains(0x2e) != Ok(true) {
@@ -615,8 +656,10 @@ impl State {
             let key = frozen
                 .or_else(|| state.collision(map, flags))
                 .ok_or(SliceError::Snapshot)?;
+            let mut room = spec.room(key).clone();
+            shared_sheet::wood(&mut room, bytes[108] == 1);
             let admission = pots::Admission {
-                room: spec.room(key),
+                room: &room,
                 objects: &spec.objects,
                 cellar_up_lanes: spec.cellar_up_lanes,
                 door_hit_enabled: flags.contains(0x28) == Ok(true)
@@ -626,18 +669,14 @@ impl State {
                 PotState::decode_snapshot(&admission, &bytes[252..292])
                     .map_err(|_| SliceError::Snapshot)?,
             );
-            let pot = state.pot.ok_or(SliceError::Snapshot)?;
-            if spec
-                .objects
-                .iter()
-                .filter(|o| pot.consumed_in(&admission, o.cell))
-                .count()
-                < usize::from(graph.counter)
-            {
-                return Err(SliceError::Snapshot);
-            }
         }
-        if graph.counter > 0 && state.pot.is_none() {
+        state.validate_sheet(spec, map, flags, bytes[108] == 1)?;
+        if bytes[303] != 0 {
+            return Err(SliceError::Snapshot);
+        }
+        // An active reservation must have been consumed during THIS visit.
+        let object = bytes[283];
+        if object > 0 && state.visit_consumed & (1 << (object - 1)) != 0 {
             return Err(SliceError::Snapshot);
         }
         if let Node::Cue(cue) = graph.node {
@@ -701,6 +740,14 @@ impl GameState {
         };
         bytes.extend(x.to_le_bytes());
         bytes.extend(y.to_le_bytes());
+        bytes.extend([
+            u8::from(state.sheet.resident),
+            state.sheet.cellar as u8,
+            state.visit_cellar as u8,
+            0,
+        ]);
+        bytes.extend(state.sheet.parked_consumed.to_le_bytes());
+        bytes.extend(state.visit_consumed.to_le_bytes());
     }
     pub(super) fn validate_pandora_restore(
         &self,
@@ -714,6 +761,26 @@ impl GameState {
         }
         if state.motion.is_some() && self.transition.is_some() {
             return Err(SliceError::Snapshot);
+        }
+        if let Some(t) = self.transition {
+            if t.map_id() != t.source_map() {
+                // Reconstruction already happened; a departing visit's action may
+                // not survive into this arrival, even if its map is also C.
+                if state.pot.is_some()
+                    || state.graph.counter != 0
+                    || self.flags.bytes()[..4] != [0; 4]
+                    || state.visit_consumed != state.consumed()
+                    || state.visit_cellar != state.sheet.cellar
+                {
+                    return Err(SliceError::Snapshot);
+                }
+            } else if state.owns()
+                || state.pot.is_some_and(|p| {
+                    !p.idle_empty() || p.position() != t.handoff() || p.facing() != t.direction()
+                })
+            {
+                return Err(SliceError::Snapshot);
+            }
         }
         if let Some((id, cursor)) = state.motion {
             let motion = &spec.motions[usize::from(id)];
@@ -740,15 +807,16 @@ impl GameState {
                     return Err(SliceError::Snapshot);
                 }
                 if let Some(frozen) = state.frozen {
-                    // At most one hit can occur in a flight: counter selects launch profile.
-                    let hit = pot.walking().position().0 == 184 && pot.phase_tick() >= 19;
+                    // At most one hit per flight; the visit baseline, not counter0,
+                    // determines whether this launch began on retained damage.
+                    let hit = pot.contact_reached();
                     let before = state
                         .graph
                         .counter
                         .checked_sub(u8::from(hit))
                         .ok_or(SliceError::Snapshot)?;
                     if frozen
-                        != if before == 0 {
+                        != if before == 0 && state.visit_cellar == CellarDoorPatch::Closed {
                             CollisionKey::CClosed
                         } else {
                             CollisionKey::CDamaged
@@ -766,7 +834,7 @@ impl GameState {
                     return Err(SliceError::Snapshot);
                 }
                 WalkingState::decode_snapshot(
-                    self.current_room(data)?,
+                    &self.effective_room(data)?,
                     &self.walking.encode_snapshot(),
                 )
                 .map_err(|_| SliceError::Snapshot)?;
@@ -803,7 +871,7 @@ impl GameState {
         self.transition = Some(transition);
         Ok(())
     }
-    /// Source-cell removals for rendering, retained for the entire current C visit.
+    /// Source-cell removals for rendering, retained for the resident sheet lifetime.
     /// # Errors
     /// Rejects incompatible/disabled data; never changes the immutable collision catalog.
     pub fn consumed_pots(
@@ -812,15 +880,12 @@ impl GameState {
     ) -> Result<Vec<crate::pots::SourceObject>, SliceError> {
         let spec = self.check_pandora(data)?;
         let state = self.pandora.ok_or(SliceError::Data)?;
-        let Some(pot) = state.pot else {
-            return Ok(Vec::new());
-        };
-        let admission = self.pot_admission(spec, state)?;
         Ok(spec
             .objects
             .iter()
             .copied()
-            .filter(|o| pot.consumed_in(&admission, o.cell))
+            .enumerate()
+            .filter_map(|(i, object)| (state.consumed() & (1 << i) != 0).then_some(object))
             .collect())
     }
 }
