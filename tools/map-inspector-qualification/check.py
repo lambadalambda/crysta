@@ -77,12 +77,12 @@ def rgb(bitmap):
     return bytes(result)
 
 
-def html(manifest):
-    return (REPO / 'crates/map-inspector/web/viewer.html').read_text().replace(
+def html(manifest, repo=REPO):
+    return (repo / 'crates/map-inspector/web/viewer.html').read_text().replace(
         '__CAPTURE_JSON__', json.dumps(manifest, sort_keys=True, separators=(',', ':')).replace('<', '\\u003c'))
 
 
-def validate_capture(root):
+def validate_capture(root, repo=REPO):
     expected = {'capture.json', 'index.html'} | {
         name for label in LABELS for name in
         [f'reference-{label}.bmp', *[f'{s}-{label}.bin' for s in SIZES]]}
@@ -99,7 +99,7 @@ def validate_capture(root):
             require(len(data) == size, f'{surface} extent mismatch')
             require(sha(data) == point[f'{surface}_sha256'], f'{surface} manifest hash mismatch')
         require(sha(rgb((root / f'reference-{label}.bmp').read_bytes())) == point['rgb_sha256'], 'RGB manifest hash mismatch')
-    require((root / 'index.html').read_text() == html(manifest), 'derived HTML differs from complete manifest')
+    require((root / 'index.html').read_text() == html(manifest, repo), 'derived HTML differs from complete manifest')
     return manifest
 
 
@@ -110,9 +110,9 @@ def nonpixels(manifest):
     return result
 
 
-def compare_captures(old, fixed, twin):
+def compare_captures(old, fixed, twin, repo=REPO):
     require(len({p.resolve() for p in (old, fixed, twin)}) == 3, 'three distinct capture roots required')
-    manifests = [validate_capture(p) for p in (old, fixed, twin)]
+    manifests = [validate_capture(p, repo) for p in (old, fixed, twin)]
     require(nonpixels(manifests[0]) == nonpixels(manifests[1]), 'complete non-pixel manifest mismatch')
     inventories = [inventory(p) for p in (old, fixed, twin)]
     # Byte comparison, not selected player/map assertions or merely reported hashes.
@@ -135,17 +135,17 @@ def verify_nonpixel_digest(report, expected):
     require(report['nonpixel_manifest_sha256'] == expected, 'archived non-pixel digest mismatch')
 
 
-def audit(rom, save, old, fixed, twin, old_repo):
+def audit(rom, save, old, fixed, twin, old_repo, fixed_repo):
     require(sha(rom.read_bytes()) == ROM and sha(save.read_bytes()) == SRAM, 'owned ROM/SRAM mismatch')
     archived = load(HERE / 'epochs/threaded-video-v0/reference.json')
     observer = load(HERE / 'observer.json')
     require(archived['policy'] == observer['policy'] == POLICY, 'observation policy mismatch')
     verify_sources(old_repo, archived['source_hashes'])
-    verify_sources(REPO, observer['source_hashes'])
+    verify_sources(fixed_repo, observer['source_hashes'])
     authenticate(old / 'capture', archived['inventory'])
     archive_test = HERE / 'epochs/threaded-video-v0/local_capture.rs'
     require(sha(archive_test.read_bytes()) == archived['test_sha256'], 'archived test mismatch')
-    manifests = [validate_capture(root / 'capture') for root in (old, fixed, twin)]
+    manifests = [validate_capture(root / 'capture', fixed_repo) for root in (old, fixed, twin)]
     require([p['rgb_sha256'] for p in manifests[0]['checkpoints']] == archived['rgb_sha256'], 'archived RGB pins not reproduced')
     producers = []
     for root, sources in ((old, archived['source_hashes']), (fixed, observer['source_hashes']), (twin, observer['source_hashes'])):
@@ -155,13 +155,13 @@ def audit(rom, save, old, fixed, twin, old_repo):
         require(sha((root / 'map-inspector').read_bytes()) == producer['binary_sha256'], 'retained binary mismatch')
         require(sha((root / 'build.log').read_bytes()) == producer['build_log_sha256'], 'retained build log mismatch')
         producers.append(producer)
-    report = compare_captures(*[r / 'capture' for r in (old, fixed, twin)])
+    report = compare_captures(*[r / 'capture' for r in (old, fixed, twin)], repo=fixed_repo)
     verify_nonpixel_digest(report, archived['nonpixel_manifest_sha256'])
     return {'schema_version': 1, 'policy': POLICY, 'epoch': observer['epoch'],
             'producers': producers, **report}
 
 
 if __name__ == '__main__':
-    if len(sys.argv) != 7:
-        sys.exit('usage: check.py ROM SRAM OLD FIXED TWIN OLD-SOURCE-REPO')
+    if len(sys.argv) != 8:
+        sys.exit('usage: check.py ROM SRAM OLD FIXED TWIN OLD-SOURCE-REPO FIXED-SOURCE-REPO')
     print(json.dumps(audit(*map(Path, sys.argv[1:])), indent=2, sort_keys=True))

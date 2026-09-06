@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 
 import check
 
@@ -134,6 +135,19 @@ class Gates(unittest.TestCase):
         check.verify_nonpixel_digest(report, report['nonpixel_manifest_sha256'])
         with self.assertRaisesRegex(ValueError, 'archived non-pixel digest'):
             check.verify_nonpixel_digest(report, 'wrong')
+
+    def test_historical_audit_requires_explicit_fixed_source(self):
+        # Stop immediately after source authentication: no private fixtures needed.
+        old_repo, fixed_repo = self.base / 'old-source', self.base / 'fixed-source'
+        rom, save = self.base / 'rom', self.base / 'save'
+        rom.write_bytes(b'rom'); save.write_bytes(b'save')
+        with patch.object(check, 'ROM', check.sha(b'rom')), patch.object(check, 'SRAM', check.sha(b'save')):
+            with patch.object(check, 'verify_sources', side_effect=[None, RuntimeError('source checked')]) as verify:
+                with self.assertRaisesRegex(RuntimeError, 'source checked'):
+                    check.audit(rom, save, *self.roots, old_repo, fixed_repo)
+                self.assertEqual([call.args[0] for call in verify.call_args_list], [old_repo, fixed_repo])
+            with self.assertRaises(TypeError):
+                check.audit(rom, save, *self.roots, old_repo)
 
     def test_archive_authentication(self):
         inventory = check.inventory(self.roots[0])

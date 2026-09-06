@@ -90,10 +90,11 @@ ROM='local/Tenchi Souzou (Japan).sfc'
 SRAM=local/saves/Terranigma.srm
 E=local/map-inspector-renewal
 OLD_REPO=../ilar-task-capture-old
+FIXED_REPO=../ilar-task-capture-renewal # explicit historical fixed sources, not current HEAD
 T=tools/map-inspector-qualification
-python3 -B "$T/check.py" "$ROM" "$SRAM" "$E/old" "$E/fixed-a" "$E/fixed-b" "$OLD_REPO" > "$E/rechecked.json"
+python3 -B "$T/check.py" "$ROM" "$SRAM" "$E/old" "$E/fixed-a" "$E/fixed-b" "$OLD_REPO" "$FIXED_REPO" > "$E/rechecked.json"
 cmp "$E/rechecked.json" "$T/migration.json"
-python3 -O -B "$T/check.py" "$ROM" "$SRAM" "$E/old" "$E/fixed-a" "$E/fixed-b" "$OLD_REPO" > "$E/rechecked-O.json"
+python3 -O -B "$T/check.py" "$ROM" "$SRAM" "$E/old" "$E/fixed-a" "$E/fixed-b" "$OLD_REPO" "$FIXED_REPO" > "$E/rechecked-O.json"
 cmp "$E/rechecked-O.json" "$T/migration.json"
 python3 -B "$T/test_check.py"
 python3 -O -B "$T/test_check.py"
@@ -108,9 +109,9 @@ absent), then use new directories:
 ```sh
 FRESH=$(mktemp -d "$PWD/local/map-inspector-replay-XXXXXX")
 python3 -B "$T/capture.py" "$OLD_REPO" "$FRESH/old" "$ROM" "$SRAM"
-python3 -B "$T/capture.py" . "$FRESH/fixed-a" "$ROM" "$SRAM"
-python3 -B "$T/capture.py" . "$FRESH/fixed-b" "$ROM" "$SRAM"
-python3 -B "$T/check.py" "$ROM" "$SRAM" "$FRESH/old" "$FRESH/fixed-a" "$FRESH/fixed-b" "$OLD_REPO" > "$FRESH/audit.json"
+python3 -B "$T/capture.py" "$FIXED_REPO" "$FRESH/fixed-a" "$ROM" "$SRAM"
+python3 -B "$T/capture.py" "$FIXED_REPO" "$FRESH/fixed-b" "$ROM" "$SRAM"
+python3 -B "$T/check.py" "$ROM" "$SRAM" "$FRESH/old" "$FRESH/fixed-a" "$FRESH/fixed-b" "$OLD_REPO" "$FIXED_REPO" > "$FRESH/audit.json"
 ```
 
 The read-only audit enforces old archive authentication, source/input policy,
@@ -149,3 +150,14 @@ Reports are retained in `terranigma/local/map-inspector-renewal/`; the full suit
 log is `terranigma/local/map-research/pandora-parent-full-host.txt`. The dedicated
 renewal issue is accepted; earlier SRAM-red handoff statements are historical.
 Other wrappers and portable Pandora gameplay are not accepted by this result.
+
+## Preview producer revalidation (in progress)
+
+`observer.json`, `migration.json` and `epochs/threaded-video-v0/` are frozen.
+Historical `check.py` now requires **both** old and fixed source repositories;
+it never tries the current checkout or chooses whichever descriptor passes.
+The viewer used to validate historical derived HTML is also from that explicit
+fixed repository. Both audit modes still byte-reproduce `migration.json`.
+The current preview producer will use a separate bounded descriptor and bridge,
+not a renewal of any RGB/nonpixel pin. Final registration is parent-owned and
+current producer evidence must wait for that registration to settle.

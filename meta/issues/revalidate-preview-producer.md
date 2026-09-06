@@ -22,3 +22,13 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
 - Exact source-delta proof, retained private build/process evidence and no-output-change bridge pass independent review.
 - Historical normal/optimized audits still reproduce; current Rust source/capture gate and focused negative tests pass.
 - Parent independently reproduces checks before archive. Future additional module registration requires explicit revalidation, not an implicit wildcard.
+
+## Progress
+
+- Historical audit separation implemented with a red→green explicit-source API
+  control. Both normal/optimized retained audits byte-reproduce frozen
+  `migration.json`; 14 tests per mode and all 20 existing mutations pass.
+- Independently hashed old worktree `8034889` main bytes:
+  `7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3`.
+- Current descriptor/bridge and fresh capture evidence pending final parent main
+  registration; no output pins or historical envelopes changed.
