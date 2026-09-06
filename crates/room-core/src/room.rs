@@ -50,7 +50,9 @@ impl Room {
     /// The caller must establish ordinary, action-free movement: native collision
     /// action hooks must be inactive (reference `$0980 & $0050 == 0`). This is a
     /// collision policy assertion, not a simulation of those hooks. Do not use it
-    /// for interactions, attacks, pushing, or other player/controller modes.
+    /// for interactions, attacks, pushing, or other unqualified controller modes.
+    /// The separate [`crate::pots`] component qualifies bounded held movement
+    /// (`$0980=$0020`) reusing this geometry, not arbitrary carrying/action hooks.
     /// Stored old-edge slopes 6/7 remain unsupported even when flagged. Raw cells
     /// are preserved; new flagged samples override their stored type with solid.
     /// [`Self::new`] keeps rejecting flagged cells when this contract is unavailable.
@@ -100,7 +102,7 @@ impl Room {
         &self.cells
     }
 
-    // Only the authenticated house constructor uses this on its private clone.
+    // Authenticated house construction and pots' private collision overlays only.
     pub(crate) fn replace_cell(&mut self, index: usize, raw: u16) {
         self.cells[index] = raw;
     }

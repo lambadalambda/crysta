@@ -14,6 +14,7 @@ mod animation;
 pub mod conversation;
 pub mod events;
 mod house;
+pub mod pots;
 mod room;
 pub mod slice;
 mod snapshot;
@@ -197,6 +198,17 @@ impl WalkingState {
     /// Returns [`Unqualified`] for invalid bounds, cells, arithmetic or
     /// accelerated input triggers. Every error leaves all state fields unchanged.
     pub fn step(&mut self, room: &Room, input: FrameInput) -> Result<MovementOutput, Unqualified> {
+        self.step_with_cadence(room, input, false)
+    }
+
+    // COP83 carrying does not reload the COP84 horizontal null stream. Collision,
+    // latency and fail-closed onset handling remain shared; pots owns mode admission.
+    pub(crate) fn step_with_cadence(
+        &mut self,
+        room: &Room,
+        input: FrameInput,
+        continuous_horizontal: bool,
+    ) -> Result<MovementOutput, Unqualified> {
         room.validate_position(self.x, self.y)?;
         let mut next = *self;
         next.onset_remaining = self.onset_remaining.saturating_sub(1);
@@ -212,7 +224,7 @@ impl WalkingState {
         if self.delayed == self.active {
             next.phase = match self.active {
                 None => 0,
-                Some(d) if d.horizontal() => (self.phase + 1) % 54,
+                Some(d) if d.horizontal() && !continuous_horizontal => (self.phase + 1) % 54,
                 Some(_) => {
                     if self.phase == 1 {
                         2
