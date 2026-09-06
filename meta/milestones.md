@@ -118,7 +118,6 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Talk to the room B resident and leave the house](issues/talk-and-leave-house.md)
-- [Qualify the room B conversation and exterior progression](issues/qualify-house-conversation-progression.md)
 - [Decode the required opening dialogue presentation](issues/decode-house-conversation-text.md)
 - [Qualify the first exterior landing profile](issues/qualify-house-exterior-profile.md)
 
