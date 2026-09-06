@@ -30,5 +30,20 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
   `migration.json`; 14 tests per mode and all 20 existing mutations pass.
 - Independently hashed old worktree `8034889` main bytes:
   `7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3`.
-- Current descriptor/bridge and fresh capture evidence pending final parent main
-  registration; no output pins or historical envelopes changed.
+- Historical split reviewed independently before signed commit `5a4d742`.
+- Proposed bounded bridge tooling has 12 normal/optimized ROM-free tests:
+  authenticated exact-byte insertion, identity substitution, non-registration
+  main changes even when resealed, all historical/additional source pins,
+  current process provenance, every capture file and capture alias rejection.
+  Four mocked recorder tests cover isolated targets, singleton invocation,
+  existing-output refusal and post-capture source/descriptor rejection. Independent
+  static review's literal-registration and orchestration coverage findings were
+  addressed. Both historical audits and all original mutation checks still pass.
+- Current capture mode requires explicit descriptor/fixed-source flags and uses
+  a fresh private target for each of two new processes. Final real execution and
+  Rust source-gate switch remain pending the parent's final registration relay;
+  no descriptor or final bridge report has been pinned prematurely.
+- Private `local/provisional-main-proof.json` authenticates old Git blob/worktree,
+  exact current navigation-only delta, ROM and 8,192-byte SRAM. `local/historical.json`
+  and `local/historical-O.json` reproduce the frozen report. No production, shared
+  index or frontend files changed; only private input symlinks added under local.

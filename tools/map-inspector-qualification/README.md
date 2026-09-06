@@ -158,6 +158,79 @@ Historical `check.py` now requires **both** old and fixed source repositories;
 it never tries the current checkout or chooses whichever descriptor passes.
 The viewer used to validate historical derived HTML is also from that explicit
 fixed repository. Both audit modes still byte-reproduce `migration.json`.
-The current preview producer will use a separate bounded descriptor and bridge,
-not a renewal of any RGB/nonpixel pin. Final registration is parent-owned and
-current producer evidence must wait for that registration to settle.
+The current preview producer uses the bounded `bridge.py` API below, not a
+renewal of any RGB/nonpixel pin. **Final registration is parent-owned: no current
+descriptor, Rust source-gate switch or bridge report is finalized yet.** The
+proposed exact insertion is these bytes, once, immediately after
+`mod opening_qualification;\n`:
+
+```text
+pub mod pandora_navigation;
+pub mod pandora_progression;
+```
+
+`verify_main_delta` authenticates the original main SHA-256 before comparing the
+entire new file to that single byte insertion. It does not split/strip lines or
+normalize whitespace. The original Git blob at `8034889` and old worktree main
+were independently hashed as `7736b543…a4d3`; the current one-registration main
+is deliberately not accepted by this proposed two-registration bridge.
+
+### Tooling handoff (run only after final source registration)
+
+The eventual `current-producer.json` has `schema_version: 1`, the unchanged
+`epoch`/`policy`, `original_descriptor_sha256`, `migration_sha256`, the original
+13-key `source_hashes` inventory with **only** main's digest changed, and
+`additional_source_hashes`. The latter is a separate explicit set of eleven
+preview modules/hooks (including the embedded preview HTML); it is provenance,
+not a retroactive expansion of the historical inventory or a complete transitive
+build-input inventory. Both historical descriptor/report identities are fixed
+in the bridge. There is no producer registry or descriptor-fallback search.
+
+```sh
+T=tools/map-inspector-qualification
+ROM='local/Tenchi Souzou (Japan).sfc'
+SRAM=local/saves/Terranigma.srm
+OLD_REPO=../ilar-task-capture-old
+FIXED_REPO=../ilar-task-capture-renewal
+ACCEPTED="$FIXED_REPO/local/map-inspector-renewal"
+CURRENT="$PWD/local/map-inspector-preview" # must be a new evidence root
+D="$T/current-producer.json"              # pending final parent registration
+python3 -B "$T/capture.py" . "$CURRENT/current-a" "$ROM" "$SRAM" \
+  --current-descriptor "$D" --fixed-source-repo "$FIXED_REPO"
+python3 -B "$T/capture.py" . "$CURRENT/current-b" "$ROM" "$SRAM" \
+  --current-descriptor "$D" --fixed-source-repo "$FIXED_REPO"
+python3 -B "$T/bridge.py" "$ROM" "$SRAM" "$ACCEPTED/old" \
+  "$ACCEPTED/fixed-a" "$ACCEPTED/fixed-b" "$CURRENT/current-a" "$CURRENT/current-b" \
+  "$OLD_REPO" "$FIXED_REPO" . "$D" > "$CURRENT/bridge.json"
+# Repeat with python3 -O -B; compare complete bridge reports byte-for-byte.
+python3 -B "$T/test_bridge.py"
+python3 -O -B "$T/test_bridge.py"
+python3 -B "$T/test_capture.py"
+python3 -O -B "$T/test_capture.py"
+```
+
+Current mode requires both explicit flags. Each capture refuses an existing
+output root, builds with `--locked` into its own initially absent `target/`, and
+runs exactly one new capture process. Thus **both** A and B get fresh isolated
+builds (stronger than historical A/B). Schema-2 producer envelopes retain the
+source/descriptor identity, exact input paths/hashes, commands/tool versions,
+build environment/log hash, binary hash, stdout/stderr hashes, process PID,
+start/end times, exit code and distinct run ID. Sources and descriptor are checked
+before build and after capture. These records support independent execution
+review; hashes cannot prove that a dishonest recorder actually ran processes.
+
+The read-only bridge requires the original accepted producer envelopes unchanged,
+checks all ten files against the frozen fixed inventory **and byte-compares them**
+across accepted A/B and current A/B, validates full manifests and derived HTML,
+and rechecks the complete nonpixel digest. A copied historical producer identity,
+non-registration main edits (even with a resealed new digest), changed additional
+sources, and capture aliases are negative controls. No output pins are written.
+
+Tooling validators used red→green. Independent static review traced the unchanged
+recipe and requested two test improvements: independently literal two-registration
+fixtures (including nav-only rejection), and producer/audit/recorder orchestration
+controls. These are now covered: 12 bridge tests and 4 mocked recorder tests pass
+in normal/optimized modes. The mocks verify wiring only; real current subprocess/
+build validation remains pending final registration. A provisional isolated Rust
+build reproduced exactly the expected old main-source-pin failure; its private log
+is `local/provisional-source-gate.txt`, not final qualification evidence.
