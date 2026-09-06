@@ -29,3 +29,16 @@ Run an early browser feasibility spike before the full game depends on assumptio
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Full browser caching, audio, input, rendering, and release packaging remain in M7.
+
+## Bounded spike in progress
+
+Owned in `task/wasm-spike`; leave this issue open for parent acceptance. Scope is
+one JP packet and the existing six-frame synthetic walking/snapshot replay,
+not the room preview or a production frontend. The preview on port 8765 is
+untouched. No shared tracker indexes or milestones are changed.
+
+Tool inspection found the Rust Wasm target and agent-browser 0.30.1 installed,
+but no wasm-bindgen CLI or wasm-pack. Use wasm-bindgen 0.2.126 (MIT/Apache-2.0),
+with its matching CLI installed under ignored `local/toolchain/`; no bundler,
+WASI, threads, or new decoder/core dependencies. Browser automation follows the
+agent-browser skill and uses a separate named session and port.
