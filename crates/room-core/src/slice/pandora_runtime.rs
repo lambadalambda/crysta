@@ -558,7 +558,7 @@ impl GameState {
         choice: Option<u8>,
     ) -> Result<FrameOutput, SliceError> {
         let spec = self.check_pandora(data)?;
-        if self.transition.is_some() || self.pandora.is_some_and(|p| p.motion.is_some()) {
+        if !self.pandora_dialogue_input_unblocked() {
             return Err(SliceError::Interaction);
         }
         let mut next = self.clone();

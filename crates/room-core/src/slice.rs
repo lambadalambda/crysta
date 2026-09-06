@@ -631,6 +631,26 @@ impl GameState {
             })
             .transpose()
     }
+    /// Whether a visible page/choice currently admits dialogue input ownership.
+    /// Visibility alone is insufficient during Pandora arrival motions. Pot recovery
+    /// alone does not block an otherwise ready request. This query never advances
+    /// a tick or probes an action; page/choice validity and tick overflow are still
+    /// checked by `acknowledge`/`choose`. False also means no visible dialogue.
+    /// # Errors
+    /// Uses the same identity and capability validation as `dialogue`.
+    pub fn dialogue_input_ready(&self, data: &GameData) -> Result<bool, SliceError> {
+        if self.dialogue(data)?.is_none() {
+            return Ok(false);
+        }
+        Ok(!self
+            .pandora
+            .is_some_and(|p| matches!(p.graph.node, crate::pandora::Node::Request(..)))
+            || self.pandora_dialogue_input_unblocked())
+    }
+    /// Shared with the Pandora action guard; not derived from presentation owner.
+    fn pandora_dialogue_input_unblocked(&self) -> bool {
+        self.transition.is_none() && self.pandora.is_none_or(|p| p.motion.is_none())
+    }
     /// Acknowledge exactly one real page in one atomic tick; choices are rejected.
     /// # Errors
     /// Rejects wrong data, absence of a page wait or tick overflow atomically.

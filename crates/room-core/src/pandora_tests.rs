@@ -266,6 +266,7 @@ fn aggregate_resident_c_choice_and_unsupported_errors_restore_per_action() {
     let mut s = at(&d, 0x13, (360, 144), Direction::Up, &[0x26]);
     replay(&mut s, &d, GameState::interact);
     ack(&mut s, &d);
+    assert_dialogue_ready_readonly(&s, &d, true); // Visible graph choice, no motion.
     s.choose(&d, 0).unwrap();
     drain(&mut s, &d);
     assert!(s.flags.contains(1).unwrap());
@@ -353,6 +354,13 @@ fn real_pot_hit_with_pose(preserve: bool) {
     );
     assert_eq!(s.current_room(&d).unwrap().cells()[20 * 32 + 11], 0x1da7);
     assert!(!s.flags.contains(0x292).unwrap());
+    // Readiness follows the dialogue guard, not the overlapping PotRecovery owner.
+    assert_eq!(
+        s.pandora_output(&d).unwrap().owner,
+        ControlOwner::PotRecovery
+    );
+    assert!(s.dialogue(&d).unwrap().is_some());
+    assert_dialogue_ready_readonly(&s, &d, true);
     // Acknowledgement during recovery may finish text, not the action or ledger.
     ack(&mut s, &d);
     frames(&mut s, &d, None, 13);
@@ -2052,4 +2060,102 @@ fn overhanging_exit_does_not_relax_origins_or_nonempty_dimensions() {
     let far = Exit([63, 79, 255, 255, 3, 0, 0, 0x55, 0x10, 2, 0x10, 2]);
     assert!(select_exit(&[far], (8, 16)).is_none());
     assert!(select_exit(&[far], (1016, 1280)).is_some());
+}
+
+fn assert_dialogue_ready_readonly(s: &GameState, d: &GameData, ready: bool) {
+    let before = s.clone();
+    let bytes = s.snapshot();
+    assert_eq!(s.dialogue_input_ready(d), Ok(ready));
+    assert_eq!(*s, before);
+    assert_eq!(s.snapshot(), bytes);
+}
+#[test]
+fn dialogue_readiness_is_readonly_and_never_falls_back_on_wrong_data() {
+    let d = data();
+    let s = GameState::new_game(&d, Policy::SemanticPreview);
+    assert_dialogue_ready_readonly(&s, &d, false);
+    let mut wrong = data();
+    wrong.identity.content_sha256[0] ^= 1;
+    assert_eq!(s.dialogue_input_ready(&wrong), Err(SliceError::Data));
+    let mut wrong = data();
+    wrong.progression = None;
+    assert_eq!(s.dialogue_input_ready(&wrong), Err(SliceError::Data));
+    let mut wrong = data();
+    wrong.pandora = None;
+    assert_eq!(s.dialogue_input_ready(&wrong), Err(SliceError::Data));
+    let mut s = at(&d, 0xc, (120, 464), Direction::Up, &[0x26, 0x28]);
+    s.tick = u64::MAX;
+    // Readiness is ownership admission, not a speculative action/tick-overflow probe.
+    assert_dialogue_ready_readonly(&s, &d, true);
+    assert_eq!(s.acknowledge(&d), Err(SliceError::TickOverflow));
+}
+#[test]
+fn c_entry_is_visible_but_not_ready_until_all_seventeen_arrival_updates() {
+    let d = navigation_data();
+    let mut s = at(&d, 0xd, (120, 611), Direction::Up, &[0x26, 0x28]);
+    frames(&mut s, &d, Some(Direction::Up), 4);
+    assert!(s.transition.is_some());
+    frames(&mut s, &d, None, 18);
+    assert_eq!(s.map_id, 0xc);
+    assert_eq!(s.output().position, (120, 464));
+    let arrival_tick = s.tick;
+    for _ in 0..17 {
+        assert!(s.dialogue(&d).unwrap().is_some());
+        assert_eq!(
+            s.pandora_output(&d).unwrap().invocation,
+            Some(Invocation::CEntry)
+        );
+        assert_dialogue_ready_readonly(&s, &d, false);
+        let before = s.snapshot();
+        assert_eq!(s.acknowledge(&d), Err(SliceError::Interaction));
+        assert_eq!(s.choose(&d, 1), Err(SliceError::Interaction));
+        assert_eq!(s.snapshot(), before);
+        replay(&mut s, &d, neutral);
+    }
+    assert_eq!(s.tick, arrival_tick + 17);
+    assert_eq!(s.output().position, (120, 447));
+    assert_dialogue_ready_readonly(&s, &d, true);
+    ack(&mut s, &d);
+}
+#[test]
+fn box_entry_visibility_does_not_make_remaining_travel_samples_ready() {
+    let mut d = navigation_data();
+    let motion = d
+        .pandora
+        .as_mut()
+        .unwrap()
+        .motions
+        .iter_mut()
+        .find(|m| m.key == MotionKey::Travel(Travel::TwentyToBox))
+        .unwrap();
+    motion.frames.push(MotionFrame {
+        map_id: 0x21,
+        pose: MotionPose::Absolute(anchor((136, 128), Direction::Down)),
+        reload: false,
+        scene: ScenePhase::BoxContact,
+    });
+    let mut s = at(
+        &d,
+        0x20,
+        (360, 867),
+        Direction::Up,
+        &[0x26, 0x28, 0x27, 0x2e, 0x292],
+    );
+    frames(&mut s, &d, Some(Direction::Up), 4);
+    assert_dialogue_ready_readonly(&s, &d, false);
+    replay(&mut s, &d, neutral); // Actual reload requests BoxEntry; arrival is not done.
+    assert_eq!(
+        s.pandora_output(&d).unwrap().invocation,
+        Some(Invocation::BoxEntry)
+    );
+    assert!(s.dialogue(&d).unwrap().is_some());
+    assert_dialogue_ready_readonly(&s, &d, false);
+    let before = s.snapshot();
+    assert_eq!(s.acknowledge(&d), Err(SliceError::Interaction));
+    assert_eq!(s.snapshot(), before);
+    replay(&mut s, &d, neutral); // Preserve the remaining qualified arrival sample.
+    assert_eq!(s.output().position, (136, 128));
+    assert_dialogue_ready_readonly(&s, &d, true);
+    ack(&mut s, &d);
+    assert_dialogue_ready_readonly(&s, &d, false);
 }

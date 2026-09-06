@@ -564,3 +564,21 @@ fn authoritative_story_storage_keeps_profile9_low_range_and_admission() {
         assert!(GameState::restore(&data, &corrupt).is_err(), "{byte}");
     }
 }
+
+#[test]
+fn legacy_dialogue_readiness_keeps_page_and_choice_behavior_readonly() {
+    let data = data();
+    let mut state = resident(&data);
+    assert_eq!(state.dialogue_input_ready(&data), Ok(false));
+    state.interact(&data).unwrap();
+    for choice in [false, true] {
+        let before = state.snapshot();
+        assert_eq!(state.dialogue_input_ready(&data), Ok(true));
+        assert_eq!(state.snapshot(), before);
+        if choice {
+            state.choose(&data, 1).unwrap();
+        } else {
+            state.acknowledge(&data).unwrap();
+        }
+    }
+}

@@ -161,3 +161,21 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   maximum-byte arithmetic. Independent review approved; 163 core tests plus one
   doctest with all five private fixtures, strict Clippy and Wasm passed. No API,
   profile/schema, host or source compiler changes; live capability stays disabled.
+
+### Dialogue visibility versus input readiness
+
+- Browser integration exposed visible CEntry/BoxEntry during mandatory arrival
+  updates. Add a read-only, identity-checked dialogue_input_ready query sharing
+  the existing action guard; do not delay requests, advance ticks, auto-acknowledge,
+  alter arrival samples or serialize new state. Pot recovery alone does not block
+  an otherwise accepted request. Parent owns host/frontend scheduling changes.
+- Implemented red→green as a public bool query with the same dialogue validation;
+  action guard and query share one unchanged transition/motion predicate. Tests
+  preserve all17 C arrival ticks, pending Box travel, graph/legacy choices and
+  accepted pot-recovery requests; readonly/identity/error controls pass. No state
+  fields, snapshot schema, identity policy or qualified motion samples changed.
+- Independent correctness/minimal-DRY review approved. Verification:167 core tests
+  plus one doctest with all five private fixture suites, strict all-target Clippy,
+  Wasm, and six unchanged host room_preview tests passed. The newer11590-tick offline
+  aggregate/hash remains parent qualification; it was not rerun in this older core
+  worktree. Issue remains open for host/browser acceptance.

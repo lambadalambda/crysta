@@ -224,6 +224,7 @@ Directions during story ownership are discarded, never buffered into a later roo
 let p = game.pandora_output(&data)?;
 let scene_phase: Option<&str> = p.scene.key(); // exact assets33 phase names
 let dialogue = game.dialogue(&data)?;        // visibility independent of ownership
+let ready = game.dialogue_input_ready(&data)?; // read-only input ownership, not visibility
 let pot = game.pot_state();                  // phase/tick/facing/walking/flight()
 let (hand, reservation) = game.pot_slots(&data)?; // FA=098A, FB=098F
 let removed_cells = game.consumed_pots(&data)?;
@@ -239,6 +240,21 @@ No new map delegates to missing house art. Host must use
 `scene.key()` rather than derive phase from flags. No interpolated actor positions
 or inventory/equipment output are emitted. Art composition, record scheduling and
 transport remain parent-owned.
+
+`dialogue_input_ready(&GameData) -> Result<bool, SliceError>` uses exactly the
+identity/capability validation of `dialogue()`. It returns false with no visible
+page/choice. For a Pandora graph request, it shares the action guard: neither a
+legacy transition nor a Pandora motion may remain active. Legacy requests retain
+their existing readiness. This is a read-only ownership query, not a speculative
+acknowledgement: it neither advances a tick nor predicts result validity or overflow.
+
+**Visibility is not readiness.** CEntry becomes visible on the C load while all17
+ordinary arrival updates still need to run. BoxEntry can likewise be visible with
+Travel samples remaining. Keep stepping those mandatory arrivals; do not pause
+simulation merely because text is visible or defer the graph request to compensate.
+Conversely, a request with `owner == PotRecovery` can already accept acknowledgement
+when no transition/motion remains. Do not derive readiness from the owner enum alone.
+The query changes no gameplay, sample timing, identity policy or snapshot bytes.
 
 Legacy `FrameOutput::phase` keeps its enum shape; its Dialogue variant is a
 non-walking bucket under this new opt-in capability. Use `PandoraOutput::owner` to
