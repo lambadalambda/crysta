@@ -39,6 +39,8 @@ pub struct PandoraOutput {
     pub locals: u32,
     /// Resident shared-sheet patches, independent of the current room visit.
     pub sheet: SharedSheetOutput,
+    /// Town wooden doors: bit0 North, bit1 Home; cleared at sheet replacement.
+    pub town_open: u8,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct State {
@@ -49,6 +51,7 @@ pub(super) struct State {
     pub sheet: Sheet,
     pub visit_consumed: u64,
     pub visit_cellar: CellarDoorPatch,
+    pub town_open: u8,
 }
 impl State {
     pub const fn new() -> Self {
@@ -60,6 +63,7 @@ impl State {
             sheet: Sheet::new(true),
             visit_consumed: 0,
             visit_cellar: CellarDoorPatch::Closed,
+            town_open: 0,
         }
     }
     pub fn owns(self) -> bool {
@@ -184,6 +188,19 @@ impl GameData {
                 }
             }
         }
+        if let Some(nav) = &pandora.navigation {
+            for map in [0xc, 0xd] {
+                if nav.records(map)
+                    != self
+                        .rooms
+                        .iter()
+                        .find(|r| r.map_id == map)
+                        .map(|r| r.exits.as_slice())
+                {
+                    return Err(SliceError::Data);
+                }
+            }
+        }
         self.pandora = Some(pandora);
         self.identity = identity;
         Ok(self)
@@ -247,6 +264,7 @@ impl GameState {
                 .motion
                 .map(|(id, cursor)| (spec.motions[usize::from(id)].key, cursor)),
             owner,
+            town_open: state.town_open,
             door_counter: state.graph.counter,
             sheet: SharedSheetOutput {
                 resident: state.sheet.resident,
@@ -425,8 +443,7 @@ impl GameState {
             }
             next.detect_pandora_contact(spec)?;
             next.poll_box_opening(spec)?;
-            next.detect_pandora_exit(spec)?;
-            next.detect_house_exit(data)?;
+            next.detect_ordered_exit(data)?;
         }
         *self = next;
         Ok(self.output())
@@ -511,40 +528,6 @@ impl GameState {
         self.walking = WalkingState::new(x, y);
         self.animation = AnimationState::standing(self.animation.facing());
         Ok(true)
-    }
-    fn detect_pandora_exit(&mut self, spec: &PandoraData) -> Result<(), SliceError> {
-        let mut state = self.pandora.ok_or(SliceError::Data)?;
-        if state.owns() || state.pot.is_some_and(|p| p.phase() != pots::Phase::Empty) {
-            return Ok(());
-        }
-        for (id, motion) in spec.motions.iter().enumerate() {
-            let MotionKey::Travel(travel) = motion.key else {
-                continue;
-            };
-            let anchor = motion.trigger.ok_or(SliceError::Data)?;
-            if travel.maps().0 != self.map_id
-                || anchor.position != self.walking.position()
-                || self.walking.active_direction() != Some(anchor.facing)
-            {
-                continue;
-            }
-            if self.flags.contains(0x26) != Ok(true)
-                || (matches!(
-                    travel,
-                    Travel::CToCellar | Travel::ETo20 | Travel::TwentyToBox
-                ) && self.flags.contains(0x292) != Ok(true))
-            {
-                return Err(SliceError::Exit);
-            }
-            state.motion = Some((u8::try_from(id).map_err(|_| SliceError::Data)?, 0));
-            if state.pot.is_none() {
-                self.walking = WalkingState::new(anchor.position.0, anchor.position.1);
-            }
-            self.animation = AnimationState::standing(anchor.facing);
-            self.pandora = Some(state);
-            return Ok(());
-        }
-        Ok(())
     }
 }
 impl GameState {
@@ -631,6 +614,7 @@ impl State {
         let mut state = Self {
             graph,
             motion,
+            town_open: bytes[303],
             pot: None,
             frozen,
             sheet: Sheet {
@@ -675,7 +659,9 @@ impl State {
             );
         }
         state.validate_sheet(spec, map, flags, bytes[108] == 1)?;
-        if bytes[303] != 0 {
+        if state.town_open > 3
+            || (state.town_open != 0 && (map != 0xa || spec.navigation.is_none()))
+        {
             return Err(SliceError::Snapshot);
         }
         // An active reservation must have been consumed during THIS visit.
@@ -749,11 +735,12 @@ impl GameState {
             u8::from(state.sheet.resident),
             state.sheet.cellar as u8,
             state.visit_cellar as u8,
-            0,
+            state.town_open,
         ]);
         bytes.extend(state.sheet.parked_consumed.to_le_bytes());
         bytes.extend(state.visit_consumed.to_le_bytes());
     }
+    #[allow(clippy::too_many_lines)] // Coupled motion, sheet and pot restore ownership checks.
     pub(super) fn validate_pandora_restore(
         &self,
         data: &GameData,
@@ -772,6 +759,7 @@ impl GameState {
                 // Reconstruction already happened; a departing visit's action may
                 // not survive into this arrival, even if its map is also C.
                 if state.pot.is_some()
+                    || state.town_open != 0
                     || state.graph.counter != 0
                     || self.flags.bytes()[..4] != [0; 4]
                     || state.visit_consumed != state.consumed()
@@ -789,6 +777,19 @@ impl GameState {
         }
         if let Some((id, cursor)) = state.motion {
             let motion = &spec.motions[usize::from(id)];
+            if let MotionKey::Travel(travel) = motion.key {
+                let before_load = !motion
+                    .frames
+                    .iter()
+                    .take(usize::from(cursor))
+                    .any(|f| f.reload);
+                state.validate_travel(spec, travel, before_load, &self.flags)?;
+                if !before_load
+                    && (state.town_open != 0 || (self.map_id == 0xd && !self.d_open_loaded))
+                {
+                    return Err(SliceError::Snapshot);
+                }
+            }
             let (position, facing) = motion.pose_at(cursor);
             if position.is_some_and(|p| p != self.walking.position())
                 || facing.is_some_and(|f| f != self.animation.facing())
@@ -798,6 +799,12 @@ impl GameState {
         }
         if self.transition.is_none() && self.dialogue.is_none() {
             if let Some(pot) = state.pot {
+                if !state.owns()
+                    && pot.phase() == pots::Phase::Empty
+                    && data.exit(self.map_id, self.walking.position()).is_some()
+                {
+                    return Err(SliceError::Snapshot);
+                }
                 if self.walking != *pot.walking() || self.animation.facing() != pot.facing() {
                     return Err(SliceError::Snapshot);
                 }
@@ -850,26 +857,57 @@ impl GameState {
     }
 }
 impl GameState {
-    fn detect_house_exit(&mut self, data: &GameData) -> Result<(), SliceError> {
-        let state = self.pandora.ok_or(SliceError::Data)?;
+    fn detect_ordered_exit(&mut self, data: &GameData) -> Result<(), SliceError> {
+        let spec = self.check_pandora(data)?;
+        let mut state = self.pandora.ok_or(SliceError::Data)?;
         if state.owns() || state.pot.is_some_and(|p| p.phase() != pots::Phase::Empty) {
             return Ok(());
         }
-        let Some((index, _)) = data.exit(self.map_id, self.walking.position()) else {
+        let selected = data.exit(self.map_id, self.walking.position());
+        let Some((index, _)) = selected else {
             return Ok(());
         };
-        let transition = Transition::select(self.map_id, index, self.walking.position())
-            .ok_or(SliceError::Exit)?;
-        if (transition.exterior() && !self.d_open_loaded)
-            || (self.map_id == 0xc && index == 2 && !self.wooden_door_open)
-            || self.walking.active_direction() != Some(transition.direction())
+        let key = ExitKey {
+            map_id: self.map_id,
+            index: u16::try_from(index).map_err(|_| SliceError::Exit)?,
+        };
+        if let Some(binding) = spec
+            .navigation
+            .as_ref()
+            .and_then(|n| n.travels.iter().find(|b| b.exit == key))
         {
-            return Err(SliceError::Exit);
+            let (id, motion) = spec
+                .motion(MotionKey::Travel(binding.travel))
+                .ok_or(SliceError::Exit)?;
+            let anchor = motion.trigger.ok_or(SliceError::Exit)?;
+            if anchor.position != self.walking.position()
+                || self.walking.active_direction() != Some(anchor.facing)
+            {
+                return Err(SliceError::Exit);
+            }
+            state
+                .validate_travel(spec, binding.travel, true, &self.flags)
+                .map_err(|_| SliceError::Exit)?;
+            state.motion = Some((u8::try_from(id).map_err(|_| SliceError::Exit)?, 0));
+            if state.pot.is_none() {
+                self.walking = WalkingState::new(anchor.position.0, anchor.position.1);
+            }
+            self.animation = AnimationState::standing(anchor.facing);
+            self.pandora = Some(state);
+        } else {
+            let transition = Transition::select(self.map_id, index, self.walking.position())
+                .ok_or(SliceError::Exit)?;
+            if (transition.exterior() && !self.d_open_loaded)
+                || (self.map_id == 0xc && index == 2 && !self.wooden_door_open)
+                || self.walking.active_direction() != Some(transition.direction())
+            {
+                return Err(SliceError::Exit);
+            }
+            let (x, y) = transition.handoff();
+            self.walking = WalkingState::new(x, y);
+            self.animation = AnimationState::standing(transition.direction());
+            self.transition = Some(transition);
         }
-        let (x, y) = transition.handoff();
-        self.walking = WalkingState::new(x, y);
-        self.animation = AnimationState::standing(transition.direction());
-        self.transition = Some(transition);
         Ok(())
     }
     /// Source-cell removals for rendering, retained for the resident sheet lifetime.
@@ -907,5 +945,65 @@ impl GameState {
             self.pandora = Some(state);
         }
         self.advance_motion(spec)
+    }
+}
+
+impl State {
+    fn validate_travel(
+        self,
+        spec: &PandoraData,
+        travel: Travel,
+        before_load: bool,
+        flags: &StoryFlags,
+    ) -> Result<(), SliceError> {
+        let nav = spec.navigation.as_ref().ok_or(SliceError::Snapshot)?;
+        let key = nav.binding(travel).ok_or(SliceError::Snapshot)?;
+        let (_, motion) = spec
+            .motion(MotionKey::Travel(travel))
+            .ok_or(SliceError::Snapshot)?;
+        let trigger = motion.trigger.ok_or(SliceError::Snapshot)?;
+        if !nav.selected(key, trigger)
+            || flags.contains(0x26) != Ok(true)
+            || (matches!(
+                travel,
+                Travel::CToCellar | Travel::ETo20 | Travel::TwentyToBox
+            ) && flags.contains(0x292) != Ok(true))
+            || (before_load
+                && nav
+                    .doors
+                    .iter()
+                    .any(|d| d.exit == key && self.town_open & d.door.mask() == 0))
+        {
+            return Err(SliceError::Snapshot);
+        }
+        Ok(())
+    }
+}
+impl GameState {
+    pub(super) fn interact_town(&mut self, data: &GameData) -> Result<FrameOutput, SliceError> {
+        let spec = self.check_pandora(data)?;
+        let state = self.pandora.ok_or(SliceError::Data)?;
+        let nav = spec.navigation.as_ref().ok_or(SliceError::Interaction)?;
+        let door = nav
+            .doors
+            .iter()
+            .find(|d| {
+                d.interaction.position == self.walking.position()
+                    && d.interaction.facing == self.animation.facing()
+            })
+            .ok_or(SliceError::Interaction)?;
+        if self.transition.is_some()
+            || self.dialogue.is_some()
+            || state.owns()
+            || state.town_open & door.door.mask() != 0
+        {
+            return Err(SliceError::Interaction);
+        }
+        let tick = self.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
+        self.pandora.as_mut().ok_or(SliceError::Data)?.town_open |= door.door.mask();
+        self.tick = tick;
+        self.walking = WalkingState::new(self.walking.position().0, self.walking.position().1);
+        self.animation = AnimationState::standing(self.animation.facing());
+        Ok(self.output())
     }
 }

@@ -105,6 +105,7 @@ impl State {
             self.sheet = Sheet::new(resident);
             *wooden = false;
         }
+        self.town_open = 0;
         self.visit_consumed = self.sheet.parked_consumed;
         self.visit_cellar = self.sheet.cellar;
         self.graph.load(map, flags);
@@ -161,6 +162,15 @@ impl State {
     }
     pub fn apply_sheet(self, room: &mut Room, spec: &PandoraData, wooden: bool) {
         if !self.sheet.resident {
+            if let Some(nav) = &spec.navigation {
+                for door in &nav.doors {
+                    if self.town_open & door.door.mask() != 0 {
+                        for p in door.patches {
+                            patch(room, usize::from(p.cell), p.open);
+                        }
+                    }
+                }
+            }
             return;
         }
         wood(room, wooden);

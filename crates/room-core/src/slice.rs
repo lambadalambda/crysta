@@ -6,6 +6,9 @@ pub use crate::pandora::{
     MotionKey, MotionPose, MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages,
     ScenePhase, Travel,
 };
+pub use crate::pandora::{
+    CellPatch, ExitKey, MapExits, NavigationSpec, TownDoor, TownDoorSpec, TravelExit,
+};
 mod pandora_runtime;
 mod shared_sheet;
 use crate::transition::Transition;
@@ -20,7 +23,7 @@ pub use shared_sheet::{CellarDoorPatch, SharedSheetOutput};
 /// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
 pub const PROFILE_VERSION: u8 = 9;
 /// Opt-in Pandora policy; v12 adds source-preserving cue pose operations.
-pub const PANDORA_PROFILE_VERSION: u8 = 12;
+pub const PANDORA_PROFILE_VERSION: u8 = 13;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +55,17 @@ impl Exit {
             && x.wrapping_sub(u16::from(self.0[0]) * 16) < u16::from(self.0[2]) * 16 - 15
             && y.wrapping_sub(u16::from(self.0[1]) * 16) < u16::from(self.0[3]) * 16 - 15
     }
+}
+
+// Find once, then fine-test ONLY that record: never search again after fine failure.
+pub(crate) fn select_exit(records: &[Exit], position: (u16, u16)) -> Option<(usize, Exit)> {
+    let origin = (position.0.wrapping_sub(8), position.1.wrapping_sub(16));
+    records
+        .iter()
+        .copied()
+        .enumerate()
+        .find(|(_, e)| e.coarse(origin.0, origin.1))
+        .filter(|(_, e)| e.fine(origin.0, origin.1))
 }
 
 /// Source-compiled fresh bedroom profile, distinct from a reloaded bedroom.
@@ -263,16 +277,18 @@ impl GameData {
             .ok_or(SliceError::Data)
     }
     fn exit(&self, id: u16, position: (u16, u16)) -> Option<(usize, Exit)> {
-        let origin = (position.0.wrapping_sub(8), position.1.wrapping_sub(16));
-        self.rooms
-            .iter()
-            .find(|p| p.map_id == id)?
-            .exits
-            .iter()
-            .copied()
-            .enumerate()
-            .find(|(_, e)| e.coarse(origin.0, origin.1))
-            .filter(|(_, e)| e.fine(origin.0, origin.1))
+        let records = self
+            .pandora
+            .as_ref()
+            .and_then(|p| p.navigation.as_ref())
+            .and_then(|n| n.records(id))
+            .or_else(|| {
+                self.rooms
+                    .iter()
+                    .find(|p| p.map_id == id)
+                    .map(|p| p.exits.as_slice())
+            })?;
+        select_exit(records, position)
     }
 }
 
@@ -403,10 +419,7 @@ impl GameState {
         {
             return Err(SliceError::Data);
         }
-        if self.pandora.is_some_and(|p| {
-            self.transition.is_none()
-                && (p.owns() || p.collision(self.map_id, &self.flags).is_some())
-        }) {
+        if self.pandora.is_some() && self.transition.is_none() {
             return self.step_pandora(data, input);
         }
         let mut next = self.clone();
@@ -497,6 +510,9 @@ impl GameState {
         if let Some(p) = self.pandora {
             if p.owns() || p.pot.is_some_and(|pot| !pot.idle_empty()) {
                 return Err(SliceError::Interaction);
+            }
+            if self.map_id == 0xa {
+                return self.interact_town(data);
             }
             if self.map_id == 0x13 {
                 return self.pandora_resident(data);
@@ -705,7 +721,7 @@ impl GameState {
             b'S',
             b'L',
             b'C',
-            if self.pandora.is_some() { 4 } else { 1 },
+            if self.pandora.is_some() { 5 } else { 1 },
             if self.pandora.is_some() {
                 PANDORA_PROFILE_VERSION
             } else {
@@ -771,7 +787,7 @@ impl GameState {
                     b'S',
                     b'L',
                     b'C',
-                    if enabled { 4 } else { 1 },
+                    if enabled { 5 } else { 1 },
                     if enabled {
                         PANDORA_PROFILE_VERSION
                     } else {

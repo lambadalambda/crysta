@@ -378,6 +378,7 @@ pub struct PandoraData {
     pub(crate) opening_gate: BoxOpeningGate,
     pub(crate) objects: Vec<SourceObject>,
     pub(crate) cellar_up_lanes: bool,
+    pub(crate) navigation: Option<super::NavigationSpec>,
 }
 impl MotionKey {
     pub(crate) const fn maps(self) -> (u16, u16, bool) {
@@ -436,6 +437,7 @@ impl PandoraData {
             if profile.key != key
                 || (profile.room.width(), profile.room.height()) != key.dimensions()
                 || profile.room.sample_halo().is_none()
+                || !valid_material_membership(key, &profile.room)
             {
                 return Err(SliceError::Data);
             }
@@ -561,6 +563,7 @@ impl PandoraData {
             opening_gate,
             objects,
             cellar_up_lanes,
+            navigation: None,
         };
         for key in [
             CollisionKey::CClosed,
@@ -622,4 +625,21 @@ impl MotionSpec {
         }
         (position, facing)
     }
+}
+
+fn valid_material_membership(key: CollisionKey, room: &Room) -> bool {
+    use crate::MaterialAlias;
+    room.material_policy().iter().all(|rule| match rule.alias {
+        MaterialAlias::TownSolid25 => key == CollisionKey::Town,
+        MaterialAlias::ClosedDoorPartial5 => key.map() == 0xc && rule.bounds == [11, 21, 12, 22],
+        MaterialAlias::StairOpen29 => match key {
+            CollisionKey::CClosed
+            | CollisionKey::CDamaged
+            | CollisionKey::CReaction
+            | CollisionKey::COpen => rule.bounds == [11, 21, 12, 22],
+            CollisionKey::CellarE => rule.bounds == [6, 53, 7, 54],
+            CollisionKey::Cellar20 => rule.bounds == [22, 53, 23, 54],
+            _ => false,
+        },
+    })
 }

@@ -250,7 +250,7 @@ fn same_new_game_opt_in_identity_and_old_profile_remain_distinct() {
     let mut s = GameState::new_game(&d, Policy::SemanticPreview);
     assert_eq!(s.output().position, (304, 112));
     assert_eq!(s.output().tick, 0);
-    assert_eq!(&s.snapshot()[..8], b"RSLC\x04\x0c\x00\x01");
+    assert_eq!(&s.snapshot()[..8], b"RSLC\x05\x0d\x00\x01");
     assert_eq!(
         &GameState::new_game(&old, Policy::SemanticPreview).snapshot()[..8],
         b"RSLC\x01\x09\x00\x01"
@@ -499,42 +499,55 @@ fn canonical_aggregate_rejects_erased_ownership_flags_motion_and_identity() {
 }
 #[test]
 fn qualified_travel_restores_departure_reload_arrival_and_discards_input() {
-    let mut d = data();
-    d.pandora.as_mut().unwrap().motions.push(MotionSpec {
-        key: MotionKey::Travel(Travel::TownToResident),
-        trigger: Some(anchor((136, 208), Direction::Down)),
-        frames: vec![
-            MotionFrame {
-                map_id: 0xa,
-                pose: MotionPose::Absolute(anchor((136, 208), Direction::Down)),
-                reload: false,
-                scene: ScenePhase::TownSource,
-            },
-            MotionFrame {
-                map_id: 0x13,
-                pose: MotionPose::Absolute(anchor((360, 144), Direction::Up)),
-                reload: true,
-                scene: ScenePhase::Resident13,
-            },
-            MotionFrame {
-                map_id: 0x13,
-                pose: MotionPose::Absolute(anchor((360, 144), Direction::Up)),
-                reload: false,
-                scene: ScenePhase::Resident13,
-            },
-        ],
-    });
-    let mut s = at(&d, 0xa, (136, 205), Direction::Down, &[0x26]);
-    frames(&mut s, &d, Some(Direction::Down), 4);
-    assert_eq!(
-        s.pandora_output(&d).unwrap().owner,
-        ControlOwner::Transition
-    );
-    frames(&mut s, &d, Some(Direction::Left), 3);
-    assert_eq!(s.output().position, (360, 144));
-    assert_eq!(s.output().map_id, 0x13);
-    assert_eq!(s.walking.last_activation_direction(), None);
-    replay(&mut s, &d, GameState::interact);
+    let d = navigation_data();
+    for (door, travel, endpoint, destination) in [
+        (TownDoor::North, Travel::TownToResident, (392, 207), 0x13),
+        (TownDoor::Home, Travel::TownToHouse, (120, 719), 0xd),
+    ] {
+        let spec = d
+            .pandora
+            .as_ref()
+            .unwrap()
+            .navigation
+            .as_ref()
+            .unwrap()
+            .door(door);
+        let mut s = at(&d, 0xa, spec.interaction.position, Direction::Up, &[0x26]);
+        replay(&mut s, &d, GameState::interact);
+        // Isolate the exact post-collision exit witness, not a native itinerary.
+        let trigger = d
+            .pandora
+            .as_ref()
+            .unwrap()
+            .motion(MotionKey::Travel(travel))
+            .unwrap()
+            .1
+            .trigger
+            .unwrap();
+        s.walking = WalkingState::new(trigger.position.0, trigger.position.1 + 3);
+        frames(&mut s, &d, Some(Direction::Up), 4);
+        assert_eq!(
+            s.pandora_output(&d).unwrap().motion,
+            Some((MotionKey::Travel(travel), 0))
+        );
+        for elapsed in 1..=35 {
+            replay(&mut s, &d, |s, d| {
+                s.step(
+                    d,
+                    FrameInput {
+                        direction: Some(Direction::Left),
+                    },
+                )
+            });
+            assert_eq!(
+                s.pandora_output(&d).unwrap().town_open,
+                if elapsed <= 17 { door.mask() } else { 0 }
+            );
+        }
+        assert_eq!(s.output().position, endpoint);
+        assert_eq!(s.output().map_id, destination);
+        assert_eq!(s.walking.last_activation_direction(), None);
+    }
 }
 #[test]
 fn a_synthetic_held_miss_boundary_consumes_a_pot_but_never_counts_an_attempt_as_hit() {
@@ -1064,36 +1077,22 @@ fn retained_damage_new_visit_throw_and_five_cell_shared_patch_lifetime() {
         );
         if map == 0xa {
             let mut returned = replaced.clone();
-            let spec = d.pandora.as_mut().unwrap();
-            let id = u8::try_from(spec.motions.len()).unwrap();
-            // Synthetic pacing, authenticated route identity; exercise the runtime
-            // motion load seam and snapshot cursors, not a native movement claim.
-            spec.motions.push(MotionSpec {
-                key: MotionKey::Travel(Travel::TownToHouse),
-                trigger: Some(anchor((136, 208), Direction::Up)),
-                frames: [(0xa, false), (0xd, true), (0xd, false)]
-                    .into_iter()
-                    .map(|(map_id, reload)| MotionFrame {
-                        map_id,
-                        reload,
-                        pose: MotionPose::Absolute(anchor(
-                            if map_id == 0xa {
-                                (136, 208)
-                            } else {
-                                (136, 600)
-                            },
-                            Direction::Up,
-                        )),
-                        scene: if map_id == 0xa {
-                            ScenePhase::TownSource
-                        } else {
-                            ScenePhase::House
-                        },
-                    })
-                    .collect(),
-            });
+            let nav_data = navigation_data();
+            let spec = nav_data.pandora.unwrap();
+            let id = u8::try_from(d.pandora.as_ref().unwrap().motions.len()).unwrap();
+            let motion = spec
+                .motions
+                .into_iter()
+                .find(|m| m.key == MotionKey::Travel(Travel::TownToHouse))
+                .unwrap();
+            d.pandora.as_mut().unwrap().motions.push(motion);
+            d.pandora.as_mut().unwrap().navigation = spec.navigation;
+            returned.walking = WalkingState::new(504, 768);
+            returned.animation = AnimationState::standing(Direction::Up);
+            replay(&mut returned, &d, GameState::interact);
+            returned.walking = WalkingState::new(504, 752);
             returned.pandora.as_mut().unwrap().motion = Some((id, 0));
-            for _ in 0..3 {
+            for _ in 0..35 {
                 replay(&mut returned, &d, neutral);
             }
             assert!(returned.flags.contains(0x292).unwrap());
@@ -1326,4 +1325,632 @@ fn preserve_after_absolute_checks_canonical_position_and_facing() {
         assert!(GameState::restore(&d, &forged).is_err());
     }
     replay(&mut s, &d, neutral);
+}
+
+#[test]
+fn town_requires_real_interaction_and_preserves_pose_flags() {
+    let d = navigation_data();
+    for door in [TownDoor::North, TownDoor::Home] {
+        let spec = d
+            .pandora
+            .as_ref()
+            .unwrap()
+            .navigation
+            .as_ref()
+            .unwrap()
+            .door(door);
+        let mut s = at(&d, 0xa, spec.interaction.position, Direction::Up, &[0x26]);
+        let before = s.effective_room(&d).unwrap();
+        let flags = s.flags.clone();
+        let pose = s.walking.position();
+        replay(&mut s, &d, GameState::interact);
+        assert_eq!(s.walking.position(), pose);
+        assert_eq!(s.flags, flags);
+        assert_eq!(s.pandora_output(&d).unwrap().town_open, door.mask());
+        let after = s.effective_room(&d).unwrap();
+        assert_eq!(
+            before
+                .cells()
+                .iter()
+                .zip(after.cells())
+                .filter(|(a, b)| a != b)
+                .count(),
+            2
+        );
+        let snapshot = s.snapshot();
+        assert_eq!(s.interact(&d), Err(SliceError::Interaction));
+        assert_eq!(s.snapshot(), snapshot);
+    }
+}
+
+fn navigation_spec() -> NavigationSpec {
+    let key = |map_id, index| ExitKey { map_id, index };
+    NavigationSpec {
+        maps: vec![
+            MapExits {
+                map_id: 0xa,
+                records: vec![
+                    Exit([31, 45, 1, 2, 13, 0, 0, 6, 112, 0, 192, 2]),
+                    Exit([29, 16, 1, 2, 19, 0, 0, 6, 128, 1, 192, 0]),
+                ],
+            },
+            MapExits {
+                map_id: 0x13,
+                records: vec![Exit([24, 12, 1, 2, 10, 0, 0, 5, 208, 1, 32, 1])],
+            },
+            MapExits {
+                map_id: 0xc,
+                records: crate::house::exits(0xc).unwrap().to_vec(),
+            },
+            MapExits {
+                map_id: 0xd,
+                records: crate::house::exits(0xd).unwrap().to_vec(),
+            },
+            MapExits {
+                map_id: 0xe,
+                records: vec![Exit([6, 53, 1, 1, 32, 0, 0, 14, 144, 1, 96, 3])],
+            },
+            MapExits {
+                map_id: 0x20,
+                records: vec![Exit([22, 53, 1, 1, 33, 0, 0, 14, 128, 0, 112, 0])],
+            },
+        ],
+        travels: vec![
+            TravelExit {
+                travel: Travel::TownToResident,
+                exit: key(0xa, 1),
+            },
+            TravelExit {
+                travel: Travel::ResidentToTown,
+                exit: key(0x13, 0),
+            },
+            TravelExit {
+                travel: Travel::TownToHouse,
+                exit: key(0xa, 0),
+            },
+            TravelExit {
+                travel: Travel::CToCellar,
+                exit: key(0xc, 3),
+            },
+            TravelExit {
+                travel: Travel::ETo20,
+                exit: key(0xe, 0),
+            },
+            TravelExit {
+                travel: Travel::TwentyToBox,
+                exit: key(0x20, 0),
+            },
+        ],
+        doors: [(TownDoor::North, 1, 29, 16), (TownDoor::Home, 0, 31, 45)].map(
+            |(door, index, x, y)| TownDoorSpec {
+                door,
+                exit: key(0xa, index),
+                interaction: anchor((x * 16 + 8, (y + 3) * 16), Direction::Up),
+                patches: [
+                    CellPatch {
+                        cell: y * 64 + x,
+                        closed: 0x1cf2,
+                        open: 0x1cf6,
+                    },
+                    CellPatch {
+                        cell: (y + 1) * 64 + x,
+                        closed: 0x1cf3,
+                        open: 0x00f7,
+                    },
+                ],
+            },
+        ),
+    }
+}
+fn navigation_data() -> GameData {
+    let mut d = data();
+    let mut p = d.pandora.take().unwrap();
+    let nav = navigation_spec();
+    for door in nav.doors {
+        for patch in door.patches {
+            p.rooms[0]
+                .room
+                .replace_cell(usize::from(patch.cell), patch.closed);
+        }
+    }
+    for (travel, trigger, loaded, scene) in [
+        (
+            Travel::TownToResident,
+            anchor((472, 288), Direction::Up),
+            (392, 224),
+            ScenePhase::Resident13,
+        ),
+        (
+            Travel::ResidentToTown,
+            anchor((392, 208), Direction::Down),
+            (472, 288),
+            ScenePhase::TownSource,
+        ),
+        (
+            Travel::TownToHouse,
+            anchor((504, 752), Direction::Up),
+            (120, 736),
+            ScenePhase::House,
+        ),
+        (
+            Travel::CToCellar,
+            anchor((184, 352), Direction::Up),
+            (138, 857),
+            ScenePhase::CellarE,
+        ),
+        (
+            Travel::ETo20,
+            anchor((104, 864), Direction::Up),
+            (394, 857),
+            ScenePhase::Cellar20,
+        ),
+        (
+            Travel::TwentyToBox,
+            anchor((360, 864), Direction::Up),
+            (122, 105),
+            ScenePhase::BoxContact,
+        ),
+    ] {
+        let ordinary = matches!(
+            travel,
+            Travel::TownToResident | Travel::ResidentToTown | Travel::TownToHouse
+        );
+        let frames = if ordinary {
+            (1..=35)
+                .map(|elapsed| MotionFrame {
+                    map_id: if elapsed <= 17 {
+                        travel.maps().0
+                    } else {
+                        travel.maps().1
+                    },
+                    pose: MotionPose::Absolute(anchor(
+                        crate::transition::doorway_position(
+                            trigger.position,
+                            loaded,
+                            trigger.facing,
+                            elapsed,
+                        )
+                        .unwrap(),
+                        trigger.facing,
+                    )),
+                    reload: elapsed == 18,
+                    scene: if elapsed <= 17 {
+                        if travel == Travel::ResidentToTown {
+                            ScenePhase::Resident13
+                        } else {
+                            ScenePhase::TownSource
+                        }
+                    } else {
+                        scene
+                    },
+                })
+                .collect()
+        } else {
+            vec![MotionFrame {
+                map_id: travel.maps().1,
+                pose: MotionPose::Absolute(anchor(loaded, Direction::Up)),
+                reload: true,
+                scene,
+            }]
+        };
+        p.motions.push(MotionSpec {
+            key: MotionKey::Travel(travel),
+            trigger: Some(trigger),
+            frames,
+        });
+    }
+    d.pandora = Some(p.with_navigation(nav).unwrap());
+    d
+}
+
+#[test]
+fn navigation_contract_rejects_mutated_order_binding_raw_and_patch() {
+    let bad = |change: fn(&mut NavigationSpec)| {
+        let mut p = navigation_data().pandora.unwrap();
+        let mut nav = p.navigation.take().unwrap();
+        change(&mut nav);
+        assert!(p.with_navigation(nav).is_err());
+    };
+    bad(|n| n.maps.swap(0, 1));
+    bad(|n| n.maps[0].records.swap(0, 1));
+    bad(|n| n.travels[0].exit.index = 0);
+    bad(|n| n.travels[0].exit.map_id = 0x13);
+    bad(|n| n.travels[1] = n.travels[0]);
+    bad(|n| {
+        n.maps[0].records[1].0[8] += 1;
+    });
+    bad(|n| n.maps[0].records[1].0[6] = 1);
+    bad(|n| n.maps[0].records[1].0[7] = 14);
+    bad(|n| n.maps[0].records[1].0[2] = 0);
+    bad(|n| n.maps[0].records[1].0[0] = 255);
+    bad(|n| n.doors[0].patches[0].cell += 1);
+    bad(|n| n.doors[0].patches[0].open |= 0x8000);
+    bad(|n| n.doors[0].patches[1].closed = 0x00f7);
+    bad(|n| n.doors[1] = n.doors[0]);
+    bad(|n| n.doors[0].interaction.position.1 -= 1);
+    bad(|n| {
+        let record = n.maps[0].records[1];
+        n.maps[0].records.insert(0, record);
+    });
+    for frame in [0, 16, 17, 18, 34] {
+        let mut p = navigation_data().pandora.unwrap();
+        let nav = p.navigation.take().unwrap();
+        let m = p
+            .motions
+            .iter_mut()
+            .find(|m| m.key == MotionKey::Travel(Travel::TownToResident))
+            .unwrap();
+        m.frames[frame].pose = MotionPose::Absolute(anchor((472, 288), Direction::Up));
+        assert!(p.with_navigation(nav).is_err());
+    }
+    let mut p = navigation_data().pandora.unwrap();
+    let nav = p.navigation.take().unwrap();
+    p.motions
+        .iter_mut()
+        .find(|m| m.key == MotionKey::Travel(Travel::TownToResident))
+        .unwrap()
+        .frames
+        .pop();
+    assert!(p.with_navigation(nav).is_err());
+    let mut p = navigation_data().pandora.unwrap();
+    let mut nav = p.navigation.take().unwrap();
+    nav.maps[2].records[0].0[8] += 1; // Shape-valid, but not the aggregate's C list.
+    let p = p.with_navigation(nav).unwrap();
+    let base = progression_tests::data();
+    let identity = DataIdentity {
+        content_sha256: [9; 32],
+        ..base.identity
+    };
+    assert!(base.with_pandora(p, identity).is_err());
+}
+
+#[test]
+fn ordered_travel_fine_failure_unsupported_and_postselection_errors_are_atomic() {
+    for first in [
+        Exit([29, 16, 1, 1, 255, 0, 0, 0, 0, 0, 0, 0]),
+        Exit([29, 16, 1, 2, 255, 0, 0, 0, 0, 0, 0, 0]),
+    ] {
+        let mut d = navigation_data();
+        let mut s = at(&d, 0xa, (472, 304), Direction::Up, &[0x26]);
+        s.interact(&d).unwrap();
+        // At origin y=271 first record coarsely matches row16, but fails its fine test;
+        // second candidate would match. The other case selects unsupported255.
+        let p = d.pandora.as_mut().unwrap();
+        let n = p.navigation.as_mut().unwrap();
+        n.maps[0].records.insert(0, first);
+        for binding in &mut n.travels {
+            if binding.exit.map_id == 0xa {
+                binding.exit.index += 1;
+            }
+        }
+        for door in &mut n.doors {
+            door.exit.index += 1;
+        }
+        s.walking = WalkingState::new(472, 287);
+        let before = s.snapshot();
+        let result = s.step(&d, FrameInput::default());
+        if first.0[3] == 1 {
+            assert!(result.is_ok());
+            assert_eq!(s.pandora_output(&d).unwrap().motion, None);
+        } else {
+            assert_eq!(result, Err(SliceError::Exit));
+            assert_eq!(s.snapshot(), before);
+        }
+    }
+    // Correct ordinal with wrong mandatory exact witness or delayed direction cannot fall through.
+    let d = navigation_data();
+    for (position, facing) in [((472, 287), Direction::Up), ((472, 288), Direction::Down)] {
+        let mut s = at(&d, 0xa, (472, 304), Direction::Up, &[0x26]);
+        s.interact(&d).unwrap();
+        s.walking = WalkingState::new(position.0, position.1);
+        s.animation = AnimationState::standing(facing);
+        let before = s.snapshot();
+        assert_eq!(s.step(&d, FrameInput::default()), Err(SliceError::Exit));
+        assert_eq!(s.snapshot(), before);
+    }
+}
+
+#[test]
+fn town_interaction_errors_and_reload_are_atomic_and_occupancy_is_preserved() {
+    let mut d = navigation_data();
+    let cell = 16 * 64 + 29;
+    d.pandora.as_mut().unwrap().rooms[0]
+        .room
+        .replace_cell(cell, 0x9cf2);
+    let mut s = at(&d, 0xa, (472, 304), Direction::Up, &[0x26]);
+    let original = s.clone();
+    for (position, facing, overflow) in [
+        ((471, 304), Direction::Up, false),
+        ((472, 304), Direction::Down, false),
+        ((472, 304), Direction::Up, true),
+    ] {
+        let mut bad = original.clone();
+        bad.walking = WalkingState::new(position.0, position.1);
+        bad.animation = AnimationState::standing(facing);
+        if overflow {
+            bad.tick = u64::MAX;
+        }
+        let before = bad.snapshot();
+        assert_eq!(
+            bad.interact(&d),
+            Err(if overflow {
+                SliceError::TickOverflow
+            } else {
+                SliceError::Interaction
+            })
+        );
+        assert_eq!(bad.snapshot(), before);
+    }
+    s.interact(&d).unwrap();
+    assert_eq!(s.effective_room(&d).unwrap().cells()[cell], 0x9cf6);
+    assert_eq!(s.current_room(&d).unwrap().cells()[cell], 0x9cf2);
+    s.walking = WalkingState::new(504, 768);
+    s.interact(&d).unwrap();
+    assert_eq!(s.pandora_output(&d).unwrap().town_open, 3);
+    load_at(&mut s, &d, 0x13, (392, 207));
+    load_at(&mut s, &d, 0xa, (472, 305));
+    assert_eq!(s.pandora_output(&d).unwrap().town_open, 0);
+    assert_eq!(s.effective_room(&d).unwrap().cells()[cell], 0x9cf2);
+    let mut bad = s.snapshot();
+    bad[303] = 4;
+    assert!(GameState::restore(&d, &bad).is_err());
+}
+
+#[test]
+fn material_aliases_require_their_pandora_profile_membership() {
+    use crate::{MaterialAlias, MaterialRule};
+    for key in CollisionKey::ALL {
+        for (alias, bounds) in [
+            (MaterialAlias::TownSolid25, [0, 0, 1, 1]),
+            (MaterialAlias::ClosedDoorPartial5, [11, 21, 12, 22]),
+            (MaterialAlias::StairOpen29, [11, 21, 12, 22]),
+            (MaterialAlias::StairOpen29, [6, 53, 7, 54]),
+            (MaterialAlias::StairOpen29, [22, 53, 23, 54]),
+        ] {
+            let mut p = data().pandora.unwrap();
+            let room = &mut p.rooms[key as usize].room;
+            if bounds[2] > room.width() || bounds[3] > room.height() {
+                continue;
+            }
+            *room = room
+                .clone()
+                .with_material_policy(vec![MaterialRule {
+                    bounds,
+                    direction: if alias == MaterialAlias::TownSolid25 {
+                        None
+                    } else {
+                        Some(Direction::Up)
+                    },
+                    alias,
+                }])
+                .unwrap();
+            let allowed = if alias == MaterialAlias::TownSolid25 {
+                key == CollisionKey::Town
+            } else {
+                match bounds {
+                    [6, 53, 7, 54] => key == CollisionKey::CellarE,
+                    [22, 53, 23, 54] => key == CollisionKey::Cellar20,
+                    _ => key.map() == 0xc,
+                }
+            };
+            let result = PandoraData::new(
+                p.text,
+                p.rooms,
+                p.motions,
+                p.contacts,
+                p.opening_gate,
+                p.objects,
+                p.cellar_up_lanes,
+            );
+            assert_eq!(result.is_ok(), allowed, "{key:?} {alias:?}");
+        }
+    }
+}
+
+#[test]
+fn town_closed_routes_and_departure_snapshot_cannot_bypass_interact() {
+    let d = navigation_data();
+    for door in [TownDoor::North, TownDoor::Home] {
+        let nav = d.pandora.as_ref().unwrap().navigation.as_ref().unwrap();
+        let spec = nav.door(door);
+        let mut s = at(&d, 0xa, spec.interaction.position, Direction::Up, &[0x26]);
+        for _ in 0..24 {
+            let before = s.snapshot();
+            if s.step(
+                &d,
+                FrameInput {
+                    direction: Some(Direction::Up),
+                },
+            )
+            .is_err()
+            {
+                assert_eq!(s.snapshot(), before);
+                break;
+            }
+            assert_eq!(s.pandora_output(&d).unwrap().motion, None);
+            assert_eq!(s.map_id, 0xa);
+        }
+        let mut s = at(&d, 0xa, spec.interaction.position, Direction::Up, &[0x26]);
+        s.interact(&d).unwrap();
+        s.walking = WalkingState::new(
+            spec.interaction.position.0,
+            spec.interaction.position.1 - 13,
+        );
+        frames(&mut s, &d, Some(Direction::Up), 4);
+        for cursor in 0..18 {
+            assert_eq!(s.pandora_output(&d).unwrap().motion.unwrap().1, cursor);
+            for mask in [0, 3 ^ door.mask()] {
+                let mut bad = s.snapshot();
+                bad[303] = mask;
+                assert!(GameState::restore(&d, &bad).is_err());
+            }
+            replay(&mut s, &d, neutral);
+        }
+        let mut bad = s.snapshot();
+        bad[303] = door.mask();
+        assert!(GameState::restore(&d, &bad).is_err());
+    }
+}
+
+#[test]
+fn resident_return_uses_all_35_samples_and_reconstructs_closed_town() {
+    let d = navigation_data();
+    let mut s = at(&d, 0x13, (392, 205), Direction::Down, &[0x26]);
+    frames(&mut s, &d, Some(Direction::Down), 4);
+    assert_eq!(
+        s.pandora_output(&d).unwrap().motion,
+        Some((MotionKey::Travel(Travel::ResidentToTown), 0))
+    );
+    for _ in 0..35 {
+        replay(&mut s, &d, neutral);
+    }
+    assert_eq!(s.map_id, 0xa);
+    assert_eq!(s.walking.position(), (472, 305));
+    assert_eq!(s.pandora_output(&d).unwrap().town_open, 0);
+}
+
+#[test]
+fn stair_selection_is_ordered_and_wrong_postselection_witness_is_atomic() {
+    let d = navigation_data();
+    for (map, position, travel) in [
+        (0xe, (104, 864), Travel::ETo20),
+        (0x20, (360, 864), Travel::TwentyToBox),
+    ] {
+        let mut s = at(
+            &d,
+            map,
+            (position.0, position.1 + 3),
+            Direction::Up,
+            &[0x26, 0x28, 0x27, 0x2e, 0x292],
+        );
+        frames(&mut s, &d, Some(Direction::Up), 4);
+        assert_eq!(
+            s.pandora_output(&d).unwrap().motion,
+            Some((MotionKey::Travel(travel), 0))
+        );
+        replay(&mut s, &d, neutral);
+        assert_eq!(s.map_id, travel.maps().1);
+        let mut s = at(
+            &d,
+            map,
+            position,
+            Direction::Up,
+            &[0x26, 0x28, 0x27, 0x2e, 0x292],
+        );
+        let before = s.snapshot();
+        assert_eq!(s.step(&d, FrameInput::default()), Err(SliceError::Exit)); // no delayed direction
+        assert_eq!(s.snapshot(), before);
+    }
+}
+
+#[test]
+fn missing_navigation_has_no_exact_trigger_fallback() {
+    let mut d = navigation_data();
+    d.pandora.as_mut().unwrap().navigation = None;
+    let mut s = at(&d, 0xa, (472, 304), Direction::Up, &[0x26]);
+    let before = s.snapshot();
+    assert_eq!(s.interact(&d), Err(SliceError::Interaction));
+    assert_eq!(s.snapshot(), before);
+    // Even an internal motion-cursor forgery cannot restore without source selection.
+    let id = d
+        .pandora
+        .as_ref()
+        .unwrap()
+        .motion(MotionKey::Travel(Travel::TownToResident))
+        .unwrap()
+        .0;
+    s.walking = WalkingState::new(472, 288);
+    s.pandora.as_mut().unwrap().motion = Some((u8::try_from(id).unwrap(), 0));
+    assert!(GameState::restore(&d, &s.snapshot()).is_err());
+}
+
+#[test]
+fn restored_arrival_cannot_invent_town_interaction_or_change_d_load_gate() {
+    let d = navigation_data();
+    for travel in [Travel::ResidentToTown, Travel::TownToHouse] {
+        let p = d.pandora.as_ref().unwrap();
+        let (id, motion) = p.motion(MotionKey::Travel(travel)).unwrap();
+        let trigger = motion.trigger.unwrap();
+        let mut s = at(
+            &d,
+            travel.maps().0,
+            trigger.position,
+            trigger.facing,
+            &[0x26],
+        );
+        if travel == Travel::TownToHouse {
+            s.walking = WalkingState::new(504, 768);
+            s.interact(&d).unwrap();
+            s.walking = WalkingState::new(trigger.position.0, trigger.position.1);
+        }
+        s.pandora.as_mut().unwrap().motion = Some((u8::try_from(id).unwrap(), 0));
+        for _ in 0..18 {
+            replay(&mut s, &d, neutral);
+        }
+        for _ in 18..35 {
+            let mut bad = s.snapshot();
+            if travel == Travel::ResidentToTown {
+                bad[303] = TownDoor::North.mask();
+            } else {
+                bad[173] = 0;
+            }
+            assert!(GameState::restore(&d, &bad).is_err(), "{travel:?}");
+            replay(&mut s, &d, neutral);
+        }
+    }
+}
+
+#[test]
+fn idle_restore_cannot_erase_selected_navigation_ownership() {
+    let d = navigation_data();
+    let mut s = at(&d, 0xa, (472, 304), Direction::Up, &[0x26]);
+    s.interact(&d).unwrap();
+    s.walking = WalkingState::new(472, 288);
+    assert!(GameState::restore(&d, &s.snapshot()).is_err());
+}
+
+#[test]
+fn legacy_d_to_town_arrival_cannot_invent_open_doors() {
+    let d = navigation_data();
+    let exit = crate::house::EXTERIOR;
+    let mut s = at(&d, 0xd, exit.handoff, exit.direction, &[0x26]);
+    s.d_open_loaded = true;
+    s.transition = Some(Transition::select(0xd, 0, exit.handoff).unwrap());
+    for _ in 0..18 {
+        replay(&mut s, &d, neutral);
+    }
+    for _ in 18..35 {
+        let mut bad = s.snapshot();
+        bad[303] = 3;
+        assert!(GameState::restore(&d, &bad).is_err());
+        replay(&mut s, &d, neutral);
+    }
+}
+
+#[test]
+fn c_stair_keeps_source_selection_and_empty_pot_ownership() {
+    let d = navigation_data();
+    let mut s = at(
+        &d,
+        0xc,
+        (184, 355),
+        Direction::Up,
+        &[0x26, 0x28, 0x27, 0x2e],
+    );
+    // Isolated post-departure resident-sheet fixture, not an action shortcut API.
+    let p = s.pandora.as_mut().unwrap();
+    p.pot = None;
+    p.sheet.cellar = CellarDoorPatch::Open;
+    p.sheet.parked_consumed = 3;
+    flag(&mut s, 0x292);
+    s.pandora_load().unwrap();
+    s.ensure_pot(d.pandora.as_ref().unwrap()).unwrap();
+    frames(&mut s, &d, Some(Direction::Up), 4);
+    assert_eq!(
+        s.pandora_output(&d).unwrap().motion,
+        Some((MotionKey::Travel(Travel::CToCellar), 0))
+    );
+    replay(&mut s, &d, neutral);
+    assert_eq!(s.map_id, 0xe);
+    assert!(s.pot_state().is_none());
 }

@@ -274,3 +274,8 @@ pub use data::{
 };
 pub use graph::Cue;
 pub(crate) use graph::{Node, Runtime};
+
+mod navigation;
+pub use navigation::{
+    CellPatch, ExitKey, MapExits, NavigationSpec, TownDoor, TownDoorSpec, TravelExit,
+};
