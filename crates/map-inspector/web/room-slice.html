@@ -309,11 +309,48 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     return Number.isInteger(width) && Number.isInteger(height) && width >= 1 && height >= 1 && width <= maxWidth && height <= maxHeight &&
       Array.isArray(rgba) && rgba.length === width*height*4 && rgba.every(v=>Number.isInteger(v) && v >= 0 && v <= 255);
   }
+  // Only these bounded same-origin sheets may be requested, never arbitrary manifest URLs.
+  function backgroundManifest(bundle) {
+    const known = {house:{url:'/map.bmp',width:512,height:1024}, exterior:{url:'/exterior.bmp',width:1024,height:1280}};
+    const maps = {10:'exterior',11:'house',12:'house',13:'house',15:'house',16:'house',17:'house'};
+    const {backgrounds, background_keys:keys} = bundle;
+    if (!backgrounds || !keys || !bundle.foreground || bundle.door_background !== 'house' || !backgrounds.house ||
+        !Object.keys(backgrounds).length) throw new Error('Invalid background manifest');
+    for (const [key, sheet] of Object.entries(backgrounds)) {
+      const expected = Object.hasOwn(known,key) && known[key];
+      if (!expected || !sheet || sheet.url !== expected.url || sheet.width !== expected.width || sheet.height !== expected.height) {
+        throw new Error('Invalid background sheet');
+      }
+    }
+    if (Object.keys(keys).length !== Object.keys(bundle.foreground).length) throw new Error('Invalid background keys');
+    for (const id of Object.keys(bundle.foreground)) {
+      if (!Object.hasOwn(maps,id) || !Object.hasOwn(keys,id) || keys[id] !== maps[id] || !Object.hasOwn(backgrounds,keys[id])) {
+        throw new Error('Invalid background key');
+      }
+    }
+    return backgrounds;
+  }
+  // New bundles take {house:ImageData, exterior:ImageData}; legacy helper fixtures
+  // may still pass one ImageData and supply the closed image to selectBackground.
   function prepareArt(bundle, background, makeRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
     const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null), choiceCatalogs = Object.create(null);
-    const door = prepareDoor(bundle.door_patches, background);
-    const openBackground = door ? makeRaster(background.width, background.height, door.pixels) : null;
+    const backgrounds = Object.create(null), backgroundKeys = Object.create(null);
+    const manifest = bundle.backgrounds === undefined ? null : backgroundManifest(bundle);
+    const pixels = manifest ? background : {house:background};
+    if (manifest) {
+      for (const [key, sheet] of Object.entries(manifest)) {
+        const data = pixels[key];
+        if (!data || data.width !== sheet.width || data.height !== sheet.height || data.data?.length !== sheet.width*sheet.height*4) {
+          throw new Error('Invalid background pixels');
+        }
+        backgrounds[key] = makeRaster(data.width,data.height,data.data);
+      }
+    }
+    for (const id of Object.keys(bundle.foreground)) backgroundKeys[id] = manifest ? bundle.background_keys[id] : 'house';
+    const doorBackground = 'house', house = pixels[doorBackground];
+    const door = prepareDoor(bundle.door_patches, house);
+    const openBackground = door ? makeRaster(house.width, house.height, door.pixels) : null;
     for (const [key, frame] of Object.entries(bundle.frames)) {
       const {width, height, offset, rgba} = frame;
       if (!validPixels(width,height,rgba,64,64) || !Array.isArray(offset) || offset.length !== 2 || !offset.every(Number.isInteger)) {
@@ -331,6 +368,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       choiceCatalogs[key] = options.map(key=>({...dialoguePages[key],key}));
     }
     for (const [id, mask] of Object.entries(bundle.foreground)) {
+      const background = pixels[backgroundKeys[id]];
       if (mask.width !== background.width || mask.height !== background.height ||
           !Array.isArray(mask.runs) || mask.runs.length % 2) throw new Error('Invalid foreground mask');
       const rgba = new Uint8ClampedArray(background.data.length);
@@ -344,7 +382,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         for (let at = start * 4; at < end * 4; at++) rgba[at] = background.data[at];
       }
       foreground[id] = makeRaster(mask.width, mask.height, rgba);
-      if (door) {
+      if (door && backgroundKeys[id] === doorBackground) {
         const opened = new Uint8ClampedArray(rgba);
         for (const [at, high] of door.writes) {
           opened.set(high ? door.pixels.subarray(at*4,at*4+4) : [0,0,0,0],at*4);
@@ -360,15 +398,17 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds, openBackground, openForeground, dialoguePages, choiceCatalogs};
+    return {actors, foreground, sceneIds, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
-    if (state.wooden_door_open) {
+    const key = art.backgroundKeys[state.map_id];
+    if (!key || !art.foreground[state.map_id]) throw new Error('Unsupported background key');
+    if (state.wooden_door_open && key === art.doorBackground) {
       if (!art.openBackground || !art.openForeground[state.map_id]) throw new Error('Missing open door art');
       return {image:art.openBackground,foreground:art.openForeground[state.map_id]};
     }
-    return {image,foreground:art.foreground[state.map_id]};
+    return {image:art.backgrounds[key] || image,foreground:art.foreground[state.map_id]};
   }
   function selectDialogue(art, state) {
     if (!state.dialogue) return null;
@@ -404,7 +444,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
-  const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
+  const buttons = [...document.querySelectorAll('[data-direction]')];
   let ready = false, art = null, assetError = null, lastView = null, lastAnnouncement = '';
   function paintPage(canvas, page, key) {
     canvas.width = page.width; canvas.height = page.height;
@@ -444,7 +484,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         const choices = selectChoices(art, state);
         if (page) paintPage($('dialogue-page'),page,state.dialogue.key);
         if (choices) choices.forEach((option,index)=>paintPage($(`choice${index+1}-label`),option,option.key));
-        const background = selectBackground(art, state, image);
+        const background = selectBackground(art, state);
         drawScene(ctx, background.image, state, selectActors(art, state), background.foreground);
         assetError = null; $('error').textContent = error || '';
       }
@@ -489,21 +529,30 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   async function loadArt() {
     let timer;
     try {
-      const loaded = new Promise((resolve, reject) => {
-        image.onload = resolve; image.onerror = () => reject(new Error('Could not load /map.bmp'));
-      });
-      image.src = '/map.bmp';
-      const metadata = fetch('/art.json', {cache:'no-store', signal:AbortSignal.timeout(5000)}).then(response => {
+      const loading = (async () => {
+        const response = await fetch('/art.json', {cache:'no-store', signal:AbortSignal.timeout(5000)});
         if (!response.ok) throw new Error(`Art HTTP ${response.status}`);
-        return response.json();
-      });
-      const [bundle] = await Promise.race([Promise.all([metadata, loaded]), new Promise((_, reject) => {
+        const bundle = await response.json(), manifest = backgroundManifest(bundle);
+        // Iterate sheets, not maps: all indoor maps share one decode/preparation.
+        const entries = await Promise.all(Object.entries(manifest).map(async ([key, sheet]) => {
+          const image = new Image();
+          await new Promise((resolve, reject) => {
+            image.onload = resolve; image.onerror = () => reject(new Error(`Could not load ${sheet.url}`));
+            image.src = sheet.url;
+          });
+          if (image.naturalWidth !== sheet.width || image.naturalHeight !== sheet.height) {
+            throw new Error(`Expected a ${sheet.width}×${sheet.height} background sheet at ${sheet.url}`);
+          }
+          const scratch = document.createElement('canvas'); scratch.width = sheet.width; scratch.height = sheet.height;
+          const context = scratch.getContext('2d'); context.drawImage(image, 0, 0);
+          return [key,context.getImageData(0, 0, sheet.width, sheet.height)];
+        }));
+        return {bundle,pixels:Object.fromEntries(entries)};
+      })();
+      const {bundle,pixels} = await Promise.race([loading, new Promise((_, reject) => {
         timer = setTimeout(() => reject(new Error('Art loading timed out')), 5000);
       })]);
-      if (image.naturalWidth !== 512 || image.naturalHeight !== 1024) throw new Error('Expected a 512×1024 first-background sheet');
-      const scratch = document.createElement('canvas'); scratch.width = 512; scratch.height = 1024;
-      const context = scratch.getContext('2d'); context.drawImage(image, 0, 0);
-      art = prepareArt(bundle, context.getImageData(0, 0, 512, 1024), makeRaster);
+      art = prepareArt(bundle, pixels, makeRaster);
       ready = true; if (lastView) render(lastView);
     } catch (failure) {
       assetError = `Art load failed: ${failure.message || failure}. Reload this page to retry.`;

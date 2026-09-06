@@ -48,10 +48,10 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null} = {}) {
-  const elements = new Map(), timers = new Map(), requests = []; let timerId = 0, key = actorKey, clock = 0;
-  const context = {fillRect(){},drawImage(){},save(){},restore(){},translate(){},putImageData(){},
-    getImageData(){return {width:512,height:1024,data:new Uint8ClampedArray(512*1024*4)};}};
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null, mutateBundle = () => {}, badDimensions = false, failBitmap = false} = {}) {
+  const elements = new Map(), timers = new Map(), requests = [], images = [], draws = []; let timerId = 0, key = actorKey, clock = 0;
+  const context = {fillRect(){},drawImage(...args){draws.push(args);},save(){},restore(){},translate(){},putImageData(){},
+    getImageData(x,y,width,height){return {width,height,data:new Uint8ClampedArray(width*height*4)};}};
   const element = id => {
     if (!elements.has(id)) {
       const target = new Target(); target.textContent=''; target.getContext=()=>context;
@@ -63,20 +63,45 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
   doc.createElement=()=>({getContext:()=>context});
   const win = new Target();
   const bundle = {schema_version:1,scene_ids:{15:['ark']},frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
-    foreground:{'15':{width:512,height:1024,runs:[]}},
+    backgrounds:{house:{url:'/map.bmp',width:512,height:1024},exterior:{url:'/exterior.bmp',width:1024,height:1280}},
+    background_keys:{10:'exterior',15:'house'},door_background:'house',
+    foreground:{'10':{width:1024,height:1280,runs:[]},'15':{width:512,height:1024,runs:[]}},
     dialogue_pages:{'page:1':{width:2,height:1,rgba:[255,255,255,255,0,0,0,0]},'option:2':{width:1,height:1,rgba:[1,2,3,255]}},choice_catalogs:{0:['page:1','option:2']}};
+  bundle.scene_ids[10]=['ark'];mutateBundle(bundle);
   const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
-    Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
+    Image:class {set src(value){
+      this.url=value;images.push(this);this.naturalWidth=value==='/exterior.bmp'?1024:512;
+      this.naturalHeight=value==='/exterior.bmp'?1280:1024;if(badDimensions)this.naturalWidth=1;
+      if(stallBitmap!==true && stallBitmap!==value) Promise.resolve().then(()=>failBitmap===true || failBitmap===value?this.onerror():this.onload());
+    }},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
     async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
       ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey,...(dialogueChoice===null?{}:{choice:dialogueChoice})},dialogue_acknowledgement:true,choice_interaction:true}:{}),
       scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
-  return {element,timers,requests,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
+  return {element,timers,requests,images,draws,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
+  const loaded = browserHarness(); await flush(); await flush();
+  assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);
+  assert.equal(loaded.element('error').textContent,'');
+  loaded.element('reset').emit('click'); await flush();
+  loaded.element('new-game').emit('click'); await flush();
+  assert.equal(loaded.images.length,2,'starts reuse both preloaded sheets');
+  for(const url of ['/other.bmp','//evil.test/map.bmp','/map.bmp?x=1','/../map.bmp']) {
+    const invalid=browserHarness({mutateBundle:b=>b.backgrounds.house.url=url});await flush();await flush();
+    assert.match(invalid.element('error').textContent,/background/i);
+    assert.equal(invalid.images.length,0,'validate entire manifest before requesting images');
+  }
+  for(const options of [{badDimensions:true},{failBitmap:'/exterior.bmp'}]) {
+    const failed=browserHarness(options);await flush();await flush();
+    assert.match(failed.element('error').textContent,/Art load failed/);
+    assert.equal(failed.element('pause').disabled,true);
+    failed.element('reset').emit('click');await flush();
+    assert.match(failed.element('error').textContent,/Art load failed/);
+  }
   const recovery = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
   assert.match(recovery.element('error').textContent, /sprite/i);
   recovery.element('new-game').emit('click'); await flush();
@@ -104,10 +129,23 @@ async function main() {
     assert.equal(badScene.element('pause').disabled, false);
     assert.equal(badScene.timers.size, validStart==='demo'?1:0);
   }
-  const stalled = browserHarness({stallBitmap:true}); await flush();
+  for(const control of ['new-game','reset']) {
+    const loading=browserHarness({stallBitmap:'/exterior.bmp'});await flush();await flush();
+    assert.equal(loading.element('pause').disabled,true,'house alone cannot make art ready');
+    loading.element(control).emit('click');await flush();
+    assert.equal(loading.element('pause').disabled,true);
+    loading.images.find(image=>image.url==='/exterior.bmp').onload();await flush();await flush();
+    assert.equal(loading.element('pause').disabled,false);
+    assert.equal(loading.element('error').textContent,'');
+    assert.equal(loading.images.length,2);
+    assert.equal(loading.requests.filter(request=>request.url==='/step').length,0,'loading/start never autosteps');
+  }
+  const stalled = browserHarness({stallBitmap:'/exterior.bmp'}); await flush();
   const deadlines=[...stalled.timers.values()].filter(t => t.ms===5000);
   assert.equal(deadlines.length,1); deadlines[0].fn(); await flush();
   assert.match(stalled.element('error').textContent, /timed out/i);
+  stalled.images.forEach(image=>image.onload());await flush();await flush();
+  assert.match(stalled.element('error').textContent,/timed out/i,'late image completion cannot resurrect timed-out art');
   assert.equal(stalled.element('pause').disabled,true);
   for(const key of ['page:1','missing']) {
     const ui=browserHarness({dialogueKey:key}); await flush(); await flush();
@@ -618,4 +656,56 @@ main().catch(error => { console.error(error); process.exitCode = 1; });
   for(const options of [[],['one'],['one','missing'],['one','two','one']]) {
     assert.throws(()=>prepareArt({...bundle,choice_catalogs:{0:options}},background,make),/choice/i);
   }
+}
+
+// Different palettes/strides, shared indoor identity, and a persistent door flag on A.
+{
+  const backgrounds={house:{url:'/map.bmp',width:512,height:1024},exterior:{url:'/exterior.bmp',width:1024,height:1280}};
+  const background_keys={10:'exterior',11:'house',12:'house',13:'house',15:'house',16:'house',17:'house'};
+  const pixels=Object.fromEntries(Object.entries(backgrounds).map(([key,{width,height}],i)=>
+    [key,{width,height,data:new Uint8ClampedArray(width*height*4).fill(i+20)}]));
+  const patches=[[8,8],[24,24]].map(position=>({position,rgba:Array(1024).fill(99),high:Array(256).fill(false)}));
+  patches[1].high[0]=true;
+  const bundle={schema_version:1,backgrounds,background_keys,door_background:'house',door_patches:patches,frames:{},
+    scene_ids:Object.fromEntries(Object.keys(background_keys).map(id=>[id,['ark']])),
+    foreground:Object.fromEntries(Object.entries(background_keys).map(([id,key])=>[id,{width:backgrounds[key].width,height:backgrounds[key].height,runs:[0,1,8200,1]}]))};
+  let copies=0;
+  const make=(width,height,data)=>{copies++;return {width,height,data:new Uint8ClampedArray(data)};};
+  const art=prepareArt(bundle,pixels,make);
+  const closed=selectBackground(art,{map_id:12}),open=selectBackground(art,{map_id:12,wooden_door_open:true});
+  const exterior=selectBackground(art,{map_id:10,wooden_door_open:true});
+  assert.notEqual(exterior.image,closed.image);
+  assert.equal(exterior.image.width,1024);assert.equal(exterior.image.height,1280);
+  assert.equal(closed.image.width,512);assert.equal(closed.image.height,1024);
+  assert.equal(exterior.foreground.data[8200*4],21,'exterior mask uses its own palette and stride');
+  assert.equal(closed.foreground.data[8200*4],20);
+  assert.equal(exterior.foreground.data[4],0,'low pixels stay transparent');
+  const at=(8*512+8)*4;
+  assert.equal(open.image.data[at],99);assert.equal(open.foreground.data[at],0);
+  assert.equal(open.foreground.data[(24*512+24)*4],99);
+  assert.equal(closed.image.data[at],20);assert.equal(pixels.house.data[at],20,'source remains closed');
+  const prepared=copies;
+  for(let i=0;i<20;i++) {
+    assert.equal(selectBackground(art,{map_id:11}).image,closed.image);
+    assert.equal(selectBackground(art,{map_id:11,wooden_door_open:true}).image,open.image);
+    assert.equal(selectBackground(art,{map_id:10,wooden_door_open:!!(i%2)}).image,exterior.image);
+    assert.equal(selectBackground(art,{map_id:10,wooden_door_open:!!(i%2)}).foreground,exterior.foreground);
+  }
+  assert.equal(copies,prepared,'selection never prepares/copies rasters');
+  const draws=[],ctx={fillRect(){},drawImage(...args){draws.push(args);},strokeRect(){}};
+  drawScene(ctx,exterior.image,{...initial(),map_id:10,camera:[376,640]});
+  assert.deepEqual(draws[0],[exterior.image,376,640,256,224,0,0,256,224]);
+  assert.throws(()=>selectBackground(art,{map_id:99}),/background/i);
+  for(const change of [
+    {backgrounds:{...backgrounds,exterior:{...backgrounds.exterior,url:'/other.bmp'}}},
+    {backgrounds:{...backgrounds,exterior:{...backgrounds.exterior,width:512}}},
+    {background_keys:{...background_keys,10:'house'}},
+    {background_keys:{...background_keys,10:'missing'}},
+    {background_keys:{11:'house'}},
+    {door_background:'exterior'},
+    {foreground:{...bundle.foreground,10:{width:512,height:1024,runs:[]}}},
+  ]) assert.throws(()=>prepareArt({...bundle,...change},pixels,make),/background|foreground/i);
+  assert.throws(()=>prepareArt(bundle,{house:pixels.house},make),/background/i);
+  assert.throws(()=>prepareArt(bundle,{...pixels,exterior:{...pixels.exterior,data:[]}},make),/background/i);
+  console.log('PASS: two-sheet preparation, identity, masks, door isolation, bounded manifest, fixed viewport');
 }
