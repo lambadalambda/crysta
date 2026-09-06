@@ -1,14 +1,16 @@
 //! Offline ROM-to-PandoraData adapter. Never called by the live host.
 use crate::{invalid, pandora_navigation, pandora_navigation::source_objects, sha256, Result};
 use assets::{
-    maps::visual::pandora::PandoraBackground,
+    maps::{exits::ExitList, visual::pandora::PandoraBackground},
     text::pandora::{PandoraDialogue, DIRECT_INVOCATIONS},
 };
 use room_core::{
     pots::SourceObject,
     slice::{
-        Anchor, CollisionKey, Cue, Invocation, MotionFrame, MotionKey, MotionPose, MotionSpec,
-        PandoraText, ProfileRoom, RequestPages, ScenePhase,
+        Anchor, BoxOpeningGate, CellPatch, CollisionKey, Cue, DataIdentity, Exit, ExitKey,
+        GameData, GameState, Invocation, MapExits, MotionFrame, MotionKey, MotionPose, MotionSpec,
+        NavigationSpec, PandoraData, PandoraText, Policy, ProfileRoom, RequestPages, ScenePhase,
+        TownDoor, TownDoorSpec, Travel, TravelExit,
     },
     Direction,
 };
@@ -22,7 +24,7 @@ fn require(ok: bool, message: &str) -> Result<()> {
     }
 }
 fn source(image: &[u8], address: u32, length: usize) -> Result<&[u8]> {
-    let at = (address & 0x3fffff) as usize;
+    let at = (address & 0x003f_ffff) as usize;
     image
         .get(
             at..at
@@ -33,6 +35,254 @@ fn source(image: &[u8], address: u32, length: usize) -> Result<&[u8]> {
 }
 fn word(image: &[u8], address: u32) -> Result<u16> {
     Ok(u16::from_le_bytes(source(image, address, 2)?.try_into()?))
+}
+
+/// Compile the opt-in aggregate from the owned ROM, never from captured state.
+///
+/// # Errors
+/// Rejects unauthenticated source data or any incompatible bounded core contract.
+pub fn compile(rom: &rom::Rom) -> Result<GameData> {
+    Ok(compile_profile(rom)?.0)
+}
+
+fn aggregate_identity(rom: &rom::Rom, base: &[u8], manifest: &Value) -> Result<DataIdentity> {
+    let mut content = b"pandora-aggregate-v1:canonical-json,base-new-game-identity".to_vec();
+    content.push(room_core::slice::PROFILE_VERSION);
+    content.extend(rom::digests(base).sha256);
+    content.extend(rom::digests(&serde_json::to_vec(manifest)?).sha256);
+    Ok(DataIdentity {
+        rom_sha256: rom.digests().sha256,
+        content_sha256: rom::digests(&content).sha256,
+    })
+}
+
+fn compile_profile(rom: &rom::Rom) -> Result<(GameData, Value)> {
+    let nav = pandora_navigation::compile(rom.image())?;
+    let base = crate::house_progression::compile(rom)?;
+    // This freshly ROM-derived serialization binds the existing house identity.
+    // It is hashed only, NEVER restored/used to initialize the enabled runtime.
+    let base_identity = GameState::new_game(&base, Policy::SemanticPreview).snapshot();
+    let (text, text_manifest) = compile_text(rom.image())?;
+    let objects = source_objects(rom.image(), &nav)?;
+    let rooms = compile_rooms(rom.image(), &nav, &objects)?;
+    let contacts = compile_contacts(&nav)?;
+    let opening_gate = BoxOpeningGate {
+        raw_bounds: nav.contact().opening_bounds(),
+    };
+    let (mut motions, cue_manifest) = compile_cues(rom.image())?;
+    let (navigation, travel_motions) = compile_navigation(rom.image(), &nav)?;
+    motions.extend(travel_motions);
+    let manifest = json!({
+        "schema":1,
+        "policy":"pandora-aggregate-v1:passive-frozen-source,completed-rest-contact,cell-scoped-delayed-materials,ordinary17-load17,stair-load-completion,graph-atomic-cue-v1,no-native-timing,no-vm",
+        "source":{"navigation":nav.metadata(),"cues":cue_manifest},
+        "text":text_manifest,
+        "rooms":rooms.iter().map(|p| json!({"key":format!("{:?}",p.key),
+            "width":p.room.width(),"height":p.room.height(),"halo":p.room.sample_halo(),"passive":true,
+            "raw_sha256":sha256(&p.room.cells().iter().flat_map(|w| w.to_le_bytes()).collect::<Vec<_>>()),
+            "materials":p.room.material_policy().iter().map(|r|json!({"bounds":r.bounds,"direction":r.direction.map(|d|format!("{d:?}")),"alias":format!("{:?}",r.alias)})).collect::<Vec<_>>()
+        })).collect::<Vec<_>>(),
+        "objects":objects.iter().map(|o|json!([o.cell,o.raw,o.replacement])).collect::<Vec<_>>(),
+        "contacts":contacts.iter().map(|c|json!({"kind":format!("{:?}",c.kind),"trigger":anchor_manifest(c.trigger),"result":anchor_manifest(c.result)})).collect::<Vec<_>>(),
+        "opening_gate":opening_gate.raw_bounds,"cellar_up_lanes":true,
+        "motions":motions.iter().map(|m|json!({"key":format!("{:?}",m.key),"trigger":m.trigger.map(anchor_manifest),
+            "frames":m.frames.iter().map(|f|json!({"map":f.map_id,"reload":f.reload,"scene":format!("{:?}",f.scene),"pose":match f.pose {
+                MotionPose::Absolute(a)=>json!({"absolute":anchor_manifest(a)}),
+                MotionPose::Preserve{facing}=>json!({"preserve":facing.map(|d|format!("{d:?}"))}),
+            }})).collect::<Vec<_>>()
+        })).collect::<Vec<_>>(),
+        "navigation":{"maps":navigation.maps.iter().map(|m|json!({"map":m.map_id,"records":m.records.iter().map(|e|e.0).collect::<Vec<_>>()})).collect::<Vec<_>>(),
+            "travels":navigation.travels.iter().map(|t|json!({"travel":format!("{:?}",t.travel),"map":t.exit.map_id,"index":t.exit.index})).collect::<Vec<_>>(),
+            "doors":navigation.doors.iter().map(|d|json!({"door":format!("{:?}",d.door),"map":d.exit.map_id,"index":d.exit.index,
+                "interaction":anchor_manifest(d.interaction),"patches":d.patches.map(|p|[p.cell,p.closed,p.open])})).collect::<Vec<_>>()}
+    });
+    let identity = aggregate_identity(rom, &base_identity, &manifest)?;
+    let pandora = PandoraData::new(text, rooms, motions, contacts, opening_gate, objects, true)
+        .map_err(|error| invalid(&format!("Pandora profile: {error}")))?
+        .with_navigation(navigation)
+        .map_err(|error| invalid(&format!("Pandora navigation: {error}")))?;
+    Ok((
+        base.with_pandora(pandora, identity)
+            .map_err(|error| invalid(&format!("Pandora aggregate: {error}")))?,
+        manifest,
+    ))
+}
+fn anchor_manifest(anchor: Anchor) -> Value {
+    json!({"position":anchor.position,"facing":format!("{:?}",anchor.facing)})
+}
+
+fn compile_navigation(
+    image: &[u8],
+    nav: &pandora_navigation::Navigation,
+) -> Result<(NavigationSpec, Vec<MotionSpec>)> {
+    use Travel::{CToCellar, ETo20, ResidentToTown, TownToHouse, TownToResident, TwentyToBox};
+    let lists = [0x000a, 0x0013, 0x000c, 0x000d, 0x000e, 0x0020]
+        .into_iter()
+        .map(|map| Ok((map, ExitList::from_rom(image, map)?)))
+        .collect::<Result<Vec<_>>>()?;
+    let maps = lists
+        .iter()
+        .map(|(map, list)| MapExits {
+            map_id: *map,
+            records: list.records().iter().map(|r| Exit(*r.bytes())).collect(),
+        })
+        .collect();
+    let mut travels = Vec::new();
+    let mut motions = Vec::new();
+    let mut doors = Vec::new();
+    for (travel, map, site) in [
+        (TownToResident, 0x000a, 0x0081_8d8f),
+        (ResidentToTown, 0x0013, 0x0081_8eac),
+        (TownToHouse, 0x000a, 0x0081_8d6b),
+        (CToCellar, 0x000c, 0x0081_8df1),
+        (ETo20, 0x000e, 0x0081_8e2f),
+        (TwentyToBox, 0x0020, 0x0081_8fc1),
+    ] {
+        let (_, list) = lists
+            .iter()
+            .find(|(id, _)| *id == map)
+            .ok_or_else(|| invalid("travel source map"))?;
+        let (index, record) = list
+            .records()
+            .iter()
+            .enumerate()
+            .find(|(_, r)| r.source_range().start == site & 0x003f_ffff)
+            .ok_or_else(|| invalid("travel source ordinal"))?;
+        let selector = record.selector();
+        let facing = match selector {
+            5 => Direction::Down,
+            6 | 14 => Direction::Up,
+            _ => return Err(invalid("travel selector").into()),
+        };
+        let trigger = Anchor {
+            position: (
+                u16::from(record.x()) * 16 + 8,
+                u16::from(record.y()) * 16 + 16,
+            ),
+            facing,
+        };
+        require(
+            list.select(trigger.position.0 - 8, trigger.position.1 - 16) == Some(record),
+            "ordered source travel witness",
+        )?;
+        let exit = ExitKey {
+            map_id: map,
+            index: u16::try_from(index)?,
+        };
+        travels.push(TravelExit { travel, exit });
+        let frames = travel_frames(image, map, record, trigger)?;
+        if matches!(travel, TownToResident | TownToHouse) {
+            let (door, opened_name) = if travel == TownToResident {
+                (TownDoor::North, "a-north-open")
+            } else {
+                (TownDoor::Home, "a-home-open")
+            };
+            let closed = nav
+                .profile("a")
+                .ok_or_else(|| invalid("Town source base"))?
+                .room();
+            let open = nav
+                .profile(opened_name)
+                .ok_or_else(|| invalid("Town source patch"))?
+                .room();
+            let lower = u16::from(record.y()) * closed.width() + u16::from(record.x());
+            doors.push(TownDoorSpec {
+                door,
+                exit,
+                interaction: Anchor {
+                    position: (trigger.position.0, trigger.position.1 + 16),
+                    facing,
+                },
+                patches: [lower - closed.width(), lower].map(|cell| CellPatch {
+                    cell,
+                    closed: closed.cells()[usize::from(cell)] & 0x7fff,
+                    open: open.cells()[usize::from(cell)] & 0x7fff,
+                }),
+            });
+        }
+        motions.push(MotionSpec {
+            key: MotionKey::Travel(travel),
+            trigger: Some(trigger),
+            frames,
+        });
+    }
+    Ok((
+        NavigationSpec {
+            maps,
+            travels,
+            doors: doors.try_into().map_err(|_| invalid("Town door count"))?,
+        },
+        motions,
+    ))
+}
+
+fn travel_frames(
+    image: &[u8],
+    map: u16,
+    record: &assets::maps::exits::ExitRecord,
+    trigger: Anchor,
+) -> Result<Vec<MotionFrame>> {
+    let selector = record.selector();
+    let facing = trigger.facing;
+    let raw = record.destination_position();
+    let adjustment = 0x008d_8985 + u32::from(selector) * 4;
+    let adjust = |value: u16, at, anchor_offset| -> Result<u16> {
+        value
+            .checked_add_signed(word(image, at)?.cast_signed())
+            .and_then(|v| v.checked_add(anchor_offset))
+            .ok_or_else(|| invalid("travel coordinate adjustment").into())
+    };
+    let loaded = (
+        adjust(raw.0, adjustment, 8)?,
+        adjust(raw.1, adjustment + 2, 16)?,
+    );
+    let destination = record.direct_destination()?;
+    let scene = |id| match id {
+        0x000a => ScenePhase::TownSource,
+        0x0013 => ScenePhase::Resident13,
+        0x000c => ScenePhase::CDeparted,
+        0x000d => ScenePhase::House,
+        0x000e => ScenePhase::CellarE,
+        0x0020 => ScenePhase::Cellar20,
+        _ => ScenePhase::BoxContact,
+    };
+    let mut frames = Vec::new();
+    if selector == 14 {
+        // Two explicit semantic boundaries: source-adjusted load, then completed
+        // stair arrival (+14,+23). No ordinary walking or native duration claim.
+        for (position, reload) in [(loaded, true), ((loaded.0 + 14, loaded.1 + 23), false)] {
+            frames.push(MotionFrame {
+                map_id: destination,
+                pose: MotionPose::Absolute(Anchor { position, facing }),
+                reload,
+                scene: scene(destination),
+            });
+        }
+    } else {
+        for elapsed in 1..=35u16 {
+            let (origin, distance) = if elapsed <= 17 {
+                (trigger.position, elapsed)
+            } else {
+                (loaded, elapsed - 18)
+            };
+            let position = (
+                origin.0,
+                match facing {
+                    Direction::Up => origin.1.checked_sub(distance),
+                    _ => origin.1.checked_add(distance),
+                }
+                .ok_or_else(|| invalid("ordinary doorway position"))?,
+            );
+            let current_map = if elapsed <= 17 { map } else { destination };
+            frames.push(MotionFrame {
+                map_id: current_map,
+                pose: MotionPose::Absolute(Anchor { position, facing }),
+                reload: elapsed == 18,
+                scene: scene(current_map),
+            });
+        }
+    }
+    Ok(frames)
 }
 
 fn compile_text(image: &[u8]) -> Result<(PandoraText, Value)> {
@@ -80,7 +330,14 @@ fn compile_rooms(
     nav: &pandora_navigation::Navigation,
     objects: &[SourceObject],
 ) -> Result<Vec<ProfileRoom>> {
-    use CollisionKey::*;
+    use room_core::{
+        MaterialAlias::{ClosedDoorPartial5, StairOpen29, TownSolid25},
+        MaterialRule,
+    };
+    use CollisionKey::{
+        Box, BoxOpened, CClosed, CDamaged, COpen, CReaction, Cellar20, CellarE, Resident, Tour41,
+        Tour42, Tour43, Tour44, Town,
+    };
     let mut rooms = Vec::new();
     for key in CollisionKey::ALL {
         let profile = match key {
@@ -139,7 +396,6 @@ fn compile_rooms(
                 cells[i] = opened.cells()[i] | 0x8000;
             }
         }
-        use room_core::{MaterialAlias::*, MaterialRule};
         let lane = |alias, x, y| MaterialRule {
             bounds: [x, y, x + 1, y + 1],
             direction: Some(Direction::Up),
@@ -214,12 +470,17 @@ fn compile_contacts(
 /// Only the explicit reconstruction samples, not the preceding cue completion.
 /// COP14 uses queued+(8,16), NOT ordinary exit-selector adjustments. Both arrival
 /// scripts restore standing without translation; timing belongs to semantic policy.
+#[allow(clippy::too_many_lines)] // Keep six fixed source sites with their arrival checks.
 fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
+    use Invocation::{OpeningFourth, TourLeave41, TourLeave42, TourLeave43, TourLeave44};
     require(
-        word(image, 0x848800)? == 0x88ac && word(image, 0x848802)? == 0x89d1,
+        word(image, 0x0084_8800)? == 0x88ac && word(image, 0x0084_8802)? == 0x89d1,
         "forced arrival dispatch",
     )?;
-    for (site, target, sequence) in [(0x8488e2, 0x84a2f3_u32, 0), (0x848a07, 0x84a308, 1)] {
+    for (site, target, sequence) in [
+        (0x0084_88e2, 0x0084_a2f3_u32, 0),
+        (0x0084_8a07, 0x0084_a308, 1),
+    ] {
         let target_bytes = target.to_le_bytes();
         require(
             source(image, site, 6)?
@@ -242,13 +503,19 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
             "stationary forced arrival facing",
         )?;
     }
-    use Invocation::*;
     let mut arrivals = Vec::new();
     for (cue, site, map, mode, selector, scene) in [
-        (Cue::BoxReload, 0x88ad53, 0x21, 7, 1, ScenePhase::BoxOpening),
+        (
+            Cue::BoxReload,
+            0x0088_ad53,
+            0x21,
+            7,
+            1,
+            ScenePhase::BoxOpening,
+        ),
         (
             Cue::Returned(OpeningFourth),
-            0x88aeab,
+            0x0088_aeab,
             0x41,
             4,
             2,
@@ -256,7 +523,7 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
         ),
         (
             Cue::Returned(TourLeave41),
-            0x89d476,
+            0x0089_d476,
             0x44,
             0,
             2,
@@ -264,7 +531,7 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
         ),
         (
             Cue::Returned(TourLeave44),
-            0x89d4b4,
+            0x0089_d4b4,
             0x42,
             0,
             2,
@@ -272,7 +539,7 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
         ),
         (
             Cue::Returned(TourLeave42),
-            0x89d4d9,
+            0x0089_d4d9,
             0x43,
             0,
             2,
@@ -280,7 +547,7 @@ fn forced_arrivals(image: &[u8]) -> Result<Vec<(MotionKey, MotionFrame)>> {
         ),
         (
             Cue::Returned(TourLeave43),
-            0x89d4fe,
+            0x0089_d4fe,
             0x41,
             0,
             2,
@@ -328,45 +595,50 @@ enum CueSegment {
 fn cue_recipes() -> Vec<(Cue, u16, Vec<CueSegment>)> {
     use Cue::Returned as R;
     use CueSegment::{Boundary as B, Delay as D, Reload as L};
-    use Invocation::*;
+    use Invocation::{
+        BoxWarning, CApproach, CEntry, FirstHit, OpeningFirst, OpeningFourth, OpeningSecond,
+        OpeningThird, ReactionFinal, ReactionLeft, ReactionRequest, ReactionRight, ReactionSpeaker,
+        SecondHit, Tour42, Tour43, Tour44, TourFive, TourFour, TourIntro, TourLeave41, TourLeave42,
+        TourLeave43, TourLeave44, TourOne, TourSix, TourThree, TourTwo,
+    };
     use ScenePhase as S;
     // B certifies the named finite cooperative completion, not one native frame.
     // D reads that exact COPC1 operand as logical actor units; never a fallback.
     #[rustfmt::skip]
     let recipes = vec![
-        (R(CEntry), 0xc, vec![B(S::CEntry, 0x889afb)]),
-        (R(CApproach), 0xc, vec![B(S::CChoice, 0x889b11)]),
-        (R(FirstHit), 0xc, vec![B(S::CFirstHit, 0x88abc6)]),
-        (Cue::SecondHitPatched, 0xc, vec![B(S::CSecondHit, 0x88abee), D(S::CSecondHit, 0x889b9b, 60)]),
-        (R(SecondHit), 0xc, vec![D(S::CSecondHit, 0x889ba5, 16), B(S::CSecondHit, 0x88a583)]),
-        (Cue::ReactionColorMath, 0xc, vec![B(S::CColorMath, 0x889d1f)]),
-        (R(ReactionSpeaker), 0xc, vec![D(S::CReactionSpeaker, 0x889bc8, 60)]),
-        (Cue::ReactionColorReturn, 0xc, vec![B(S::CColorMath, 0x889d4f), D(S::CReactionSpeaker, 0x889bd9, 60), B(S::CReactionSpeaker, 0x889bef)]),
-        (R(ReactionRequest), 0xc, vec![B(S::CReactionSpeaker, 0x88a241)]),
-        (R(ReactionRight), 0xc, vec![B(S::CReactionRight, 0x88a256)]),
-        (R(ReactionLeft), 0xc, vec![B(S::CReactionLeft, 0x889c10)]),
-        (R(ReactionFinal), 0xc, vec![B(S::CReactionFinal, 0x889c30)]),
-        (R(BoxWarning), 0x21, vec![D(S::BoxContact, 0x88adbd, 32)]),
-        (Cue::BoxAcquireControl, 0x21, vec![B(S::BoxContact, 0x888ea6)]),
-        (R(OpeningFirst), 0x21, vec![D(S::BoxOpeningCue, 0x88ae81, 60)]),
-        (R(OpeningSecond), 0x21, vec![D(S::BoxOpening, 0x88ae8f, 30)]),
-        (R(OpeningThird), 0x21, vec![D(S::BoxOpeningCue, 0x88ae9d, 30)]),
-        (R(TourIntro), 0x41, vec![B(S::Tour410, 0x89d3ee)]),
-        (R(TourOne), 0x41, vec![B(S::Tour411, 0x89d402)]),
-        (R(TourTwo), 0x41, vec![B(S::Tour412, 0x89d416)]),
-        (R(TourThree), 0x41, vec![B(S::Tour413, 0x89d42a)]),
-        (R(TourFour), 0x41, vec![B(S::Tour414, 0x89d43e)]),
-        (R(TourFive), 0x41, vec![B(S::Tour415, 0x89d452)]),
-        (R(TourSix), 0x41, vec![B(S::Tour416, 0x89d466), D(S::Tour417, 0x89d46c, 32)]),
-        (R(Tour44), 0x44, vec![D(S::Tour44, 0x89d4aa, 32)]),
-        (R(Tour42), 0x42, vec![D(S::Tour42, 0x89d4cf, 32)]),
-        (R(Tour43), 0x43, vec![D(S::Tour43, 0x89d4f4, 32)]),
-        (Cue::BoxReload, 0x21, vec![L, D(S::BoxOpening, 0x88ae6c, 120), D(S::BoxOpening, 0x88ae73, 240)]),
-        (R(OpeningFourth), 0x21, vec![D(S::BoxOpeningCue, 0x88aea7, 120), L, D(S::Tour410, 0x89d3dc, 60)]),
-        (R(TourLeave41), 0x41, vec![L, D(S::Tour44, 0x89d4a0, 60)]),
-        (R(TourLeave44), 0x44, vec![L, D(S::Tour42, 0x89d4c5, 60)]),
-        (R(TourLeave42), 0x42, vec![L, D(S::Tour43, 0x89d4ea, 60)]),
-        (R(TourLeave43), 0x43, vec![L, D(S::Tour410, 0x89d487, 60)]),
+        (R(CEntry), 0xc, vec![B(S::CEntry, 0x0088_9afb)]),
+        (R(CApproach), 0xc, vec![B(S::CChoice, 0x0088_9b11)]),
+        (R(FirstHit), 0xc, vec![B(S::CFirstHit, 0x0088_abc6)]),
+        (Cue::SecondHitPatched, 0xc, vec![B(S::CSecondHit, 0x0088_abee), D(S::CSecondHit, 0x0088_9b9b, 60)]),
+        (R(SecondHit), 0xc, vec![D(S::CSecondHit, 0x0088_9ba5, 16), B(S::CSecondHit, 0x0088_a583)]),
+        (Cue::ReactionColorMath, 0xc, vec![B(S::CColorMath, 0x0088_9d1f)]),
+        (R(ReactionSpeaker), 0xc, vec![D(S::CReactionSpeaker, 0x0088_9bc8, 60)]),
+        (Cue::ReactionColorReturn, 0xc, vec![B(S::CColorMath, 0x0088_9d4f), D(S::CReactionSpeaker, 0x0088_9bd9, 60), B(S::CReactionSpeaker, 0x0088_9bef)]),
+        (R(ReactionRequest), 0xc, vec![B(S::CReactionSpeaker, 0x0088_a241)]),
+        (R(ReactionRight), 0xc, vec![B(S::CReactionRight, 0x0088_a256)]),
+        (R(ReactionLeft), 0xc, vec![B(S::CReactionLeft, 0x0088_9c10)]),
+        (R(ReactionFinal), 0xc, vec![B(S::CReactionFinal, 0x0088_9c30)]),
+        (R(BoxWarning), 0x21, vec![D(S::BoxContact, 0x0088_adbd, 32)]),
+        (Cue::BoxAcquireControl, 0x21, vec![B(S::BoxContact, 0x0088_8ea6)]),
+        (R(OpeningFirst), 0x21, vec![D(S::BoxOpeningCue, 0x0088_ae81, 60)]),
+        (R(OpeningSecond), 0x21, vec![D(S::BoxOpening, 0x0088_ae8f, 30)]),
+        (R(OpeningThird), 0x21, vec![D(S::BoxOpeningCue, 0x0088_ae9d, 30)]),
+        (R(TourIntro), 0x41, vec![B(S::Tour410, 0x0089_d3ee)]),
+        (R(TourOne), 0x41, vec![B(S::Tour411, 0x0089_d402)]),
+        (R(TourTwo), 0x41, vec![B(S::Tour412, 0x0089_d416)]),
+        (R(TourThree), 0x41, vec![B(S::Tour413, 0x0089_d42a)]),
+        (R(TourFour), 0x41, vec![B(S::Tour414, 0x0089_d43e)]),
+        (R(TourFive), 0x41, vec![B(S::Tour415, 0x0089_d452)]),
+        (R(TourSix), 0x41, vec![B(S::Tour416, 0x0089_d466), D(S::Tour417, 0x0089_d46c, 32)]),
+        (R(Tour44), 0x44, vec![D(S::Tour44, 0x0089_d4aa, 32)]),
+        (R(Tour42), 0x42, vec![D(S::Tour42, 0x0089_d4cf, 32)]),
+        (R(Tour43), 0x43, vec![D(S::Tour43, 0x0089_d4f4, 32)]),
+        (Cue::BoxReload, 0x21, vec![L, D(S::BoxOpening, 0x0088_ae6c, 120), D(S::BoxOpening, 0x0088_ae73, 240)]),
+        (R(OpeningFourth), 0x21, vec![D(S::BoxOpeningCue, 0x0088_aea7, 120), L, D(S::Tour410, 0x0089_d3dc, 60)]),
+        (R(TourLeave41), 0x41, vec![L, D(S::Tour44, 0x0089_d4a0, 60)]),
+        (R(TourLeave44), 0x44, vec![L, D(S::Tour42, 0x0089_d4c5, 60)]),
+        (R(TourLeave42), 0x42, vec![L, D(S::Tour43, 0x0089_d4ea, 60)]),
+        (R(TourLeave43), 0x43, vec![L, D(S::Tour410, 0x0089_d487, 60)]),
     ];
     recipes
 }
@@ -379,9 +651,9 @@ fn compile_cues(image: &[u8]) -> Result<(Vec<MotionSpec>, Value)> {
     // Readiness comes from completed northern recoil/rest and the closed ordinary
     // control subset, NOT this downstream handoff pose or gate proximity.
     require(
-        source(image, 0x8488cd, 3)? == [0x9c, 0x7c, 9]
-            && source(image, 0x80b828, 8)? == [0xad, 0x7c, 9, 0x89, 0x10, 8, 0xd0, 0x4b]
-            && source(image, 0x888ea6, 16)?
+        source(image, 0x0084_88cd, 3)? == [0x9c, 0x7c, 9]
+            && source(image, 0x0080_b828, 8)? == [0xad, 0x7c, 9, 0x89, 0x10, 8, 0xd0, 0x4b]
+            && source(image, 0x0088_8ea6, 16)?
                 == [
                     2, 0x84, 0, 0, 0, 2, 0x8e, 2, 0xcb, 1, 0xc1, 0x87, 0x84, 2, 0xbc, 0x6b,
                 ],
@@ -437,27 +709,27 @@ fn compile_cues(image: &[u8]) -> Result<(Vec<MotionSpec>, Value)> {
     }
     let mut ranges = Vec::new();
     for (start, end) in [
-        (0x889ae9, 0x889c34),
-        (0x889cd8, 0x889d53),
-        (0x88a241, 0x88a266),
-        (0x88a3d9, 0x88a400),
-        (0x88a56d, 0x88a58b),
-        (0x88ab96, 0x88ac12),
-        (0x88ad2f, 0x88adcb),
-        (0x88ae6c, 0x88aeb5),
-        (0x89d2f4, 0x89d510),
-        (0x808a23, 0x808a58),
-        (0x80f7f3, 0x80f815),
-        (0x8487ce, 0x848804),
-        (0x8488ac, 0x8488e8),
-        (0x8489d1, 0x848a0d),
-        (0x84a2e9, 0x84a389),
-        (0x85d735, 0x85d755),
-        (0x85f8d1, 0x85f925),
-        (0x848000, 0x84803b),
-        (0x84809b, 0x8480c8),
-        (0x80b827, 0x80b885),
-        (0x888ea6, 0x888eb6),
+        (0x0088_9ae9, 0x0088_9c34),
+        (0x0088_9cd8, 0x0088_9d53),
+        (0x0088_a241, 0x0088_a266),
+        (0x0088_a3d9, 0x0088_a400),
+        (0x0088_a56d, 0x0088_a58b),
+        (0x0088_ab96, 0x0088_ac12),
+        (0x0088_ad2f, 0x0088_adcb),
+        (0x0088_ae6c, 0x0088_aeb5),
+        (0x0089_d2f4, 0x0089_d510),
+        (0x0080_8a23, 0x0080_8a58),
+        (0x0080_f7f3, 0x0080_f815),
+        (0x0084_87ce, 0x0084_8804),
+        (0x0084_88ac, 0x0084_88e8),
+        (0x0084_89d1, 0x0084_8a0d),
+        (0x0084_a2e9, 0x0084_a389),
+        (0x0085_d735, 0x0085_d755),
+        (0x0085_f8d1, 0x0085_f925),
+        (0x0084_8000, 0x0084_803b),
+        (0x0084_809b, 0x0084_80c8),
+        (0x0080_b827, 0x0080_b885),
+        (0x0088_8ea6, 0x0088_8eb6),
     ] {
         ranges.push(json!({"start":start,"end":end,"sha256":sha256(source(image, start, (end-start) as usize)?)}));
     }
@@ -479,6 +751,109 @@ mod tests {
         )
         .unwrap()
     }
+    #[test]
+    #[ignore = "owned ROM; run tools/pandora-runtime-qualification/run.sh"]
+    fn navigation_retains_complete_lists_and_source_stair_boundaries() {
+        let rom = owned_rom();
+        let nav = pandora_navigation::compile(rom.image()).unwrap();
+        let (spec, motions) = compile_navigation(rom.image(), &nav).unwrap();
+        for (map, expected_id) in spec
+            .maps
+            .iter()
+            .zip([0x000a, 0x0013, 0x000c, 0x000d, 0x000e, 0x0020])
+        {
+            assert_eq!(map.map_id, expected_id);
+            let source = ExitList::from_rom(rom.image(), expected_id).unwrap();
+            assert_eq!(
+                map.records.iter().map(|e| e.0).collect::<Vec<_>>(),
+                source
+                    .records()
+                    .iter()
+                    .map(|e| *e.bytes())
+                    .collect::<Vec<_>>()
+            );
+        }
+        // Remote unsupported Town record extends beyond grid width; keep it verbatim.
+        assert_eq!(
+            spec.maps[0].records[8].0,
+            [0, 0x3e, 0x50, 2, 3, 0, 0, 0x55, 0x10, 2, 0x10, 2]
+        );
+        for (motion, (travel, map, loaded, settled)) in motions[3..].iter().zip([
+            (Travel::CToCellar, 0x000e, (138, 857), (152, 880)),
+            (Travel::ETo20, 0x0020, (394, 857), (408, 880)),
+            (Travel::TwentyToBox, 0x0021, (122, 105), (136, 128)),
+        ]) {
+            assert_eq!(motion.key, MotionKey::Travel(travel));
+            assert_eq!(motion.frames.len(), 2);
+            for (frame, (position, reload)) in
+                motion.frames.iter().zip([(loaded, true), (settled, false)])
+            {
+                assert_eq!(frame.map_id, map);
+                assert_eq!(frame.reload, reload);
+                assert_eq!(
+                    frame.pose,
+                    MotionPose::Absolute(Anchor {
+                        position,
+                        facing: Direction::Up
+                    })
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[ignore = "owned ROM; run tools/pandora-runtime-qualification/run.sh"]
+    fn aggregate_compiles_complete_source_navigation_and_repeatable_identity() {
+        use room_core::slice::{GameState, Policy};
+        let rom = owned_rom();
+        let (data, manifest) = compile_profile(&rom).unwrap();
+        assert!(data.pandora_enabled());
+        assert_eq!(manifest["motions"].as_array().unwrap().len(), 39);
+        assert_eq!(manifest["navigation"]["maps"].as_array().unwrap().len(), 6);
+        assert_eq!(manifest["rooms"].as_array().unwrap().len(), 14);
+        let snapshot = GameState::new_game(&data, Policy::SemanticPreview).snapshot();
+        assert_eq!(snapshot.len(), 320);
+        assert_eq!(
+            GameState::restore(&data, &snapshot).unwrap().snapshot(),
+            snapshot
+        );
+        let repeated = compile(&rom).unwrap();
+        assert_eq!(
+            GameState::new_game(&repeated, Policy::SemanticPreview).snapshot(),
+            snapshot
+        );
+        let base = crate::house_progression::compile(&rom).unwrap();
+        let base_snapshot = GameState::new_game(&base, Policy::SemanticPreview).snapshot();
+        assert!(GameState::restore(&base, &snapshot).is_err());
+        let identity = aggregate_identity(&rom, &base_snapshot, &manifest).unwrap();
+        for section in [
+            "rooms",
+            "motions",
+            "navigation",
+            "contacts",
+            "text",
+            "source",
+            "objects",
+            "policy",
+            "opening_gate",
+            "cellar_up_lanes",
+        ] {
+            let mut changed = manifest.clone();
+            changed[section] = Value::Null;
+            assert_ne!(
+                aggregate_identity(&rom, &base_snapshot, &changed).unwrap(),
+                identity,
+                "{section}"
+            );
+        }
+        let mut changed_base = base_snapshot;
+        changed_base[10] ^= 1;
+        assert_ne!(
+            aggregate_identity(&rom, &changed_base, &manifest).unwrap(),
+            identity
+        );
+    }
+
     #[test]
     #[ignore = "owned ROM; run tools/pandora-runtime-qualification/run.sh"]
     fn cue_catalog_is_complete_preserving_and_has_no_default_delays() {
@@ -555,7 +930,7 @@ mod tests {
         )
         .unwrap();
         let mut changed = rom.image().to_vec();
-        changed[0x88adbd & 0x3fffff] ^= 1;
+        changed[0x0088_adbd & 0x003f_ffff] ^= 1;
         assert!(compile_cues(&changed).is_err());
     }
 
@@ -610,13 +985,13 @@ mod tests {
             );
         }
         let mut changed = rom.image().to_vec();
-        changed[0x88ad53 & 0x3fffff] ^= 1;
+        changed[0x0088_ad53 & 0x003f_ffff] ^= 1;
         assert!(forced_arrivals(&changed).is_err());
         let mut changed = rom.image().to_vec();
-        changed[0x848802 & 0x3fffff] ^= 1;
+        changed[0x0084_8802 & 0x003f_ffff] ^= 1;
         assert!(forced_arrivals(&changed).is_err());
         let mut changed = rom.image().to_vec();
-        changed[0x84a315 & 0x3fffff] ^= 1;
+        changed[0x0084_a315 & 0x003f_ffff] ^= 1;
         assert!(forced_arrivals(&changed).is_err());
     }
 

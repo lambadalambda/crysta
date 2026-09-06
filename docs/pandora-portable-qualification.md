@@ -1,6 +1,6 @@
 # Offline Pandora portable qualification
 
-Status: **compiler groundwork, not a qualified Pandora runtime route**. Nothing
+Status: **aggregate compiler complete; full input-only route not yet qualified**. Nothing
 here enables the live host. The completed source/navigation qualification remains
 in [pandora-navigation.md](pandora-navigation.md); this document tracks the new
 `PandoraData` adapter and actual input-only continuation separately.
@@ -17,7 +17,7 @@ sh tools/pandora-runtime-qualification/run.sh 'local/Tenchi Souzou (Japan).sfc'
 
 The standalone crate is generated below ignored `local/`; it imports the source
 compilers directly, without modifying host module registration. Optional second
-argument selects a test. Current result: **7 tests pass**:
+argument selects a test. Current result: **9 tests pass**:
 
 - Authentic 33-resource / 34-invocation text, source page IDs and choice contexts.
 - Fourteen raw collision profiles, source pot catalog and temporary C occupancy.
@@ -28,6 +28,10 @@ argument selects a test. Current result: **7 tests pass**:
 - Six COP14 reconstruction samples, source standing facing and mutation controls.
 - All33 graph cue recipes: exact key/count, preserve-player operation, genuine
   reload samples and constructor compatibility. No executed Pandora route yet.
+- Complete source-ordered exit lists, including the oversized Town record, and
+  the exact two-boundary stair loads/arrivals.
+- Full39-motion aggregate construction, repeatable identity, canonical snapshot
+  roundtrip and identity sensitivity for every section plus the base-house data.
 - The existing house input prefix reaches mapA `(538,815)` at tick1701 with26.
   This is only the regression prefix, **not** Pandora completion.
 
@@ -39,8 +43,9 @@ house qualification; its original fixture and compiler are untouched.
 
 ## Compiled source inputs so far
 
-`crates/map-inspector/src/pandora_progression.rs` currently supplies private
-building blocks, not an aggregate `compile` entry point. Raw words are never
+`crates/map-inspector/src/pandora_progression.rs` exposes
+`pub fn compile(rom: &rom::Rom) -> Result<GameData>`. It extends the existing
+`house_progression` compiler; no fresh fixture replaces that base. Raw words are never
 rewritten to disguise material types. Text metadata includes source page keys,
 rasters/dimensions/boundaries/acknowledgements and invocation sites. The pot catalog
 is derived from the admitted source C halo and FA/FB fallback operands.
@@ -86,8 +91,8 @@ interpret events or put recipe instructions/source addresses into core. Metadata
 retains each recipe, delay/completion site, dependency-range digest and policy.
 All non-reload samples preserve Ark's position/facing, except successful
 `BoxAcquireControl` selects stationary Down. Only the six COP14 samples set an
-absolute position. The catalog is not the complete39-motion route: six ordinary
-travel motions await the Town/ordered-exit API.
+absolute position. The cue catalog is combined with six ordinary/stair travel
+motions by the aggregate compiler below.
 
 Notation below: **B** is one semantic finite cooperative-completion sample,
 **D(site,n)** reads and checks the exact COPC1 operand as n logical actor-delay
@@ -181,17 +186,46 @@ all sixteen dispatch tables before adaptation. Core retains delayed collision
 direction, old-edge slope rejection before bit15, and aliases after occupancy.
 The policy is carried by `Room` and must be included in aggregate identity.
 
+## Ordered navigation and aggregate identity
+
+Core `26210f2`, `b69d358`, `041dcf2` are applied as `ad1df0f`, `e26970c`,
+`0a88364`. Oversized-exit correction `0fd1f08` is applied as `cb57353`. The enabled
+envelope is schema5/profile13, still320 bytes. All source lists for A/13/C/D/E/20
+are retained in order, including A ordinal8 `$818DB3`:
+`00 3E 50 02 03 00 00 55 10 02 10 02`. Its width80 deliberately overhangs the
+width64 grid. It is neither dropped nor clipped; core selects first coarse then
+only that record's fine test and rejects unsupported selected exits atomically.
+
+Six travel bindings identify source record ordinals, not destination searches.
+A→13/13→A/A→D compile35 samples from the source selector adjustments and shared
+17/load/17 policy. C→E/E→20/20→21 compile two semantic boundaries: source-adjusted
+load then arrival completion `(+14,+23)`, not ordinary walking or native timing.
+Town's two doors start closed and require their real Up interactions. Patches are
+derived from authenticated closed/open source profiles, upper then lower:
+North `(472,304)` → handoff `(472,288)`; Home `(504,768)` → `(504,752)`.
+No trigger bypass replaces ordered selection.
+
+Aggregate identity hashes a canonical JSON manifest with full ordered exits,
+bindings/door patches, raw grid digests, dimensions/halos/material policies,
+text/raster metadata, shared source objects, contacts/opening gate/lane assertion,
+all39 expanded motion samples including pose/scene/reload/trigger, source evidence
+and semantic policy. It also hashes the existing house compiler's freshly
+ROM-derived NewGame serialization, which contains that base's data identity.
+This serialization is **hash input only**, never restored or used to initialize
+Pandora. Runtime construction remains `base.with_pandora(...)`; the itinerary must
+start separately with `GameState::new_game`.
+
+Independent source/API/identity review found no blocker; the known oversized-exit
+constructor failure is now green. Actual workspace Clippy is run with temporary
+public navigation/progression registration; registration is restored, not committed.
+Standalone harness lint configuration alone is not equivalent to workspace pedantic.
+
 ## Remaining integration gates
 
-1. Source-backed Town wooden-door interaction/patch for A→13 and A→D. Do not start
-   Town with open doors or travel from a closed approach.
-2. Qualify the compiled preserve-player cue catalog in the actual aggregate route.
-   C residents and tour guide move; their coordinates are not Ark's coordinates.
-3. Ordered source exit selection: first coarse match, then that record's fine
-   test, never fallthrough on failed fine; unsupported records fail closed.
-   Delivered runtime currently selects exact motion triggers instead.
-4. Aggregate identity binding all base-house and Pandora data/policies; complete
-   39-motion catalog; actual New Game→final41 input itinerary and restoration.
+1. Execute the full input-only NewGame→final41 route and restore after every action.
+2. Qualify direct pot hits, cue/contact/readiness/reload order, shared-sheet
+   continuity and stable final two-axis control using this exact aggregate.
+3. Parent-owned host wiring/presentation and fresh producer pin revalidation.
 
 Semantic preview may use finite logical cue completion, not native frame-count
 claims. Ordinary doors retain 17 departure / load / 17 arrival. Source COPC1
