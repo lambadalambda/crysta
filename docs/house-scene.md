@@ -467,3 +467,177 @@ Python checks. Eight synthetic tests pass. Independent final correctness/
 architecture review found no blockers. The cause of the earlier dialogue-band
 pixel discrepancy is **not diagnosed** by matching endpoint hardware buffers;
 root-cause investigation is separate from this census qualification.
+
+## Decoder phase: complete admitted frozen setup roster
+
+This phase completes the **source-art** work deferred by the census above. It
+admits exactly nine residents plus F's child `$88:D618`, not the shadow or any
+additional controller/effect. `assets::sprites::HouseScenes::from_rom(image)`
+projects the caller-authenticated Japanese ROM into immutable `HouseActor`s.
+It is deliberately **frozen fresh setup**, not an event VM, animation clock,
+collision implementation, dialogue system or wandering simulation.
+
+### Public consumer contract
+
+```rust,ignore
+use assets::sprites::{HouseScenes, SpritePixel};
+
+let scenes = HouseScenes::from_rom(rom.image())?;
+for actor in scenes.actors().iter().filter(|a| a.map_id() == map_id) {
+    let frame = actor.setup_frame(); // explicitly record zero
+    let composition = frame.composition();
+    let bounds = composition.bounds(actor.hflip(), false);
+    // Local signed coordinates relative to actor.position(); no extra Y+1.
+    match composition.sample(actor.graphics(), actor.hflip(), false, x, y)? {
+        SpritePixel::Transparent => {}
+        SpritePixel::Opaque { palette_index, priority, .. } => {
+            let color = actor.palette()[usize::from(palette_index - actor.palette_base())];
+            // Retain priority and alpha; color.rgb8() is natural, not emulator gamma.
+        }
+    }
+}
+```
+
+- `actors()` is the complete roster; `actor(source_id)` is exact lookup with no
+  fallback. Instance identity is the source spawn record, or F's child-creation
+  instruction, **not a runtime WRAM slot, frame key or shared raster key**.
+- `position()`, `selector()`, `hflip()`, `facing()` and `map_id()` are source
+  setup metadata. Facing uses native Down=0, Up=1, Left=2, Right=3. Vertical
+  mirroring is not requested. Native OAM name-select `$100` is **not** added to
+  the source-indexed graphics resource. Shared `SpriteFrame` already implements
+  the hardware Y convention; the consumer must not add another pixel.
+- `frames()` retains every bounded list record in source order, including
+  repeated keys and duration bytes. `setup_frame()` always selects record zero.
+  Duration 7 is not a promise to advance every seven host frames: native list
+  scheduling/AI is not implemented. C and 11 expose their full selected lists;
+  D also exposes its four-record **creation** list, not later AI selectors.
+- `HousePoseKey::Compressed { packet, offset }` keeps the CPU packet address
+  separate from its decoded composition offset. `Direct(address)` is a real ROM
+  composition address. Both point four bytes after the corresponding anchor.
+  `HouseGraphicsKey::Compressed(address)` identifies the 256-tile graphics
+  packet. Composition packets and graphics are cached; instances may share art.
+- `source_composition()` preserves unrelocated source bytes. `composition()`
+  applies native palette relocation while preserving component order, offsets,
+  flips, priority and source tile IDs. `palette_base()` is 160, 192 or 208;
+  `palette()` retains the sixteen source BGR555 colors, with color zero
+  transparent. Only used colors are needed for actor rendering.
+- `source_ranges()` on both actor and roster returns exact normalized headerless
+  input extents, including reuse dependencies and consumed packet terminators.
+  Ranges may repeat/overlap. Descriptor zero reuses the previous relocated
+  resource; graphics `$FFFF` reuses **only graphics**, not the new palette/list.
+  Neither reuse form can borrow a predecessor from another room.
+- Ordinary back-to-front sorting is ascending `(world_y, tie_rank())`.
+  `HouseScenes::ark_tie_rank(map)` gives Ark's last rank at equal Y. It returns
+  `None` outside the six admitted rooms. Shadow/text use other ordering classes.
+  Existing `HouseNpc` methods, const accessors, source-range order and first-NPC
+  raster output remain compatible through a thin shared-loader adapter; that
+  legacy load does not require the other nine actors to exist.
+
+| Source ID | Map | Source origin | Selector | Setup facing / H-flip | Palette base | Tie rank |
+|---|---|---|---|---|---|---|
+| `$838B96` | B | `(120,112)` | 6 | Down / no | 208 | 0 |
+| `$838C0A` | C | `(88,416)` | 4 | Up / no | 208 | 3 |
+| `$838C14` | C | `(56,384)` | 5 | Right / no | 208 | 2 |
+| `$838C1E` | C | `(72,368)` | 3 | Down / no | 192 | 1 |
+| `$838C28` | C | `(104,368)` | 3 | Down / no | 192 | 0 |
+| `$838CB4` | D | `(72,672)` | 3 | **Down / no** | 192 | 0 |
+| `$838D7C` | 10 | `(424,416)` | 2 | Right / no | 208 | 1 |
+| `$838D86` | 10 | `(440,416)` | 2 | Left / yes | 192 | 0 |
+| `$838DE2` | 11 | `(440,640)` | 4 | Up / yes | 192 | 0 |
+| `$88D618` | F | `(472,144)` | `$42` | Right / no | 160 | 0 |
+
+Ark's ranks are B=1, C=4, D=1, F=1, 10=2, 11=1. F's retained facing byte is
+metadata for its direct frame, not a claim that the table object turns.
+
+### D creation is not its later arrival screenshot
+
+A fresh trace follows the ordinary source loader, stopping on the entity whose
+source cursor has just advanced from `$838CB4` to `$838CBE` and whose first script
+is `$88:A83C`. The paired probes discover entity `$1040`; at completed creation
+`$80:F5E4`, frame 8099, it has origin `(72,672)`, selector 3, facing Down, no
+H-flip, composition `$7E:7163`, anchors from that composition, timer zero and
+flags `$5100/$0000/$0100`. Earlier stops at `$80:F5D3`, `$80:ED99`, `$80:EE11`
+and the later stop **before** `$88:A83C` bracket initialization and first AI use.
+
+The initialized record-zero composition is **not emitted to OAM before the
+scheduler/AI runs** on this fresh route. Its creation origin/pose is qualified
+against initialized WRAM and source metadata, not a pre-AI framebuffer. Its
+complete `$D8:1022` list and graphics/palette are identical to C's `$838C28`,
+whose distinct list poses have separate native OAM/VRAM/CGRAM witnesses. A later
+D capture facing Up or at `(104,672)` must not replace this setup contract.
+
+### Art qualification and explicit framebuffer limits
+
+```sh
+cargo test -p assets --lib --test sprites --test local_sprites
+cargo clippy -p assets --all-targets -- -D warnings
+python3 -B tools/house-scene-qualification/test_art.py
+python3 -O -B tools/house-scene-qualification/test_art.py
+sh tools/house-scene-qualification/art-replay.sh 'local/Tenchi Souzou (Japan).sfc'
+```
+
+`export.rs` uses only the ROM and public decoder; it exports all ten actors and
+all 28 list records (repeated keys retained). `art-route.jsonl` has exactly the
+same frame-by-frame real inputs as the census route; it only splits passive
+waits into additional capture boundaries. `art-replay.sh` runs two independent
+empty-SRAM native processes and two independent fresh D creation probes. No
+warps, patches, restored states or `save_state` calls are used. Raw ROM, art,
+WRAM, OAM and pixels remain ignored under `local/`. The committed
+`art-reference.json` contains metadata/hashes only; `art_check.py --record` is a
+separate explicit maintainer operation, never part of replay.
+
+The independent checker validates source ranges/hashes, palette relocation,
+all bounded compositions in native relocated WRAM, direct F ROM composition,
+component anchors, OAM coordinates/attributes/order/size/ninth-X bits and
+ordinary source tie ranks including Ark. All 256 resident source tiles match
+native VRAM. F's used tiles `$AD..AF` match its separate scene graphics upload;
+Ark dynamically overwrites unrelated low tiles, so the complete F resource is
+not compared wholesale to VRAM. A separate planar decoder and compositor
+reproduce every exported indexed, natural-RGBA and priority raster. All distinct
+non-D list frames have actual hardware OAM witnesses; repeated records retain
+separate source positions but can share the same art witness. D is qualified as
+described above, not counted as another pre-AI OAM witness.
+
+Two qualifications are intentionally narrower than full-frame equality:
+
+1. Native `$8D:AC09` conditionally writes white `$7FFF` to `$7F:079C`, uploaded by
+   `$85:F98F` from `$7F:0600` to CGRAM. This is index 206 (base192/color14), whose
+   source value is `$7C1F`. The checker explicitly validates that override and
+   that **no admitted resident list frame uses it**. Every used color matches
+   the source palette. The API retains the source palette rather than baking
+   scene-global palette effects into resident assets.
+2. Isolated opaque framebuffer pixels match using the emulator's documented
+   gamma/output layout. B, 10, 11 and C's upper/side-facing residents match all
+   opaque pixels. C's two seated Down-facing residents use the fixed local
+   `y < -8` mask, excluding their table-occluded lower bodies. F uses fixed local
+   `x < 3`; its right-side final BG/effect composition is **not qualified** here.
+   Its whole OBJ raster still matches source, OAM, used VRAM tiles and palette.
+   Complete opaque-pixel match counts, including excluded regions, remain in
+   the reference as diagnostics. These masks are fixed, not inferred by
+   accepting whichever pixels happened to match. Sample checkpoints are after
+   pose changes settle: endpoint OAM changes precede the captured framebuffer
+   by two samples here. No full-frame equality or complete BG/effect rendering
+   claim follows from this work.
+
+TDD covered the new roster/prop API and pure art helpers. Independent production
+review found and prompted red/green fixes for base-relative bank crossings and
+compressed selectors entering packet payload instead of the selector table.
+Malformed/reuse/relocation tests cover exact roster, D creation policy, distinct
+reuse palettes, inherited provenance, record metadata, component boundaries and
+prop script shapes. The admitted resources do not use large components crossing
+tile column 15 or the last resource row; this loader rejects those cases rather
+than silently using the generic compositor's unqualified boundary behavior.
+Native trace discovery and capture selection were experimental RE; their
+regression checks were added after discovery, not claimed as prospective TDD.
+
+End-to-end paired art replay passed normal and optimized checks at
+`local/house-scene-qualification/art-tHjpM3`. The remaining work is consumer
+integration and separately scoped native behavior/BG/effects, not another
+missing admitted resident family. Optional Ark shadow, D's transient OBJ3 text,
+E/20/21 phase visuals and all controllers remain excluded from this decoder.
+
+Independent qualification review found no blockers. Six pure art tests pass in
+normal and optimized Python, as does the complete asset test suite. A freshly
+compiled legacy export (`legacy-export-v4`) remains byte-identical to the
+original first-NPC metadata, tiles, both compositions and all three raster
+products; the earlier census golden also remains unchanged.
