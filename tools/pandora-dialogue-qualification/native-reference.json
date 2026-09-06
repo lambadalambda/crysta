@@ -1,0 +1,1723 @@
+{
+  "selection_policy": "First button-free route checkpoint at each source acknowledgement boundary; retained choice tails use explicitly named choice checkpoints. Original and parentfresh use the same labels, each checked separately. Discovery is supplemental, never a replacement for a direct comparison.",
+  "capture_sets": {
+    "original": {
+      "samples": [
+        {
+          "label": "13-first-page",
+          "page_id": 143354992,
+          "compared_pixels": 7680,
+          "foreground_pixels": 1810,
+          "wram_sha256": "266fbf8193af9c2fa851b677d7cf0c3c8b91a5f232aa42158cc5577d8eb6b386",
+          "vram_sha256": "d05485a9cb0ef670537f3f34f99d5b95678ec56d0197a80676718e540fc7b1ca"
+        },
+        {
+          "label": "13-choice",
+          "page_id": 143354993,
+          "compared_pixels": 6208,
+          "foreground_pixels": 1372,
+          "wram_sha256": "6e81e6e04f36d7d504b71d794cb9c6ec69d7fe541cb1e5c1ea6cfaab58b4508f",
+          "vram_sha256": "97d2a0096811d07bb296c916be9c8a98949e2a702d503d5a2cce1da352177416"
+        },
+        {
+          "label": "13-followup-1",
+          "page_id": 143357312,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1382,
+          "wram_sha256": "c7a27842eda3279176d94372aca9348f58f264e5100cd25f4768dc4ac7e25069",
+          "vram_sha256": "2d9f036716e3f9329f5501a64d2db03d98b4c89235285ce26d6601384ba863f0"
+        },
+        {
+          "label": "13-followup-2",
+          "page_id": 143357313,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1411,
+          "wram_sha256": "2feebe144b9cb5602927e4bd4c5cbbf3c19e8431b7570e755d8ad9f7a3d0e2b3",
+          "vram_sha256": "c7230fbd9cb799da72b8771e58610b680e34fd19125ffb86baf0c0c673a2e042"
+        },
+        {
+          "label": "13-followup-3",
+          "page_id": 143357314,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1780,
+          "wram_sha256": "c02a4e9313dae5c596dadc82ce5727d5968a2abac72554388341195b10db65a4",
+          "vram_sha256": "da91511240700535ba8333508d9d125927ee1dea8b2c343937cc16685e314e69"
+        },
+        {
+          "label": "13-followup-4",
+          "page_id": 143357315,
+          "compared_pixels": 4032,
+          "foreground_pixels": 959,
+          "wram_sha256": "60f89706545f059de03ea38e7c6c45d18fbc6e47cdceaa0624d26c3ca2232e8c",
+          "vram_sha256": "38329760e477655aafdfa02eb463aaf627d6515ddd53a44778afd479470caa80"
+        },
+        {
+          "label": "return-home-C28-rest",
+          "page_id": 143256000,
+          "compared_pixels": 3648,
+          "foreground_pixels": 764,
+          "wram_sha256": "c7e1319bb1dda2340f2ace6666b4c84db532b44bc6ecefce2b036a59e8db647d",
+          "vram_sha256": "28b917cafa2fe075b759fab5a0d9ea1c4f15ad43570c4cc386ef902f8cf2a98d"
+        },
+        {
+          "label": "C28-entry-page2",
+          "page_id": 143256001,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1448,
+          "wram_sha256": "4def370487749293ddec3820a3d32d189ade3b6c59f29280265d7950078b288e",
+          "vram_sha256": "2129e4a9da709fec2e8621e5895b52e04b10a30dbb985a4228652f6787eb52a7"
+        },
+        {
+          "label": "C28-entry-request2",
+          "page_id": 143257136,
+          "compared_pixels": 3648,
+          "foreground_pixels": 788,
+          "wram_sha256": "2e29d349a835d1696c805a16b4bfdd06505ff3dae45faafa1feb0a9f71020608",
+          "vram_sha256": "924a0080afa188b9ace4d4c39cd8b0a4988d99eab7768c2a454448d08724e582"
+        },
+        {
+          "label": "C28-entry-request3",
+          "page_id": 143257536,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1862,
+          "wram_sha256": "72462309a9b1c8563d859670f507f28143074017b4b91450ddf21743b17a6cec",
+          "vram_sha256": "05f480211ede12de6a3d894c54c2e05ad024191e62174209b42055f1ef90c16e"
+        },
+        {
+          "label": "C28-entry-choice",
+          "page_id": 143257537,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1753,
+          "wram_sha256": "32de2cccc635e031e6646790c529969aa759dcad95fc467997ed4b2f94d77350",
+          "vram_sha256": "80733845dddb2325f7dae2a53e2f39e408e7ee4556cc54e1ea0e325d1875141c"
+        },
+        {
+          "label": "C28-entry-page6",
+          "page_id": 143257538,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1571,
+          "wram_sha256": "e1ac427b9dbdf91407f232bf5289ebd056297e2f4c38b77a60ea72804fab2218",
+          "vram_sha256": "73ba6a141cf2f695a2f11f572b1eb4467e1fa7ec1a18724a60c39a901d5e7355"
+        },
+        {
+          "label": "C28-entry-real-choice",
+          "page_id": 143257539,
+          "compared_pixels": 4672,
+          "foreground_pixels": 965,
+          "wram_sha256": "a25a31e277da672e1007e0d892933881fcaabf6b6d0aba6336603e2b978e79b8",
+          "vram_sha256": "25aaf7c4f9834ada43548f6fb3f04d65c5b65afc1ec9474a01eb53a040edabde"
+        },
+        {
+          "label": "C-direct-page1",
+          "page_id": 143260304,
+          "compared_pixels": 4032,
+          "foreground_pixels": 812,
+          "wram_sha256": "8720bbadd362d96ea4571cd2eb2c2954b59a5db60e4174d2f7a6c6b978865182",
+          "vram_sha256": "b05181bd6a3bb53e32cc33f0f82b19924c9c4ee77ca2029fdba0ce93dad4a228"
+        },
+        {
+          "label": "C-direct-page2",
+          "page_id": 143260305,
+          "compared_pixels": 7872,
+          "foreground_pixels": 1758,
+          "wram_sha256": "b9f62d7a0f9c8a794c32abbad61ebe2a78cd9dee7f1031e2bc63945cc91922ca",
+          "vram_sha256": "a2c573b42cd385a580f85dd1db362d6397d1b529fa01f8dd8d6c457606d5e69e"
+        },
+        {
+          "label": "door-real-hit1",
+          "page_id": 143267312,
+          "compared_pixels": 4032,
+          "foreground_pixels": 759,
+          "wram_sha256": "6e92542ae064710a09be95432efb2dc1dd90dba2551096895b54c0d2ad3bd29a",
+          "vram_sha256": "185fb3703d80e8925bae579f4a8e4acdfb33f0a346d4e97544bf7d961f5dc8f6"
+        },
+        {
+          "label": "door-hit2",
+          "page_id": 143267760,
+          "compared_pixels": 4032,
+          "foreground_pixels": 756,
+          "wram_sha256": "8e5983672ba04e15bd8b61b0f65295cf1dc251cd612f61868b5f83f7598d83f6",
+          "vram_sha256": "32e369a3ccbca7ccbdae44bde94b60fa0acc3964fb17e24fda765a53b0856e50"
+        },
+        {
+          "label": "cellar-sequence-003",
+          "page_id": 143252528,
+          "compared_pixels": 3648,
+          "foreground_pixels": 732,
+          "wram_sha256": "65c5649ab2b6cc16f376a78c95aba1c217f3cc2daeb1b929cdac254f86e623d2",
+          "vram_sha256": "e1b6a3692576dfa8d1523f6a2bfe3c059188a8d2b8b4dcf7e367ce87d45ef21c"
+        },
+        {
+          "label": "cellar-sequence-005",
+          "page_id": 143253168,
+          "compared_pixels": 3648,
+          "foreground_pixels": 845,
+          "wram_sha256": "7daa4723932920e5b52ed6dc3744d5e2bb21795ca18ed59d1a929f380554021f",
+          "vram_sha256": "6a0b550a6722edccc998d83d9058278e23600de5c6b66f3c0410c30ef635d5b0"
+        },
+        {
+          "label": "cellar-sequence-006",
+          "page_id": 143272272,
+          "compared_pixels": 4608,
+          "foreground_pixels": 923,
+          "wram_sha256": "414ad48f33f72733177c812082f8e1a497997dc683815b4b0d5b91c6f9b4f2ac",
+          "vram_sha256": "51ec6e65bd68f21143a23cf2669a5b252ef2b49b8a757034d01b07257bddb062"
+        },
+        {
+          "label": "cellar-sequence-007",
+          "page_id": 143278592,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1123,
+          "wram_sha256": "6af06d4b696decab58b73626f1931d81bc9257010cd1a6d077a0c98fcd6e4f12",
+          "vram_sha256": "e74bd90b93d40097a489d168f64a56915a3fed3ae19a1c1678634b44d7243fb8"
+        },
+        {
+          "label": "cellar-sequence-009",
+          "page_id": 143253664,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1900,
+          "wram_sha256": "5bd25edbbcc47745e74ba2242d4e4d04af18f5dc688978fa3cce86b9882403dd",
+          "vram_sha256": "5a7117d8cbf4404a78249580236858d655006d6d2d1a3abcc71bea8bfc853ed0"
+        },
+        {
+          "label": "landed-21",
+          "page_id": 143318192,
+          "compared_pixels": 4992,
+          "foreground_pixels": 639,
+          "wram_sha256": "e87acc7b9add5d12677dbc6dd640d96ab92907e55b16437fba3343da8098be13",
+          "vram_sha256": "c231786af686cf681a7c06bf621164035a4e90a8585a50caad18306b5f0d9530"
+        },
+        {
+          "label": "21-box-contact-rest",
+          "page_id": 143318816,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1850,
+          "wram_sha256": "d7da6daed5fa2d45d5f0168bb65313b3f061614be1676e265b581d7da2eb01e0",
+          "vram_sha256": "a9d6902ecaf5aa391e26a8bbebd2ee769292e64d0accf6c1b16871439b9249fa"
+        },
+        {
+          "label": "21-warning-return",
+          "page_id": 143318817,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1336,
+          "wram_sha256": "36a4e803ed4b5ca0defcfef835424a56b41d3256c61630bf1fd1e59616e68eaa",
+          "vram_sha256": "198153053667da35bf3693d8ca5c19abd8da96aefcf60b4c60721a5ae3739847"
+        },
+        {
+          "label": "tutorial-000",
+          "page_id": 143325792,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1075,
+          "wram_sha256": "744d1706c7bd8314b29eb3b8c035d78d8985f120aa421513de64928c7f4cf75c",
+          "vram_sha256": "f6dc9002e9e4527c10066113a8a8c23dc9e410c7bb18ba7c429fb9bf0534f8e7"
+        },
+        {
+          "label": "tutorial-001",
+          "page_id": 143325793,
+          "compared_pixels": 4416,
+          "foreground_pixels": 737,
+          "wram_sha256": "af0113287f0e692aa5b824c1073349846d6c401b7c24f78c5aa54a0a59bf6736",
+          "vram_sha256": "629db7c4ed162e17fe6aba3f9e02616246cac56af6498cac14404b40eda9e032"
+        },
+        {
+          "label": "tutorial-002",
+          "page_id": 143326736,
+          "compared_pixels": 2880,
+          "foreground_pixels": 565,
+          "wram_sha256": "869bebdcbc5474d715557eb524891d4be7acb34d10ded6c489e9ad78d3cf5e1a",
+          "vram_sha256": "869564e4141cdd4bd1b88cdcd4addc09f710c6e0d80b66639c98943f26af7f9a"
+        },
+        {
+          "label": "tutorial-003",
+          "page_id": 143326737,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1628,
+          "wram_sha256": "8a2dcb802eda35ccaddb20778bd2707da5f88be62fa088fd5e5b53817ca12bb5",
+          "vram_sha256": "d2ee50c9bc26123b1ad3397e0ac0b7126ee97ab03ac6584052fffe1dd347d4c6"
+        },
+        {
+          "label": "tutorial-004",
+          "page_id": 143326738,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1062,
+          "wram_sha256": "2515222a7b58508c63a805282c0e5be1f99ffea311c6b5d17ac500ce7c939fef",
+          "vram_sha256": "fed47adbaef8cb2a0b71eaabc6234bc91c6928d9448c882fcdba841dc7e41670"
+        },
+        {
+          "label": "tutorial-005",
+          "page_id": 143326739,
+          "compared_pixels": 5568,
+          "foreground_pixels": 1471,
+          "wram_sha256": "fe54fa02bd17468470e88c9acac2b427650f69295ce641e3d0de5f157726205a",
+          "vram_sha256": "15a80d5269b0f7d45bbb47a5927a746b8c6364044d0266a8ac97ce7ed2c4cafc"
+        },
+        {
+          "label": "tutorial-006",
+          "page_id": 143328832,
+          "compared_pixels": 3840,
+          "foreground_pixels": 772,
+          "wram_sha256": "b94200b64d7a7b3572d0d8c9af35e2a76814f1a84c5df0a659dd5a2ee66c1aff",
+          "vram_sha256": "be7c06412401cd1e104ac057b269eb4b27c467998295e13223d39e8b2679d157"
+        },
+        {
+          "label": "tutorial-007",
+          "page_id": 143328833,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1882,
+          "wram_sha256": "0d31b827c42dcd8c592e1896b5093012a50ebc43b1657e4ca233cfa2a86a8372",
+          "vram_sha256": "abde1d78cb98d96155faca9b1d2b3eff0117225355e54819637748cb6b9b43ba"
+        },
+        {
+          "label": "tutorial-008",
+          "page_id": 143328834,
+          "compared_pixels": 7296,
+          "foreground_pixels": 2076,
+          "wram_sha256": "8faf0b45d898783813814d9e11158857b8be2ea8fe562e7499c8f4f13e77c4af",
+          "vram_sha256": "39b30705876319fed0dcb844f285e7dc5037c08ae040f7c98f33f2b17158ffd8"
+        },
+        {
+          "label": "tutorial-009",
+          "page_id": 143328835,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1234,
+          "wram_sha256": "7972b270088e4a2c6da0b2fa6130014177e2ac3d3cc782a0e45bb8881365cb19",
+          "vram_sha256": "9d0ae360f8d8754ab101de5b2037ca9cf6392f7edf65e90cbb71d2d91aed1b05"
+        },
+        {
+          "label": "tutorial-010",
+          "page_id": 143331248,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1223,
+          "wram_sha256": "d5ab69fa703cf84f7c9e5741d5a2c1c19e130f983e3c1b7bc6a0e050057c2147",
+          "vram_sha256": "15c82e13cd5f934f9d0da9a1a694ac856d4d55070082ab0bc94fce5751e39703"
+        },
+        {
+          "label": "tutorial-011",
+          "page_id": 143331249,
+          "compared_pixels": 7488,
+          "foreground_pixels": 2274,
+          "wram_sha256": "f3af4d551aa7ec3546285d6587a9b9bc69c7dab7a682a687bcbd7678f3be06d8",
+          "vram_sha256": "7013a01178f5d7c161969b9669402142f6533c438d89562a3708884933042061"
+        },
+        {
+          "label": "tutorial-012",
+          "page_id": 143331250,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1601,
+          "wram_sha256": "c95a1148fea29116010aacdb30687c4aea0597b6123ec7acbcaec02655e240fe",
+          "vram_sha256": "0da293fc1e6cd7e9a0124212093bafe80e258c6a360254cf52b6d727ece4a941"
+        },
+        {
+          "label": "tutorial-013",
+          "page_id": 143331251,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1551,
+          "wram_sha256": "75e7f2919a5024a82fb09ee6f9bd837cf1e5ea1fe3447cc90c78fc86ee764e7c",
+          "vram_sha256": "82946a38f561624f4ed9d9dc6952fad6a444f9c732c3352e728f473463740da1"
+        },
+        {
+          "label": "tutorial-015",
+          "page_id": 144527600,
+          "compared_pixels": 8064,
+          "foreground_pixels": 2303,
+          "wram_sha256": "4562951332181dc0708a3e610caadc9ba270f92c1968061af904e74fbaef457b",
+          "vram_sha256": "c2030d3340c505cab240de2e1a0b96d6b62eec111d0147ece34132cf8e64ad7c"
+        },
+        {
+          "label": "tutorial-016",
+          "page_id": 144528512,
+          "compared_pixels": 1920,
+          "foreground_pixels": 597,
+          "wram_sha256": "3227a4a78452f00e63e55d0efc9006dda08936373d914f7d9216e4a775a3bbef",
+          "vram_sha256": "b30ce314ba13d07fab4eabd377b5da974f321a276a24ae59d9bd85a3d86197c0"
+        },
+        {
+          "label": "tutorial-017",
+          "page_id": 144528513,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1255,
+          "wram_sha256": "fdddcbe6c4a4989de45e243a9a880576b4e373bedbbe27ed3adb6ca7ab26e38c",
+          "vram_sha256": "36d31f4777c4d3926e708d80640c3d5d9aaed6285f02ba3f5c4f148e5f6f15e9"
+        },
+        {
+          "label": "tutorial-018",
+          "page_id": 144528514,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1607,
+          "wram_sha256": "4d0a9456c739c48f5d2b8c283ba97e6530099d9c5164da4d0c790266c5b04d6a",
+          "vram_sha256": "d61c581cd07bc3036cbe59d1f04ab9aeedec5241d121a80f3bae6b8315fbbaa8"
+        },
+        {
+          "label": "tutorial-019",
+          "page_id": 144528515,
+          "compared_pixels": 6144,
+          "foreground_pixels": 2134,
+          "wram_sha256": "ea4f62f65aa902921407d4b3065fba8e2ecd82d8bbcd01aac8c816a6c3edc1d5",
+          "vram_sha256": "d2616a919a48ea85bb485b521cfe0195c8119ea33bf561eb42b04477b72b28a1"
+        },
+        {
+          "label": "tutorial-020",
+          "page_id": 144531024,
+          "compared_pixels": 2496,
+          "foreground_pixels": 770,
+          "wram_sha256": "921a68e89cc0c8b917881aa471e5c3cec05443603a34f5eae58096061ba0067d",
+          "vram_sha256": "3e8e6d8c709f84873d91165ce15ace2f35733ad3b302d22fd73a60b24edc0da3"
+        },
+        {
+          "label": "tutorial-021",
+          "page_id": 144531025,
+          "compared_pixels": 5376,
+          "foreground_pixels": 1537,
+          "wram_sha256": "7fbb8f2000d294b1121347ab96ed00d30f8575032171b10e3373380480fc845c",
+          "vram_sha256": "b187fc09f286d419c4604277dff213e46fcc807f86fcf6116207603bd38b2c63"
+        },
+        {
+          "label": "tutorial-022",
+          "page_id": 144532000,
+          "compared_pixels": 2304,
+          "foreground_pixels": 608,
+          "wram_sha256": "ef08ba53c413e6e9a6b425a86bac0025abd788ee699a2f7c5aade323f19340e7",
+          "vram_sha256": "210aad49f1e53936c9b6dda3958155dd386dc6f80f0145dd55844d7dcd2625c3"
+        },
+        {
+          "label": "tutorial-023",
+          "page_id": 144532001,
+          "compared_pixels": 7104,
+          "foreground_pixels": 2289,
+          "wram_sha256": "66ec36df4620fe6a7e57e0633b70d9edeea6ee083f650d2c5c39e37bdbdebf61",
+          "vram_sha256": "029b4bacefb97cac91359df3fef014e43cd803cd2f11362dc634eb2793db8bc5"
+        },
+        {
+          "label": "tutorial-024",
+          "page_id": 144533200,
+          "compared_pixels": 2496,
+          "foreground_pixels": 536,
+          "wram_sha256": "67bbd4f724e0ef4c48879b2eaf69549d6698cc75e49a3a6c962274ca76b01a30",
+          "vram_sha256": "c695b00631269eeb07d0bd7a08a4ae9c1ec4eb27f3a317c706db5586172a626b"
+        },
+        {
+          "label": "tutorial-025",
+          "page_id": 144533201,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1255,
+          "wram_sha256": "d3da1b4d47702a047022b2aa426a702040cfe13fb3b8a97bf48cb5b6b7dc19a7",
+          "vram_sha256": "7d827ad172a3549b10450878f77e730bc2987e8cdab6e29c7dab7565181b59d5"
+        },
+        {
+          "label": "tutorial-026",
+          "page_id": 144534128,
+          "compared_pixels": 1728,
+          "foreground_pixels": 522,
+          "wram_sha256": "5899e41345b5eda719d2dbc041bb4718d08b6cf92243a2b7c18d93d4dbbe0c1b",
+          "vram_sha256": "26bf24a91ef83a3843f40d7215a98914583b60f0e0629be9ab5117bd8b813579"
+        },
+        {
+          "label": "tutorial-027",
+          "page_id": 144534129,
+          "compared_pixels": 4608,
+          "foreground_pixels": 1319,
+          "wram_sha256": "89a53eb7f1bc1dddf559c99ecfb24f70f954502146d138cca8d1d1fb4b32b914",
+          "vram_sha256": "674924518d112eb69abcd35453a972b049ee74fe40d795d7d673f88f98a7e031"
+        },
+        {
+          "label": "tutorial-028",
+          "page_id": 144534992,
+          "compared_pixels": 2304,
+          "foreground_pixels": 711,
+          "wram_sha256": "cfbca1cd567b95a1936a382d3e65d3f6a67ca78781156972b79daad94c13cf01",
+          "vram_sha256": "e95d2d7eb73b3bf9d7cac99323a8235e95032b1f48f6e47fa01373332183f26a"
+        },
+        {
+          "label": "tutorial-029",
+          "page_id": 144534993,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1733,
+          "wram_sha256": "d5411729f1c58d41f00717084d74bab577eaa8a49951edb2f45ecbc847c6a1c3",
+          "vram_sha256": "382037457fb4233cab2a589f8ec3f2ff49d54acf2de96a4fc923eedad22719c0"
+        },
+        {
+          "label": "tutorial-030",
+          "page_id": 144536064,
+          "compared_pixels": 2496,
+          "foreground_pixels": 538,
+          "wram_sha256": "b3392e854a9cf52e8ccd301d8c7b01fc622ac8fdd2979dadd4e7f84730617bee",
+          "vram_sha256": "89d273f2f3f671d6cfa8ade6565ca1b0968e0f71615910b0467af6d8722e28d1"
+        },
+        {
+          "label": "tutorial-031",
+          "page_id": 144538640,
+          "compared_pixels": 2304,
+          "foreground_pixels": 780,
+          "wram_sha256": "0f0615ff645dd68a9316a99fa402b74e746b1188f72a5c90bc8feffe5f554a81",
+          "vram_sha256": "14369d057f70564de9e443d9313d1f5edb10460bfce78ab5a721ccd09e089453"
+        },
+        {
+          "label": "tutorial-032",
+          "page_id": 144538641,
+          "compared_pixels": 8256,
+          "foreground_pixels": 2347,
+          "wram_sha256": "0c523f4dc87f786e2f40a6fe10c266d894f9a4227ae66cb99d94fa960d197234",
+          "vram_sha256": "f25e65a39edec814c541483d1d7c47ed8be7613d95e6adead9dcac92e92a8b97"
+        },
+        {
+          "label": "tutorial-033",
+          "page_id": 144538642,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1887,
+          "wram_sha256": "b1e433ed82ce3cb62e06e748ecd20ae3cbeb82f8a1ce015b97e1a9b1443d5b31",
+          "vram_sha256": "6c5e655ba676ad021e6cfe64b5a203791be01fce3aa8cec53c20c7270239bfa7"
+        },
+        {
+          "label": "tutorial-034",
+          "page_id": 144538643,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1628,
+          "wram_sha256": "b759ac9ad14f4d5a239f2daf806337d25da349810fb71268fccc256bd983a414",
+          "vram_sha256": "55bfbc671cc3db26f936b98d8ad6f825fcd5c939dab3b769adfe3e23f59e1737"
+        },
+        {
+          "label": "tutorial-035",
+          "page_id": 144538644,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1835,
+          "wram_sha256": "5389af142540d309b6d03ce706ba58081709e247aaf8f66ba6767bbe9cb53360",
+          "vram_sha256": "30d4b23b05ce56673e1fe748e57d81ed364f3d509e740c4cf629ba2e11838fd4"
+        },
+        {
+          "label": "tutorial-036",
+          "page_id": 144538645,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1702,
+          "wram_sha256": "e88c967cce2f4a5a5a003b3b6467ca99a2a5a3c89c35dbbe8abbd3cdd419f800",
+          "vram_sha256": "c390830384dbbe018ea1978029456785d188ca2193df7615c107128256ab76f0"
+        },
+        {
+          "label": "tutorial-037",
+          "page_id": 144538646,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1779,
+          "wram_sha256": "31ef64cc1154959ab94e85a3e8f97c60de175a5596919d66ae085d157da03fb6",
+          "vram_sha256": "73832341658f67a4dcf959fa7f8353d97d8d2f83bd557aed44451ef907186136"
+        },
+        {
+          "label": "tutorial-038",
+          "page_id": 144538647,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1650,
+          "wram_sha256": "17fa4f6391dfe2fa421e462fb82426d3fab8491693661ceb65ee036e270be2c5",
+          "vram_sha256": "eba38d5b3b89195a3771b47fb5634befabc91fb89fb9128be3afe763ab8f5a5c"
+        },
+        {
+          "label": "tutorial-040",
+          "page_id": 144544464,
+          "compared_pixels": 2112,
+          "foreground_pixels": 769,
+          "wram_sha256": "bde700bbac43e759370bce9356b7168f8b76940b74986a2cde603ea61056e2e1",
+          "vram_sha256": "5d5aaced27545f2c419642cf4e2b7847f32a4abee82815f6f1e2586bd0fb5d77"
+        },
+        {
+          "label": "tutorial-041",
+          "page_id": 144544465,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1349,
+          "wram_sha256": "7e8ff64b0b2fe14ca55cb14a2a1d89b41455b2b3d942dab26bcf343b48675f31",
+          "vram_sha256": "eca536317a8ec20b32749b6c9db18875c9b651903ad865082a88a40024c46a04"
+        },
+        {
+          "label": "tutorial-042",
+          "page_id": 144544466,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1905,
+          "wram_sha256": "a73c3ac33eff08da8f1df57e0f67ce707e6b00367cdb47b8a1791d563acdc48c",
+          "vram_sha256": "803697a4f27c27a40fa47d26499aafb3c9ede3cecf506c682f90c686d8c55ba1"
+        },
+        {
+          "label": "tutorial-044",
+          "page_id": 144546064,
+          "compared_pixels": 2304,
+          "foreground_pixels": 769,
+          "wram_sha256": "fc7201d29ec5a1224808f1fd3d0c9eee8d5622c5c7eabedb702b11f5a37980df",
+          "vram_sha256": "54ec6913073aa29b7f3ebdb400c70bdb60fb4f918618b07cc088a07735bdc6d8"
+        },
+        {
+          "label": "tutorial-045",
+          "page_id": 144546065,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1331,
+          "wram_sha256": "8d0b7e4933a88eb1a4352b0429438ada92d5c69b63f2543dc96da8ce67642805",
+          "vram_sha256": "ff1c0dba551d9938236c8e5d69e007b581600e76dc989606b8ed489c7d797d10"
+        },
+        {
+          "label": "tutorial-046",
+          "page_id": 144546066,
+          "compared_pixels": 6912,
+          "foreground_pixels": 2125,
+          "wram_sha256": "8cc2e07059237e3947249d6736ff44c0e7bec5947ddcf3222f483a5c82a6fcc7",
+          "vram_sha256": "70c099c2345a27dffdc4826a9a8b1a57f114b9aec2389c1d60c459ba2c34796f"
+        },
+        {
+          "label": "tutorial-048",
+          "page_id": 144536400,
+          "compared_pixels": 4416,
+          "foreground_pixels": 1180,
+          "wram_sha256": "4409b26e960e9f9a32a05d2e4c6521167b22ac19192a8dfe4b8fc2f1fa128506",
+          "vram_sha256": "ca18936cafd07cfa69d6f0326e2b80b30ce4df2ce05895fc81e2b4793413fc7b"
+        },
+        {
+          "label": "tutorial-049",
+          "page_id": 144536401,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1375,
+          "wram_sha256": "75aa3a52584cad71ec9fd7cd2bfee509aa8da7b4daac6bb556c474c8d5cf5f96",
+          "vram_sha256": "0e4b318667999110ea3f167ba6864196ca718fffb145b567fa428a379fd99c92"
+        },
+        {
+          "label": "tutorial-050",
+          "page_id": 144536402,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1891,
+          "wram_sha256": "ea3de111cd97aae1228caf04489b68c6ee56a0888373a36288fcd697f419a17b",
+          "vram_sha256": "5df5916a9caf2120fffb04d936f8fc373d4d14ef1ff5c0f07d83e44375392956"
+        },
+        {
+          "label": "tutorial-051",
+          "page_id": 144536403,
+          "compared_pixels": 3648,
+          "foreground_pixels": 906,
+          "wram_sha256": "caf91d7a36a39bab34e6fd35a004a14b630225a3e1a092e7c7b0b2bea519c941",
+          "vram_sha256": "f3e35d0faca8867d1d9e82cdd25512c45cc76cff62f18390b9964a52abbd663b"
+        }
+      ],
+      "source_only_page_ids": [
+        143356448
+      ]
+    },
+    "discovery": {
+      "samples": [
+        {
+          "label": "resident13-request",
+          "page_id": 143354992,
+          "compared_pixels": 7680,
+          "foreground_pixels": 1810,
+          "wram_sha256": "8d0475e68c19956d196034e934260859e1de096d40ef7a594022b256eac166ce",
+          "vram_sha256": "54fd64ac2e01d56008fd1e185d8fbdbedc8f325bb3ab45fc92c1485f5bf552fa"
+        },
+        {
+          "label": "resident13-choice",
+          "page_id": 143354993,
+          "compared_pixels": 6208,
+          "foreground_pixels": 1372,
+          "wram_sha256": "2e9357e06e2eb4fd33a2dc1666d84606abee25374b6db6c45ab02834145ff679",
+          "vram_sha256": "ad1c9aae5734bd12a76d5f2a382876ba68931cd44529ea23ebc32abde99ad5b6"
+        },
+        {
+          "label": "resident13-accepted-page",
+          "page_id": 143357312,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1382,
+          "wram_sha256": "df95bda063bc5bef3ba46ceb6341648e9356f6ad52d926d03255acf8c75a0f71",
+          "vram_sha256": "6d7b5fe55b7ce877d99044b6d672c2cd9be381f78ec992c8344e6b8fe7a13b5c"
+        },
+        {
+          "label": "resident13-accept-page2",
+          "page_id": 143357313,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1411,
+          "wram_sha256": "131dc2b7dfc99f4839ba1b7378634c8d2f1738a729663e74728b6b9587434044",
+          "vram_sha256": "9ab7da9b8880191861aed1e9a7a7185561d47b7a6febdd9dfbd67dcc3c5b66fa"
+        },
+        {
+          "label": "resident13-accept-page3",
+          "page_id": 143357314,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1780,
+          "wram_sha256": "09cdfc5aa2f761c02e26c3e747a4b0613871f8980c76385fd746f354e4c7049d",
+          "vram_sha256": "c5578de765f536c886fff1c9a638cc2df1506f3ae65f86ac7e49abb85aa94a50"
+        },
+        {
+          "label": "resident13-accept-page4",
+          "page_id": 143357315,
+          "compared_pixels": 4032,
+          "foreground_pixels": 959,
+          "wram_sha256": "afa5ae5b10e1f452f1668d39d81a6a9267af938cd8e58d14e93236fa0b54cfce",
+          "vram_sha256": "8237097c306d243660f727000621d80c306e638fddff8462388a07bda1d7b707"
+        },
+        {
+          "label": "return-home-C28-rest",
+          "page_id": 143256000,
+          "compared_pixels": 3648,
+          "foreground_pixels": 764,
+          "wram_sha256": "40236cbcb0a6241030572fee86cc9843319297a200806155fcfc7ea513f8f287",
+          "vram_sha256": "18abfa6947110f3bc153b3ea4155ab54803de946c73a609b52bbd418ac5af56e"
+        },
+        {
+          "label": "C28-entry-page2",
+          "page_id": 143256001,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1448,
+          "wram_sha256": "d27ef71496ae60fb04f7aa3d6e599e0ca4c6c9453896673ea44a15fe2dcbd24a",
+          "vram_sha256": "dee353e5f4604ce92ad3579869afc4d74b329407ebad933a185c1f2723e792e2"
+        },
+        {
+          "label": "C28-entry-request2",
+          "page_id": 143257136,
+          "compared_pixels": 3648,
+          "foreground_pixels": 788,
+          "wram_sha256": "4c2bfe99b4dead970e1bdb6c7e8d36e1c88a149a1ae2eb40d56df34d60b86b25",
+          "vram_sha256": "d54f7f1dd13b304c9bf5c5b31a96f4116ab3016230e8bbfc39c91a64543c3145"
+        },
+        {
+          "label": "C28-entry-request3",
+          "page_id": 143257536,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1862,
+          "wram_sha256": "c48088ef5660b52105c4bc741f466b7fca348de7121685391f55c596435a0eb3",
+          "vram_sha256": "1962e3f16c732bc0f0ef1e45127ae63dd6e6e4e8184f3c7339cd362a085ab4a6"
+        },
+        {
+          "label": "C28-entry-choice",
+          "page_id": 143257537,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1753,
+          "wram_sha256": "057b535d102905f31245f6a9575e713889775b9702fb06096f688c9a4ce7f729",
+          "vram_sha256": "1fd18f05257aebcd342466bfb178619118bb71f4a9347fb4437b2229c8d76dde"
+        },
+        {
+          "label": "C28-entry-page6",
+          "page_id": 143257538,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1571,
+          "wram_sha256": "31b1a4994e8b8de71cdb31f6bc775748db3309355d6297d419cac702f66c99b8",
+          "vram_sha256": "6abaa599890b8d110349f60e207181c8b9db046efd84f54fa546bb50f62fa1f1"
+        },
+        {
+          "label": "C28-entry-real-choice",
+          "page_id": 143257539,
+          "compared_pixels": 4672,
+          "foreground_pixels": 965,
+          "wram_sha256": "d1a3b47fe0dd93cb5daf4c499ce01da2d3d1dd335ddd2ad5f27f201e83201b1b",
+          "vram_sha256": "5e427d96cd7497c47bf9e165c64d79b320140e712a41ec5579c794f53a0c92cd"
+        },
+        {
+          "label": "landed-21",
+          "page_id": 143318192,
+          "compared_pixels": 4992,
+          "foreground_pixels": 639,
+          "wram_sha256": "9f332b6c2f051cce0a2fe25f3c42a469ba15bba6b4f77a72ce951d301dc73a40",
+          "vram_sha256": "768f52a87c14b89a5b85ff412208d2a71c8a31c503fe585d2c59dbcb7f35fb67"
+        },
+        {
+          "label": "21-box-contact-rest",
+          "page_id": 143318816,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1850,
+          "wram_sha256": "6ab73424b30ef547ad3020d3a39d3bf3249e786b2273ccfe54e709fb8f5759bf",
+          "vram_sha256": "bbf1a6db0c910f10190f2fc615913a7a6367641f7c261ef878753156391770af"
+        },
+        {
+          "label": "21-warning-return",
+          "page_id": 143318817,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1336,
+          "wram_sha256": "150f42ad5727544f3721e361ea2d788801ab867596ec623f2912f7c6d834ea11",
+          "vram_sha256": "ca9b787f900766ee4c9c8a48ec2556d138a6d34b174fcde5c508931410040547"
+        },
+        {
+          "label": "tutorial-000",
+          "page_id": 143325792,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1075,
+          "wram_sha256": "a54f9d2a2dc1cda4926a4d5e572c1b7a8459548387d282f76395ed57deab8f7f",
+          "vram_sha256": "364816323041e7cde94b0f75515e37bfebf755e1f3e9f78a14b18106557e0909"
+        },
+        {
+          "label": "tutorial-001",
+          "page_id": 143325793,
+          "compared_pixels": 4416,
+          "foreground_pixels": 737,
+          "wram_sha256": "9e741ae4fb919adbd58bc2926e90744ebb2589101ea5229466903c02dff0f43f",
+          "vram_sha256": "2714bb20c7ebbab8b7c47e4ec88ad6b4006c6bbf892c71f09dc845157464e0c7"
+        },
+        {
+          "label": "tutorial-002",
+          "page_id": 143326736,
+          "compared_pixels": 2880,
+          "foreground_pixels": 565,
+          "wram_sha256": "44b4ef3723318746a155c2df51f11fca5a333b6317eeddbade976f16507b4888",
+          "vram_sha256": "aed7e7bfd4457e5cb060ab8fc35a653f6411bee5b1f75cf12b5ff746620fc172"
+        },
+        {
+          "label": "tutorial-003",
+          "page_id": 143326737,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1628,
+          "wram_sha256": "cf77450b8e651da4f1f1874f685e95a38ec0775d26147e1eef40a5438dc444a2",
+          "vram_sha256": "ec3b6dc298fda4f967ad957bdcb6dcb503fb6db488523e0f0993e22de8718b15"
+        },
+        {
+          "label": "tutorial-004",
+          "page_id": 143326738,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1062,
+          "wram_sha256": "689fead8f91425ead08e11de165c192fcf85e76a1902fa558339328f143d9f5d",
+          "vram_sha256": "f6b3519f9d9652d87196f69d4fb100b323ae206c9e347df543904df370bef1ca"
+        },
+        {
+          "label": "tutorial-005",
+          "page_id": 143326739,
+          "compared_pixels": 5568,
+          "foreground_pixels": 1471,
+          "wram_sha256": "8a75dc11c9f1a4c21fe206c6cb5d5643710f4a214348c57861ff240467743f8d",
+          "vram_sha256": "676b84cc95df507adaa5dcd024f3af955ec3ba3088b7bed0d9f6041a96be6020"
+        },
+        {
+          "label": "tutorial-006",
+          "page_id": 143328832,
+          "compared_pixels": 3840,
+          "foreground_pixels": 772,
+          "wram_sha256": "03e0f89cd5c0ce81c2f2fb3e0023d4d3c9b098b323248f1e6b3e676e2c83ae73",
+          "vram_sha256": "733b7df9745d823ec2ab2a0f334bedef51a928395e87d2a98b31543775ad4af5"
+        },
+        {
+          "label": "tutorial-007",
+          "page_id": 143328833,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1882,
+          "wram_sha256": "9e368b69d190ef377a370272828e8ffba1c58627581bc1255be3f4720eaa26f2",
+          "vram_sha256": "c553f567aa06a1503a8c0e14ef7ea829911e1110416768fee2b7709f2dbe643c"
+        },
+        {
+          "label": "tutorial-008",
+          "page_id": 143328834,
+          "compared_pixels": 7296,
+          "foreground_pixels": 2076,
+          "wram_sha256": "911ab7732945ef2fb98be8494555ba943dad9f458e93bd4b8f602d9653960879",
+          "vram_sha256": "7ec370e9617697831dbeee14df58dce13b1693318611e61dee912cae8860135b"
+        },
+        {
+          "label": "tutorial-009",
+          "page_id": 143328835,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1234,
+          "wram_sha256": "028e1806c01690ca0a55ff18c634a8c67684a3a96361e9212cecbc49de8934bc",
+          "vram_sha256": "1589d2c2f995ac762853a1188d88a83d774dc487114ec7e704e25057a93c2320"
+        },
+        {
+          "label": "tutorial-010",
+          "page_id": 143331248,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1223,
+          "wram_sha256": "07713b7ba0ecbb0b457e859747729448184df9369e4ee46bc3dbcf06d48e0610",
+          "vram_sha256": "51bc88332bc8cfc9fe285fbf427a1c462010e21cbea725f1e1819e270b8f1947"
+        },
+        {
+          "label": "tutorial-011",
+          "page_id": 143331249,
+          "compared_pixels": 7488,
+          "foreground_pixels": 2274,
+          "wram_sha256": "7db192421917f87f2c6e145c5e2bfc7d1a580ed49a548a24e068f402ee3e4e46",
+          "vram_sha256": "58100c3d1fad3fc54c613f9708480ee9ab06413fad329b2f20c4efa879cbdb3b"
+        },
+        {
+          "label": "tutorial-012",
+          "page_id": 143331250,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1601,
+          "wram_sha256": "e747df4332e95a18dda66d8571d18d60f91c98abc7132fec6f49fc75768a446d",
+          "vram_sha256": "acf6555082aa69596c6f6b1d6aec2aba2de4ce57d56ab9d9f406a7e6b7f4ff98"
+        },
+        {
+          "label": "tutorial-013",
+          "page_id": 143331251,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1551,
+          "wram_sha256": "927cc9e10243c3a07f4ddbf652a865defbd41c48653bce100731411d73076921",
+          "vram_sha256": "ed3cc75053754c04b7b126ff44e33151e9de31053d1734620273960f84a82469"
+        },
+        {
+          "label": "tutorial-015",
+          "page_id": 144527600,
+          "compared_pixels": 8064,
+          "foreground_pixels": 2303,
+          "wram_sha256": "50ce5fac5df35c6dc4f7065d695b4225c50a970f4589d0f49f73f8dae49d2249",
+          "vram_sha256": "ae4a3676cdbb08a42cf22b72ecd07d31da1c6d9566219e50a1cbb6cf1c3a2f23"
+        },
+        {
+          "label": "tutorial-016",
+          "page_id": 144528512,
+          "compared_pixels": 1920,
+          "foreground_pixels": 597,
+          "wram_sha256": "3517cca48c881bf99882d66a097557c72a7b92cb1d291ad5d59ee16b6bd541b5",
+          "vram_sha256": "ecd18e449cb60b1d7d1819ecefefbda8a5a652644a52ac1c86a2819d03b8322a"
+        },
+        {
+          "label": "tutorial-017",
+          "page_id": 144528513,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1255,
+          "wram_sha256": "851fd3d1d4f4add72b5affae27418611d032fec65cdf525c82a82087f12289b2",
+          "vram_sha256": "e1e5b4384f14b840fca903918cebcc0d108c5cd1a4bf71717a0a060cdf83fcb6"
+        },
+        {
+          "label": "tutorial-018",
+          "page_id": 144528514,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1607,
+          "wram_sha256": "147802404f9b9e33662f1f1b1020e774fb9e1b93ff732aa486c7aaaea848df94",
+          "vram_sha256": "0df38880ff0f754939c77e20cd79beb4c4d411300f9187384fb5a1b50371c222"
+        },
+        {
+          "label": "tutorial-019",
+          "page_id": 144528515,
+          "compared_pixels": 6144,
+          "foreground_pixels": 2134,
+          "wram_sha256": "fb51cd918a7471fd49da4ce7507a1fc8b5d8e404a61ab582b437e002669678ce",
+          "vram_sha256": "0c26bcf84b189b1a212886f7366e88572af0e833224e64d4ea8579c09870c26b"
+        },
+        {
+          "label": "tutorial-020",
+          "page_id": 144531024,
+          "compared_pixels": 2496,
+          "foreground_pixels": 770,
+          "wram_sha256": "4e1968b95d04d47b66af55475730dc92a9f99940f5e3efb994d0d0194de44a3e",
+          "vram_sha256": "73dd694f42104308bc711a212cad2b1142f9ecd93edae7fc472eac74a5a75041"
+        },
+        {
+          "label": "tutorial-021",
+          "page_id": 144531025,
+          "compared_pixels": 5376,
+          "foreground_pixels": 1537,
+          "wram_sha256": "8def8113b60f5df3e08396b7ecbc7609a53830a677237b402b97ec9e167c7f56",
+          "vram_sha256": "b2e0da2ef8f2b2742401566130e52d8aa94e8af6aee5610b6f938965c871da28"
+        },
+        {
+          "label": "tutorial-022",
+          "page_id": 144532000,
+          "compared_pixels": 2304,
+          "foreground_pixels": 608,
+          "wram_sha256": "d22060fbca9b1372eb7cc0f4bef36e8a2e3fbe4001e071746e407b8fa6b36516",
+          "vram_sha256": "81846121964d554219ad16efe7cb740fa79def296b129209575c6c6f4451c55f"
+        },
+        {
+          "label": "tutorial-023",
+          "page_id": 144532001,
+          "compared_pixels": 7104,
+          "foreground_pixels": 2289,
+          "wram_sha256": "8ea17445619f84f019eb1f89982543b921a2ef6c521bf5beb59f69c6960ed4f6",
+          "vram_sha256": "fdd126ef68f05314cc75e2f5401139846cbd2f75c454b24d989c80fdcdc2a6cd"
+        },
+        {
+          "label": "tutorial-024",
+          "page_id": 144533200,
+          "compared_pixels": 2496,
+          "foreground_pixels": 536,
+          "wram_sha256": "8520f7a37522286158141c7efec8f976884a621a0382009d905313dc70fad649",
+          "vram_sha256": "e74fdf31bcec909618a3d17fa4c7d6448acddaf3ce149c1c97e55fd2e4c44c1d"
+        },
+        {
+          "label": "tutorial-025",
+          "page_id": 144533201,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1255,
+          "wram_sha256": "c6bb2aa171c13727eadf52367cb7b5a3d0a5e53fbaa5479c14ebe6e0dab4a167",
+          "vram_sha256": "aaf2c0f6e77bf3f8ac0c948efe302f566b5d9ded68a4cf7cec60250f517c59b4"
+        },
+        {
+          "label": "tutorial-026",
+          "page_id": 144534128,
+          "compared_pixels": 1728,
+          "foreground_pixels": 522,
+          "wram_sha256": "acaf0a15571250a7d05698719bb1e5715a8d7d556de4423ef226f84ef1e42c47",
+          "vram_sha256": "43893c98a9a060c9c4bdb3a4228e783c26d4cc4a2b3fac205f938420c014d5fe"
+        },
+        {
+          "label": "tutorial-027",
+          "page_id": 144534129,
+          "compared_pixels": 4608,
+          "foreground_pixels": 1319,
+          "wram_sha256": "1e1bada7ea04fd0804d4d67cc5eba5cf2e25189e0c3723a1659ffafcd9b1338f",
+          "vram_sha256": "500b2cf205199851a188f54ea3f81af8988d28631196c0682804d392d813334a"
+        },
+        {
+          "label": "tutorial-028",
+          "page_id": 144534992,
+          "compared_pixels": 2304,
+          "foreground_pixels": 711,
+          "wram_sha256": "2112ac59c1da0618abce0723c977c17d50bfa186d0b706138fba3f889a7f738c",
+          "vram_sha256": "a68d5c3a40a9ba108216ab5555eba5277d64160f6c21760807e615e2ff7584af"
+        },
+        {
+          "label": "tutorial-029",
+          "page_id": 144534993,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1733,
+          "wram_sha256": "af74cfd28649c739b8ec59dcecc5fe82693b63265349515ed29d77d96407b6ac",
+          "vram_sha256": "a895d9499abc7b03b1b09b8d6948c2567de05cc71338e0fcb4ae4063babadae4"
+        },
+        {
+          "label": "tutorial-030",
+          "page_id": 144536064,
+          "compared_pixels": 2496,
+          "foreground_pixels": 538,
+          "wram_sha256": "6ebe19533e2717015cd63de716adc68b80db4dddb3918c316a7d2e10abdfef65",
+          "vram_sha256": "90572885f5859b1eadc75ad37fca74f81666f5ac84b8f51c4b8d2f32fe71f972"
+        },
+        {
+          "label": "tutorial-031",
+          "page_id": 144538640,
+          "compared_pixels": 2304,
+          "foreground_pixels": 780,
+          "wram_sha256": "6805e0c72066897a18522ece366a091a5ac2d1983589fbaa7cbc91754f787d6c",
+          "vram_sha256": "454e9cd3831ca7988690676713774623c8d7c291c218b0d231133da24edfd3eb"
+        },
+        {
+          "label": "tutorial-032",
+          "page_id": 144538641,
+          "compared_pixels": 8256,
+          "foreground_pixels": 2347,
+          "wram_sha256": "61227121c18878424f08239fbbd8e73112b49d150422620baa443546eb20274c",
+          "vram_sha256": "f7d1d923038748b957a363f1d84f443cc7bdcdb24660b26cae748e6b2da09a60"
+        },
+        {
+          "label": "tutorial-033",
+          "page_id": 144538642,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1887,
+          "wram_sha256": "0e2fb58877bbbd7c321804102f5124cf69bc9f7bf1aea4235bebe16bc1ded35c",
+          "vram_sha256": "a3eeb389a410e6d738190c002f297a1a2344b076c279036caf78251f94f48f4c"
+        },
+        {
+          "label": "tutorial-034",
+          "page_id": 144538643,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1628,
+          "wram_sha256": "5e9b39a7e86860b9edf1fd9b386f4a214fc75232e8a4c66304e43471937449c4",
+          "vram_sha256": "32764d470763b73074a63cf8479dc816db5536c243d50c5c7d242792b5c7d54b"
+        },
+        {
+          "label": "tutorial-035",
+          "page_id": 144538644,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1835,
+          "wram_sha256": "a5eb180c1c9ad7f440575b47d36a9f6b4e63c6fa3ccb8cb3bb9b00dcbd15a716",
+          "vram_sha256": "9e2937d1cad685ae08c9630ac68efa6ca860d2fea8f02676aeee5781420ace8c"
+        },
+        {
+          "label": "tutorial-036",
+          "page_id": 144538645,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1702,
+          "wram_sha256": "c839155ec0d47c00ff117e1c7bef911f40a5b9a0eb092bf432594563f8a4b1c3",
+          "vram_sha256": "fd43f2a5aa98874583fddb9bf45d434ab81fbfc7907a3b73eda9449e4780a0e0"
+        },
+        {
+          "label": "tutorial-037",
+          "page_id": 144538646,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1779,
+          "wram_sha256": "d509015e8bfee5baf771a92fcc73afde084774fc5f7c90731038829763698273",
+          "vram_sha256": "2046c39f0f2424872f231157ad26ea1a015041255989005820fcaf63d2f593ef"
+        },
+        {
+          "label": "tutorial-038",
+          "page_id": 144538647,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1650,
+          "wram_sha256": "5f6443df44a8b667b752922ae24863745d4d4460927b0858330415b288bdf12e",
+          "vram_sha256": "2633f90ea33ec3d511ed504d1ad5b967fd79d197461b2f58ee9858bc5b46b4d7"
+        },
+        {
+          "label": "tutorial-040",
+          "page_id": 144544464,
+          "compared_pixels": 2112,
+          "foreground_pixels": 769,
+          "wram_sha256": "0a2adabbe75dbc97b5ce261bab91d4237b092dcec0fbc40ded2949e8ed9df36e",
+          "vram_sha256": "5f64f85715ba00d46e06200702a34070e3ea871122bc6748e169287ab7320fd7"
+        },
+        {
+          "label": "tutorial-041",
+          "page_id": 144544465,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1349,
+          "wram_sha256": "7edb0d34568f88480ef95701bb7c072d485824aa9ffd73b27e4077c1a3280eef",
+          "vram_sha256": "6d6fe28fc9c5eb12fd30c13cef20d6b62f4f820580a88095f14fe937af41dffa"
+        },
+        {
+          "label": "tutorial-042",
+          "page_id": 144544466,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1905,
+          "wram_sha256": "bb4ef1f1929bca0fe7d3c368bb4222453c1aaaffa2c0eaa67260cafbde8a37f3",
+          "vram_sha256": "0e0d069a8ffc86effb71eab364cf5053742d23eae1aa6e5a9dc07b67b525c83f"
+        },
+        {
+          "label": "tutorial-044",
+          "page_id": 144546064,
+          "compared_pixels": 2304,
+          "foreground_pixels": 769,
+          "wram_sha256": "62c5b8ecde648df67cfb20416875b0b3561b7ae687a588f2f77f1d6dcadfb5df",
+          "vram_sha256": "b4ae56d16f04baa78053d8598e267884ef5b4111c60ca4ab7c8400a9516b54e7"
+        },
+        {
+          "label": "tutorial-045",
+          "page_id": 144546065,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1331,
+          "wram_sha256": "37707944dba2fcf751cad82d7e02a0132f2fb108f1184c321c5eee682279ef39",
+          "vram_sha256": "636aa0d4609f22bc7981d5a7a04a4268e8986ac3520c7b3c19dbb59c171592ec"
+        },
+        {
+          "label": "tutorial-046",
+          "page_id": 144546066,
+          "compared_pixels": 6912,
+          "foreground_pixels": 2125,
+          "wram_sha256": "7921c1265fe27e43669beb11117ab39b6b8370b23b5e71dcbd39de86608f9acc",
+          "vram_sha256": "93fa462efca6f56234cdb1084ceb188bedc9ad125cb3e4fa1f3a70c3a4a5d9db"
+        },
+        {
+          "label": "tutorial-048",
+          "page_id": 144536400,
+          "compared_pixels": 4416,
+          "foreground_pixels": 1180,
+          "wram_sha256": "26f65b9a205e40e7fd890acfa4c8774b0b60973a2e57b7be01686accefc3c9cc",
+          "vram_sha256": "3347955da7f0a5d386e10d4203896ee3435216d8f0459cbcecace83e7103e48e"
+        },
+        {
+          "label": "tutorial-049",
+          "page_id": 144536401,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1375,
+          "wram_sha256": "1eebd66ea1003bc048c9bdb39d5b7a938fe74f9cb3ffe26d6f4cee1b08478d41",
+          "vram_sha256": "31bcd06c0554f21134101f954558b61409700282f2b5ca0ff9185379649a0d3e"
+        },
+        {
+          "label": "tutorial-050",
+          "page_id": 144536402,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1891,
+          "wram_sha256": "de3a16d43fdc3b1b47584fb4ce07dab6965f82f38453c8b188f3257a8e86fe07",
+          "vram_sha256": "88524a905cf318236199d8865db1e520a3db07c622f3a9f82162b4140633a6cb"
+        },
+        {
+          "label": "tutorial-051",
+          "page_id": 144536403,
+          "compared_pixels": 3648,
+          "foreground_pixels": 906,
+          "wram_sha256": "8c01cff3aca7c2188103d38bcdc45fe738031055f83818a65f5812f7988c4a5c",
+          "vram_sha256": "60089c5f9ef8652a5b4eed593c03ebeb0d62ea472863b0d8a8a3334f0e2a0e79"
+        },
+        {
+          "label": "resident13-repeat-choice",
+          "page_id": 143356448,
+          "compared_pixels": 6784,
+          "foreground_pixels": 1712,
+          "wram_sha256": "6a6148a4e72663853c4842ab50ed3ca65e2b4ad4ba9e2bc46be0707fb64f1f13",
+          "vram_sha256": "2abdb25c1e680125872d199bfda9a40f09fefd562fa0723efb130f345df138b7"
+        }
+      ],
+      "source_only_page_ids": [
+        143260304,
+        143260305,
+        143267312,
+        143267760,
+        143252528,
+        143253168,
+        143272272,
+        143278592,
+        143253664
+      ]
+    },
+    "parentfresh": {
+      "samples": [
+        {
+          "label": "13-first-page",
+          "page_id": 143354992,
+          "compared_pixels": 7680,
+          "foreground_pixels": 1810,
+          "wram_sha256": "266fbf8193af9c2fa851b677d7cf0c3c8b91a5f232aa42158cc5577d8eb6b386",
+          "vram_sha256": "d05485a9cb0ef670537f3f34f99d5b95678ec56d0197a80676718e540fc7b1ca"
+        },
+        {
+          "label": "13-choice",
+          "page_id": 143354993,
+          "compared_pixels": 6208,
+          "foreground_pixels": 1372,
+          "wram_sha256": "6e81e6e04f36d7d504b71d794cb9c6ec69d7fe541cb1e5c1ea6cfaab58b4508f",
+          "vram_sha256": "97d2a0096811d07bb296c916be9c8a98949e2a702d503d5a2cce1da352177416"
+        },
+        {
+          "label": "13-followup-1",
+          "page_id": 143357312,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1382,
+          "wram_sha256": "c7a27842eda3279176d94372aca9348f58f264e5100cd25f4768dc4ac7e25069",
+          "vram_sha256": "2d9f036716e3f9329f5501a64d2db03d98b4c89235285ce26d6601384ba863f0"
+        },
+        {
+          "label": "13-followup-2",
+          "page_id": 143357313,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1411,
+          "wram_sha256": "2feebe144b9cb5602927e4bd4c5cbbf3c19e8431b7570e755d8ad9f7a3d0e2b3",
+          "vram_sha256": "c7230fbd9cb799da72b8771e58610b680e34fd19125ffb86baf0c0c673a2e042"
+        },
+        {
+          "label": "13-followup-3",
+          "page_id": 143357314,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1780,
+          "wram_sha256": "c02a4e9313dae5c596dadc82ce5727d5968a2abac72554388341195b10db65a4",
+          "vram_sha256": "da91511240700535ba8333508d9d125927ee1dea8b2c343937cc16685e314e69"
+        },
+        {
+          "label": "13-followup-4",
+          "page_id": 143357315,
+          "compared_pixels": 4032,
+          "foreground_pixels": 959,
+          "wram_sha256": "60f89706545f059de03ea38e7c6c45d18fbc6e47cdceaa0624d26c3ca2232e8c",
+          "vram_sha256": "38329760e477655aafdfa02eb463aaf627d6515ddd53a44778afd479470caa80"
+        },
+        {
+          "label": "return-home-C28-rest",
+          "page_id": 143256000,
+          "compared_pixels": 3648,
+          "foreground_pixels": 764,
+          "wram_sha256": "c7e1319bb1dda2340f2ace6666b4c84db532b44bc6ecefce2b036a59e8db647d",
+          "vram_sha256": "28b917cafa2fe075b759fab5a0d9ea1c4f15ad43570c4cc386ef902f8cf2a98d"
+        },
+        {
+          "label": "C28-entry-page2",
+          "page_id": 143256001,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1448,
+          "wram_sha256": "4def370487749293ddec3820a3d32d189ade3b6c59f29280265d7950078b288e",
+          "vram_sha256": "2129e4a9da709fec2e8621e5895b52e04b10a30dbb985a4228652f6787eb52a7"
+        },
+        {
+          "label": "C28-entry-request2",
+          "page_id": 143257136,
+          "compared_pixels": 3648,
+          "foreground_pixels": 788,
+          "wram_sha256": "2e29d349a835d1696c805a16b4bfdd06505ff3dae45faafa1feb0a9f71020608",
+          "vram_sha256": "924a0080afa188b9ace4d4c39cd8b0a4988d99eab7768c2a454448d08724e582"
+        },
+        {
+          "label": "C28-entry-request3",
+          "page_id": 143257536,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1862,
+          "wram_sha256": "72462309a9b1c8563d859670f507f28143074017b4b91450ddf21743b17a6cec",
+          "vram_sha256": "05f480211ede12de6a3d894c54c2e05ad024191e62174209b42055f1ef90c16e"
+        },
+        {
+          "label": "C28-entry-choice",
+          "page_id": 143257537,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1753,
+          "wram_sha256": "32de2cccc635e031e6646790c529969aa759dcad95fc467997ed4b2f94d77350",
+          "vram_sha256": "80733845dddb2325f7dae2a53e2f39e408e7ee4556cc54e1ea0e325d1875141c"
+        },
+        {
+          "label": "C28-entry-page6",
+          "page_id": 143257538,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1571,
+          "wram_sha256": "e1ac427b9dbdf91407f232bf5289ebd056297e2f4c38b77a60ea72804fab2218",
+          "vram_sha256": "73ba6a141cf2f695a2f11f572b1eb4467e1fa7ec1a18724a60c39a901d5e7355"
+        },
+        {
+          "label": "C28-entry-real-choice",
+          "page_id": 143257539,
+          "compared_pixels": 4672,
+          "foreground_pixels": 965,
+          "wram_sha256": "a25a31e277da672e1007e0d892933881fcaabf6b6d0aba6336603e2b978e79b8",
+          "vram_sha256": "25aaf7c4f9834ada43548f6fb3f04d65c5b65afc1ec9474a01eb53a040edabde"
+        },
+        {
+          "label": "C-direct-page1",
+          "page_id": 143260304,
+          "compared_pixels": 4032,
+          "foreground_pixels": 812,
+          "wram_sha256": "8720bbadd362d96ea4571cd2eb2c2954b59a5db60e4174d2f7a6c6b978865182",
+          "vram_sha256": "b05181bd6a3bb53e32cc33f0f82b19924c9c4ee77ca2029fdba0ce93dad4a228"
+        },
+        {
+          "label": "C-direct-page2",
+          "page_id": 143260305,
+          "compared_pixels": 7872,
+          "foreground_pixels": 1758,
+          "wram_sha256": "b9f62d7a0f9c8a794c32abbad61ebe2a78cd9dee7f1031e2bc63945cc91922ca",
+          "vram_sha256": "a2c573b42cd385a580f85dd1db362d6397d1b529fa01f8dd8d6c457606d5e69e"
+        },
+        {
+          "label": "door-real-hit1",
+          "page_id": 143267312,
+          "compared_pixels": 4032,
+          "foreground_pixels": 759,
+          "wram_sha256": "6e92542ae064710a09be95432efb2dc1dd90dba2551096895b54c0d2ad3bd29a",
+          "vram_sha256": "185fb3703d80e8925bae579f4a8e4acdfb33f0a346d4e97544bf7d961f5dc8f6"
+        },
+        {
+          "label": "door-hit2",
+          "page_id": 143267760,
+          "compared_pixels": 4032,
+          "foreground_pixels": 756,
+          "wram_sha256": "8e5983672ba04e15bd8b61b0f65295cf1dc251cd612f61868b5f83f7598d83f6",
+          "vram_sha256": "32e369a3ccbca7ccbdae44bde94b60fa0acc3964fb17e24fda765a53b0856e50"
+        },
+        {
+          "label": "cellar-sequence-003",
+          "page_id": 143252528,
+          "compared_pixels": 3648,
+          "foreground_pixels": 732,
+          "wram_sha256": "65c5649ab2b6cc16f376a78c95aba1c217f3cc2daeb1b929cdac254f86e623d2",
+          "vram_sha256": "e1b6a3692576dfa8d1523f6a2bfe3c059188a8d2b8b4dcf7e367ce87d45ef21c"
+        },
+        {
+          "label": "cellar-sequence-005",
+          "page_id": 143253168,
+          "compared_pixels": 3648,
+          "foreground_pixels": 845,
+          "wram_sha256": "7daa4723932920e5b52ed6dc3744d5e2bb21795ca18ed59d1a929f380554021f",
+          "vram_sha256": "6a0b550a6722edccc998d83d9058278e23600de5c6b66f3c0410c30ef635d5b0"
+        },
+        {
+          "label": "cellar-sequence-006",
+          "page_id": 143272272,
+          "compared_pixels": 4608,
+          "foreground_pixels": 923,
+          "wram_sha256": "414ad48f33f72733177c812082f8e1a497997dc683815b4b0d5b91c6f9b4f2ac",
+          "vram_sha256": "51ec6e65bd68f21143a23cf2669a5b252ef2b49b8a757034d01b07257bddb062"
+        },
+        {
+          "label": "cellar-sequence-007",
+          "page_id": 143278592,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1123,
+          "wram_sha256": "6af06d4b696decab58b73626f1931d81bc9257010cd1a6d077a0c98fcd6e4f12",
+          "vram_sha256": "e74bd90b93d40097a489d168f64a56915a3fed3ae19a1c1678634b44d7243fb8"
+        },
+        {
+          "label": "cellar-sequence-009",
+          "page_id": 143253664,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1900,
+          "wram_sha256": "5bd25edbbcc47745e74ba2242d4e4d04af18f5dc688978fa3cce86b9882403dd",
+          "vram_sha256": "5a7117d8cbf4404a78249580236858d655006d6d2d1a3abcc71bea8bfc853ed0"
+        },
+        {
+          "label": "landed-21",
+          "page_id": 143318192,
+          "compared_pixels": 4992,
+          "foreground_pixels": 639,
+          "wram_sha256": "e87acc7b9add5d12677dbc6dd640d96ab92907e55b16437fba3343da8098be13",
+          "vram_sha256": "c231786af686cf681a7c06bf621164035a4e90a8585a50caad18306b5f0d9530"
+        },
+        {
+          "label": "21-box-contact-rest",
+          "page_id": 143318816,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1850,
+          "wram_sha256": "d7da6daed5fa2d45d5f0168bb65313b3f061614be1676e265b581d7da2eb01e0",
+          "vram_sha256": "a9d6902ecaf5aa391e26a8bbebd2ee769292e64d0accf6c1b16871439b9249fa"
+        },
+        {
+          "label": "21-warning-return",
+          "page_id": 143318817,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1336,
+          "wram_sha256": "36a4e803ed4b5ca0defcfef835424a56b41d3256c61630bf1fd1e59616e68eaa",
+          "vram_sha256": "198153053667da35bf3693d8ca5c19abd8da96aefcf60b4c60721a5ae3739847"
+        },
+        {
+          "label": "tutorial-000",
+          "page_id": 143325792,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1075,
+          "wram_sha256": "744d1706c7bd8314b29eb3b8c035d78d8985f120aa421513de64928c7f4cf75c",
+          "vram_sha256": "f6dc9002e9e4527c10066113a8a8c23dc9e410c7bb18ba7c429fb9bf0534f8e7"
+        },
+        {
+          "label": "tutorial-001",
+          "page_id": 143325793,
+          "compared_pixels": 4416,
+          "foreground_pixels": 737,
+          "wram_sha256": "af0113287f0e692aa5b824c1073349846d6c401b7c24f78c5aa54a0a59bf6736",
+          "vram_sha256": "629db7c4ed162e17fe6aba3f9e02616246cac56af6498cac14404b40eda9e032"
+        },
+        {
+          "label": "tutorial-002",
+          "page_id": 143326736,
+          "compared_pixels": 2880,
+          "foreground_pixels": 565,
+          "wram_sha256": "869bebdcbc5474d715557eb524891d4be7acb34d10ded6c489e9ad78d3cf5e1a",
+          "vram_sha256": "869564e4141cdd4bd1b88cdcd4addc09f710c6e0d80b66639c98943f26af7f9a"
+        },
+        {
+          "label": "tutorial-003",
+          "page_id": 143326737,
+          "compared_pixels": 6720,
+          "foreground_pixels": 1628,
+          "wram_sha256": "8a2dcb802eda35ccaddb20778bd2707da5f88be62fa088fd5e5b53817ca12bb5",
+          "vram_sha256": "d2ee50c9bc26123b1ad3397e0ac0b7126ee97ab03ac6584052fffe1dd347d4c6"
+        },
+        {
+          "label": "tutorial-004",
+          "page_id": 143326738,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1062,
+          "wram_sha256": "2515222a7b58508c63a805282c0e5be1f99ffea311c6b5d17ac500ce7c939fef",
+          "vram_sha256": "fed47adbaef8cb2a0b71eaabc6234bc91c6928d9448c882fcdba841dc7e41670"
+        },
+        {
+          "label": "tutorial-005",
+          "page_id": 143326739,
+          "compared_pixels": 5568,
+          "foreground_pixels": 1471,
+          "wram_sha256": "fe54fa02bd17468470e88c9acac2b427650f69295ce641e3d0de5f157726205a",
+          "vram_sha256": "15a80d5269b0f7d45bbb47a5927a746b8c6364044d0266a8ac97ce7ed2c4cafc"
+        },
+        {
+          "label": "tutorial-006",
+          "page_id": 143328832,
+          "compared_pixels": 3840,
+          "foreground_pixels": 772,
+          "wram_sha256": "b94200b64d7a7b3572d0d8c9af35e2a76814f1a84c5df0a659dd5a2ee66c1aff",
+          "vram_sha256": "be7c06412401cd1e104ac057b269eb4b27c467998295e13223d39e8b2679d157"
+        },
+        {
+          "label": "tutorial-007",
+          "page_id": 143328833,
+          "compared_pixels": 7104,
+          "foreground_pixels": 1882,
+          "wram_sha256": "0d31b827c42dcd8c592e1896b5093012a50ebc43b1657e4ca233cfa2a86a8372",
+          "vram_sha256": "abde1d78cb98d96155faca9b1d2b3eff0117225355e54819637748cb6b9b43ba"
+        },
+        {
+          "label": "tutorial-008",
+          "page_id": 143328834,
+          "compared_pixels": 7296,
+          "foreground_pixels": 2076,
+          "wram_sha256": "8faf0b45d898783813814d9e11158857b8be2ea8fe562e7499c8f4f13e77c4af",
+          "vram_sha256": "39b30705876319fed0dcb844f285e7dc5037c08ae040f7c98f33f2b17158ffd8"
+        },
+        {
+          "label": "tutorial-009",
+          "page_id": 143328835,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1234,
+          "wram_sha256": "7972b270088e4a2c6da0b2fa6130014177e2ac3d3cc782a0e45bb8881365cb19",
+          "vram_sha256": "9d0ae360f8d8754ab101de5b2037ca9cf6392f7edf65e90cbb71d2d91aed1b05"
+        },
+        {
+          "label": "tutorial-010",
+          "page_id": 143331248,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1223,
+          "wram_sha256": "d5ab69fa703cf84f7c9e5741d5a2c1c19e130f983e3c1b7bc6a0e050057c2147",
+          "vram_sha256": "15c82e13cd5f934f9d0da9a1a694ac856d4d55070082ab0bc94fce5751e39703"
+        },
+        {
+          "label": "tutorial-011",
+          "page_id": 143331249,
+          "compared_pixels": 7488,
+          "foreground_pixels": 2274,
+          "wram_sha256": "f3af4d551aa7ec3546285d6587a9b9bc69c7dab7a682a687bcbd7678f3be06d8",
+          "vram_sha256": "7013a01178f5d7c161969b9669402142f6533c438d89562a3708884933042061"
+        },
+        {
+          "label": "tutorial-012",
+          "page_id": 143331250,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1601,
+          "wram_sha256": "c95a1148fea29116010aacdb30687c4aea0597b6123ec7acbcaec02655e240fe",
+          "vram_sha256": "0da293fc1e6cd7e9a0124212093bafe80e258c6a360254cf52b6d727ece4a941"
+        },
+        {
+          "label": "tutorial-013",
+          "page_id": 143331251,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1551,
+          "wram_sha256": "75e7f2919a5024a82fb09ee6f9bd837cf1e5ea1fe3447cc90c78fc86ee764e7c",
+          "vram_sha256": "82946a38f561624f4ed9d9dc6952fad6a444f9c732c3352e728f473463740da1"
+        },
+        {
+          "label": "tutorial-015",
+          "page_id": 144527600,
+          "compared_pixels": 8064,
+          "foreground_pixels": 2303,
+          "wram_sha256": "4562951332181dc0708a3e610caadc9ba270f92c1968061af904e74fbaef457b",
+          "vram_sha256": "c2030d3340c505cab240de2e1a0b96d6b62eec111d0147ece34132cf8e64ad7c"
+        },
+        {
+          "label": "tutorial-016",
+          "page_id": 144528512,
+          "compared_pixels": 1920,
+          "foreground_pixels": 597,
+          "wram_sha256": "3227a4a78452f00e63e55d0efc9006dda08936373d914f7d9216e4a775a3bbef",
+          "vram_sha256": "b30ce314ba13d07fab4eabd377b5da974f321a276a24ae59d9bd85a3d86197c0"
+        },
+        {
+          "label": "tutorial-017",
+          "page_id": 144528513,
+          "compared_pixels": 5184,
+          "foreground_pixels": 1255,
+          "wram_sha256": "fdddcbe6c4a4989de45e243a9a880576b4e373bedbbe27ed3adb6ca7ab26e38c",
+          "vram_sha256": "36d31f4777c4d3926e708d80640c3d5d9aaed6285f02ba3f5c4f148e5f6f15e9"
+        },
+        {
+          "label": "tutorial-018",
+          "page_id": 144528514,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1607,
+          "wram_sha256": "4d0a9456c739c48f5d2b8c283ba97e6530099d9c5164da4d0c790266c5b04d6a",
+          "vram_sha256": "d61c581cd07bc3036cbe59d1f04ab9aeedec5241d121a80f3bae6b8315fbbaa8"
+        },
+        {
+          "label": "tutorial-019",
+          "page_id": 144528515,
+          "compared_pixels": 6144,
+          "foreground_pixels": 2134,
+          "wram_sha256": "ea4f62f65aa902921407d4b3065fba8e2ecd82d8bbcd01aac8c816a6c3edc1d5",
+          "vram_sha256": "d2616a919a48ea85bb485b521cfe0195c8119ea33bf561eb42b04477b72b28a1"
+        },
+        {
+          "label": "tutorial-020",
+          "page_id": 144531024,
+          "compared_pixels": 2496,
+          "foreground_pixels": 770,
+          "wram_sha256": "921a68e89cc0c8b917881aa471e5c3cec05443603a34f5eae58096061ba0067d",
+          "vram_sha256": "3e8e6d8c709f84873d91165ce15ace2f35733ad3b302d22fd73a60b24edc0da3"
+        },
+        {
+          "label": "tutorial-021",
+          "page_id": 144531025,
+          "compared_pixels": 5376,
+          "foreground_pixels": 1537,
+          "wram_sha256": "7fbb8f2000d294b1121347ab96ed00d30f8575032171b10e3373380480fc845c",
+          "vram_sha256": "b187fc09f286d419c4604277dff213e46fcc807f86fcf6116207603bd38b2c63"
+        },
+        {
+          "label": "tutorial-022",
+          "page_id": 144532000,
+          "compared_pixels": 2304,
+          "foreground_pixels": 608,
+          "wram_sha256": "ef08ba53c413e6e9a6b425a86bac0025abd788ee699a2f7c5aade323f19340e7",
+          "vram_sha256": "210aad49f1e53936c9b6dda3958155dd386dc6f80f0145dd55844d7dcd2625c3"
+        },
+        {
+          "label": "tutorial-023",
+          "page_id": 144532001,
+          "compared_pixels": 7104,
+          "foreground_pixels": 2289,
+          "wram_sha256": "66ec36df4620fe6a7e57e0633b70d9edeea6ee083f650d2c5c39e37bdbdebf61",
+          "vram_sha256": "029b4bacefb97cac91359df3fef014e43cd803cd2f11362dc634eb2793db8bc5"
+        },
+        {
+          "label": "tutorial-024",
+          "page_id": 144533200,
+          "compared_pixels": 2496,
+          "foreground_pixels": 536,
+          "wram_sha256": "67bbd4f724e0ef4c48879b2eaf69549d6698cc75e49a3a6c962274ca76b01a30",
+          "vram_sha256": "c695b00631269eeb07d0bd7a08a4ae9c1ec4eb27f3a317c706db5586172a626b"
+        },
+        {
+          "label": "tutorial-025",
+          "page_id": 144533201,
+          "compared_pixels": 4800,
+          "foreground_pixels": 1255,
+          "wram_sha256": "d3da1b4d47702a047022b2aa426a702040cfe13fb3b8a97bf48cb5b6b7dc19a7",
+          "vram_sha256": "7d827ad172a3549b10450878f77e730bc2987e8cdab6e29c7dab7565181b59d5"
+        },
+        {
+          "label": "tutorial-026",
+          "page_id": 144534128,
+          "compared_pixels": 1728,
+          "foreground_pixels": 522,
+          "wram_sha256": "5899e41345b5eda719d2dbc041bb4718d08b6cf92243a2b7c18d93d4dbbe0c1b",
+          "vram_sha256": "26bf24a91ef83a3843f40d7215a98914583b60f0e0629be9ab5117bd8b813579"
+        },
+        {
+          "label": "tutorial-027",
+          "page_id": 144534129,
+          "compared_pixels": 4608,
+          "foreground_pixels": 1319,
+          "wram_sha256": "89a53eb7f1bc1dddf559c99ecfb24f70f954502146d138cca8d1d1fb4b32b914",
+          "vram_sha256": "674924518d112eb69abcd35453a972b049ee74fe40d795d7d673f88f98a7e031"
+        },
+        {
+          "label": "tutorial-028",
+          "page_id": 144534992,
+          "compared_pixels": 2304,
+          "foreground_pixels": 711,
+          "wram_sha256": "cfbca1cd567b95a1936a382d3e65d3f6a67ca78781156972b79daad94c13cf01",
+          "vram_sha256": "e95d2d7eb73b3bf9d7cac99323a8235e95032b1f48f6e47fa01373332183f26a"
+        },
+        {
+          "label": "tutorial-029",
+          "page_id": 144534993,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1733,
+          "wram_sha256": "d5411729f1c58d41f00717084d74bab577eaa8a49951edb2f45ecbc847c6a1c3",
+          "vram_sha256": "382037457fb4233cab2a589f8ec3f2ff49d54acf2de96a4fc923eedad22719c0"
+        },
+        {
+          "label": "tutorial-030",
+          "page_id": 144536064,
+          "compared_pixels": 2496,
+          "foreground_pixels": 538,
+          "wram_sha256": "b3392e854a9cf52e8ccd301d8c7b01fc622ac8fdd2979dadd4e7f84730617bee",
+          "vram_sha256": "89d273f2f3f671d6cfa8ade6565ca1b0968e0f71615910b0467af6d8722e28d1"
+        },
+        {
+          "label": "tutorial-031",
+          "page_id": 144538640,
+          "compared_pixels": 2304,
+          "foreground_pixels": 780,
+          "wram_sha256": "0f0615ff645dd68a9316a99fa402b74e746b1188f72a5c90bc8feffe5f554a81",
+          "vram_sha256": "14369d057f70564de9e443d9313d1f5edb10460bfce78ab5a721ccd09e089453"
+        },
+        {
+          "label": "tutorial-032",
+          "page_id": 144538641,
+          "compared_pixels": 8256,
+          "foreground_pixels": 2347,
+          "wram_sha256": "0c523f4dc87f786e2f40a6fe10c266d894f9a4227ae66cb99d94fa960d197234",
+          "vram_sha256": "f25e65a39edec814c541483d1d7c47ed8be7613d95e6adead9dcac92e92a8b97"
+        },
+        {
+          "label": "tutorial-033",
+          "page_id": 144538642,
+          "compared_pixels": 6912,
+          "foreground_pixels": 1887,
+          "wram_sha256": "b1e433ed82ce3cb62e06e748ecd20ae3cbeb82f8a1ce015b97e1a9b1443d5b31",
+          "vram_sha256": "6c5e655ba676ad021e6cfe64b5a203791be01fce3aa8cec53c20c7270239bfa7"
+        },
+        {
+          "label": "tutorial-034",
+          "page_id": 144538643,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1628,
+          "wram_sha256": "b759ac9ad14f4d5a239f2daf806337d25da349810fb71268fccc256bd983a414",
+          "vram_sha256": "55bfbc671cc3db26f936b98d8ad6f825fcd5c939dab3b769adfe3e23f59e1737"
+        },
+        {
+          "label": "tutorial-035",
+          "page_id": 144538644,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1835,
+          "wram_sha256": "5389af142540d309b6d03ce706ba58081709e247aaf8f66ba6767bbe9cb53360",
+          "vram_sha256": "30d4b23b05ce56673e1fe748e57d81ed364f3d509e740c4cf629ba2e11838fd4"
+        },
+        {
+          "label": "tutorial-036",
+          "page_id": 144538645,
+          "compared_pixels": 6336,
+          "foreground_pixels": 1702,
+          "wram_sha256": "e88c967cce2f4a5a5a003b3b6467ca99a2a5a3c89c35dbbe8abbd3cdd419f800",
+          "vram_sha256": "c390830384dbbe018ea1978029456785d188ca2193df7615c107128256ab76f0"
+        },
+        {
+          "label": "tutorial-037",
+          "page_id": 144538646,
+          "compared_pixels": 5760,
+          "foreground_pixels": 1779,
+          "wram_sha256": "31ef64cc1154959ab94e85a3e8f97c60de175a5596919d66ae085d157da03fb6",
+          "vram_sha256": "73832341658f67a4dcf959fa7f8353d97d8d2f83bd557aed44451ef907186136"
+        },
+        {
+          "label": "tutorial-038",
+          "page_id": 144538647,
+          "compared_pixels": 6144,
+          "foreground_pixels": 1650,
+          "wram_sha256": "17fa4f6391dfe2fa421e462fb82426d3fab8491693661ceb65ee036e270be2c5",
+          "vram_sha256": "eba38d5b3b89195a3771b47fb5634befabc91fb89fb9128be3afe763ab8f5a5c"
+        },
+        {
+          "label": "tutorial-040",
+          "page_id": 144544464,
+          "compared_pixels": 2112,
+          "foreground_pixels": 769,
+          "wram_sha256": "bde700bbac43e759370bce9356b7168f8b76940b74986a2cde603ea61056e2e1",
+          "vram_sha256": "5d5aaced27545f2c419642cf4e2b7847f32a4abee82815f6f1e2586bd0fb5d77"
+        },
+        {
+          "label": "tutorial-041",
+          "page_id": 144544465,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1349,
+          "wram_sha256": "7e8ff64b0b2fe14ca55cb14a2a1d89b41455b2b3d942dab26bcf343b48675f31",
+          "vram_sha256": "eca536317a8ec20b32749b6c9db18875c9b651903ad865082a88a40024c46a04"
+        },
+        {
+          "label": "tutorial-042",
+          "page_id": 144544466,
+          "compared_pixels": 5952,
+          "foreground_pixels": 1905,
+          "wram_sha256": "a73c3ac33eff08da8f1df57e0f67ce707e6b00367cdb47b8a1791d563acdc48c",
+          "vram_sha256": "803697a4f27c27a40fa47d26499aafb3c9ede3cecf506c682f90c686d8c55ba1"
+        },
+        {
+          "label": "tutorial-044",
+          "page_id": 144546064,
+          "compared_pixels": 2304,
+          "foreground_pixels": 769,
+          "wram_sha256": "fc7201d29ec5a1224808f1fd3d0c9eee8d5622c5c7eabedb702b11f5a37980df",
+          "vram_sha256": "54ec6913073aa29b7f3ebdb400c70bdb60fb4f918618b07cc088a07735bdc6d8"
+        },
+        {
+          "label": "tutorial-045",
+          "page_id": 144546065,
+          "compared_pixels": 4032,
+          "foreground_pixels": 1331,
+          "wram_sha256": "8d0b7e4933a88eb1a4352b0429438ada92d5c69b63f2543dc96da8ce67642805",
+          "vram_sha256": "ff1c0dba551d9938236c8e5d69e007b581600e76dc989606b8ed489c7d797d10"
+        },
+        {
+          "label": "tutorial-046",
+          "page_id": 144546066,
+          "compared_pixels": 6912,
+          "foreground_pixels": 2125,
+          "wram_sha256": "8cc2e07059237e3947249d6736ff44c0e7bec5947ddcf3222f483a5c82a6fcc7",
+          "vram_sha256": "70c099c2345a27dffdc4826a9a8b1a57f114b9aec2389c1d60c459ba2c34796f"
+        },
+        {
+          "label": "tutorial-048",
+          "page_id": 144536400,
+          "compared_pixels": 4416,
+          "foreground_pixels": 1180,
+          "wram_sha256": "4409b26e960e9f9a32a05d2e4c6521167b22ac19192a8dfe4b8fc2f1fa128506",
+          "vram_sha256": "ca18936cafd07cfa69d6f0326e2b80b30ce4df2ce05895fc81e2b4793413fc7b"
+        },
+        {
+          "label": "tutorial-049",
+          "page_id": 144536401,
+          "compared_pixels": 4992,
+          "foreground_pixels": 1375,
+          "wram_sha256": "75aa3a52584cad71ec9fd7cd2bfee509aa8da7b4daac6bb556c474c8d5cf5f96",
+          "vram_sha256": "0e4b318667999110ea3f167ba6864196ca718fffb145b567fa428a379fd99c92"
+        },
+        {
+          "label": "tutorial-050",
+          "page_id": 144536402,
+          "compared_pixels": 7488,
+          "foreground_pixels": 1891,
+          "wram_sha256": "ea3de111cd97aae1228caf04489b68c6ee56a0888373a36288fcd697f419a17b",
+          "vram_sha256": "5df5916a9caf2120fffb04d936f8fc373d4d14ef1ff5c0f07d83e44375392956"
+        },
+        {
+          "label": "tutorial-051",
+          "page_id": 144536403,
+          "compared_pixels": 3648,
+          "foreground_pixels": 906,
+          "wram_sha256": "caf91d7a36a39bab34e6fd35a004a14b630225a3e1a092e7c7b0b2bea519c941",
+          "vram_sha256": "f3e35d0faca8867d1d9e82cdd25512c45cc76cff62f18390b9964a52abbd663b"
+        }
+      ],
+      "source_only_page_ids": [
+        143356448
+      ]
+    }
+  },
+  "source_only_page_ids": []
+}

@@ -1,0 +1,1299 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "invocations": [
+    {
+      "site": 8959603,
+      "source": 8959687
+    },
+    {
+      "site": 8959644,
+      "source": 8959832
+    },
+    {
+      "site": 8952553,
+      "source": 8953500
+    },
+    {
+      "site": 8952571,
+      "source": 8953571
+    },
+    {
+      "site": 8952593,
+      "source": 8953596
+    },
+    {
+      "site": 8953257,
+      "source": 8953769
+    },
+    {
+      "site": 8956860,
+      "source": 8954207
+    },
+    {
+      "site": 8952735,
+      "source": 8954235
+    },
+    {
+      "site": 8952770,
+      "source": 8953283
+    },
+    {
+      "site": 8952815,
+      "source": 8953323
+    },
+    {
+      "site": 8954433,
+      "source": 8954517
+    },
+    {
+      "site": 8954841,
+      "source": 8954912
+    },
+    {
+      "site": 8952848,
+      "source": 8953354
+    },
+    {
+      "site": 8957333,
+      "source": 8957387
+    },
+    {
+      "site": 8957367,
+      "source": 8957426
+    },
+    {
+      "site": 8957559,
+      "source": 8957862
+    },
+    {
+      "site": 8957573,
+      "source": 8957921
+    },
+    {
+      "site": 8957587,
+      "source": 8958052
+    },
+    {
+      "site": 8957601,
+      "source": 8958203
+    },
+    {
+      "site": 9032672,
+      "source": 9032975
+    },
+    {
+      "site": 9032692,
+      "source": 9033032
+    },
+    {
+      "site": 9032712,
+      "source": 9033189
+    },
+    {
+      "site": 9032732,
+      "source": 9033250
+    },
+    {
+      "site": 9032752,
+      "source": 9033325
+    },
+    {
+      "site": 9032772,
+      "source": 9033383
+    },
+    {
+      "site": 9032792,
+      "source": 9033437
+    },
+    {
+      "site": 9032816,
+      "source": 9033504
+    },
+    {
+      "site": 9032868,
+      "source": 9033665
+    },
+    {
+      "site": 9032878,
+      "source": 9033504
+    },
+    {
+      "site": 9032905,
+      "source": 9034029
+    },
+    {
+      "site": 9032915,
+      "source": 9033504
+    },
+    {
+      "site": 9032942,
+      "source": 9034129
+    },
+    {
+      "site": 9032952,
+      "source": 9033504
+    },
+    {
+      "site": 9032843,
+      "source": 9033525
+    }
+  ],
+  "requests": [
+    {
+      "source": 8959687,
+      "choice_catalog": 1,
+      "page_ids": [
+        143354992,
+        143354993
+      ]
+    },
+    {
+      "source": 8959832,
+      "choice_catalog": null,
+      "page_ids": [
+        143357312,
+        143357313,
+        143357314,
+        143357315
+      ]
+    },
+    {
+      "source": 8953500,
+      "choice_catalog": null,
+      "page_ids": [
+        143256000,
+        143256001
+      ]
+    },
+    {
+      "source": 8953571,
+      "choice_catalog": null,
+      "page_ids": [
+        143257136
+      ]
+    },
+    {
+      "source": 8953596,
+      "choice_catalog": 1,
+      "page_ids": [
+        143257536,
+        143257537,
+        143257538,
+        143257539
+      ]
+    },
+    {
+      "source": 8953769,
+      "choice_catalog": null,
+      "page_ids": [
+        143260304,
+        143260305
+      ]
+    },
+    {
+      "source": 8954207,
+      "choice_catalog": null,
+      "page_ids": [
+        143267312
+      ]
+    },
+    {
+      "source": 8954235,
+      "choice_catalog": null,
+      "page_ids": [
+        143267760
+      ]
+    },
+    {
+      "source": 8953283,
+      "choice_catalog": null,
+      "page_ids": [
+        143252528
+      ]
+    },
+    {
+      "source": 8953323,
+      "choice_catalog": null,
+      "page_ids": [
+        143253168
+      ]
+    },
+    {
+      "source": 8954517,
+      "choice_catalog": null,
+      "page_ids": [
+        143272272
+      ]
+    },
+    {
+      "source": 8954912,
+      "choice_catalog": null,
+      "page_ids": [
+        143278592
+      ]
+    },
+    {
+      "source": 8953354,
+      "choice_catalog": null,
+      "page_ids": [
+        143253664
+      ]
+    },
+    {
+      "source": 8957387,
+      "choice_catalog": null,
+      "page_ids": [
+        143318192
+      ]
+    },
+    {
+      "source": 8957426,
+      "choice_catalog": null,
+      "page_ids": [
+        143318816,
+        143318817
+      ]
+    },
+    {
+      "source": 8957862,
+      "choice_catalog": null,
+      "page_ids": [
+        143325792,
+        143325793
+      ]
+    },
+    {
+      "source": 8957921,
+      "choice_catalog": null,
+      "page_ids": [
+        143326736,
+        143326737,
+        143326738,
+        143326739
+      ]
+    },
+    {
+      "source": 8958052,
+      "choice_catalog": null,
+      "page_ids": [
+        143328832,
+        143328833,
+        143328834,
+        143328835
+      ]
+    },
+    {
+      "source": 8958203,
+      "choice_catalog": null,
+      "page_ids": [
+        143331248,
+        143331249,
+        143331250,
+        143331251
+      ]
+    },
+    {
+      "source": 9032975,
+      "choice_catalog": null,
+      "page_ids": [
+        144527600
+      ]
+    },
+    {
+      "source": 9033032,
+      "choice_catalog": null,
+      "page_ids": [
+        144528512,
+        144528513,
+        144528514,
+        144528515
+      ]
+    },
+    {
+      "source": 9033189,
+      "choice_catalog": null,
+      "page_ids": [
+        144531024,
+        144531025
+      ]
+    },
+    {
+      "source": 9033250,
+      "choice_catalog": null,
+      "page_ids": [
+        144532000,
+        144532001
+      ]
+    },
+    {
+      "source": 9033325,
+      "choice_catalog": null,
+      "page_ids": [
+        144533200,
+        144533201
+      ]
+    },
+    {
+      "source": 9033383,
+      "choice_catalog": null,
+      "page_ids": [
+        144534128,
+        144534129
+      ]
+    },
+    {
+      "source": 9033437,
+      "choice_catalog": null,
+      "page_ids": [
+        144534992,
+        144534993
+      ]
+    },
+    {
+      "source": 9033504,
+      "choice_catalog": null,
+      "page_ids": [
+        144536064
+      ]
+    },
+    {
+      "source": 9033665,
+      "choice_catalog": null,
+      "page_ids": [
+        144538640,
+        144538641,
+        144538642,
+        144538643,
+        144538644,
+        144538645,
+        144538646,
+        144538647
+      ]
+    },
+    {
+      "source": 9034029,
+      "choice_catalog": null,
+      "page_ids": [
+        144544464,
+        144544465,
+        144544466
+      ]
+    },
+    {
+      "source": 9034129,
+      "choice_catalog": null,
+      "page_ids": [
+        144546064,
+        144546065,
+        144546066
+      ]
+    },
+    {
+      "source": 9033525,
+      "choice_catalog": null,
+      "page_ids": [
+        144536400,
+        144536401,
+        144536402,
+        144536403
+      ]
+    },
+    {
+      "source": 8959778,
+      "choice_catalog": 1,
+      "page_ids": [
+        143356448
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "text_source": 8959687,
+      "index": 0,
+      "page_id": 143354992,
+      "boundary_source": 8959731,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 40,
+      "sha256": "c30c98494bcc1ad152c42c8cdba88564b871a8ecb9b47c4b429b80139083c901"
+    },
+    {
+      "text_source": 8959687,
+      "index": 1,
+      "page_id": 143354993,
+      "boundary_source": 8959777,
+      "acknowledgement": "none",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 33,
+      "sha256": "18dc8d5a9177feadd0b885d550227536af3661428e46febbcc09e853e2ecfb0e"
+    },
+    {
+      "text_source": 8959832,
+      "index": 0,
+      "page_id": 143357312,
+      "boundary_source": 8959870,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 35,
+      "sha256": "cb45d8353cf7ea68cdc7693e1559b1823d085fc5b18f4403c81eff4576d8f64f"
+    },
+    {
+      "text_source": 8959832,
+      "index": 1,
+      "page_id": 143357313,
+      "boundary_source": 8959903,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 32,
+      "sha256": "87c152a4f686f6109819a49badad007c544bc3bfa64975ff9b8c641c6263f12f"
+    },
+    {
+      "text_source": 8959832,
+      "index": 2,
+      "page_id": 143357314,
+      "boundary_source": 8959943,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 35,
+      "sha256": "1698527916ff4992269285ecdaa21e5537370a3e43b87d8f86efd0840535c2df"
+    },
+    {
+      "text_source": 8959832,
+      "index": 3,
+      "page_id": 143357315,
+      "boundary_source": 8959970,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "a5c56b49c9916c885be2c568fde09ecd1ca7a089b29f7a7ebb21fddff5e133a9"
+    },
+    {
+      "text_source": 8953500,
+      "index": 0,
+      "page_id": 143256000,
+      "boundary_source": 8953526,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 19,
+      "sha256": "607df45523c6978f21b16912e49a23e1b28129ae01bab578cee079660d59a295"
+    },
+    {
+      "text_source": 8953500,
+      "index": 1,
+      "page_id": 143256001,
+      "boundary_source": 8953570,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 35,
+      "sha256": "73667642d93080cc4c14a52cdce2a45c36ed990841fc60634afbb0d7ab05e7a0"
+    },
+    {
+      "text_source": 8953571,
+      "index": 0,
+      "page_id": 143257136,
+      "boundary_source": 8953595,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 19,
+      "sha256": "43d62a4db7404cfafe14ac04b483d371e5f039f96c8a637f6ca64168ab6385da"
+    },
+    {
+      "text_source": 8953596,
+      "index": 0,
+      "page_id": 143257536,
+      "boundary_source": 8953645,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 39,
+      "sha256": "572e6c0bdf001ed4eefcc536a1b008836d79c82cf0304bee1e49bd97b5d2a3d9"
+    },
+    {
+      "text_source": 8953596,
+      "index": 1,
+      "page_id": 143257537,
+      "boundary_source": 8953690,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 35,
+      "sha256": "f728327b31937103ad1c84b2d13e1f15a3621e089cd3ae6823492b3b4481b952"
+    },
+    {
+      "text_source": 8953596,
+      "index": 2,
+      "page_id": 143257538,
+      "boundary_source": 8953733,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 37,
+      "sha256": "d4605009e00aa5a41eb4803fe1d53aa9bf263594cf95a413125bfa9c4b562961"
+    },
+    {
+      "text_source": 8953596,
+      "index": 3,
+      "page_id": 143257539,
+      "boundary_source": 8953768,
+      "acknowledgement": "none",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 25,
+      "sha256": "24f71c4629f3e3490d0001886c86f625f1aad8ae17e9c5976b2b660d6fed7791"
+    },
+    {
+      "text_source": 8953769,
+      "index": 0,
+      "page_id": 143260304,
+      "boundary_source": 8953789,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "3d9b60c46399c2b01c10c709a19f2f99b36d9728980c272cc3034568a1038c2c"
+    },
+    {
+      "text_source": 8953769,
+      "index": 1,
+      "page_id": 143260305,
+      "boundary_source": 8953833,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 41,
+      "sha256": "8eef8d570beba70fdab49eace4d6b7ca2d24b71288659445b0ccde7737daa841"
+    },
+    {
+      "text_source": 8954207,
+      "index": 0,
+      "page_id": 143267312,
+      "boundary_source": 8954234,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "37dae5bfbacd2cbb50c14d5721e03dda7776750556e22d223f03a3fc17ec5c72"
+    },
+    {
+      "text_source": 8954235,
+      "index": 0,
+      "page_id": 143267760,
+      "boundary_source": 8954260,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "9d5e5da6c4f73946c8b5bffea996c36634a0d4ef57c7bf73ecaa81df15d8c6f5"
+    },
+    {
+      "text_source": 8953283,
+      "index": 0,
+      "page_id": 143252528,
+      "boundary_source": 8953322,
+      "acknowledgement": "end",
+      "width": 192,
+      "height": 48,
+      "background_index": 0,
+      "glyph_count": 19,
+      "sha256": "51ce72e255b15b13031b98fb7ec8adab9dde2307d435f8afeb0663744874278b"
+    },
+    {
+      "text_source": 8953323,
+      "index": 0,
+      "page_id": 143253168,
+      "boundary_source": 8953353,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 19,
+      "sha256": "8ccfe8398598b3da23a38675f6e9fee75192ba8231d4fc2e6e3b2258399e6acb"
+    },
+    {
+      "text_source": 8954517,
+      "index": 0,
+      "page_id": 143272272,
+      "boundary_source": 8954548,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 24,
+      "sha256": "23a0f8b9a3da2cc02032d4ce489b9463a2e759c7d68fdf2f7e0290919321251d"
+    },
+    {
+      "text_source": 8954912,
+      "index": 0,
+      "page_id": 143278592,
+      "boundary_source": 8954945,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 25,
+      "sha256": "f83c0ea5878f580356a57b5a0df961db9bf4628e4e5b242a8edae3277c6377df"
+    },
+    {
+      "text_source": 8953354,
+      "index": 0,
+      "page_id": 143253664,
+      "boundary_source": 8953403,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 37,
+      "sha256": "4f91da6d140c5ee4b25fef375854498f2905a1e1eeeb9509ec3ce94dbcd000f7"
+    },
+    {
+      "text_source": 8957387,
+      "index": 0,
+      "page_id": 143318192,
+      "boundary_source": 8957425,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 0,
+      "glyph_count": 26,
+      "sha256": "1efef019138ef290f85a0b4ddd9d0f8b2e0224ca620fc74038c2e26a2fded280"
+    },
+    {
+      "text_source": 8957426,
+      "index": 0,
+      "page_id": 143318816,
+      "boundary_source": 8957481,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 0,
+      "glyph_count": 39,
+      "sha256": "b05c555b605bca05c6c93f55a4dcf688ec4dc8d7b6e9adb6577e0c253999a964"
+    },
+    {
+      "text_source": 8957426,
+      "index": 1,
+      "page_id": 143318817,
+      "boundary_source": 8957534,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 0,
+      "glyph_count": 33,
+      "sha256": "1b6e4a139f60b664a29e0688efa38b391373980332cf93f505eeeeab85873412"
+    },
+    {
+      "text_source": 8957862,
+      "index": 0,
+      "page_id": 143325792,
+      "boundary_source": 8957897,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 27,
+      "sha256": "1a9af0450631abf6b87a5e592207d99ef7acf78cfc28b8b9433a11fb1e8bcbe5"
+    },
+    {
+      "text_source": 8957862,
+      "index": 1,
+      "page_id": 143325793,
+      "boundary_source": 8957920,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 23,
+      "sha256": "7c38a0e992aea63431e6f432afab70314afa72f8ea39efc4804dbf5545472afa"
+    },
+    {
+      "text_source": 8957921,
+      "index": 0,
+      "page_id": 143326736,
+      "boundary_source": 8957941,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 15,
+      "sha256": "1db87bff4548421872f4bf452687c9eaf6dca158641ef6eafe05bf97030d9633"
+    },
+    {
+      "text_source": 8957921,
+      "index": 1,
+      "page_id": 143326737,
+      "boundary_source": 8957990,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 35,
+      "sha256": "46fd9523d2ff1bc61be3e9a6e2d51ba84a9ef9313669b8544e09d8f0db0c7a3a"
+    },
+    {
+      "text_source": 8957921,
+      "index": 2,
+      "page_id": 143326738,
+      "boundary_source": 8958016,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 25,
+      "sha256": "52bbbea614524fdf15291bbf90e08b9a8d6311954613d28797ad79cfc7740f2a"
+    },
+    {
+      "text_source": 8957921,
+      "index": 3,
+      "page_id": 143326739,
+      "boundary_source": 8958051,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 29,
+      "sha256": "2cf2760c527e2ce219247a4c40b11d7f17a17bf7e709dfac35534f79951d4c49"
+    },
+    {
+      "text_source": 8958052,
+      "index": 0,
+      "page_id": 143328832,
+      "boundary_source": 8958077,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 20,
+      "sha256": "ff0425216c8cd72920ad969c34fcd1b3e44c114f1f878030d4b24413c35a48bf"
+    },
+    {
+      "text_source": 8958052,
+      "index": 1,
+      "page_id": 143328833,
+      "boundary_source": 8958121,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 37,
+      "sha256": "b4bade315db9f8024f95cbee49645ca8e5524266487f8286ec68b635537d7cc4"
+    },
+    {
+      "text_source": 8958052,
+      "index": 2,
+      "page_id": 143328834,
+      "boundary_source": 8958173,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 38,
+      "sha256": "ca0149e8c824e95264a8dfd488a503e3b28f54bf9073de269ecae1dee185f581"
+    },
+    {
+      "text_source": 8958052,
+      "index": 3,
+      "page_id": 143328835,
+      "boundary_source": 8958202,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 27,
+      "sha256": "805a82d6a8138e46923c262fbbdcc411a2c3af862c20e835276cd7db65781135"
+    },
+    {
+      "text_source": 8958203,
+      "index": 0,
+      "page_id": 143331248,
+      "boundary_source": 8958234,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 26,
+      "sha256": "e4de7c86bea19b25982c0bf3471d958036ec013b5b5ff08b6fd13fa5ecbc8e3d"
+    },
+    {
+      "text_source": 8958203,
+      "index": 1,
+      "page_id": 143331249,
+      "boundary_source": 8958284,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 39,
+      "sha256": "ea28847a9b5898f09861f2b21ee18ac59a1200df330005659b2869cd375273a0"
+    },
+    {
+      "text_source": 8958203,
+      "index": 2,
+      "page_id": 143331250,
+      "boundary_source": 8958327,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 31,
+      "sha256": "b569e9b2c1a769a5d4eee8e48b8fe263b80adf53ae6702d5a0d558b6d21ae0d7"
+    },
+    {
+      "text_source": 8958203,
+      "index": 3,
+      "page_id": 143331251,
+      "boundary_source": 8958365,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 31,
+      "sha256": "144844b86d90a54c04aa76018b140764592fe26348a09b87d850ceffa4819312"
+    },
+    {
+      "text_source": 9032975,
+      "index": 0,
+      "page_id": 144527600,
+      "boundary_source": 9033031,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 42,
+      "sha256": "49c56b1eae99a77930ac7600028b548c558e926a996e83ce7b5329d222ed9251"
+    },
+    {
+      "text_source": 9033032,
+      "index": 0,
+      "page_id": 144528512,
+      "boundary_source": 9033053,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 10,
+      "sha256": "36ec6c61751592d514118564eb272723a6b30dbe3e1dbcc63834b7500d2a73fc"
+    },
+    {
+      "text_source": 9033032,
+      "index": 1,
+      "page_id": 144528513,
+      "boundary_source": 9033099,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 27,
+      "sha256": "003d92eb560e11aaf7b44500c00c0f8873f66f1cc2e505b61e6f8db132ff90d2"
+    },
+    {
+      "text_source": 9033032,
+      "index": 2,
+      "page_id": 144528514,
+      "boundary_source": 9033137,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 30,
+      "sha256": "cee1b04b204ce21d70b93fb809c385b3da3ced5f46971927b9c081ca3a374749"
+    },
+    {
+      "text_source": 9033032,
+      "index": 3,
+      "page_id": 144528515,
+      "boundary_source": 9033188,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 32,
+      "sha256": "14e73c9f270ba19ed7a669ee8c5a78bc8de5050d00559591e4bc6dbfef549ec4"
+    },
+    {
+      "text_source": 9033189,
+      "index": 0,
+      "page_id": 144531024,
+      "boundary_source": 9033214,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 13,
+      "sha256": "6fcee32782b5b82ee7778625936fa1898a151c0e6dc69c87fa22cb340ca06716"
+    },
+    {
+      "text_source": 9033189,
+      "index": 1,
+      "page_id": 144531025,
+      "boundary_source": 9033249,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 28,
+      "sha256": "bd7fb63036fa8ec4140d67744aab6e14c89b7981900de1a8f79f259f62255311"
+    },
+    {
+      "text_source": 9033250,
+      "index": 0,
+      "page_id": 144532000,
+      "boundary_source": 9033271,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 12,
+      "sha256": "5fada839c1cf49fd08b29766a7ac5f6512afa81731abed4477660abed3c1f11c"
+    },
+    {
+      "text_source": 9033250,
+      "index": 1,
+      "page_id": 144532001,
+      "boundary_source": 9033324,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 37,
+      "sha256": "debc66fdd2d48c3774fc16e76dac64aadef00067dc07887ea404061ff042269f"
+    },
+    {
+      "text_source": 9033325,
+      "index": 0,
+      "page_id": 144533200,
+      "boundary_source": 9033348,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 13,
+      "sha256": "0acf4142bc0185bbf31bf899a57a33ce91c4622a283bf2ec3d324486a7fdf843"
+    },
+    {
+      "text_source": 9033325,
+      "index": 1,
+      "page_id": 144533201,
+      "boundary_source": 9033382,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 25,
+      "sha256": "f333c1fdd79630c56c233bee51a3663ffbf3a78b2db007ecc26662d44d92cd38"
+    },
+    {
+      "text_source": 9033383,
+      "index": 0,
+      "page_id": 144534128,
+      "boundary_source": 9033402,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 9,
+      "sha256": "4992342ef35db4f052351ed278701c7881abd17995b4e12e64a28f71dba41a6b"
+    },
+    {
+      "text_source": 9033383,
+      "index": 1,
+      "page_id": 144534129,
+      "boundary_source": 9033436,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 24,
+      "sha256": "8d88c44dd6092e8d3ca17a1ca6dfb17518bb96949f51ffb5c1e6ba89551bbc6c"
+    },
+    {
+      "text_source": 9033437,
+      "index": 0,
+      "page_id": 144534992,
+      "boundary_source": 9033461,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 12,
+      "sha256": "5bffc9b5f1604116550b546f8a3a130fe533f3c6b558200e8c02b14784afbbc5"
+    },
+    {
+      "text_source": 9033437,
+      "index": 1,
+      "page_id": 144534993,
+      "boundary_source": 9033503,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 36,
+      "sha256": "9018b930648c24f573ae69278dc3294ca383436349692a2944d5076651e65693"
+    },
+    {
+      "text_source": 9033504,
+      "index": 0,
+      "page_id": 144536064,
+      "boundary_source": 9033524,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 13,
+      "sha256": "857ada77baaba8f68b91bbd0f6f01a71150104905e61285092697c9ed2b4a95e"
+    },
+    {
+      "text_source": 9033665,
+      "index": 0,
+      "page_id": 144538640,
+      "boundary_source": 9033689,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 12,
+      "sha256": "cbc89e03c7310306f9cef210bde274e122ab833457eb916f44088896a0344264"
+    },
+    {
+      "text_source": 9033665,
+      "index": 1,
+      "page_id": 144538641,
+      "boundary_source": 9033754,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 43,
+      "sha256": "12f794de95d673a7227643ef1df04069f3140acd04a25c9599f60205966a3d97"
+    },
+    {
+      "text_source": 9033665,
+      "index": 2,
+      "page_id": 144538642,
+      "boundary_source": 9033803,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 36,
+      "sha256": "55ccf1dd84b584cbbbed37d8dbe57c496b73e33b3f49579e5b795b88ba435a8a"
+    },
+    {
+      "text_source": 9033665,
+      "index": 3,
+      "page_id": 144538643,
+      "boundary_source": 9033854,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 32,
+      "sha256": "08ca976df5213a19114bb53e6472dbbbc2d20cb612afc2101f0d3ad566389794"
+    },
+    {
+      "text_source": 9033665,
+      "index": 4,
+      "page_id": 144538644,
+      "boundary_source": 9033896,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 30,
+      "sha256": "fea1b9c1c7effb8dca27d1537fa00585004ee639ccb23d2a023bc41968d63be3"
+    },
+    {
+      "text_source": 9033665,
+      "index": 5,
+      "page_id": 144538645,
+      "boundary_source": 9033944,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 33,
+      "sha256": "7640ad1404abeedea8577d6e17b992f273bb0f719033387844b011446ed7a6e8"
+    },
+    {
+      "text_source": 9033665,
+      "index": 6,
+      "page_id": 144538646,
+      "boundary_source": 9033987,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 30,
+      "sha256": "7df44c41639e0ac89dafda1f49b7b6499e2317da9cdf81bc8974f2cb2f4054f6"
+    },
+    {
+      "text_source": 9033665,
+      "index": 7,
+      "page_id": 144538647,
+      "boundary_source": 9034028,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 32,
+      "sha256": "01eaa82d1b03ac56ff8cf2f1d38c242f1393c44f2880d27c0f218b0e5080f693"
+    },
+    {
+      "text_source": 9034029,
+      "index": 0,
+      "page_id": 144544464,
+      "boundary_source": 9034052,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 11,
+      "sha256": "0e8ba041e87164d349d1e6f44821f46cc6ab9c33695d37795143f039cac546f7"
+    },
+    {
+      "text_source": 9034029,
+      "index": 1,
+      "page_id": 144544465,
+      "boundary_source": 9034082,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "f63e5f24fc9b46c096221830d3b8968805a1a340be1808fe0847594b5e9e72a6"
+    },
+    {
+      "text_source": 9034029,
+      "index": 2,
+      "page_id": 144544466,
+      "boundary_source": 9034128,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 31,
+      "sha256": "c03438ed067af30cdc64b83cbaf8528f3d1ad92ef1606fba1c39541f1cbb9abc"
+    },
+    {
+      "text_source": 9034129,
+      "index": 0,
+      "page_id": 144546064,
+      "boundary_source": 9034153,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 12,
+      "sha256": "edc65b3ca2f449fc2d776bf60ef7cc4b8944657264b016ce9de64fe0278270c1"
+    },
+    {
+      "text_source": 9034129,
+      "index": 1,
+      "page_id": 144546065,
+      "boundary_source": 9034183,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 21,
+      "sha256": "24ef4293b3def98e1d0663503add3bb354c27ddb5d7cd82feea91e7004cd4c1d"
+    },
+    {
+      "text_source": 9034129,
+      "index": 2,
+      "page_id": 144546066,
+      "boundary_source": 9034232,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 36,
+      "sha256": "30a7584e6c9726c3795f44b461201cf172d62b02fd713427cb6b1a6bede825e9"
+    },
+    {
+      "text_source": 9033525,
+      "index": 0,
+      "page_id": 144536400,
+      "boundary_source": 9033555,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 23,
+      "sha256": "1ab99133a350d38711f2d45477d50f7d8fb10ca6e02548e8585046e3fa32e238"
+    },
+    {
+      "text_source": 9033525,
+      "index": 1,
+      "page_id": 144536401,
+      "boundary_source": 9033596,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 26,
+      "sha256": "62c5fb8f0b8ea68b281c14713352da74d54eec58f1a4195528fb645e30ed5fd9"
+    },
+    {
+      "text_source": 9033525,
+      "index": 2,
+      "page_id": 144536402,
+      "boundary_source": 9033642,
+      "acknowledgement": "next",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 39,
+      "sha256": "7bce67a5c7952434f48cfedfd83490a5203749973193eddb6b1d9506653f8d5f"
+    },
+    {
+      "text_source": 9033525,
+      "index": 3,
+      "page_id": 144536403,
+      "boundary_source": 9033664,
+      "acknowledgement": "end",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 19,
+      "sha256": "5d45685c0083d6a73def6f7cd317e43cdf1db1d571f53ca7b2558ecd3a8296a2"
+    },
+    {
+      "text_source": 8959778,
+      "index": 0,
+      "page_id": 143356448,
+      "boundary_source": 8959831,
+      "acknowledgement": "none",
+      "width": 224,
+      "height": 48,
+      "background_index": 3,
+      "glyph_count": 36,
+      "sha256": "cf750c9ab8d4dfb405f7ed71e9198ad8da418472fdf98bde45d9fd78f4bd3767"
+    }
+  ]
+}
