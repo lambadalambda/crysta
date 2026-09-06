@@ -74,3 +74,16 @@ returns an optional exact Ark key plus typed overlay; source NPC scenes remain u
 - **Issue stays open.** Parent owns acceptance, real GameData/navigation, finite
   BG patches and live wiring. No room_preview/core/assets/server/world-patch/
   shared-index/backgrounds/door or action-controller changes were made.
+
+### Parent component reproduction
+
+- Parent independently rebuilt/exported the opt-in source art and passed all six
+  carry unit tests within 65 host unit passes (three separate diagnostic tests
+  intentionally ignored). Full workspace Clippy passes.
+- Parent `parent-carry` browser independently reproduced all160 full-canvas cases,
+  14,805 visible pot samples,146 pot/NPC depth witnesses and all five negative
+  controls using that fresh parent export. Artifact/logs:
+  `local/map-research/pandora-carry-parent-{art.json,browser.json}` and
+  `pandora-world-host.txt`. Synthetic finite poses/diagnostic BG, not a journey.
+- Latest live house-only UI passes511,2244 and1671 real-input regressions; its pot
+  action remains hidden. Aggregate host wiring/final issue acceptance remain open.

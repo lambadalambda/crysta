@@ -37,6 +37,15 @@ Implement only the maps, source assets and semantic state transitions required b
 
 - Remaining integration split: [navigation/contact admission](qualify-pandora-navigation.md) and [fixed story continuation](port-pandora-story-state.md). These are required beyond the independently decoded visual resources; neither enables an unqualified live route.
 
+- Parent reproduced current core (163 tests plus one doctest, all five private
+  fixture suites) and Wasm after the authentic overhanging Town-exit correction.
+  Latest house-only host also passed real input-only browser regressions: 511
+  steps/512 visual checks, 2244/2245, and conversation/exterior 1671/1683. Evidence:
+  `local/map-research/pandora-parent-overhang-core.txt` and
+  `pandora-latest-house{511,2244,-browser}.json`. These preserve the old profile;
+  they are not yet a Pandora journey witness. Producer source-gate revalidation
+  is tracked separately; no legacy observer mismatch is hidden.
+
 - Parent camera adapter has an explicit opt-in path for the eight additional maps
   and Town A, delegating directly to authenticated `SourceCamera` decoding and
   settled clamping. No duplicate geometry or in-flight camera-pan claim. Red→green
