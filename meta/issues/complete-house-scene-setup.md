@@ -1,0 +1,24 @@
+# Complete the fresh house scene with all residents
+
+## Summary
+
+Set up the whole fresh-game house correctly rather than displaying only Ark and one resident. Establish the actual room/actor inventory first; do not assume every linked entity is a visible NPC or that every house exit leads indoors.
+
+## Dependencies
+
+- [Render the first NPC in the adjoining house room](render-first-house-npc.md)
+- [Qualify the fresh house room and actor roster](qualify-house-scene-roster.md)
+- [Decode the complete ordinary house actor set](decode-house-scene-actors.md)
+
+## Requirements
+
+- Account for all rooms, visible residents and scene objects belonging to the fresh house, using source data and fresh input-only references.
+- Render all admitted residents with correct source-derived positions, ordinary poses, palettes, transparency and ordering; account for any missing scene objects needed by the setup.
+- Preserve walking, the qualified doorway pair, deterministic snapshots and CPU-free simulation. Qualify additional interior transitions separately if the inventory requires them.
+- Distinguish correct initial/frozen presentation from unsupported AI, conversations, NPC collision, story-event progression and full native scene effects. No guessed placements or copied framebuffer assets.
+
+## Acceptance Criteria
+
+- A documented room/actor inventory explains every included resident and every excluded nonvisual/controller entity.
+- The actual browser shows the complete qualified house roster, with correct membership on room changes and source-backed scene composition.
+- Source/native asset comparisons, synthetic tests, authenticated walking/house regressions, pixel checks, native/Wasm builds and independent reviews pass.
