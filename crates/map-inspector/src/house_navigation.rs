@@ -15,7 +15,13 @@ const PROFILES: &str = include_str!("../../../tools/house-background-qualificati
 // Changing admission, occupancy, transition or action semantics changes snapshot identity.
 const POLICY: &[u8] = b"house-navigation-v1:passive,no-rng,frozen-source-occupancy,17-load-17,atomic-final-door,unsupported-interaction-noop";
 
+#[cfg(test)]
 pub(super) fn compile(rom: &rom::Rom) -> Result<GameData> {
+    Ok(compile_with_identity(rom)?.0)
+}
+
+/// Preserve the authenticated house/startup identity when composing extensions.
+pub(super) fn compile_with_identity(rom: &rom::Rom) -> Result<(GameData, DataIdentity)> {
     let navigation: Value = serde_json::from_str(NAVIGATION)?;
     let background: Value = serde_json::from_str(BACKGROUND)?;
     let profiles: Value = serde_json::from_str(PROFILES)?;
@@ -63,14 +69,15 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<GameData> {
         rom_sha256: rom::digests(rom.image()).sha256,
         content_sha256: rom::digests(&content).sha256,
     };
-    Ok(GameData::new_house(
+    let data = GameData::new_house(
         rooms.try_into().map_err(|_| invalid("house room count"))?,
         identity,
         NewGameData {
             bedroom,
             position: startup.position,
         },
-    )?)
+    )?;
+    Ok((data, identity))
 }
 
 fn compile_room(
@@ -311,9 +318,9 @@ mod tests {
         assert_eq!(
             snapshot[40..72],
             [
-                0xa0, 0xb0, 0x2b, 0x78, 0x74, 0xbc, 0x85, 0xbe, 0xb1, 0x3b, 0xce, 0x7d, 0xbe, 0x75,
-                0x60, 0x2c, 0x0f, 0x62, 0xa3, 0xb3, 0xab, 0xc1, 0x99, 0xf7, 0x60, 0x59, 0xf6, 0x25,
-                0x3c, 0xa7, 0x67, 0x36
+                0xc5, 0x95, 0xae, 0x53, 0x9d, 0x06, 0x9b, 0xec, 0x93, 0xbe, 0x9a, 0x9f, 0xfc, 0x01,
+                0xe3, 0xb5, 0x0f, 0x00, 0x51, 0xc4, 0xfc, 0xba, 0x2c, 0x99, 0x54, 0x47, 0x12, 0x9e,
+                0x39, 0x93, 0x69, 0x30
             ]
         );
         let mut wrong_identity = snapshot.clone();
