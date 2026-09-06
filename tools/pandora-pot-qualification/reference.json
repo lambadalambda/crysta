@@ -1,0 +1,70 @@
+{
+  "original_log_sha256": "d19191a33eb0e41603d2d80d24e054bb4e6510ec0218d94f57bb43303bb09339",
+  "segments": {
+    "miss": {
+      "csv_sha256": "56a830ecf961a9204c234d9d07bffe4bfb56fc0f82e4ce736601201ec1a767d7",
+      "grid_sha256": "f674e74afa472a9e8c5049b6bf9ada2b7b487e921d3ff0dbffa12cfed0240fe7",
+      "first": 18833,
+      "last": 19372,
+      "checkpoints": {
+        "pot-first-ready": "2ac26b9bc05876e58b39f82bb746e4d935ec44d5cf4f86a60a816b4eb0554d29",
+        "pot-first-A": "f3377423367b955760a3b583aeaf1d6b3c69c9c488b2b110135f138f1e7502b2",
+        "pot-first-held": "214f5770bea775475aaa9da0eb8ffed49b17cee2b0c7b5c3438118618877349d",
+        "carry-first-down": "7c24475a90c9abf5c30f0fc3b656b9371a0fc0ca6b51bfa56eb28392fdcd54be",
+        "carry-first-down-rest": "8e890284bbb209cfc916db19ff013569b0f9621b99deeb3cc8be65aed2d5e938",
+        "carry-first-right": "ad81a3fa03981cbb5f4eb5c0d9729f53a5c01bfd1cc881b2bbd584a465d63dae",
+        "carry-first-right-rest": "7420af519c4c6f04e57cc8968fdf4c204d9b2a57d0636880e6b2974a58464f7e",
+        "carry-first-up": "6134eb2abd9c46af096dd868e8f1c15c6e7ccd13aa5d71374fa70bf6e12860f4",
+        "carry-first-ready": "2c8ef0ffdb5b67101b96199c5623fbf020881b64949b45b046aa3f2c25949b2c",
+        "throw-first": "0a4bb772f27c303590e6b96fda1a03560bda1b3306407dfd6adc55e30ddad653",
+        "door-hit1": "513380cf8449c7edd56e85eccd4996f1016c2c2fe333f7544815b80d8e3cec39"
+      }
+    },
+    "fa-hit": {
+      "csv_sha256": "10f134d96e5422dd8d7b954454cca477938f7056a9a7d890ffd90e1c51ba5dea",
+      "grid_sha256": "0cc8b84a1b3a83680683d478ee3b24dfc2d2fcba57b72ec79a3c9b6c2cb73c89",
+      "first": 20031,
+      "last": 20938,
+      "checkpoints": {
+        "left-pot-face-rest": "966dd32c604623f2d6eeb0eae02ac2312462208fbeba08a30634d091d6cb6ae2",
+        "left-pot-A": "1ffb12f8786ad8ba0f0d11c8b970c190e297a093f26adeab12717c68b4abd045",
+        "left-pot-held": "89e2048e4e95dbabc9440f7935372f561a4fe831fd90415bce8a36e4abc2f6cf",
+        "left-carry-down": "5c02593531d11d4c6dcee18dc07a33be1ed9fb68e897b3ec5b3152abca0c663c",
+        "left-carry-down-rest": "137e85589fc625de5b57854a260eaca7f05e93a76cd0a31f0cd0bc53462b26a9",
+        "left-carry-south": "df4bb497e3f944396c109fdd3e87ff4cc3238f3e33bcc3208172c8df5a520c01",
+        "left-carry-south-rest": "af241709d01b02ba2f4badfb820891618e86db29e3fd2d821b5932c3a4868217",
+        "left-carry-east": "08181f0f49beb11b0dcf8dbc8754aac54214a68921ab7128352cd2c705b5f9cd",
+        "left-carry-east-rest": "8c74bd6440fa710d1b1800a8601ef76022d62a39ab72ddb6536d0ccf5da2fc95",
+        "left-carry-north": "03384459431e64f7f5d4c02ee970c9b4de9fc76860ee3e030ea42f9904589333",
+        "left-carry-north-rest": "052e0372378b8f5ad6a327b232276e4c7899a55bee646558b25195ced20373e7",
+        "left-carry-door": "e0f3f5195c8ac98660dc95d43fbb4675439791cf5acb91baaf96fc471ecd93fb",
+        "left-carry-door-rest": "55eb7f019daf1c54ee523515da8023ddc80fc1c161867530fa3849a51cc4a1fe",
+        "left-carry-target": "ed7ffe3d8311a32b2fcdb3d6a15a1d68da37ea6b287473901995b8cf287c76cd",
+        "left-carry-target-rest": "e1b4b146749960196dc53f5bd5fda04d9a1c5bffd23aba1c0113b18439e6c53d",
+        "door-throw-hit1": "a342b44dd98b2cb4deba4a140ce1190a10d4c4e210dad36b4d41c5ffcf0698f1",
+        "door-real-hit1": "6e92542ae064710a09be95432efb2dc1dd90dba2551096895b54c0d2ad3bd29a"
+      }
+    },
+    "fb-hit": {
+      "csv_sha256": "6b3e9d255e9d6d24478b56dfc8fb5c8ed3ab56bac9c20caa034c646a1b0c5f07",
+      "grid_sha256": "3db2b37535c4124413b74ccf6b0672d1e1d51c7ec9df2b300fc8c542be200357",
+      "first": 21470,
+      "last": 22205,
+      "checkpoints": {
+        "middle-route-ready": "c0e502eaf87726ba1cbf6bd99b6d051beab40bd26def97d3fd0cd9b08263f02b",
+        "middle-grab": "7fc9058b8c94e6c9b244143ee2193cb1515902019a5677987e62cdc435b2fc0d",
+        "middle-held": "900b02c26d2294d0ec2e3c746961c34ebbe2e9544c32267f446e8025e8ddc1f9",
+        "middle-carry-right": "ef032c24e4ee47e238cadbdeac0a8c10e736df93e9df6d2c1e13a820fd4692ff",
+        "middle-carry-right-rest": "e444fde50aa4a749a549ba5c26afa11b6f0c56e349c6e78bd0fcc4fa7a5e1288",
+        "middle-carry-down": "c0e233c6e42247e64ccb233d6ad43669a0452463b8d500b8e3627e746d1c9a16",
+        "middle-carry-down-rest": "2cccf1bb03590c0326b20249a495a3f0a1e85bed04ee811b7e9e7bff7ddf98ad",
+        "middle-carry-door": "2d327568c28f37ac8286652e6dd827f26736c371fc7a892baa606f7b272d537b",
+        "middle-carry-door-rest": "e32a452dc0a119c92c8b39f74baca58610cba92b5649f9e93eddead8771d38a3",
+        "middle-carry-up": "0ff9e282830377fc3749e1b70f6364bc3797de74eff4afb38bbfc03b7ad5c4f5",
+        "middle-carry-ready": "1fdd5802902978fd13799ffb05d94c7234bafb065544ef1e7b4ef427f2dceac9",
+        "door-throw-hit2": "5de248cc2a78334c28e9a87c1a0fa7dd448f9a62a653a2ecd916d027a7e79896",
+        "door-hit2": "8e5983672ba04e15bd8b61b0f65295cf1dc251cd612f61868b5f83f7598d83f6"
+      }
+    }
+  }
+}

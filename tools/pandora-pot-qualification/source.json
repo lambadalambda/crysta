@@ -1,0 +1,179 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "held_records": {
+    "map": 12,
+    "source": 9888166,
+    "slots": [
+      2442,
+      2447
+    ],
+    "replacement_tile": 248
+  },
+  "carry": [
+    {
+      "source": 8697097,
+      "table": 1,
+      "sequence": 9
+    },
+    {
+      "source": 8697114,
+      "table": 1,
+      "sequence": 10
+    },
+    {
+      "source": 8697135,
+      "table": 1,
+      "sequence": 11
+    }
+  ],
+  "collision_tables": [
+    {
+      "source": 8443202,
+      "partial5": 54198,
+      "type29_target": 54188,
+      "open0_target": 54188
+    },
+    {
+      "source": 8443266,
+      "partial5": 54257,
+      "type29_target": 54218,
+      "open0_target": 54218
+    },
+    {
+      "source": 8443330,
+      "partial5": 54269,
+      "type29_target": 54246,
+      "open0_target": 54246
+    },
+    {
+      "source": 8443394,
+      "partial5": 54246,
+      "type29_target": 54246,
+      "open0_target": 54246
+    },
+    {
+      "source": 8444136,
+      "partial5": 55210,
+      "type29_target": 55200,
+      "open0_target": 55200
+    },
+    {
+      "source": 8444200,
+      "partial5": 55251,
+      "type29_target": 55230,
+      "open0_target": 55230
+    },
+    {
+      "source": 8444264,
+      "partial5": 55262,
+      "type29_target": 55240,
+      "open0_target": 55240
+    },
+    {
+      "source": 8444328,
+      "partial5": 55240,
+      "type29_target": 55240,
+      "open0_target": 55240
+    },
+    {
+      "source": 8445024,
+      "partial5": 56146,
+      "type29_target": 56136,
+      "open0_target": 56136
+    },
+    {
+      "source": 8445088,
+      "partial5": 56187,
+      "type29_target": 56166,
+      "open0_target": 56166
+    },
+    {
+      "source": 8445152,
+      "partial5": 56198,
+      "type29_target": 56176,
+      "open0_target": 56176
+    },
+    {
+      "source": 8445216,
+      "partial5": 56176,
+      "type29_target": 56176,
+      "open0_target": 56176
+    },
+    {
+      "source": 8445916,
+      "partial5": 57032,
+      "type29_target": 57022,
+      "open0_target": 57022
+    },
+    {
+      "source": 8445980,
+      "partial5": 57073,
+      "type29_target": 57052,
+      "open0_target": 57052
+    },
+    {
+      "source": 8446044,
+      "partial5": 57084,
+      "type29_target": 57062,
+      "open0_target": 57062
+    },
+    {
+      "source": 8446108,
+      "partial5": 57062,
+      "type29_target": 57084,
+      "open0_target": 57062
+    }
+  ],
+  "ranges": [
+    {
+      "start": 8885891,
+      "end": 8886087,
+      "sha256": "66a5d0ef7e69472892e477698c30d34cbfdb8761659ce9a60c967189bc34c2fb"
+    },
+    {
+      "start": 8694731,
+      "end": 8695344,
+      "sha256": "7eebec8a38923e9b62f90b90f2505b2cb6adbc0eb648776c280191e8b2a0bc1f"
+    },
+    {
+      "start": 8697023,
+      "end": 8697209,
+      "sha256": "ac90eeabd75451d7294ede41852cdbca615e4a00992111d26fd243d9c98e0183"
+    },
+    {
+      "start": 8699871,
+      "end": 8699936,
+      "sha256": "7366df3cb3a844c4336f2ddbf7415b285b6546333bad4b16b36aee20f0913c8f"
+    },
+    {
+      "start": 8700600,
+      "end": 8701387,
+      "sha256": "9bee969b8559f62ca5aa278645cb4de73132e757b69cc9332e1d670b745beb59"
+    },
+    {
+      "start": 8701591,
+      "end": 8701867,
+      "sha256": "ff01de8f3b9972d501aab574c0ad688b8fe88ffac05e5d5b7266bbf82e1aa5be"
+    },
+    {
+      "start": 9287845,
+      "end": 9287957,
+      "sha256": "c5a34ceaa439cd4a6a48590c4ac32cb2de6dd283e50cd8ae876411cc42809b0f"
+    },
+    {
+      "start": 9888166,
+      "end": 9888181,
+      "sha256": "fdc3174854046537af511611ef44068c8d015327f16e7facf9ac65d68959c48d"
+    },
+    {
+      "start": 8956654,
+      "end": 8956822,
+      "sha256": "73114aa47366c1ce6f00ef553e3a5a34b1ddbd57265c499d543f9e062ab5302e"
+    },
+    {
+      "start": 8446431,
+      "end": 8446766,
+      "sha256": "cc450c3638fbf387be3213fa74596786a282e17f22fd5af89f034b44e2fdf05d"
+    }
+  ]
+}
