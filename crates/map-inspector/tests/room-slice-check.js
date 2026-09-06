@@ -10,7 +10,7 @@ const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 assert.equal(scripts.length, 1);
 const sandbox = {console};
 vm.runInNewContext(scripts[0][1], sandbox);
-const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue} = sandbox.RoomSlice;
+const {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices} = sandbox.RoomSlice;
 const initial = () => ({map_id: 15, x: 472, y: 176, tick: 0, phase: 'walking', error: null,
   policy: 'semantic-preview', camera: [256, 0], door_interaction:true});
 const newGameState = () => ({...initial(), x: 304, y: 112, start_kind: 'new-game'});
@@ -48,8 +48,8 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null} = {}) {
-  const elements = new Map(), timers = new Map(); let timerId = 0, key = actorKey, clock = 0;
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null} = {}) {
+  const elements = new Map(), timers = new Map(), requests = []; let timerId = 0, key = actorKey, clock = 0;
   const context = {fillRect(){},drawImage(){},save(){},restore(){},translate(){},putImageData(){},
     getImageData(){return {width:512,height:1024,data:new Uint8ClampedArray(512*1024*4)};}};
   const element = id => {
@@ -64,17 +64,17 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
   const win = new Target();
   const bundle = {schema_version:1,scene_ids:{15:['ark']},frames:{'0:0':{width:1,height:1,offset:[0,0],rgba:[1,2,3,255]}},
     foreground:{'15':{width:512,height:1024,runs:[]}},
-    dialogue_pages:{'page:1':{width:2,height:1,rgba:[255,255,255,255,0,0,0,0]}}};
+    dialogue_pages:{'page:1':{width:2,height:1,rgba:[255,255,255,255,0,0,0,0]},'option:2':{width:1,height:1,rgba:[1,2,3,255]}},choice_catalogs:{0:['page:1','option:2']}};
   const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {constructor(){this.naturalWidth=512;this.naturalHeight=1024;} set src(value){if(!stallBitmap) Promise.resolve().then(()=>this.onload());}},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
-    async fetch(url){return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
-      ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey},dialogue_acknowledgement:true}:{}),
+    async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:{...(url==='/reset'?initial():newGameState()),actor_key:key,
+      ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey,...(dialogueChoice===null?{}:{choice:dialogueChoice})},dialogue_acknowledgement:true,choice_interaction:true}:{}),
       scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]};}};},
   };
   vm.runInNewContext(scripts[0][1], browser);
-  return {element,timers,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
+  return {element,timers,requests,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
   const recovery = browserHarness({actorKey:'unsupported'}); await flush(); await flush();
@@ -133,7 +133,7 @@ async function main() {
   }
   // Dialogue owns control; each acknowledgement is one paced command, never autoplay.
   const talk=harness(); await talk.start();
-  const page = (key,tick) => ({...initial(),tick,phase:'dialogue',dialogue:{key},dialogue_acknowledgement:true});
+  const page = (key,tick) => ({...initial(),tick,phase:'dialogue',dialogue:{key,choice:null},dialogue_acknowledgement:true});
   talk.controller.resume(); talk.controller.press('prior-held',2); await talk.fire();
   await talk.reply({...page('test:1',1),phase:'walking'});
   assert.equal(talk.views.at(-1).paused,true);
@@ -164,9 +164,51 @@ async function main() {
   assert.equal(resetAck.timers.size,0); assert.equal(resetAck.views.at(-1).dialogue,false);
   const pageBindings = new Target(), pageWindow = new Target();
   bindInputs(talk.controller,pageBindings,pageWindow,[]);
-  let blockedRepeat=false;
-  pageBindings.emit('keydown',{key:'Enter',repeat:true,target:{closest:()=>({id:'continue'})},preventDefault(){blockedRepeat=true;}});
-  assert.equal(blockedRepeat,true,'focused Continue must suppress native repeated Enter clicks');
+  for(const id of ['continue','choice1','choice2','choice-cancel']) for(const repeat of [false,true]) {
+    let prevented=false;
+    pageBindings.emit('keydown',{key:'Enter',repeat,target:{closest:()=>({id})},preventDefault(){prevented=true;}});
+    assert.equal(prevented,repeat,'only repeated native button clicks are suppressed');
+  }
+  for(const catalog of [0,1]) {
+    const ui=browserHarness({dialogueKey:'page:1',dialogueChoice:catalog});await flush();await flush();
+    ui.element('interact').emit('click');
+    const timer=[...ui.timers].find(([,timer])=>timer.ms<100);assert(timer);
+    ui.timers.delete(timer[0]);ui.advance(timer[1].ms);timer[1].fn();await flush();await flush();
+    if(catalog===0) {
+      assert.equal(ui.element('continue').hidden,true);assert.equal(ui.element('dialogue-choices').hidden,false);
+      assert.equal(ui.element('choice2').disabled,false);assert.equal(ui.element('choice1-label').dataset.key,'page:1');assert.equal(ui.element('choice2-label').dataset.key,'option:2');
+      ui.element('choice2').emit('click');
+      for(const id of ['choice1','choice2','choice-cancel']) assert.equal(ui.element(id).disabled,true);
+      const next=[...ui.timers].find(([,timer])=>timer.ms<100);assert(next);
+      ui.timers.delete(next[0]);ui.advance(next[1].ms);next[1].fn();await flush();await flush();
+      assert.equal(ui.requests.at(-1).body,'9');
+    } else {
+      assert.match(ui.element('error').textContent,/choice/i);assert.equal(ui.element('dialogue-panel').hidden,true);
+      assert.equal(ui.element('choice2').disabled,true);
+    }
+  }
+  for(const invalid of [-1,65536,0.5,'0']) {
+    const bad=harness();await bad.start();bad.controller.resume();await bad.fire();
+    await bad.reply({...page('prompt',1),dialogue:{key:'prompt',choice:invalid}});
+    assert.match(bad.views.at(-1).error,/Invalid host state/);assert.equal(bad.timers.size,0);
+  }
+  // A source choice is not an acknowledgement or an implicit first option.
+  for(const selection of [0,1,2]) {
+    const choice=harness();await choice.start();choice.controller.resume();await choice.fire();
+    const pendingChoice={...page('prompt:0',1),dialogue:{key:'prompt:0',choice:0},choice_interaction:true};
+    await choice.reply(pendingChoice);
+    choice.controller.acknowledge();choice.controller.interact();choice.controller.choose(3);
+    const keys=new Target();bindInputs(choice.controller,keys,new Target(),[]);keys.emit('keydown',{key:'Enter'});
+    assert.equal(choice.timers.size,0,'choice needs an explicit valid selection');
+    choice.controller.choose(selection);choice.controller.choose(2);await choice.fire();
+    assert.equal(choice.calls.at(-1).body,String(7+selection));
+    choice.controller.choose(2);assert.equal(choice.timers.size,0,'in-flight selection is not replayed');
+    await choice.reply(page('followup:0',2));
+    choice.controller.choose(selection);assert.equal(choice.timers.size,0,'choice cannot acknowledge a follow-up');
+  }
+  const noChoice=harness();await noChoice.start();noChoice.controller.resume();await noChoice.fire();
+  await noChoice.reply({...page('prompt:0',1),dialogue:{key:'prompt:0',choice:0}});
+  noChoice.controller.choose(1);assert.equal(noChoice.timers.size,0,'choice capability required');
   // Door interaction is one paced command, never a held direction or autoplay.
   const door = harness(); await door.start(); door.controller.interact();
   assert.equal(door.calls.length,1); door.controller.interact(); door.controller.stepOnce();
@@ -560,5 +602,20 @@ main().catch(error => { console.error(error); process.exitCode = 1; });
   assert.throws(()=>selectDialogue(art,{dialogue:{key:'missing'}}),/dialogue/i);
   for(const change of [{width:0},{width:513},{height:225},{rgba:[1]},{rgba:[255,255,255,255,0,0,0,256]}]) {
     assert.throws(()=>prepareArt({...bundle,dialogue_pages:{'page:1':{...bundle.dialogue_pages['page:1'],...change}}},background,make),/dialogue/i);
+  }
+}
+
+// Choice labels reuse immutable dialogue rasters without an extra page wait.
+{
+  const frame={width:1,height:1,rgba:[255,255,255,255]};
+  const bundle={schema_version:1,frames:{},scene_ids:{15:['ark']},foreground:{15:{width:1,height:1,runs:[]}},
+    dialogue_pages:{prompt:frame,one:frame,two:frame},choice_catalogs:{0:['one','two']}};
+  const background={width:1,height:1,data:frame.rgba},make=(width,height,rgba)=>({width,height,rgba:Array.from(rgba)});
+  const art=prepareArt(bundle,background,make);
+  assert.equal(selectChoices(art,{dialogue:{key:'prompt'}}),null);
+  assert.equal(selectChoices(art,{dialogue:{key:'prompt',choice:0}}).length,2);
+  assert.throws(()=>selectChoices(art,{dialogue:{key:'prompt',choice:1}}),/choice/i);
+  for(const options of [[],['one'],['one','missing'],['one','two','one']]) {
+    assert.throws(()=>prepareArt({...bundle,choice_catalogs:{0:options}},background,make),/choice/i);
   }
 }

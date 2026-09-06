@@ -12,6 +12,7 @@ p{margin:.6em 0}.warning{border-left:4px solid #f2c574;background:#28251e;paddin
 .layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:20px;margin-top:20px}
 .panel{min-width:0;background:#19212d;border:1px solid #354252;border-radius:8px;padding:16px}
 canvas{display:block;width:100%;max-width:512px;height:auto;image-rendering:pixelated;background:#10151d;margin:auto;border:1px solid #526476}
+#dialogue-choices button:not(#choice-cancel){width:100%;max-width:512px}
 .legend{color:#58f5ff;font-size:.9rem}.actions{display:flex;flex-wrap:wrap;gap:8px;margin:14px 0}
 button{font:inherit;color:inherit;background:#263647;border:1px solid #6b8196;border-radius:6px;padding:9px 13px;min-height:44px;cursor:pointer}
 button:hover:not(:disabled){background:#354d65}button:focus-visible{outline:3px solid #58f5ff;outline-offset:3px}button:disabled{opacity:.5;cursor:not-allowed}
@@ -39,6 +40,11 @@ Ark uses ROM-derived standing/walking sprites. All nine residents and the bedroo
 <section id="dialogue-panel" aria-label="Dialogue" hidden>
 <canvas id="dialogue-page" width="256" height="64" role="img" aria-label="Original Japanese dialogue"></canvas>
 <p><button id="continue" disabled>Continue (Space / Enter)</button></p>
+<div id="dialogue-choices" role="group" aria-label="Choose a response" hidden>
+<p><button id="choice1" aria-label="Choose option 1" disabled><canvas id="choice1-label" aria-hidden="true"></canvas></button></p>
+<p><button id="choice2" aria-label="Choose option 2" disabled><canvas id="choice2-label" aria-hidden="true"></canvas></button></p>
+<p><button id="choice-cancel" disabled>Cancel choice</button></p>
+</div>
 <small>ROM-derived Japanese text; simplified dialogue presentation.</small>
 </section>
 <div class="actions">
@@ -86,7 +92,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (!state || state.policy !== 'semantic-preview' || !Number.isInteger(state.map_id) ||
         !Number.isInteger(state.x) || !Number.isInteger(state.y) || !Number.isInteger(state.tick) ||
         !(state.start_kind === undefined || typeof state.start_kind === 'string') ||
-        !(state.dialogue === undefined || state.dialogue === null || (typeof state.dialogue === 'object' && typeof state.dialogue.key === 'string' && state.dialogue.key.length > 0 && state.dialogue.key.length <= 128)) ||
+        !(state.dialogue === undefined || state.dialogue === null || (typeof state.dialogue === 'object' && typeof state.dialogue.key === 'string' && state.dialogue.key.length > 0 && state.dialogue.key.length <= 128 && (state.dialogue.choice == null || (Number.isInteger(state.dialogue.choice) && state.dialogue.choice >= 0 && state.dialogue.choice <= 65535)))) ||
         typeof state.phase !== 'string' || !(state.error === null || typeof state.error === 'string') ||
         !Array.isArray(state.camera) || state.camera.length !== 2 || !state.camera.every(Number.isInteger)) {
       throw new Error('Invalid host state or policy. Choose New Game or Checkpoint Reset; no input was queued.');
@@ -111,9 +117,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     // The protocol leaves phase names open. Learn the normal phase only at a
     // known new-game start or saved checkpoint, never a mid-session response.
     const dialogue = () => !!state?.dialogue;
+    const choice = () => state?.dialogue?.choice ?? null;
     const transition = () => state && !dialogue() && state.phase !== walkingPhase;
     const view = () => ({state, error, paused, busy: busy || pendingCommand !== null || pendingStart !== null, mode, demoIndex, note,
-      canDrive: walkingPhase !== null, walking: !!state && !transition() && !dialogue(), dialogue: dialogue()});
+      canDrive: walkingPhase !== null, walking: !!state && !transition() && !dialogue(), dialogue: dialogue(), choice: choice()});
     const notify = () => render(view());
     function clearTimer() { if (timer !== null) cancel(timer); timer = null; }
     function stop(message) { paused = true; pendingCommand = null; held.clear(); clearTimer(); if (message) note = message; }
@@ -123,7 +130,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (pendingStart) pendingStart.demo = false;
     }
     function arm() {
-      if ((dialogue() && pendingCommand !== 6) || timer !== null || busy || (paused && pendingCommand === null) || hidden || error || !state || pendingStart) return;
+      if ((dialogue() && !(pendingCommand >= 6 && pendingCommand <= 9)) || timer !== null || busy || (paused && pendingCommand === null) || hidden || error || !state || pendingStart) return;
       const remaining = Math.max(0, interval - (now() - lastStepAt));
       timer = schedule(() => {
         timer = null;
@@ -161,7 +168,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           if (!paused) note = `Checkpoint doorway demo: ${demoIndex} / 115 logical steps.`;
           if (demoIndex === 115) { mode = 'live'; stop('Checkpoint doorway demo complete — paused.'); }
         }
-        if (dialogue()) stop('Dialogue — acknowledge each page to continue.');
+        if (dialogue()) stop(choice() === null ? 'Dialogue — acknowledge each page to continue.' : 'Choose a response, or cancel the choice.');
         if (state.error !== null) reject(state.error || 'Unsupported host step.');
       } catch (failure) { if (!pendingStart) reject(`Host request failed: ${failure.message || failure}`); }
       finally {
@@ -202,8 +209,12 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       setHidden(value) { hidden = value; if (hidden) this.pause('Tab hidden — paused and controls released.'); },
       stepOnce() { if (!dialogue()) manualStep(0, 'Single neutral logical step — paused.'); },
       acknowledge() {
-        if (!dialogue() || state.dialogue_acknowledgement !== true || mode === 'demo') return;
+        if (!dialogue() || choice() !== null || state.dialogue_acknowledgement !== true || mode === 'demo') return;
         manualStep(6, 'Dialogue acknowledged — paused. Resume when the conversation ends.');
+      },
+      choose(selection) {
+        if (choice() === null || state.choice_interaction !== true || mode === 'demo' || ![0,1,2].includes(selection)) return;
+        manualStep(7+selection, 'Choice submitted — paused.');
       },
       interact() {
         if (dialogue()) { this.acknowledge(); return; }
@@ -224,7 +235,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       else if (key === ' ' || key === 'enter') {
         const control = event.target?.closest?.('button,input,textarea,select,[contenteditable]');
         if (control) {
-          if (event.repeat && control.id === 'continue') event.preventDefault();
+          if (event.repeat && ['continue','choice1','choice2','choice-cancel'].includes(control.id)) event.preventDefault();
           return;
         }
         event.preventDefault(); if (!event.repeat) controller.interact();
@@ -300,7 +311,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   function prepareArt(bundle, background, makeRaster) {
     if (bundle.schema_version !== 1 || !bundle.frames || !bundle.foreground) throw new Error('Invalid art bundle');
-    const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null);
+    const actors = Object.create(null), foreground = Object.create(null), openForeground = Object.create(null), dialoguePages = Object.create(null), choiceCatalogs = Object.create(null);
     const door = prepareDoor(bundle.door_patches, background);
     const openBackground = door ? makeRaster(background.width, background.height, door.pixels) : null;
     for (const [key, frame] of Object.entries(bundle.frames)) {
@@ -314,6 +325,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       const {width,height,rgba} = page || {};
       if (!validPixels(width,height,rgba,512,224)) throw new Error('Invalid dialogue raster');
       dialoguePages[key] = {width,height,image:makeRaster(width,height,rgba)};
+    }
+    for (const [key,options] of Object.entries(bundle.choice_catalogs || {})) {
+      if (!Array.isArray(options) || options.length !== 2 || !options.every(key=>typeof key === 'string' && dialoguePages[key])) throw new Error('Invalid choice catalog');
+      choiceCatalogs[key] = options.map(key=>({...dialoguePages[key],key}));
     }
     for (const [id, mask] of Object.entries(bundle.foreground)) {
       if (mask.width !== background.width || mask.height !== background.height ||
@@ -345,7 +360,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds, openBackground, openForeground, dialoguePages};
+    return {actors, foreground, sceneIds, openBackground, openForeground, dialoguePages, choiceCatalogs};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
@@ -360,6 +375,12 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     const page = art.dialoguePages[state.dialogue.key];
     if (!page) throw new Error('Unsupported dialogue page key');
     return page;
+  }
+  function selectChoices(art, state) {
+    if (state.dialogue?.choice == null) return null;
+    const options = art.choiceCatalogs[state.dialogue.choice];
+    if (!options) throw new Error('Unsupported dialogue choice catalog');
+    return options;
   }
   function selectActor(art, state) {
     const actor = art.actors[state.actor_key];
@@ -380,11 +401,16 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     return scene.map(entry => ({...art.actors[entry.key], position:entry.position}));
   }
   // The same controller/bindings are evaluated by the dependency-free Node test.
-  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue};
+  globalThis.RoomSlice = {createController, bindInputs, drawScene, prepareArt, selectActor, selectActors, selectBackground, selectDialogue, selectChoices};
   if (typeof document === 'undefined') return;
   const $ = id => document.getElementById(id), canvas = $('room'), ctx = canvas.getContext('2d');
   const buttons = [...document.querySelectorAll('[data-direction]')], image = new Image();
   let ready = false, art = null, assetError = null, lastView = null, lastAnnouncement = '';
+  function paintPage(canvas, page, key) {
+    canvas.width = page.width; canvas.height = page.height;
+    const context = canvas.getContext('2d'); context.imageSmoothingEnabled = false;
+    context.drawImage(page.image,0,0); canvas.dataset.key = key;
+  }
   function render(view) {
     lastView = view;
     const {state, error, paused, busy, mode, note, canDrive, walking} = view;
@@ -403,7 +429,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('pause').textContent = paused ? 'Resume' : 'Pause';
     $('pause').disabled = !ready || !canDrive || !!error || view.dialogue;
     $('step').disabled = !ready || !canDrive || !!error || busy || !paused || view.dialogue;
-    $('continue').disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || !view.dialogue || state?.dialogue_acknowledgement !== true;
+    $('continue').hidden = view.choice !== null;
+    $('dialogue-choices').hidden = view.choice === null;
+    for (const id of ['choice1','choice2','choice-cancel']) $(id).disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || view.choice === null || state?.choice_interaction !== true;
+    $('continue').disabled = !ready || !canDrive || !!error || busy || mode === 'demo' || !view.dialogue || view.choice !== null || state?.dialogue_acknowledgement !== true;
     $('dialogue-panel').hidden = !ready || !state?.dialogue;
     $('interact').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.door_interaction !== true;
     $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
@@ -412,11 +441,9 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     if (ready && state) {
       try {
         const page = selectDialogue(art, state);
-        if (page) {
-          const canvas = $('dialogue-page'); canvas.width = page.width; canvas.height = page.height;
-          const context = canvas.getContext('2d'); context.imageSmoothingEnabled = false; context.drawImage(page.image,0,0);
-          canvas.dataset.key = state.dialogue.key;
-        }
+        const choices = selectChoices(art, state);
+        if (page) paintPage($('dialogue-page'),page,state.dialogue.key);
+        if (choices) choices.forEach((option,index)=>paintPage($(`choice${index+1}-label`),option,option.key));
         const background = selectBackground(art, state, image);
         drawScene(ctx, background.image, state, selectActors(art, state), background.foreground);
         assetError = null; $('error').textContent = error || '';
@@ -447,6 +474,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   $('step').addEventListener('click', () => controller.stepOnce());
   $('interact').addEventListener('click', () => controller.interact());
   $('continue').addEventListener('click', () => controller.acknowledge());
+  for (const [id,selection] of [['choice-cancel',0],['choice1',1],['choice2',2]]) $(id).addEventListener('click', () => controller.choose(selection));
   $('new-game').addEventListener('click', () => controller.newGame());
   $('reset').addEventListener('click', () => controller.reset());
   $('demo').addEventListener('click', () => controller.demo());
