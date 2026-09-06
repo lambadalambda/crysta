@@ -126,6 +126,8 @@ qualification remain open.
 - [Decode the required Pandora progression dialogue](issues/decode-pandora-dialogue.md)
 - [Qualify and implement bounded cellar pot actions](issues/qualify-pandora-pot-actions.md)
 - [Decode the required Pandora actors and carrying poses](issues/decode-pandora-scene-art.md)
+- [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
+- [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

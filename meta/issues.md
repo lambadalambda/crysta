@@ -33,3 +33,5 @@
 - [ ] [Qualify and implement bounded cellar pot actions](issues/qualify-pandora-pot-actions.md)
 - [ ] [Decode the required Pandora actors and carrying poses](issues/decode-pandora-scene-art.md)
 - [ ] [Make oracle video publication deterministic and race-free](issues/fix-oracle-video-publication.md)
+- [ ] [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
+- [ ] [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)

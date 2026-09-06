@@ -34,3 +34,5 @@ Implement only the maps, source assets and semantic state transitions required b
 
 - Parent: [Open Pandora’s Box in the portable slice](open-pandora-portable-slice.md).
 - Do not enable an unqualified placeholder sequence while source discovery is incomplete.
+
+- Remaining integration split: [navigation/contact admission](qualify-pandora-navigation.md) and [fixed story continuation](port-pandora-story-state.md). These are required beyond the independently decoded visual resources; neither enables an unqualified live route.
