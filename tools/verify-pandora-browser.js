@@ -14,6 +14,20 @@
   function checkState(actual,expected,tick) {
     insist(actual?.tick===tick && same(withoutTick(actual),withoutTick(expected)),`State differs at UI tick ${tick}`);
   }
+  function blockingDialogue(state) {
+    insist(state.dialogue_ready===undefined || typeof state.dialogue_ready==='boolean','Invalid dialogue readiness');
+    return state.dialogue!=null && state.dialogue_ready!==false;
+  }
+  function checkDialogueControls($,state) {
+    insist($('dialogue-panel').hidden===(state.dialogue===null),'Dialogue panel visibility differs');
+    if(!state.dialogue)return;
+    const blocking=blockingDialogue(state),choice=state.dialogue.choice??null;
+    insist(['pause','step'].every(id=>$(id).disabled===blocking),'Dialogue Resume/neutral availability differs');
+    insist(['interact','pot-action'].every(id=>$(id).disabled),'Dialogue manual controls not locked');
+    insist($('continue').disabled===(!blocking || choice!==null) && $('continue').hidden===(choice!==null) &&
+      $('dialogue-choices').hidden===(choice===null),'Wrong ack/choice controls');
+    for(const id of ['choice1','choice2','choice-cancel'])insist($(id).disabled===(!blocking || choice===null),'Choice availability differs');
+  }
   function projectRoute(route,proof) {
     insist(Array.isArray(route?.actions) && route.actions.length>0,'Invalid route');
     const commands=[];
@@ -26,12 +40,13 @@
       Array.isArray(proof.projected),'Missing complete fresh replay proof');
     for(const [kind,records] of [['offline',proof.offline],['projected',proof.projected]]) for(const [tick,r] of records.entries()) {
       insist(r?.state?.tick===tick && hash(r.continuation) && Object.hasOwn(r.state,'dialogue'),`Invalid ${kind} continuation/tick ${tick}`);
+      blockingDialogue(r.state); // Reject malformed readiness even on retained/manual states.
     }
     insist(same(proof.offline[0],proof.projected[0]),'Fresh replay initial state differs');
     const steps=[],omissions=[];
     for(const [i,command] of commands.entries()) {
       const before=proof.offline[i],after=proof.offline[i+1],offlineTick=i+1;
-      if(command<=4 && before.state.dialogue!==null) {
+      if(command<=4 && blockingDialogue(before.state)) {
         insist(before.continuation===after.continuation && same(crossClock(before.state),crossClock(after.state)),
           `Paused dialogue command ${command} at offline ${offlineTick} is not a proved no-op; require fresh UI route`);
         omissions.push({command,offlineTick,continuation:before.continuation});
@@ -51,9 +66,10 @@
       insist(Number.isInteger(command) && command>=0 && command<=10,'Invalid UI command');
       insist($('pause').textContent==='Resume','UI command must start paused');
       if(command<=4) {
-        insist(state.dialogue===null,'Cannot advance paused dialogue');
+        insist(!blockingDialogue(state),'Cannot advance paused dialogue');
         motion.resume();motion.apply(command,{map:state.map_id,phase:state.phase});
       } else {
+        if(command>=6 && command<=9)insist(blockingDialogue(state),'Cannot acknowledge/choose unready dialogue');
         insist(command!==10 || state.dialogue===null,'Pot input during dialogue');
         click(['interact','continue','choice-cancel','choice1','choice2','pot-action'][command-5]);
       }
@@ -123,7 +139,7 @@
     for(const key of ['lifting','standing','walking','throwing','flight-miss','flight-hit'])insist(e.carry[key]>0,`Missing carry pixels ${key}`);
     insist(e.ark>0,'Missing Ark pixels');
   }
-  const helpers={projectRoute,checkState,createCommands,indexedPage,compareComposition,requireCoverage,checkSemanticCheckpoint};
+  const helpers={projectRoute,checkState,createCommands,indexedPage,compareComposition,requireCoverage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls};
   if(typeof module!=='undefined' && module.exports && typeof document==='undefined'){module.exports=helpers;return;}
   globalThis.PandoraBrowserHelpers=helpers;
   if(globalThis.PANDORA_BROWSER_HELPERS_ONLY)return 'PandoraBrowserHelpers ready (no input)';
@@ -153,7 +169,7 @@
       insist(plan.offlineTicks===11590,'Fixed route action count differs');
       const bundle=await get('/art.json'),before=await get('/state');
       insist(before.pot_action===true && before.choice_interaction===true && before.dialogue_acknowledgement===true && before.world_background &&
-        typeof before.owner==='string','Enabled host contract is not ready');
+        typeof before.owner==='string' && typeof before.dialogue_ready==='boolean','Enabled host contract is not ready');
       // Reuse the existing independent house/source contracts on their exact
       // subset; expanded Pandora frames/resources must not weaken the prefix.
       H.validateArt({...bundle,frames:Object.fromEntries(Object.entries(bundle.frames).filter(([k])=>!k.startsWith('pandora:')))});
@@ -211,13 +227,10 @@
         run.evidence.ark+=e.sprites.ark||0;
         for(const p of s.world_background.patches) {const k=`${name}:${p.cell}:${p.tile}`;run.evidence.patches[k]=(run.evidence.patches[k]||0)+(e.patches[p.cell]||0);}
         if(carryKeys && e.sprites.carry) {const k=s.carry.flight?(s.x===136?'flight-miss':'flight-hit'):s.carry.pose.split(':')[0];run.evidence.carry[k]=(run.evidence.carry[k]||0)+e.sprites.carry;}
-        insist($('dialogue-panel').hidden===(s.dialogue===null),'Dialogue panel visibility differs');
+        checkDialogueControls($,s);
         if(s.dialogue) {
           raster('dialogue-page',bundle.dialogue_pages[s.dialogue.key],s.dialogue.key);
           const choice=s.dialogue.choice??null;
-          insist(['pause','step','interact','pot-action'].every(id=>$(id).disabled),'Dialogue controls not locked');
-          insist($('continue').disabled===(choice!==null) && $('continue').hidden===(choice!==null) && $('dialogue-choices').hidden===(choice===null),'Wrong ack/choice controls');
-          for(const id of ['choice1','choice2','choice-cancel'])insist($(id).disabled===(choice===null),'Choice availability differs');
           if(choice!==null)R.selectChoices(art,s).forEach((option,i)=>raster(`choice${i+1}-label`,bundle.dialogue_pages[option.key],option.key));
         }
         run.visualChecks++;
@@ -228,7 +241,7 @@
         const request=s.dialogue?.key.split(':').slice(0,2).join(':')??null;
         if(request!==previousRequest && request && reference.invocations.some(i=>request===`text:${i.source.toString(16)}`))run.invocations.push(request);
         previousRequest=request;
-        if(previous.map_id!==s.map_id || previous.scene_phase!==s.scene_phase || previous.owner!==s.owner || !same(previous.events,s.events) || !same(previous.dialogue,s.dialogue))
+        if(previous.map_id!==s.map_id || previous.scene_phase!==s.scene_phase || previous.owner!==s.owner || previous.dialogue_ready!==s.dialogue_ready || !same(previous.events,s.events) || !same(previous.dialogue,s.dialogue))
           run.checkpoints.push({offlineTick:step.offlineTick,state:structuredClone(s)});
       }
       const latch=C.createAckLatch(0);

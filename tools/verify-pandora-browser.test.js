@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {projectRoute,checkState,createCommands,compareComposition,requireCoverage,indexedPage,checkSemanticCheckpoint}=require('./verify-pandora-browser.js');
+const {projectRoute,checkState,createCommands,compareComposition,requireCoverage,indexedPage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls}=require('./verify-pandora-browser.js');
 const clone=structuredClone;
 function fixture() {
   const state=(tick,dialogue=null,x=304)=>({tick,dialogue,x,y:112,map_id:15,owner:dialogue?'dialogue':'player',events:[32,251]});
@@ -121,4 +121,48 @@ test('browser bootstrap forbids8765, requires explicit origin and retains async 
   await incomplete.PANDORA_BROWSER_RUN.promise;
   assert.equal(incomplete.PANDORA_BROWSER_RUN.status,'failed');
   assert.match(incomplete.PANDORA_BROWSER_RUN.error,/createControls/);assert.equal(inputs,0);
+});
+test('only explicit false readiness unblocks visible text; legacy undefined still blocks',()=>{
+  for(const dialogue of [null,{key:'text:889e9c:0'}])for(const dialogue_ready of [undefined,true,false])
+    assert.equal(blockingDialogue({dialogue,dialogue_ready}),dialogue!==null && dialogue_ready!==false);
+  for(const dialogue_ready of [null,0,1,'false'])assert.throws(()=>blockingDialogue({dialogue:{},dialogue_ready}),/readiness/);
+});
+test('visible unready arrival/motion and identical ordinary neutral ticks are never omitted',()=>{
+  const record=(tick,ready,x,identity)=>({state:{tick,dialogue:{key:'text:889e9c:0'},dialogue_ready:ready,x,phase:'arriving'},continuation:identity.repeat(64)});
+  const records=[record(0,false,120,'a'),record(1,false,121,'b'),record(2,false,121,'b'),record(3,true,122,'c')];
+  const route={actions:[[3,1],[0,2]]},proof={schema:1,offline:records,projected:clone(records)};
+  const p=projectRoute(route,proof);
+  assert.deepEqual(p.steps.map(s=>s.command),[3,0,0]);assert.deepEqual(p.omissions,[]);
+  proof.projected.splice(2,1);assert.throws(()=>projectRoute(route,proof));
+  const f=fixture();for(const records of [f.proof.offline,f.proof.projected])for(const r of records)r.state.dialogue_ready=true;
+  assert.equal(projectRoute(f.route,f.proof).omissions.length,2);
+  f.proof.offline[2].continuation='f'.repeat(64);assert.throws(()=>projectRoute(f.route,f.proof),/no-op/);
+});
+test('unready dialogue uses real Resume and transition-neutral controls; never sends ack/choice',()=>{
+  const H=require('./verify-house-browser.js'),log=[];
+  const buttons=Object.fromEntries(['pause','continue','choice-cancel','choice1','choice2','pot-action'].map(id=>[id,
+    {textContent:'Resume',click(){log.push(id);}}]));
+  const commands=createCommands(id=>buttons[id],H.createControls(id=>buttons[id],(type,key)=>log.push([type,key])));
+  for(const phase of ['arriving','dialogue'])for(let command=0;command<=4;command++) {
+    commands.send(command,{dialogue:{},dialogue_ready:false,phase,map_id:12});
+    commands.stop();
+  }
+  assert.deepEqual(log,Array(10).fill('pause'),'only Resume: no arrow injected during transition/motion');
+  for(let command=6;command<=10;command++)assert.throws(()=>commands.send(command,{dialogue:{},dialogue_ready:false}),/dialogue|ready/);
+  assert.equal(log.length,10,'even incorrectly enabled manual buttons cannot bypass readiness');
+});
+test('visible unready text stays painted, disables ack/choices, and permits paused Resume/neutral',()=>{
+  for(const ready of [true,false,undefined])for(const choice of [null,1]) {
+    const blocked=ready!==false,s={dialogue:{key:'text:889e9c:0',...(choice===null?{}:{choice})},dialogue_ready:ready};
+    const buttons={'dialogue-panel':{hidden:false},pause:{disabled:blocked},step:{disabled:blocked},interact:{disabled:true},'pot-action':{disabled:true},
+      continue:{disabled:!blocked || choice!==null,hidden:choice!==null},'dialogue-choices':{hidden:choice===null}};
+    for(const id of ['choice1','choice2','choice-cancel'])buttons[id]={disabled:!blocked || choice===null};
+    checkDialogueControls(id=>buttons[id],s);
+    for(const id of ['pause','step','continue','choice1','choice2','choice-cancel']) {
+      buttons[id].disabled=!buttons[id].disabled;
+      assert.throws(()=>checkDialogueControls(id=>buttons[id],s));
+      buttons[id].disabled=!buttons[id].disabled;
+    }
+    buttons['dialogue-panel'].hidden=true;assert.throws(()=>checkDialogueControls(id=>buttons[id],s));
+  }
 });

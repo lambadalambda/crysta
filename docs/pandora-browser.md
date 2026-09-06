@@ -22,24 +22,43 @@ run's status is failed/stopped, not full acceptance. Private retained evidence:
 All76 Pandora source rasters also independently matched the committed indexed
 hashes in the parent export. This does not mean all76 were displayed.
 
-The13 Pandora synthetic tests and28 combined house/conversation/Pandora tests
-pass. Independent correctness/compactness review approved the staged verifier
-after an initialization-failure regression was fixed red→green. Repository safety
-passes; tracker membership awaits parent-owned shared index/roadmap registration.
+The17 Pandora synthetic tests and32 combined house/conversation/Pandora tests
+pass, including red→green readiness adaptation tests. Independent
+correctness/compactness review approved the original staged verifier after an
+initialization-failure regression was fixed. The parent reports shared
+index/roadmap registration complete; those files remain parent-owned.
 Nonblocking follow-up: bitmap image loading has no timeout yet (before any input).
 
-Source inspection and that export expose a blocking distinction:
+The historical prefix above predates the readiness contract. **No further input
+to8877 or full journey attempt is permitted until the parent relays both the
+independently qualified canonical proof and the updated isolated host/UI.**
+Final producer pinning remains held.
+
+Source inspection and that export expose a visibility/readiness distinction:
 
 - Offline5706 loads C and requests `CEntry` while the doorway is still arriving
   at(120,464);5707 moves to(120,463) with visible dialogue. Seventeen arrival
-  updates remain. The UI pauses on dialogue, but acknowledge rejects an active
-  transition.
+  updates remain. The old UI paused on any dialogue, but acknowledge rejects an
+  active transition.
 - The Box-entry reload sample similarly requests dialogue at(122,105), before
   the mandatory arrival sample at(136,128); acknowledge rejects active motion.
 
-These are **not** omittable no-ops. Parent must resolve the presentation contract
-before final producer/HTML pinning. Neither hidden transition progress nor pot
-recovery may be erased to make the route fit. No production fix is supplied here.
+These are **not** omittable no-ops. The parent resolution preserves the core
+request/timeline and transports read-only `GameState::dialogue_input_ready()` as
+opt-in boolean `state.dialogue_ready`: the existing acknowledgement guard
+(transition absent and motion absent), not a second inferred story state.
+Visible text remains painted, including when readiness is false. Only
+`dialogue != null && dialogue_ready !== false` blocks ordinary input. While
+visible-but-unready, Resume/neutral arrival updates remain available and all
+acknowledgement/choice buttons are disabled. The verifier retains these arrival
+commands and uses the existing transition-neutral UI driver; it neither hides
+requests nor disables ready-dialogue pauses. Legacy undefined readiness retains
+the old blocking behavior; enabled browser acceptance requires the boolean.
+
+The parent's observational scan reports181 unchanged blocking-dialogue inputs
+and17 C-arrival plus1 Box-completion update. These numbers are **not omission
+permissions** and are not hardcoded in projection; the canonical producer must
+prove the actual omissions and independently replay every retained input.
 
 ## Explicit cadence projection API
 
@@ -84,10 +103,12 @@ animation phase, walking/input history, all1024 flags, motion cursor, pot age,
 source reservations and sheet mutations intact. The existing sparse runtime
 semantic-event report does not prove this equality.
 
-Projection omits only command0..4 where the **preceding observable dialogue is
-non-null**, the canonical continuation hash is unchanged, and every observation
-except `tick`/`snapshot_sha256` is unchanged. An unchanged non-dialogue neutral is
-**retained**: ordinary cue clocks and all35 doorway ticks are not accelerated.
+Projection omits only command0..4 where the **preceding dialogue is blocking**
+(`dialogue != null && dialogue_ready !== false`), the canonical continuation hash
+is unchanged, and every observation except `tick`/`snapshot_sha256` is unchanged.
+Readiness itself is compared, never erased. An unchanged ordinary neutral or a
+visible-but-unready input is **retained**, even if its continuation is identical:
+ordinary cue clocks and all35 doorway ticks are not accelerated.
 Every B/A, acknowledgement and choice remains in order. Every retained boundary
 must equal the second fresh replay in continuation and non-clock observations.
 Unemittable inputs fail rather than inventing acknowledgements or alternate paths.
