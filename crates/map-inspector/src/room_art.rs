@@ -277,7 +277,8 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
             "scene_ids":membership(&rooms),"actors":actors,"foreground":masks,
             "backgrounds":backgrounds,"background_keys":background_keys,"door_background":"house",
             "door_patches":door::compile(rom.image(), &bedroom)?,
-            "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests}))?,
+            "dialogue_pages":dialogue.pages,"choice_catalogs":dialogue.choices,"dialogue_requests":dialogue.requests,
+            "dialogue_choice_contexts":dialogue.choice_contexts}))?,
         rooms,
     })
 }

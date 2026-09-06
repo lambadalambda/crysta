@@ -207,14 +207,19 @@ async function main() {
     pageBindings.emit('keydown',{key:'Enter',repeat,target:{closest:()=>({id})},preventDefault(){prevented=true;}});
     assert.equal(prevented,repeat,'only repeated native button clicks are suppressed');
   }
-  for(const catalog of [0,1]) {
-    const ui=browserHarness({dialogueKey:'page:1',dialogueChoice:catalog});await flush();await flush();
+  for(const contextual of [false,true]) for(const catalog of [0,1]) {
+    const ui=browserHarness({dialogueKey:'page:1',dialogueChoice:catalog,mutateBundle:bundle=> {
+      if(contextual) {
+        bundle.dialogue_choice_contexts={'page:1':{catalog:0,options:['option:2','page:1']}};
+        bundle.choice_catalogs[1]=['page:1','option:2']; // A valid fallback must not hide a context mismatch.
+      }
+    }});await flush();await flush();
     ui.element('interact').emit('click');
     const timer=[...ui.timers].find(([,timer])=>timer.ms<100);assert(timer);
     ui.timers.delete(timer[0]);ui.advance(timer[1].ms);timer[1].fn();await flush();await flush();
     if(catalog===0) {
       assert.equal(ui.element('continue').hidden,true);assert.equal(ui.element('dialogue-choices').hidden,false);
-      assert.equal(ui.element('choice2').disabled,false);assert.equal(ui.element('choice1-label').dataset.key,'page:1');assert.equal(ui.element('choice2-label').dataset.key,'option:2');
+      assert.equal(ui.element('choice2').disabled,false);assert.equal(ui.element('choice1-label').dataset.key,contextual?'option:2':'page:1');assert.equal(ui.element('choice2-label').dataset.key,contextual?'page:1':'option:2');
       ui.element('choice2').emit('click');
       for(const id of ['choice1','choice2','choice-cancel']) assert.equal(ui.element(id).disabled,true);
       const next=[...ui.timers].find(([,timer])=>timer.ms<100);assert(next);
@@ -655,6 +660,28 @@ main().catch(error => { console.error(error); process.exitCode = 1; });
   assert.throws(()=>selectChoices(art,{dialogue:{key:'prompt',choice:1}}),/choice/i);
   for(const options of [[],['one'],['one','missing'],['one','two','one']]) {
     assert.throws(()=>prepareArt({...bundle,choice_catalogs:{0:options}},background,make),/choice/i);
+  }
+}
+
+// The same native choice catalog may label different source prompt responses.
+{
+  const frame={width:1,height:1,rgba:[255,255,255,255]};
+  const bundle={schema_version:1,frames:{},scene_ids:{15:['ark']},foreground:{15:{width:1,height:1,runs:[]}},
+    dialogue_pages:{promptA:frame,promptB:frame,one:frame,two:frame,other:{...frame,rgba:[255,0,0,255]}},choice_catalogs:{0:['one','two']},
+    dialogue_choice_contexts:{promptA:{catalog:0,options:['one','two']},promptB:{catalog:0,options:['other','one']}}};
+  const background={width:1,height:1,data:frame.rgba},make=(width,height,rgba)=>({width,height,rgba:Array.from(rgba)});
+  const art=prepareArt(bundle,background,make);
+  assert.deepEqual(Array.from(selectChoices(art,{dialogue:{key:'promptB',choice:0}}),o=>o.key),['other','one']);
+  assert.deepEqual(selectChoices(art,{dialogue:{key:'promptB',choice:0}})[0].image.rgba,[255,0,0,255]);
+  assert.deepEqual(Array.from(selectChoices(art,{dialogue:{key:'promptA',choice:0}}),o=>o.key),['one','two']);
+  assert.equal(selectChoices(art,{dialogue:{key:'promptA'}}),null);
+  assert.throws(()=>selectChoices(art,{dialogue:{key:'promptB',choice:1}}),/choice/i);
+  assert.throws(()=>selectChoices(art,{dialogue:{key:'one',choice:0}}),/choice/i); // No global fallback when contexts are declared.
+  for(const contexts of [null,[],42,{missing:{catalog:0,options:['one','two']}},
+      {promptA:{catalog:'0',options:['one','two']}},{promptA:{catalog:65536,options:['one','two']}},
+      {promptA:{catalog:0,options:['one','missing']}},{promptA:{catalog:0,options:['one']}},
+      {promptA:null}]) {
+    assert.throws(()=>prepareArt({...bundle,dialogue_choice_contexts:contexts},background,make),/choice/i);
   }
 }
 

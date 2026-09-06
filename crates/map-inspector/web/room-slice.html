@@ -367,6 +367,17 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       if (!Array.isArray(options) || options.length !== 2 || !options.every(key=>typeof key === 'string' && dialoguePages[key])) throw new Error('Invalid choice catalog');
       choiceCatalogs[key] = options.map(key=>({...dialoguePages[key],key}));
     }
+    const contextSource = bundle.dialogue_choice_contexts;
+    const choiceContexts = contextSource === undefined ? null : Object.create(null);
+    if (choiceContexts) {
+      if (!contextSource || typeof contextSource !== 'object' || Array.isArray(contextSource)) throw new Error('Invalid choice contexts');
+      for (const [key, context] of Object.entries(contextSource)) {
+        if (!dialoguePages[key] || !context || !Number.isInteger(context.catalog) || context.catalog < 0 || context.catalog > 65535 ||
+            !Array.isArray(context.options) || context.options.length !== 2 ||
+            !context.options.every(key=>typeof key === 'string' && dialoguePages[key])) throw new Error('Invalid choice context');
+        choiceContexts[key] = {catalog:context.catalog,options:context.options.map(key=>({...dialoguePages[key],key}))};
+      }
+    }
     for (const [id, mask] of Object.entries(bundle.foreground)) {
       const background = pixels[backgroundKeys[id]];
       if (mask.width !== background.width || mask.height !== background.height ||
@@ -398,7 +409,7 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
           new Set(ids).size !== ids.length) throw new Error('Invalid scene membership');
       sceneIds[id] = ids.slice();
     }
-    return {actors, foreground, sceneIds, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs};
+    return {actors, foreground, sceneIds, backgrounds, backgroundKeys, doorBackground, openBackground, openForeground, dialoguePages, choiceCatalogs, choiceContexts};
   }
   function selectBackground(art, state, image) {
     if (state.wooden_door_open !== undefined && typeof state.wooden_door_open !== 'boolean') throw new Error('Invalid door state');
@@ -418,6 +429,11 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
   }
   function selectChoices(art, state) {
     if (state.dialogue?.choice == null) return null;
+    if (art.choiceContexts != null) {
+      const context = art.choiceContexts[state.dialogue.key];
+      if (!context || context.catalog !== state.dialogue.choice) throw new Error('Unsupported dialogue choice context');
+      return context.options;
+    }
     const options = art.choiceCatalogs[state.dialogue.choice];
     if (!options) throw new Error('Unsupported dialogue choice catalog');
     return options;
