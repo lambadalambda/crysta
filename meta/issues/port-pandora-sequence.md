@@ -13,6 +13,8 @@ Implement only the maps, source assets and semantic state transitions required b
 - [Qualify and implement bounded cellar pot actions](qualify-pandora-pot-actions.md)
 - [Decode the required Pandora actors and carrying poses](decode-pandora-scene-art.md)
 
+- [Support the bounded Pandora event flag projection](pandora-event-flag-projection.md)
+
 ## Requirements
 
 - Derive the scope from the qualified source contract rather than assumed story order. Split substantial map/asset/mechanic work into focused child issues after discovery.
