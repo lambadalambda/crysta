@@ -104,6 +104,49 @@ fn palette_changes_flush_only_pending_half_tiles() {
 }
 
 #[test]
+fn top_level_return_retains_page_without_fabricated_acknowledgement() {
+    let pages = decode(&image(&[0x21, 0xd4]), START).unwrap();
+    assert_eq!(pages.len(), 1);
+    assert_eq!(pages[0].acknowledgement(), Acknowledgement::None);
+    assert_eq!(pages[0].boundary_source(), START + 1);
+    assert_eq!(pages[0].glyphs().len(), 1);
+}
+
+#[test]
+fn choice_catalog_retains_results_positions_and_navigation() {
+    let mut rom = image(&[]);
+    rom[0x12_c259..0x12_c25b].copy_from_slice(&0xc800_u16.to_le_bytes());
+    for (index, words) in [
+        [0x0082_u16, 0xc80a, 0xc80a, 0, 0],
+        [0x0084, 0xc800, 0xc800, 0, 0],
+    ]
+    .iter()
+    .enumerate()
+    {
+        for (word, value) in words.iter().enumerate() {
+            let at = 0x12_c800 + index * 10 + word * 2;
+            rom[at..at + 2].copy_from_slice(&value.to_le_bytes());
+        }
+    }
+    let choice = decode_choice(&rom, 0).unwrap();
+    assert_eq!(choice.options[0].result, 1);
+    assert_eq!(choice.options[0].position, [0, 16]);
+    assert_eq!(choice.options[1].position, [0, 32]);
+    assert_eq!(choice.options[0].neighbors, [Some(2), Some(2), None, None]);
+    assert_eq!(choice.options[1].neighbors, [Some(1), Some(1), None, None]);
+    // Catalog 1 lookup, absolute row/column words and nonzero horizontal offset.
+    rom[0x12_c25b..0x12_c25d].copy_from_slice(&0xc800_u16.to_le_bytes());
+    rom[0x12_c800..0x12_c802].copy_from_slice(&0x0616_u16.to_le_bytes());
+    rom[0x12_c80a..0x12_c80c].copy_from_slice(&0x0618_u16.to_le_bytes());
+    let choice = decode_choice(&rom, 1).unwrap();
+    assert_eq!(choice.options[0].position, [8, 16]);
+    assert_eq!(choice.options[1].position, [8, 32]);
+    rom[0x12_c802..0x12_c804].copy_from_slice(&0xc814_u16.to_le_bytes());
+    assert!(decode_choice(&rom, 0).is_err());
+    assert!(decode_choice(&rom, 2).is_err());
+}
+
+#[test]
 fn public_loader_rejects_unqualified_images() {
     assert!(HouseDialogue::from_rom(&[]).is_err());
     assert!(HouseDialogue::from_rom(&image(&[0xd3])).is_err());

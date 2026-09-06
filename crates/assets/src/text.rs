@@ -9,8 +9,20 @@ mod tests;
 
 /// The entry greeting, not the progression conversation.
 pub const ENTRY_TEXT: u32 = 0x88_8fda;
-/// The resident's first progression conversation.
+/// The first interaction's prompt, before the event-level choice.
+pub const FIRST_TEXT: u32 = 0x88_8ff0;
+/// First interaction's second-option/cancel follow-up (not the initial prompt).
 pub const RESIDENT_TEXT: u32 = 0x88_905a;
+/// Entry, first prompt, its two follow-ups, repeat prompt and its two follow-ups.
+pub const TEXT_SOURCES: [u32; 7] = [
+    ENTRY_TEXT,
+    FIRST_TEXT,
+    RESIDENT_TEXT,
+    0x88_90d9,
+    0x88_9156,
+    0x88_918c,
+    0x88_91d6,
+];
 const WIDTH: usize = 224;
 const HEIGHT: usize = 48;
 
@@ -32,13 +44,17 @@ fn invalid(source: u32, reason: &'static str) -> TextError {
     TextError { source, reason }
 }
 
-/// Action after one acknowledgement of a fully presented page.
+/// Text-page boundary semantics; choice dispatch remains with the event caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Acknowledgement {
     /// Native `$D5`: clear this page and continue this same text invocation.
     Next,
     /// Native `$D3`: close the dialogue and return to the event caller.
     End,
+    /// Native top-level `$D4`: return immediately, retaining the visible page.
+    /// Do NOT invent a Continue acknowledgement. The required prompts next enter
+    /// an event-level choice on this same page; see `HouseDialogue::choice`.
+    None,
 }
 
 /// Provenance and placement of one native font record.
@@ -82,23 +98,47 @@ impl DialoguePage {
     pub fn glyphs(&self) -> &[DialogueGlyph] {
         &self.glyphs
     }
-    /// Address of the actual `$D5`/`$D3` control ending this page.
+    /// Address of the actual `$D5`/`$D3`/top-level `$D4` ending this page.
     #[must_use]
     pub const fn boundary_source(&self) -> u32 {
         self.boundary_source
     }
-    /// The semantic action after one explicit acknowledgement.
+    /// Whether/how this text page requires an acknowledgement before returning.
     #[must_use]
     pub const fn acknowledgement(&self) -> Acknowledgement {
         self.acknowledgement
     }
 }
 
+/// Source-derived option cursor and native selection/navigation results.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct DialogueOption {
+    /// Source address of the ten-byte catalog entry.
+    pub source: u32,
+    /// Native result (1 or 2); cancellation returns 0 instead.
+    pub result: u8,
+    /// Cursor position relative to the retained page. The real option text is
+    /// already drawn on this row; a host can use that row's bitmap as its button.
+    pub position: [u16; 2],
+    /// Native Up/Down/Left/Right destinations, expressed as option result IDs.
+    pub neighbors: [Option<u8>; 4],
+}
+
+/// One of the two admitted choice catalogs. Native initial option is result 1;
+/// confirm is A/L, cancel is B/result 0. No option labels are fabricated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DialogueChoice {
+    /// Native catalog ID (0 first interaction, 1 repeat interaction).
+    pub catalog: u8,
+    /// The two options, in native result order.
+    pub options: [DialogueOption; 2],
+}
+
 /// Only the authenticated Japanese default-name room-B dialogue resources.
 #[derive(Debug)]
 pub struct HouseDialogue {
-    entry: Vec<DialoguePage>,
-    resident: Vec<DialoguePage>,
+    dialogues: Vec<(u32, Vec<DialoguePage>)>,
+    choices: [DialogueChoice; 2],
 }
 impl HouseDialogue {
     /// Compile the required text and font directly from a normalized Japanese ROM.
@@ -111,19 +151,26 @@ impl HouseDialogue {
             return Err(invalid(0, "expected authenticated normalized Japanese ROM"));
         }
         Ok(Self {
-            entry: decode(image, ENTRY_TEXT)?,
-            resident: decode(image, RESIDENT_TEXT)?,
+            dialogues: TEXT_SOURCES
+                .into_iter()
+                .map(|source| Ok((source, decode(image, source)?)))
+                .collect::<Result<_, TextError>>()?,
+            choices: [decode_choice(image, 0)?, decode_choice(image, 1)?],
         })
     }
     /// Source-ID lookup. Page index is a stable zero-based key within the text ID;
     /// hosts can assign sequential numeric page keys scoped to the ROM identity.
     #[must_use]
     pub fn pages(&self, text_source: u32) -> Option<&[DialoguePage]> {
-        match text_source {
-            ENTRY_TEXT => Some(&self.entry),
-            RESIDENT_TEXT => Some(&self.resident),
-            _ => None,
-        }
+        self.dialogues
+            .iter()
+            .find(|(source, _)| *source == text_source)
+            .map(|(_, pages)| pages.as_slice())
+    }
+    /// Native event-level choice catalog; no event flags or branches are executed.
+    #[must_use]
+    pub fn choice(&self, catalog: u8) -> Option<&DialogueChoice> {
+        self.choices.get(usize::from(catalog))
     }
 }
 
@@ -136,6 +183,52 @@ fn bytes(image: &[u8], source: u32, count: usize) -> Result<&[u8], TextError> {
         .get(start..start + count)
         .ok_or_else(|| invalid(source, "truncated source"))
 }
+fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError> {
+    if catalog > 1 {
+        return Err(invalid(0, "unsupported choice catalog"));
+    }
+    let pointer = bytes(image, 0x92_c259 + u32::from(catalog) * 2, 2)?;
+    let base = u16::from_le_bytes([pointer[0], pointer[1]]);
+    let mut options = Vec::new();
+    for index in 0..2_u8 {
+        let source = 0x92_0000 + u32::from(base) + u32::from(index) * 10;
+        let record = bytes(image, source, 10)?;
+        let mut tile_offset = u16::from(record[0] & 0x7f) * 64 + u16::from(record[1]);
+        if record[0] & 0x80 == 0 {
+            tile_offset = tile_offset
+                .checked_sub(0x0504)
+                .ok_or_else(|| invalid(source, "choice outside standard window"))?;
+        }
+        let position = [tile_offset % 64 * 4, tile_offset / 64 * 8];
+        if tile_offset % 2 != 0 || position[0] >= 224 || position[1] >= 48 {
+            return Err(invalid(source, "choice outside page"));
+        }
+        let mut neighbors = [None; 4];
+        for (direction, pair) in record[2..].chunks_exact(2).enumerate() {
+            let target = u16::from_le_bytes([pair[0], pair[1]]);
+            neighbors[direction] = if target == 0 {
+                None
+            } else if target == base {
+                Some(1)
+            } else if u32::from(target) == u32::from(base) + 10 {
+                Some(2)
+            } else {
+                return Err(invalid(source, "unsupported choice neighbor"));
+            };
+        }
+        options.push(DialogueOption {
+            source,
+            result: index + 1,
+            position,
+            neighbors,
+        });
+    }
+    Ok(DialogueChoice {
+        catalog,
+        options: [options[0], options[1]],
+    })
+}
+
 fn glyph_pixels(source: &[u8]) -> Result<[u8; 256], TextError> {
     if source.len() != 64 {
         return Err(invalid(0, "glyph must contain 64 bytes"));
@@ -314,10 +407,12 @@ fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
                 return Ok(d.pages);
             }
             0xd4 => {
-                d.pc = d
-                    .stack
-                    .pop()
-                    .ok_or_else(|| invalid(at, "unacknowledged top-level end"))?;
+                if let Some(caller) = d.stack.pop() {
+                    d.pc = caller;
+                } else {
+                    d.boundary(at, Acknowledgement::None)?;
+                    return Ok(d.pages);
+                }
             }
             0xd5 => d.boundary(at, Acknowledgement::Next)?,
             // Palette changes flush a pending half-tile even without color effects.
