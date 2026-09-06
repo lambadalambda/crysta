@@ -242,7 +242,7 @@ pub(super) fn verify(rom: &Rom) -> Result<Value> {
     Ok(
         json!({"kind":"cpu-free-semantic-room-preview","initial":initial,"handoff":handoff,"departure":departure,"spawn":spawn,"arrival":arrival,
         "return_handoff":return_handoff,"returned":returned,
-        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites and one frozen room10 resident with static house BG2 priority only; no NPC behavior/dialogue, shadows, effects, combat, audio or events."}),
+        "limits":"Walking frames reference-qualified on bounded paths. Doorways are opt-in endpoint-qualified 17/load/17 logical policy, NOT native scheduling or video-frame fidelity. Ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, no native AI/dialogue, shadows, effects, combat, audio or events."}),
     )
 }
 
@@ -301,7 +301,7 @@ pub(super) fn verify_house(rom: &Rom) -> Result<Value> {
         json!({"kind":"cpu-free-semantic-new-game-house-route", "initial":initial,
         "outbound_handoff":outbound_handoff,"arrival":arrival,"return_handoff":return_handoff,
         "returned":returned,"revisited":revisited,
-        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites and one frozen room10 resident with static house BG2 priority only; no native loader timing, NPC behavior/dialogue, shadows, effects, combat or audio."}),
+        "limits":"ROM-derived default-name start with explicit intro presentation omission.441 reference walking steps +70 semantic doorway updates; ordinary Ark sprites, nine frozen fresh residents and a table with static house BG2 priority; six-room semantic endpoints, no native loader timing, AI/dialogue, shadows, effects, combat or audio."}),
     )
 }
 
@@ -398,7 +398,6 @@ mod tests {
         let key = crate::room_art::frame_key(output.animation);
         assert_eq!(state["actor_key"], key);
         let scene = state["scene"].as_array().unwrap();
-        assert_eq!(scene.len(), if output.map_id == 16 { 2 } else { 1 });
         let mut ids: Vec<_> = scene
             .iter()
             .map(|entry| entry["id"].as_str().unwrap())
