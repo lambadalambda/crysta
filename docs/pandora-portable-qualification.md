@@ -1,6 +1,6 @@
 # Offline Pandora portable qualification
 
-Status: **aggregate compiler complete; full input-only route not yet qualified**. Nothing
+Status: **aggregate compiler and restored input-only route pass offline**. Nothing
 here enables the live host. The completed source/navigation qualification remains
 in [pandora-navigation.md](pandora-navigation.md); this document tracks the new
 `PandoraData` adapter and actual input-only continuation separately.
@@ -9,7 +9,7 @@ in [pandora-navigation.md](pandora-navigation.md); this document tracks the new
 
 Requires the locally owned headerless Japanese ROM, SHA-256
 `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`.
-No ROM, extracted grids, captures or checkpoints are shipped.
+No ROM, extracted grids, native captures or runtime snapshot initializers are shipped.
 
 ```sh
 sh tools/pandora-runtime-qualification/run.sh 'local/Tenchi Souzou (Japan).sfc'
@@ -17,7 +17,7 @@ sh tools/pandora-runtime-qualification/run.sh 'local/Tenchi Souzou (Japan).sfc'
 
 The standalone crate is generated below ignored `local/`; it imports the source
 compilers directly, without modifying host module registration. Optional second
-argument selects a test. Current result: **9 tests pass**:
+argument selects a test. Current result: **11 tests pass**:
 
 - Authentic 33-resource / 34-invocation text, source page IDs and choice contexts.
 - Fourteen raw collision profiles, source pot catalog and temporary C occupancy.
@@ -27,19 +27,92 @@ argument selects a test. Current result: **9 tests pass**:
   structural compatibility with the delivered `PandoraData` constructor.
 - Six COP14 reconstruction samples, source standing facing and mutation controls.
 - All33 graph cue recipes: exact key/count, preserve-player operation, genuine
-  reload samples and constructor compatibility. No executed Pandora route yet.
+  reload samples and constructor compatibility.
 - Complete source-ordered exit lists, including the oversized Town record, and
   the exact two-boundary stair loads/arrivals.
 - Full39-motion aggregate construction, repeatable identity, canonical snapshot
   roundtrip and identity sensitivity for every section plus the base-house data.
 - The existing house input prefix reaches mapA `(538,815)` at tick1701 with26.
-  This is only the regression prefix, **not** Pandora completion.
+  This remains a separate unchanged-base regression.
+- Full fixed input-only route:11,590 actions/restores, all34 direct invocations,
+  true door/hit/readiness/ordered-load semantics, stable two-axis final41 control.
+- Removing the real North-door interaction makes the fixed replay fail; additional
+  live-state negative probes check wrong facing, repeated opening, manual interaction
+  during handoff and acknowledgement after final control.
 
 The runner starts solely from `GameState::new_game`. It applies each public input
 both to the continuing state and a restored twin, compares result and snapshot,
-then restores the continuing state again after success. Rejected actions must
-leave canonical state unchanged. The prefix is copied as inputs from the existing
+then restores the continuing state again after success. Frame output, semantic
+story output and the fully patched `effective_room` must also match after restore.
+Rejected actions must leave canonical state unchanged. The prefix is copied as inputs from the existing
 house qualification; its original fixture and compiler are untouched.
+
+## Fixed portable itinerary
+
+`tools/pandora-runtime-qualification/route.json` contains **276 run-length encoded
+public input commands**, expanding to11,590 actions. It starts at NewGame, not at
+mapA or a checkpoint. Eighty-neutral-input waits are deliberate player inputs;
+8,667 total neutral inputs are included, not hidden engine completion timers.
+The route deliberately misses once with source pot5, then lands two actual door
+hits with pot3/4. All34 direct `Invocation` keys are checked in source order,
+including the four distinct repeated-resource leave invocations.
+
+The qualification test does **no planning, BFS, coordinate injection, flag write,
+ledger initialization or captured-checkpoint initialization**. Source geometry and forward input
+simulations were discovery aids only; they are absent from the fixed replay.
+Expected positions and semantic/snapshot hashes are assertions after inputs, never
+initializers. Canonical per-action restoration is the only explicit restore.
+
+Selected portable milestones (logical ticks, **not native video frames**):
+
+| Tick | Observation |
+| ---: | --- |
+| 965 | grant26 from the existing house conversation |
+| 1701 | A `(538,815)`, continuous house-prefix endpoint |
+| 2618 | actual North Interact at `(472,304)`, Town mask1 |
+| 3187 | ResidentGrant returns at13 `(360,144)`, grant28 |
+| 4333 / 4517 | Town return crosses `(472,400)` → `(504,400)`, frozen bird retained |
+| 5520 | actual Home Interact at `(504,768)`, Town mask2 |
+| 5706 / 5778 | C load grants27 / direct choice return grants2E |
+| 6431 | off-target throw recovered empty; consumed mask4 and counter0 |
+| 7657 | first actual door hit; consumed mask5, damaged sheet |
+| 9128 / 9189 | second actual hit, consumed mask7 / completion grants292 |
+| 9353 / 9558 | E/20 loads retain open cellar+mask7, reset locals/counter |
+| 9763 |21 replaces the sheet, consumed mask0 |
+| 10087 | first box callback/recoil completes at `(136,359)`, local1 only |
+| 10121 | warning return sets local2; still outside opening gate |
+| 10129 | gate `(136,368)` owns BoxAcquireControl;22 still absent |
+| 10130 / 10131 | successful handoff grants22 / real same-map reload resets locals |
+| 11218 / 11222 | final41 startup grants243 / TourFinal return grants244 and control |
+| 11314 / 11406 / 11498 / 11590 | player-controlled `(120,208)` → `(120,192)` → `(136,192)` → `(136,208)` |
+
+A fresh Down approach fromY360 reaches the exactY370 first-contact witness. A
+continuous hold from the stair arrival skipped that witness in discovery; it was
+not repaired by broadening contact or collision admission. Opening remains a
+separate local1/local2 polling gate, not a second callback.
+
+Each run writes ignored `local/pandora-runtime-qualification/report.json`, binding
+ROM/profile, input-fixture digest, final snapshot digest, action/restore count and
+152 semantic-change observations. The fixture pins both final snapshot and full
+semantic trace hashes; checkpoint assertions independently cover the prefix,
+Town interactions/Y400 corridor, contact/gate and final two-axis control. The
+report is output only and is never read to initialize or drive the replay.
+
+Debug and optimized release replay agree. After the normal harness builds:
+
+```sh
+PANDORA_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" cargo test --quiet --release \
+  --manifest-path local/pandora-runtime-qualification/build/Cargo.toml \
+  input_only -- --include-ignored --nocapture
+cargo clippy --manifest-path local/pandora-runtime-qualification/build/Cargo.toml \
+  --all-targets -- -D warnings
+```
+
+The generated harness now also applies the workspace all/pedantic/missing-docs
+lint policy. Actual workspace public-registration Clippy remains a separate check.
+No new native producer/observer equivalence is claimed: the earlier navigation
+qualification and its36 frozen-bird differences remain distinct evidence. Parent
+owns fresh producer pin revalidation and host/presentation acceptance.
 
 ## Compiled source inputs so far
 
@@ -222,10 +295,9 @@ Standalone harness lint configuration alone is not equivalent to workspace pedan
 
 ## Remaining integration gates
 
-1. Execute the full input-only NewGame→final41 route and restore after every action.
-2. Qualify direct pot hits, cue/contact/readiness/reload order, shared-sheet
-   continuity and stable final two-axis control using this exact aggregate.
-3. Parent-owned host wiring/presentation and fresh producer pin revalidation.
+1. Parent reproduction/acceptance of this exact compiler and fixed portable route.
+2. Parent-owned host wiring, presentation/carry/world-patch acceptance and fresh
+   producer pin revalidation. Offline success does not implicitly enable live play.
 
 Semantic preview may use finite logical cue completion, not native frame-count
 claims. Ordinary doors retain 17 departure / load / 17 arrival. Source COPC1
@@ -234,7 +306,7 @@ reloads and completion ownership; no fallback timers. C's temporary occupancy
 clears after local6, while source input unmasking precedes final departure;
 conservative ownership through departure must be labeled semantic policy.
 
-The eventual Town return must use the bird-safe Y400 corridor. Keep frozen bird
-`$838A19`; do not erase its `(28,25)` conflict to force the historical Y401 line.
-Final acceptance requires completed flags243/244 and stable two-axis final41
-player control, not simply reaching map41. The tracking issue remains open.
+The fixed Town return uses the bird-safe Y400 corridor. Frozen bird `$838A19`
+and its `(28,25)` conflict remain intact, rather than forcing the historical Y401
+line. Final control checks require completed flags243/244 and stable two-axis
+movement, not simply reaching map41. The issue stays open for parent acceptance.
