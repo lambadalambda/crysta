@@ -1,7 +1,9 @@
 //! Allowlisted ROM-only first backgrounds, not a general scene compositor.
+pub mod pandora;
+
 use super::{
-    scripts::{self, Command, Limits, ResourceKind},
     StaticLayer, StaticMapError,
+    scripts::{self, Command, Limits, ResourceKind},
 };
 use crate::{
     compression,
@@ -77,8 +79,10 @@ impl VisualResource {
     }
 }
 
-/// Qualified first background for Japanese maps $000A–$000D, $000F–$0011 and $0128.
+/// Qualified first-background resources and sampling.
 ///
+/// [`Self::from_rom`] admits Japanese maps $000A–$000D, $000F–$0011 and $0128.
+/// [`pandora::PandoraBackground`] separately compiles the wider route's profiles.
 /// Preserves raw cells, definition words and natural ROM colors. Does not apply
 /// animation, sprites, windows, color math, brightness or layer composition.
 /// Room profiles recognize audited script shapes, including the audio-only
@@ -108,9 +112,17 @@ impl StaticBackground {
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
-                ))
+                ));
             }
         };
+        Self::from_loads(image, &loads, graphics_size)
+    }
+
+    fn from_loads(
+        image: &[u8],
+        loads: &[Load],
+        graphics_size: usize,
+    ) -> Result<Self, VisualMapError> {
         let graphics = resource(
             image,
             loads[0].1,
@@ -123,14 +135,35 @@ impl StaticBackground {
         let attributes = resource(image, loads[3].1, ResourceKind::Metatiles, 512, true)?;
         let shared_colors = resource(image, loads[5].1, ResourceKind::Palette, 64, false)?;
         let layer = StaticLayer::from_rom(image, loads[4].1).map_err(VisualMapError::Layer)?;
+        let mut palette = [Bgr555::new(0); 128];
+        for (color, bytes) in palette.iter_mut().zip(
+            shared_colors
+                .decoded()
+                .chunks_exact(2)
+                .chain(colors.decoded().chunks_exact(2)),
+        ) {
+            *color = Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]]));
+        }
+        Self::from_parts(
+            layer,
+            vec![graphics, colors, definitions, attributes, shared_colors],
+            palette,
+        )
+    }
+
+    fn from_parts(
+        layer: StaticLayer,
+        resources: Vec<VisualResource>,
+        palette: [Bgr555; 128],
+    ) -> Result<Self, VisualMapError> {
         if layer.cells().iter().any(|cell| cell.raw() > 0x1ff) {
             return Err(VisualMapError::Unsupported(
                 "unqualified high bits in static background cells",
             ));
         }
-        let tiles =
-            graphics::decode_tiles_4bpp(graphics.decoded()).map_err(VisualMapError::Graphics)?;
-        let metatiles: Vec<_> = definitions
+        let tiles = graphics::decode_tiles_4bpp(resources[0].decoded())
+            .map_err(VisualMapError::Graphics)?;
+        let metatiles: Vec<_> = resources[2]
             .decoded()
             .chunks_exact(8)
             .map(|record| {
@@ -150,18 +183,9 @@ impl StaticBackground {
                 "nonzero background definition graphics adjustment",
             ));
         }
-        let mut palette = [Bgr555::new(0); 128];
-        for (color, bytes) in palette.iter_mut().zip(
-            shared_colors
-                .decoded()
-                .chunks_exact(2)
-                .chain(colors.decoded().chunks_exact(2)),
-        ) {
-            *color = Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]]));
-        }
         Ok(Self {
             layer,
-            resources: vec![graphics, colors, definitions, attributes, shared_colors],
+            resources,
             tiles,
             metatiles,
             palette,
@@ -172,13 +196,14 @@ impl StaticBackground {
     pub const fn layer(&self) -> &StaticLayer {
         &self.layer
     }
-    /// Ordered decoded BG1 loads: graphics, palette, definitions, attributes,
-    /// shared palette. Excludes the separately retained layer and unused BG2/sprites.
+    /// Resource storage order: graphics, base palette, definitions, attributes,
+    /// shared palette; Pandora tour profiles append six ordered palette overrides.
+    /// Not chronological transfer order. Excludes the separately retained layer and unused BG2/sprites.
     #[must_use]
     pub fn resources(&self) -> &[VisualResource] {
         &self.resources
     }
-    /// Decoded 4bpp tiles from index zero: 512 for the cavern, 768 for rooms.
+    /// Decoded 4bpp tiles from index zero: 384 for the tour, 512 cavern, 768 rooms/exterior.
     #[must_use]
     pub fn tiles(&self) -> &[Tile4bpp] {
         &self.tiles
@@ -507,6 +532,36 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             &ROOM_SHARED,
         ]
     };
+    validate_spans(image, spans)?;
+    // Fixed offsets into validated windows; never discover instruction boundaries.
+    let offsets = if id == 0xa {
+        [0x18_8369, 0x18_8354, 0x18_8372, 0x18_837a, 0x18_835f]
+    } else {
+        [0x18_841e, 0x18_8405, 0x18_8427, 0x18_842f, 0x18_8410]
+    };
+    [
+        (ResourceKind::Graphics, offsets[0], 4, 9),
+        (ResourceKind::Palette, offsets[1], 4, 7),
+        (ResourceKind::Metatiles, offsets[2], 5, 8),
+        (ResourceKind::Metatiles, offsets[3], 5, 8),
+        (ResourceKind::Layer, offsets[4], 2, 5),
+        (ResourceKind::Palette, 0x18_81a5, 4, 7),
+    ]
+    .into_iter()
+    .map(|(kind, at, p, len)| {
+        let bytes = &image[at..at + len];
+        let source =
+            scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("three-byte field"), 0x98)
+                .map_err(VisualMapError::Script)?
+                .normalized()
+                .value() as usize;
+        Ok((kind, source, bytes.to_vec()))
+    })
+    .collect()
+}
+
+fn validate_spans(image: &[u8], spans: &[&RoomSpan]) -> Result<(), VisualMapError> {
+    let invalid = || VisualMapError::Unsupported("unqualified room script profile");
     for span in spans {
         let bytes = image
             .get(span.offset..span.offset + span.bytes.len())
@@ -536,31 +591,7 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             }
         }
     }
-    // Fixed offsets into validated windows; never discover instruction boundaries.
-    let offsets = if id == 0xa {
-        [0x18_8369, 0x18_8354, 0x18_8372, 0x18_837a, 0x18_835f]
-    } else {
-        [0x18_841e, 0x18_8405, 0x18_8427, 0x18_842f, 0x18_8410]
-    };
-    [
-        (ResourceKind::Graphics, offsets[0], 4, 9),
-        (ResourceKind::Palette, offsets[1], 4, 7),
-        (ResourceKind::Metatiles, offsets[2], 5, 8),
-        (ResourceKind::Metatiles, offsets[3], 5, 8),
-        (ResourceKind::Layer, offsets[4], 2, 5),
-        (ResourceKind::Palette, 0x18_81a5, 4, 7),
-    ]
-    .into_iter()
-    .map(|(kind, at, p, len)| {
-        let bytes = &image[at..at + len];
-        let source =
-            scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("three-byte field"), 0x98)
-                .map_err(VisualMapError::Script)?
-                .normalized()
-                .value() as usize;
-        Ok((kind, source, bytes.to_vec()))
-    })
-    .collect()
+    Ok(())
 }
 
 fn resource(
@@ -599,7 +630,7 @@ fn resource(
 mod tests {
     use super::*;
 
-    fn room_fixture() -> Vec<u8> {
+    pub(super) fn room_fixture() -> Vec<u8> {
         let mut image = vec![0; 0x28_0000];
         for (id, entry) in [
             (0xb_usize, 0x98_8401_u32),
@@ -655,7 +686,7 @@ mod tests {
         image
     }
 
-    fn exterior_fixture() -> Vec<u8> {
+    pub(super) fn exterior_fixture() -> Vec<u8> {
         let mut image = room_fixture();
         image[0x06_95ba..0x06_95bd].copy_from_slice(&[0x50, 0x83, 0x98]);
         // Same transfer modes, different sources and a root-only F8 fallthrough.
