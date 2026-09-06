@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<title>Browser-local extraction spike</title>
+<h1>Browser-local extraction spike</h1>
+<p>Japanese reference only. One intro Earth packet; six synthetic walking frames.
+No rendering, caching, audio, or upload. The native comparison is loaded before selection.</p>
+<label>Owned Japanese ROM <input id="rom" type="file" accept=".sfc,.smc" disabled></label>
+<pre id="result" role="status">Loading Wasm and native metadata…</pre>
+<p>Timing includes input copying, validation, decoding, metadata hashing and replay.
+Wasm linear capacity is not live allocations or total browser peak. JS heap samples
+are optional and are not peak measurements; total browser peak is unknown.</p>
+<script type="module" src="./main.mjs"></script>
+</html>
