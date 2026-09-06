@@ -83,7 +83,11 @@ samples. Load motions contain exactly one explicit reload marker, even for 21→
 Map membership and pose bounds are checked. Missing cue motions reject the whole
 action atomically; there are **no fallback timers, inferred stairs or teleports**.
 The compiler must constrain its halo/collision to admitted movement and exits;
-this is not a general town/navigation engine.
+this is not a general town/navigation engine. Exact `MotionSpec` anchors do not
+represent the navigation compiler's complete ordered coarse/fine exit tables.
+Likewise, ordinary `Room` sampling does not express E/20's Up-only type29 admission;
+an adapter needs an explicitly qualified typed seam, not a global type29-to-floor
+alias. These integration limits remain unresolved by the polling/sheet corrections.
 
 The last motion sample is an explicit **completion boundary**: its pose and reload
 apply, then the graph continuation and next scene win in the same logical update.

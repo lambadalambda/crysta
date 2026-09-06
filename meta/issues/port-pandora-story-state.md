@@ -72,5 +72,16 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   tile/attribute patches and removed pots; A/13/21 replace the resident sheet.
   Locals/counter and scene occupancy still reset/rebuild on every load. The new
   profile must rebuild A→D with the wooden door closed, leaving profile9 unchanged.
+- Polling correction implemented red → green as `ce617cf`: two callback specs plus
+  `BoxOpeningGate`; the masked `BoxAcquireControl` cue awaits compiler-certified
+  COPDF success before grant22/reload. Profile11 supersedes profile10; the opening
+  correction alone keeps the 300-byte version2 envelope. Inclusive corners,
+  neutral/held input, all facings, both local requirements, Y359 exclusion, missing
+  readiness and per-action restore are covered. Independent source-contract review
+  approved; all five private fixture suites, strict core Clippy and Wasm pass.
 - Reopening cellar tiles after replacement with persistent292 needs authenticated
   source load effects, not flag-derived inference; requested from navigation/parent.
+- Adapter gaps remain distinct from these corrections: exact motion anchors do not
+  encode the full ordered exit tables, and ordinary Room sampling cannot express
+  E/20's Up-only type29 admission. Do not substitute guessed exits or globally
+  classify type29 as floor.
