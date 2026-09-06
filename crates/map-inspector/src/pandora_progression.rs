@@ -1,5 +1,5 @@
 //! Offline ROM-to-PandoraData adapter. Never called by the live host.
-use crate::{invalid, pandora_navigation, sha256, Result};
+use crate::{invalid, pandora_navigation, pandora_navigation::source_objects, sha256, Result};
 use assets::{
     maps::visual::pandora::PandoraBackground,
     text::pandora::{PandoraDialogue, DIRECT_INVOCATIONS},
@@ -73,38 +73,6 @@ fn compile_text(image: &[u8]) -> Result<(PandoraText, Value)> {
         PandoraText::new(requests)?,
         json!({"resources":resources,"invocations":DIRECT_INVOCATIONS.as_slice()}),
     ))
-}
-
-fn source_objects(image: &[u8], nav: &pandora_navigation::Navigation) -> Result<Vec<SourceObject>> {
-    require(
-        source(image, 0x8796d7, 1)? == [0xa9]
-            && word(image, 0x96e1a6)? == 0
-            && word(image, 0x96e1ab)? == 0,
-        "FA/FB source fallback",
-    )?;
-    let replacement = word(image, 0x8796d8)?;
-    require(replacement == 0xf8, "qualified pot replacement")?;
-    let room = nav
-        .profile("c-direct")
-        .ok_or_else(|| invalid("C profile"))?
-        .room();
-    let [l, t, r, b] = room.sample_halo().ok_or_else(|| invalid("C source halo"))?;
-    let mut objects = Vec::new();
-    for y in t..b {
-        for x in l..r {
-            let cell = y * room.width() + x;
-            let raw = room.cells()[usize::from(cell)];
-            if matches!(raw & 511, 0xfa | 0xfb) {
-                objects.push(SourceObject {
-                    cell,
-                    raw,
-                    replacement,
-                });
-            }
-        }
-    }
-    require(!objects.is_empty(), "missing bounded source pots")?;
-    Ok(objects)
 }
 
 fn compile_rooms(

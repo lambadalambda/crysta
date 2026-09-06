@@ -3,7 +3,7 @@ use assets::maps::{
     exits::ExitList,
     visual::{pandora::PandoraBackground, StaticBackground},
 };
-use room_core::{Direction, Room};
+use room_core::{pots::SourceObject, Direction, Room};
 use serde_json::{json, Value};
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
@@ -18,8 +18,11 @@ fn ensure(ok: bool, reason: &str) -> Result<()> {
 /// Collision classification, never a replacement for the retained source word.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Material {
+    /// Ordinary open-cell handler.
     Open,
+    /// Solid-cell handler, including qualified passive occupancy.
     Solid,
+    /// Partial-cell handler used by type16 and the scoped closed-door alias.
     Partial,
 }
 
@@ -33,23 +36,31 @@ pub struct Profile {
     exits: ExitList,
 }
 impl Profile {
+    /// Stable source-phase profile name.
     pub fn name(&self) -> &str {
         self.name
     }
+    /// Source map ID for this profile.
     pub fn map(&self) -> u16 {
         self.map
     }
+    /// Immutable raw collision words and admitted sample halo.
     pub fn room(&self) -> &Room {
         &self.room
     }
+    /// Complete source-ordered exit list, including unsupported destinations.
     pub fn exits(&self) -> &ExitList {
         &self.exits
     }
+    /// Source actor IDs and positions in source phase order; no live actor AI.
     pub fn actors(&self) -> &[(u32, [u16; 2])] {
         &self.actors
     }
     /// Samples are cells, not anchors. Direction is the delayed direction governing
     /// this collision tick, NOT newly submitted input. Unknown modes/materials fail.
+    ///
+    /// # Errors
+    /// Rejects unqualified control, out-of-halo cells, old-edge slopes or unknown materials.
     pub fn sample(
         &self,
         cell: (u16, u16),
@@ -112,9 +123,11 @@ pub struct ContactSpec {
     opening: [u16; 4],
 }
 impl ContactSpec {
+    /// Inclusive raw Ark first-contact bounds `[left, top, right, bottom]`.
     pub fn first_bounds(&self) -> [u16; 4] {
         self.first
     }
+    /// Inclusive raw Ark polling bounds, independent of first-contact geometry.
     pub fn opening_bounds(&self) -> [u16; 4] {
         self.opening
     }
@@ -193,19 +206,60 @@ pub struct Navigation {
     metadata: Value,
 }
 impl Navigation {
+    /// All immutable profiles in compiler recipe order.
     pub fn profiles(&self) -> &[Profile] {
         &self.profiles
     }
+    /// Look up an exact source-phase profile name; no fallback profile.
     pub fn profile(&self, name: &str) -> Option<&Profile> {
         self.profiles.iter().find(|p| p.name == name)
     }
+    /// Source hashes, complete exits, transfer/contact provenance and policy.
     pub fn metadata(&self) -> &Value {
         &self.metadata
     }
+    /// Shared source-derived first-contact and opening-polling geometry.
     pub fn contact(&self) -> &ContactSpec {
         &self.contact
     }
 }
+/// Compile the shared, cell-sorted FA/FB source-object catalog for the entire
+/// admitted `c-direct` halo, including objects beyond the witnessed input route.
+/// Runtime and world-patch consumers must share this catalog and its ledger order.
+/// `image` and `nav` must come from the same authenticated ROM compilation.
+///
+/// # Errors
+/// Rejects missing C admission, changed FA/FB fallback operands, truncation or an
+/// empty catalog. Does not scan outside the halo or initialize consumed objects.
+pub fn source_objects(image: &[u8], nav: &Navigation) -> Result<Vec<SourceObject>> {
+    ensure(
+        bytes(image, 0x8796d7, 1)? == [0xa9]
+            && word(image, 0x96e1a6)? == 0
+            && word(image, 0x96e1ab)? == 0,
+        "FA/FB source fallback",
+    )?;
+    let replacement = word(image, 0x8796d8)?;
+    ensure(replacement == 0xf8, "qualified pot replacement")?;
+    let room = nav.profile("c-direct").ok_or("C profile")?.room();
+    let [l, t, r, b] = room.sample_halo().ok_or("C source halo")?;
+    let mut objects = Vec::new();
+    for y in t..b {
+        for x in l..r {
+            let cell = y * room.width() + x;
+            let raw = room.cells()[usize::from(cell)];
+            if matches!(raw & 511, 0xfa | 0xfb) {
+                objects.push(SourceObject {
+                    cell,
+                    raw,
+                    replacement,
+                });
+            }
+        }
+    }
+    ensure(!objects.is_empty(), "missing bounded source pots")?;
+    Ok(objects)
+}
+
 fn bytes(image: &[u8], address: usize, length: usize) -> Result<&[u8]> {
     let start = address & 0x3fffff;
     image
@@ -250,6 +304,9 @@ fn validate_dispatch(image: &[u8]) -> Result<()> {
 }
 
 /// Actual ordered source edge cells. Position overflow/underflow fails closed.
+///
+/// # Errors
+/// Rejects coordinate underflow or overflow when deriving the collision edge.
 pub fn sample_cells((x, y): (u16, u16), d: Direction) -> Result<Vec<(u16, u16)>> {
     let (u, v) = match d {
         Direction::Left | Direction::Up => (x.checked_sub(8), y.checked_sub(16)),
@@ -273,6 +330,9 @@ pub fn sample_cells((x, y): (u16, u16), d: Direction) -> Result<Vec<(u16, u16)>>
 }
 /// Raw Ark anchors project to (x,y-8) at $8791A2 before these far/near probes.
 /// Actor-first traversal must try both points within each candidate.
+///
+/// # Errors
+/// Rejects coordinate underflow or overflow in the projection/probes.
 pub fn interaction_samples((x, y): (u16, u16), d: Direction) -> Result<[(u16, u16); 2]> {
     let y = y.checked_sub(8).ok_or("interaction projection Y")?;
     let p = |distance: i16| -> Result<(u16, u16)> {
@@ -309,7 +369,11 @@ fn patched_word(attributes: &[u8], tile: u16) -> Result<u16> {
         | ((u16::from(*attributes.get(usize::from(tile)).ok_or("patch attribute")?) & 127) << 9))
 }
 
-/// Decode only ROM. Capture/provenance metadata is never a production argument.
+/// Compile the bounded profiles and contracts from the authenticated headerless JP ROM.
+/// Capture/provenance metadata is never a production argument.
+///
+/// # Errors
+/// Rejects any other ROM, changed source operands or unsupported asset/geometry data.
 pub fn compile(image: &[u8]) -> Result<Navigation> {
     ensure(
         hash(image) == "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
@@ -693,6 +757,56 @@ mod tests {
             );
         }
     }
+    #[test]
+    #[ignore = "requires PANDORA_ROM, run by the standalone qualification harness"]
+    fn shared_source_objects_cover_the_entire_admitted_halo() {
+        let image = std::fs::read(std::env::var("PANDORA_ROM").unwrap()).unwrap();
+        let mut nav = compile(&image).unwrap();
+        let original = source_objects(&image, &nav).unwrap();
+        assert_eq!(
+            original
+                .iter()
+                .map(|o| (o.cell, o.raw, o.replacement))
+                .collect::<Vec<_>>(),
+            [
+                (675, 0x18fa, 0xf8),
+                (676, 0x18fb, 0xf8),
+                (677, 0x18fa, 0xf8)
+            ]
+        );
+        // Synthetic discovery control: a later halo object must join the shared
+        // catalog; an adjacent out-of-halo object must not broaden admission.
+        let profile = nav
+            .profiles
+            .iter_mut()
+            .find(|p| p.name == "c-direct")
+            .unwrap();
+        let halo = profile.room.sample_halo().unwrap();
+        let width = profile.room.width();
+        let inside = (halo[3] - 1) * width + halo[2] - 1;
+        let outside = inside + 1;
+        let mut cells = profile.room.cells().to_vec();
+        cells[usize::from(inside)] = 0x18fb;
+        cells[usize::from(outside)] = 0x18fa;
+        profile.room = Room::new_passive(width, profile.room.height(), cells)
+            .unwrap()
+            .with_sample_halo(halo)
+            .unwrap();
+        let expanded = source_objects(&image, &nav).unwrap();
+        assert_eq!(&expanded[..original.len()], original);
+        assert_eq!(expanded.len(), original.len() + 1);
+        assert_eq!(
+            (expanded.last().unwrap().cell, expanded.last().unwrap().raw),
+            (inside, 0x18fb)
+        );
+        assert!(expanded
+            .iter()
+            .all(|o| o.cell != outside && o.replacement == 0xf8));
+        let mut changed = image;
+        changed[0x8796d8 & 0x3fffff] ^= 1;
+        assert!(source_objects(&changed, &nav).is_err());
+    }
+
     #[test]
     #[ignore = "requires PANDORA_ROM, run by the standalone qualification harness"]
     fn owned_source_compile_and_mutation_controls() {
