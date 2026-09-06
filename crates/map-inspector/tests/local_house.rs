@@ -43,17 +43,19 @@ fn new_game_explores_both_rooms_and_revisits_without_scope_errors() {
         assert_eq!(state["phase"], phase, "{key}");
         assert_eq!(state["error"], serde_json::Value::Null, "{key}");
         let scene = state["scene"].as_array().unwrap();
-        assert_eq!(scene.len(), if map == 16 { 2 } else { 1 });
-        let residents: Vec<_> = scene
-            .iter()
-            .filter(|entry| entry["key"] == "npc:house")
-            .collect();
+        assert_eq!(scene.len(), if map == 16 { 3 } else { 2 });
+        let actors: Vec<_> = scene.iter().filter(|entry| entry["id"] != "ark").collect();
         if map == 16 {
-            assert_eq!(residents.len(), 1);
-            assert_eq!(residents[0]["position"], serde_json::json!([424, 416]));
+            assert_eq!(actors.len(), 2);
+            assert_eq!(actors[0]["id"], "house:838d86");
+            assert_eq!(actors[0]["position"], serde_json::json!([440, 416]));
+            assert_eq!(actors[1]["id"], "house:838d7c");
+            assert_eq!(actors[1]["position"], serde_json::json!([424, 416]));
             assert_eq!(scene[0]["key"], state["actor_key"]);
         } else {
-            assert!(residents.is_empty(), "NPC must not leak into bedroom");
+            assert_eq!(actors.len(), 1);
+            assert_eq!(actors[0]["id"], "house:88d618");
+            assert_eq!(actors[0]["position"], serde_json::json!([472, 144]));
         }
     }
 }

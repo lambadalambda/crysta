@@ -4,13 +4,14 @@ use crate::{invalid, Result};
 use assets::{
     graphics::{Bgr555, IndexedPixel, Tile4bpp},
     maps::visual::{StaticBackground, VisualResource},
-    sprites::{ArkSprites, HouseNpc, SpriteFrame, SpritePixel},
+    sprites::{ArkSprites, HouseGraphicsKey, HousePoseKey, HouseScenes, SpriteFrame, SpritePixel},
 };
 use room_core::{AnimationFrame, AnimationSet};
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
-const NPC_KEY: &str = "npc:house";
+#[cfg(test)]
+const NPC_KEY: &str = "house:838d7c";
 
 /// Ordinary world-space presentation; tie ranks come from the source draw list.
 struct PlacedActor {
@@ -142,7 +143,7 @@ fn foreground(background: &StaticBackground) -> Result<Value> {
     Ok(json!({"width":width,"height":height,"runs":runs(pixels)}))
 }
 
-pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
+fn ark_frames(rom: &rom::Rom) -> Result<serde_json::Map<String, Value>> {
     let sprites = ArkSprites::from_rom(rom.image())?;
     let mut frames = serde_json::Map::new();
     for set in [AnimationSet::Standing, AnimationSet::Walking] {
@@ -174,56 +175,86 @@ pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
             }
         }
     }
-    let npc = HouseNpc::from_rom(rom.image())?;
-    frames.insert(
-        NPC_KEY.into(),
-        raster(
-            npc.composition(),
-            npc.graphics(),
-            npc.palette(),
-            npc.palette_base(),
-            npc.hflip(),
-        )?,
-    );
-    let bedroom = StaticBackground::from_rom(rom.image(), 15)?;
-    let house = StaticBackground::from_rom(rom.image(), 16)?;
-    // /map.bmp is fixed to map15. Require full decoded source identity, not an
-    // assumption that the two room viewports happen to look alike.
-    if bedroom.layer().layer_bytes() != house.layer().layer_bytes()
-        || !bedroom
-            .resources()
-            .iter()
-            .map(VisualResource::decoded)
-            .eq(house.resources().iter().map(VisualResource::decoded))
-    {
-        return Err(invalid("house backgrounds differ: fixed /map.bmp cannot be reused").into());
+    Ok(frames)
+}
+
+pub(super) fn compile(rom: &rom::Rom) -> Result<Art> {
+    let mut frames = ark_frames(rom)?;
+    let scenes = HouseScenes::from_rom(rom.image())?;
+    let mut rooms = crate::house_profiles::MAPS
+        .into_iter()
+        .map(|map| {
+            (
+                map,
+                RoomActors {
+                    actors: Vec::new(),
+                    ark_tie_rank: u16::from(
+                        HouseScenes::ark_tie_rank(map).expect("admitted house map"),
+                    ),
+                },
+            )
+        })
+        .collect::<BTreeMap<_, _>>();
+    let mut actors = Vec::new();
+    for actor in scenes.actors() {
+        // Instance-keyed rasters deliberately avoid assuming pose identity alone
+        // also identifies graphics, palette relocation or actor mirroring.
+        let id = format!("house:{:06x}", actor.source_id());
+        frames.insert(
+            id.clone(),
+            raster(
+                actor.setup_frame().composition(),
+                actor.graphics(),
+                actor.palette(),
+                actor.palette_base(),
+                actor.hflip(),
+            )?,
+        );
+        rooms
+            .get_mut(&actor.map_id())
+            .expect("qualified scene map")
+            .actors
+            .push(PlacedActor {
+                id: id.clone(),
+                key: id.clone(),
+                position: actor.position(),
+                tie_rank: u16::from(actor.tie_rank()),
+            });
+        let pose = match actor.setup_frame().key() {
+            HousePoseKey::Compressed { packet, offset } => {
+                json!({"kind":"compressed","packet":packet,"decoded_offset":offset})
+            }
+            HousePoseKey::Direct(address) => json!({"kind":"direct","address":address}),
+        };
+        let HouseGraphicsKey::Compressed(graphics) = actor.graphics_key();
+        actors.push(json!({"id":id,"key":id,"source_id":actor.source_id(),"map_id":actor.map_id(),
+            "position":actor.position(),"tie_rank":actor.tie_rank(),"policy":"frozen-fresh-setup",
+            "setup_record":0,"selector":actor.selector(),"facing":actor.facing(),"hflip":actor.hflip(),
+            "palette_base":actor.palette_base(),"pose":pose,"graphics_packet":graphics,
+            "source_ranges":actor.source_ranges().iter().map(|r| [r.start,r.end]).collect::<Vec<_>>()}));
     }
-    let rooms = BTreeMap::from([
-        (
-            15,
-            RoomActors {
-                actors: vec![],
-                ark_tie_rank: 0,
-            },
-        ),
-        (
-            npc.map_id(),
-            RoomActors {
-                actors: vec![PlacedActor {
-                    id: NPC_KEY.into(),
-                    key: NPC_KEY.into(),
-                    position: npc.position(),
-                    tie_rank: 0,
-                }],
-                ark_tie_rank: 1,
-            },
-        ),
-    ]);
+    let bedroom = StaticBackground::from_rom(rom.image(), 15)?;
+    let mut masks = BTreeMap::new();
+    for map in crate::house_profiles::MAPS {
+        let background = StaticBackground::from_rom(rom.image(), map)?;
+        // /map.bmp is fixed to map15. Require full decoded source identity for
+        // every admitted room, not merely similar-looking viewport samples.
+        if bedroom.layer().layer_bytes() != background.layer().layer_bytes()
+            || !bedroom
+                .resources()
+                .iter()
+                .map(VisualResource::decoded)
+                .eq(background.resources().iter().map(VisualResource::decoded))
+        {
+            return Err(
+                invalid("house backgrounds differ: fixed /map.bmp cannot be reused").into(),
+            );
+        }
+        masks.insert(map, foreground(&background)?);
+    }
     Ok(Art {
         bytes: serde_json::to_vec(&json!({"schema_version":1,"frames":frames,
-            "scene_ids":membership(&rooms),
-            "npc":{"key":NPC_KEY,"map_id":npc.map_id(),"position":npc.position(),"policy":"frozen-ordinary-pose"},
-            "foreground":{"15":foreground(&bedroom)?,"16":foreground(&house)?}}))?,
+            "scene_ids":membership(&rooms),"actors":actors,"foreground":masks}))?,
         rooms,
     })
 }
@@ -457,10 +488,6 @@ mod tests {
             "../../../tools/house-npc-qualification/reference.json"
         ))
         .unwrap();
-        assert_eq!(
-            art["npc"],
-            json!({"key":NPC_KEY,"map_id":16,"position":[424,416],"policy":"frozen-ordinary-pose"})
-        );
         let resident = &art["frames"][NPC_KEY];
         assert_eq!(resident["offset"], json!([-8, -33]));
         assert_eq!(
@@ -477,8 +504,40 @@ mod tests {
         assert_eq!(rgba.chunks_exact(4).filter(|p| p[3] == 255).count(), 313);
     }
 
+    fn assert_house_roster(art: &Value) {
+        let expected = [
+            (11, "house:838b96", [120, 112], 0),
+            (12, "house:838c0a", [88, 416], 3),
+            (12, "house:838c14", [56, 384], 2),
+            (12, "house:838c1e", [72, 368], 1),
+            (12, "house:838c28", [104, 368], 0),
+            (13, "house:838cb4", [72, 672], 0),
+            (15, "house:88d618", [472, 144], 0),
+            (16, "house:838d7c", [424, 416], 1),
+            (16, "house:838d86", [440, 416], 0),
+            (17, "house:838de2", [440, 640], 0),
+        ];
+        assert_eq!(art["actors"].as_array().unwrap().len(), expected.len());
+        for (map, id, position, tie) in expected {
+            let entry = art["actors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|a| a["id"] == id)
+                .unwrap();
+            assert_eq!(entry["map_id"], map);
+            assert_eq!(entry["position"], json!(position));
+            assert_eq!(entry["tie_rank"], tie);
+            assert_eq!(entry["policy"], "frozen-fresh-setup");
+            assert_eq!(entry["setup_record"], 0);
+            assert!(art["frames"].get(entry["key"].as_str().unwrap()).is_some());
+        }
+        assert_eq!(art["scene_ids"].as_object().unwrap().len(), 6);
+        assert_eq!(art["foreground"].as_object().unwrap().len(), 6);
+    }
+
     #[test]
-    fn local_rom_full_atlas_pixels_bounds_and_both_backgrounds() {
+    fn local_rom_full_atlas_pixels_bounds_and_six_backgrounds() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../local/Tenchi Souzou (Japan).sfc");
         if !path.try_exists().unwrap() {
@@ -489,7 +548,8 @@ mod tests {
         let art: Value = serde_json::from_slice(&compile(&rom).unwrap().bytes).unwrap();
         assert_eq!(art["schema_version"], 1);
         assert_npc_raster(&art);
-        assert_eq!(art["frames"].as_object().unwrap().len(), 29);
+        assert_eq!(art["frames"].as_object().unwrap().len(), 38);
+        assert_house_roster(&art);
         let sprites = ArkSprites::from_rom(rom.image()).unwrap();
         for (index, frame) in sprites.frames().iter().enumerate() {
             for mirror in [false, true] {
@@ -538,7 +598,7 @@ mod tests {
         let a = StaticBackground::from_rom(rom.image(), 15).unwrap();
         let b = StaticBackground::from_rom(rom.image(), 16).unwrap();
         assert_eq!(a.palette(), b.palette());
-        for id in ["15", "16"] {
+        for id in ["11", "12", "13", "15", "16", "17"] {
             let mask = &art["foreground"][id];
             let width = a.layer().width() * 16;
             let height = a.layer().height() * 16;
