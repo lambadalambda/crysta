@@ -1,5 +1,9 @@
 //! Bounded ROM-backed Ark and house actor sprites, not a sprite VM or scene renderer.
 mod house;
+pub use house::pandora::{
+    PandoraActorPhase, PandoraArt, PandoraCarryMotion, PandoraCarryPose, PandoraGraphicsKey,
+    PandoraMotion, PandoraPhase, PandoraPoseList, PandoraSceneLimit, PandoraSprites,
+};
 pub use house::{HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseScenes};
 mod house_npc;
 pub use house_npc::HouseNpc;

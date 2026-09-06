@@ -7,6 +7,9 @@ use crate::{
 };
 use std::{collections::HashMap, ops::Range, sync::Arc};
 
+#[path = "pandora.rs"]
+pub(super) mod pandora;
+
 /// Source coordinates for a pose. Decoded offsets are never added to ROM addresses.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HousePoseKey {
