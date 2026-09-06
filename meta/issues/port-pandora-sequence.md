@@ -65,9 +65,13 @@ Implement only the maps, source assets and semantic state transitions required b
   TDD covers all17 C updates, Box completion, unready choices/malformed values and
   visible-page controls. Independent review approved; nine host tests retain the
   exact11,590-action final snapshot and workspace Clippy passes.
-- Full browser cadence still requires the canonical no-op proof and a second
-  independently fresh projected replay; no omitted input is accepted merely
-  because it looks unchanged. The producer bridge remains held.
+- Canonical no-op proof accepted after independent source/log review and parent
+  clean debug/release reproduction: complete offline/projected arrays agree,
+  181 blocking no-ops omitted and all17 C+1 Box arrivals retained. Parent verified
+  actual artifact hashes and Git archive/tree linkage; see the
+  [pinned cadence proof](../../docs/pandora-cadence.md). The input-only browser
+  journey is now running against that expectation; no partial prefix is acceptance.
+  The producer bridge remains held.
 - Both module registrations are explicit in main. Producer bridge/current pins
   and the continuous real-browser journey remain acceptance gates, not bypassed
   by passing the offline route.
