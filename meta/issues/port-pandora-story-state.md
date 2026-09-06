@@ -18,7 +18,7 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
 - One authoritative story projection; exact room-local and counter resets including same-map reload, preserving persistent highflags.
 - Fixed map13 refusal/retry and direct C branch; unsupported C cancel/result2 must not grant or advance.
 - Real hit output drives door state; preserve pot consumed ledger and launch collision profile through recovery.
-- Box warning has two acknowledgements and requires a second contact; forced tour owns control through final four-page return and grants `$243/$244` at their distinct boundaries.
+- Box warning has two acknowledgements; opening requires the raw-coordinate polling gate, local1 AND local2 and successful COPDF handoff; forced tour owns control through final four-page return and grants `$243/$244` at their distinct boundaries.
 - Versioned canonical snapshots and aggregate identity; restore must reject impossible stages/flags/ownership and resume every supported action exactly.
 - Source-data geometry belongs to the authenticated host compiler, not speculative core constants.
 
@@ -62,3 +62,15 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
 - Parent/navigation still supply qualified new geometry/contact/presentation
   samples and own compiler/transport/render acceptance. Missing cue data fail
   atomically, never with guessed pacing. Keep this issue open until those gates.
+
+### Source correction from navigation e98a7cc
+
+- Opening is a facing-independent polling predicate on inclusive raw bounds and
+  local1 AND local2, not a second Down/contact callback. COPDF success is a separate
+  required boundary before grant22/reload; first-contact witness remains narrow.
+- Shared AFCBB3 sheet lifetime is distinct from room visits. B/C/D/E/20 retain
+  tile/attribute patches and removed pots; A/13/21 replace the resident sheet.
+  Locals/counter and scene occupancy still reset/rebuild on every load. The new
+  profile must rebuild A→D with the wooden door closed, leaving profile9 unchanged.
+- Reopening cellar tiles after replacement with persistent292 needs authenticated
+  source load effects, not flag-derived inference; requested from navigation/parent.

@@ -115,6 +115,7 @@ fn data() -> GameData {
     }
     for cue in [
         Cue::BoxReload,
+        Cue::BoxAcquireControl,
         Cue::SecondHitPatched,
         Cue::ReactionColorMath,
         Cue::ReactionColorReturn,
@@ -145,13 +146,8 @@ fn data() -> GameData {
         },
         ContactSpec {
             kind: ContactKind::BoxWarning,
-            trigger: anchor((136, 359), Direction::Down),
+            trigger: anchor((136, 370), Direction::Down),
             result: anchor((136, 359), Direction::Down),
-        },
-        ContactSpec {
-            kind: ContactKind::BoxOpen,
-            trigger: anchor((136, 368), Direction::Down),
-            result: anchor((136, 368), Direction::Down),
         },
     ];
     let objects = vec![
@@ -171,7 +167,18 @@ fn data() -> GameData {
         last.reload = false;
         motion.frames.push(last);
     }
-    let spec = PandoraData::new(text(), rooms, motions, contacts, objects, true).unwrap();
+    let spec = PandoraData::new(
+        text(),
+        rooms,
+        motions,
+        contacts,
+        BoxOpeningGate {
+            raw_bounds: [120, 368, 152, 400],
+        },
+        objects,
+        true,
+    )
+    .unwrap();
     let base = progression_tests::data();
     let identity = DataIdentity {
         content_sha256: [9; 32],
@@ -241,7 +248,7 @@ fn same_new_game_opt_in_identity_and_old_profile_remain_distinct() {
     let mut s = GameState::new_game(&d, Policy::SemanticPreview);
     assert_eq!(s.output().position, (304, 112));
     assert_eq!(s.output().tick, 0);
-    assert_eq!(&s.snapshot()[..8], b"RSLC\x02\x0a\x00\x01");
+    assert_eq!(&s.snapshot()[..8], b"RSLC\x02\x0b\x00\x01");
     assert_eq!(
         &GameState::new_game(&old, Policy::SemanticPreview).snapshot()[..8],
         b"RSLC\x01\x09\x00\x01"
@@ -409,6 +416,10 @@ fn box_contact_not_interact_and_forced_aggregate_finishes_in_controllable41() {
     while !s.pandora.unwrap().owns() {
         frames(&mut s, &d, Some(Direction::Down), 1);
     }
+    assert!(!s.flags.contains(0x22).unwrap());
+    replay(&mut s, &d, neutral);
+    assert!(!s.flags.contains(0x22).unwrap());
+    replay(&mut s, &d, neutral);
     assert!(s.flags.contains(0x22).unwrap());
     assert_eq!(s.pandora_output(&d).unwrap().scene, ScenePhase::BoxContact);
     assert_eq!(
@@ -569,6 +580,7 @@ fn malformed_immutable_geometry_and_catalogs_are_rejected() {
             p.rooms,
             p.motions,
             p.contacts,
+            p.opening_gate,
             p.objects,
             p.cellar_up_lanes
         )
@@ -589,7 +601,7 @@ fn malformed_immutable_geometry_and_catalogs_are_rejected() {
             .replace_cell(21 * 32 + 11, 0);
     });
     bad(|p| p.contacts[1].trigger.facing = Direction::Up);
-    bad(|p| p.contacts[2].result.position = (256, 368));
+    bad(|p| p.opening_gate.raw_bounds = [120, 368, 256, 400]);
     bad(|p| p.motions[0].frames.clear());
     bad(|p| p.motions[0].frames[0].reload = true);
     bad(|p| p.motions[0].frames[0].map_id = 0x41);
@@ -639,6 +651,7 @@ fn independent_source_dimensions_and_ambiguous_exits_are_checked() {
         p.rooms,
         p.motions,
         p.contacts,
+        p.opening_gate,
         p.objects,
         p.cellar_up_lanes
     )
@@ -660,4 +673,101 @@ fn terminal_motion_commits_next_scene_without_inventing_a_trailing_frame() {
         Some(Invocation::CApproach)
     );
     assert!(s.pandora_output(&d).unwrap().motion.is_none());
+}
+#[test]
+fn opening_polls_both_locals_and_any_facing_but_waits_for_script_handoff() {
+    let d = data();
+    for facing in [
+        Direction::Down,
+        Direction::Up,
+        Direction::Left,
+        Direction::Right,
+    ] {
+        for direction in [None, Some(Direction::Down), Some(Direction::Up)] {
+            let mut s = at(
+                &d,
+                0x21,
+                (136, 368),
+                facing,
+                &[0x26, 0x28, 0x27, 0x2e, 0x292],
+            );
+            ack(&mut s, &d);
+            flag(&mut s, 1);
+            flag(&mut s, 2);
+            frames(&mut s, &d, direction, 1);
+            assert_eq!(
+                s.pandora_output(&d).unwrap().cue,
+                Some(Cue::BoxAcquireControl)
+            );
+            assert!(!s.flags.contains(0x22).unwrap());
+            replay(&mut s, &d, neutral); // qualified busy sample, not COPDF success
+            assert!(!s.flags.contains(0x22).unwrap());
+            replay(&mut s, &d, neutral); // qualified completion: COPDF succeeded
+            assert!(s.flags.contains(0x22).unwrap());
+            assert_eq!(s.pandora_output(&d).unwrap().cue, Some(Cue::BoxReload));
+        }
+    }
+}
+#[test]
+fn opening_raw_gate_is_inclusive_and_outside_recoil_never_grants() {
+    let d = data();
+    for (position, inside) in [
+        ((120, 368), true),
+        ((152, 400), true),
+        ((136, 368), true),
+        ((119, 368), false),
+        ((153, 368), false),
+        ((136, 367), false),
+        ((136, 401), false),
+        ((136, 359), false),
+    ] {
+        let mut s = at(
+            &d,
+            0x21,
+            position,
+            Direction::Left,
+            &[0x26, 0x28, 0x27, 0x2e, 0x292],
+        );
+        ack(&mut s, &d);
+        flag(&mut s, 1);
+        flag(&mut s, 2);
+        frames(&mut s, &d, None, 1);
+        assert_eq!(
+            s.pandora_output(&d).unwrap().cue,
+            inside.then_some(Cue::BoxAcquireControl)
+        );
+        assert!(!s.flags.contains(0x22).unwrap());
+        if !inside {
+            frames(&mut s, &d, None, 20);
+            assert!(!s.flags.contains(0x22).unwrap());
+        }
+    }
+}
+#[test]
+fn missing_copdf_readiness_does_not_grant_or_reload() {
+    let mut d = data();
+    d.pandora
+        .as_mut()
+        .unwrap()
+        .motions
+        .retain(|m| m.key != MotionKey::Cue(Cue::BoxAcquireControl));
+    let mut s = at(
+        &d,
+        0x21,
+        (136, 368),
+        Direction::Right,
+        &[0x26, 0x28, 0x27, 0x2e, 0x292],
+    );
+    ack(&mut s, &d);
+    flag(&mut s, 1);
+    flag(&mut s, 2);
+    replay(&mut s, &d, neutral);
+    let before = s.snapshot();
+    assert_eq!(neutral(&mut s, &d), Err(SliceError::Exit));
+    assert_eq!(s.snapshot(), before);
+    assert!(!s.flags.contains(0x22).unwrap());
+    assert_eq!(s.output().map_id, 0x21);
+    let mut forged = before;
+    forged[109 + 0x22 / 8] |= 1 << (0x22 % 8);
+    assert!(GameState::restore(&d, &forged).is_err());
 }

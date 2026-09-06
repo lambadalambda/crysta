@@ -2,8 +2,8 @@
 use crate::conversation::{self, Active, ConversationSpec, DialogueOutput, StoryConversationSpec};
 use crate::events::{EventFlags, StoryFlags};
 pub use crate::pandora::{
-    Anchor, CollisionKey, ContactKind, ContactSpec, Cue, Invocation, MotionFrame, MotionKey,
-    MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages, ScenePhase, Travel,
+    Anchor, BoxOpeningGate, CollisionKey, ContactKind, ContactSpec, Cue, Invocation, MotionFrame,
+    MotionKey, MotionSpec, PandoraData, PandoraText, ProfileRoom, RequestPages, ScenePhase, Travel,
 };
 mod pandora_runtime;
 use crate::transition::Transition;
@@ -16,6 +16,8 @@ pub use pandora_runtime::{ControlOwner, PandoraOutput};
 
 /// Semantic profile version; v9 adds conversation ownership and bounded exterior progression.
 pub const PROFILE_VERSION: u8 = 9;
+/// Opt-in Pandora policy; v11 corrects polling and explicit COPDF readiness.
+pub const PANDORA_PROFILE_VERSION: u8 = 11;
 
 /// Only supported policy. Doorway updates are logical, not reference video frames.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -696,7 +698,7 @@ impl GameState {
             b'C',
             if self.pandora.is_some() { 2 } else { 1 },
             if self.pandora.is_some() {
-                10
+                PANDORA_PROFILE_VERSION
             } else {
                 PROFILE_VERSION
             },
@@ -761,7 +763,11 @@ impl GameState {
                     b'L',
                     b'C',
                     if enabled { 2 } else { 1 },
-                    if enabled { 10 } else { PROFILE_VERSION },
+                    if enabled {
+                        PANDORA_PROFILE_VERSION
+                    } else {
+                        PROFILE_VERSION
+                    },
                     0,
                     1,
                 ]

@@ -126,12 +126,13 @@ impl State {
             Node::Cue(Cue::ReactionColorMath | Cue::ReactionColorReturn) => {
                 return ScenePhase::CColorMath
             }
+            Node::Cue(Cue::BoxAcquireControl) => return ScenePhase::BoxContact,
             Node::Cue(Cue::BoxReload) => {
                 return if flags.contains(1) == Ok(true) {
                     ScenePhase::BoxContact // The old roster survives until reconstruction.
                 } else {
                     ScenePhase::BoxOpening
-                }
+                };
             }
             _ => {}
         }
@@ -381,6 +382,8 @@ impl GameState {
             next.advance_pending_motion(spec)?;
         } else if matches!(state.graph.node, Node::Request(..)) || next.dialogue.is_some() {
             // Semantic text ownership: discard directions, never buffer them.
+        } else if next.poll_box_opening(spec)? {
+            // COP0D/local predicate takes control, but COPDF has not succeeded.
         } else {
             if state.pot.is_some() {
                 next.advance_pot(
@@ -397,6 +400,7 @@ impl GameState {
                 next.animation.advance(next.walking.active_direction());
             }
             next.detect_pandora_contact(spec)?;
+            next.poll_box_opening(spec)?;
             next.detect_pandora_exit(spec)?;
             next.detect_house_exit(data)?;
         }
@@ -454,12 +458,10 @@ impl GameState {
         {
             return Ok(());
         }
-        let index = if self.flags.contains(2) == Ok(true) {
-            2
-        } else {
-            1
-        };
-        let contact = spec.contacts[index];
+        if self.flags.contains(1) == Ok(true) {
+            return Ok(());
+        } // callback category cleared
+        let contact = spec.contacts[1];
         if self.walking.position() != contact.trigger.position
             || self.animation.facing() != contact.trigger.facing
         {
@@ -470,6 +472,19 @@ impl GameState {
         self.animation = AnimationState::standing(contact.result.facing);
         self.pandora = Some(state);
         Ok(())
+    }
+    fn poll_box_opening(&mut self, spec: &PandoraData) -> Result<bool, SliceError> {
+        if self.map_id != 0x21 || !spec.opening_gate.contains(self.walking.position()) {
+            return Ok(false);
+        }
+        let state = self.pandora.as_mut().ok_or(SliceError::Data)?;
+        if !state.graph.poll_opening(&self.flags) {
+            return Ok(false);
+        }
+        let (x, y) = self.walking.position();
+        self.walking = WalkingState::new(x, y);
+        self.animation = AnimationState::standing(self.animation.facing());
+        Ok(true)
     }
     fn detect_pandora_exit(&mut self, spec: &PandoraData) -> Result<(), SliceError> {
         let mut state = self.pandora.ok_or(SliceError::Data)?;

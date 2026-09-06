@@ -15,6 +15,8 @@ pub enum Cue {
     SecondHitPatched,
     /// Source box opening sets $22 before a same-map reload.
     BoxReload,
+    /// Masked COPDF handoff wait; completion certifies script readiness, before grant22.
+    BoxAcquireControl,
     /// Cooperating color-math worker writes local4 before speaker request.
     ReactionColorMath,
     /// Worker writes local6 after the speaker has requested local5.
@@ -194,16 +196,26 @@ impl Runtime {
         if self.node != Node::Control || has(flags, 0x22) || !has(flags, 0x292) {
             return Err(SliceError::Interaction);
         }
-        if has(flags, 2) {
-            set(flags, 0x22, true);
-            self.node = Node::Cue(Cue::BoxReload);
-        } else if !has(flags, 1) {
-            set(flags, 1, true);
-            self.request(Invocation::BoxWarning);
-        } else {
+        if has(flags, 1) || has(flags, 2) {
             return Err(SliceError::Interaction);
         }
+        set(flags, 1, true);
+        self.request(Invocation::BoxWarning);
         Ok(())
+    }
+    /// Spatial polling is admitted separately by the immutable raw-coordinate gate.
+    /// Taking control does not prove COPDF success and cannot grant22 yet.
+    pub fn poll_opening(&mut self, flags: &StoryFlags) -> bool {
+        if self.node != Node::Control
+            || !has(flags, 1)
+            || !has(flags, 2)
+            || !has(flags, 0x292)
+            || has(flags, 0x22)
+        {
+            return false;
+        }
+        self.node = Node::Cue(Cue::BoxAcquireControl);
+        true
     }
     /// A typed boundary can only complete the currently owned source continuation.
     /// The aggregate performs any required load/pose sequence before invoking this.
@@ -215,6 +227,11 @@ impl Runtime {
             Cue::SecondHitPatched => {
                 set(flags, 0x292, true);
                 Some(SecondHit)
+            }
+            Cue::BoxAcquireControl => {
+                set(flags, 0x22, true);
+                self.node = Node::Cue(Cue::BoxReload);
+                return Ok(());
             }
             Cue::BoxReload => Some(OpeningFirst),
             Cue::ReactionColorMath => {
@@ -311,6 +328,7 @@ impl Runtime {
             Node::Cue(Cue::BoxReload) => (4, 0, 0),
             Node::Cue(Cue::ReactionColorMath) => (5, 0, 0),
             Node::Cue(Cue::ReactionColorReturn) => (6, 0, 0),
+            Node::Cue(Cue::BoxAcquireControl) => (7, 0, 0),
         };
         [tag, id, page, self.counter]
     }
@@ -330,6 +348,7 @@ impl Runtime {
             [4, 0, 0, _] => Node::Cue(Cue::BoxReload),
             [5, 0, 0, _] => Node::Cue(Cue::ReactionColorMath),
             [6, 0, 0, _] => Node::Cue(Cue::ReactionColorReturn),
+            [7, 0, 0, _] => Node::Cue(Cue::BoxAcquireControl),
             _ => return Err(SliceError::Snapshot),
         };
         let state = Self {
@@ -402,6 +421,9 @@ impl Runtime {
                     && locals == 4
                     && has(flags, 0x2e)
                     && !has(flags, 0x292)
+            }
+            Node::Cue(Cue::BoxAcquireControl) => {
+                return map == 0x21 && locals == 6 && has(flags, 0x292) && !has(flags, 0x22);
             }
             Node::Cue(Cue::BoxReload) => {
                 return map == 0x21
@@ -604,7 +626,7 @@ mod tests {
         }
     }
     #[test]
-    fn warning_is_two_pages_delay_then_second_contact_and_same_map_reset() {
+    fn warning_is_two_pages_delay_then_poll_handoff_and_same_map_reset() {
         let t = text();
         let mut r = Runtime::new();
         let mut f = flags();
@@ -624,7 +646,9 @@ mod tests {
             .unwrap();
         assert!(has(&f, 2));
         assert!(!has(&f, 0x22));
-        r.contact(&mut f).unwrap();
+        assert!(r.poll_opening(&f));
+        assert!(!has(&f, 0x22));
+        r.complete(Cue::BoxAcquireControl, &mut f).unwrap();
         assert!(has(&f, 0x22));
         assert_ne!(r.node, Node::Control);
         r.load(0x21, &mut f);
@@ -749,6 +773,28 @@ mod malformed_tests {
                 Runtime::decode(state.encode(), 0xc, &invalid).is_err(),
                 "bit {bit}"
             );
+        }
+    }
+}
+
+#[cfg(test)]
+mod opening_predicate_tests {
+    use super::*;
+    #[test]
+    fn local1_and_local2_are_required_and_neither_contact_nor_poll_grants22() {
+        for locals in [0, 2, 4, 6] {
+            let mut flags = StoryFlags::new([0; 128]);
+            for bit in [0x20, 0xfb, 0x26, 0x28, 0x27, 0x2e, 0x292] {
+                set(&mut flags, bit, true);
+            }
+            set(&mut flags, 1, locals & 2 != 0);
+            set(&mut flags, 2, locals & 4 != 0);
+            let mut r = Runtime::new();
+            assert_eq!(r.poll_opening(&flags), locals == 6);
+            assert!(!has(&flags, 0x22));
+            if locals != 0 {
+                assert!(r.contact(&mut flags).is_err());
+            }
         }
     }
 }

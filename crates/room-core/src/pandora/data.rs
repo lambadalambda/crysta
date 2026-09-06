@@ -278,7 +278,8 @@ impl Travel {
 pub enum MotionKey {
     /// Ordinary exit, requiring player ownership and story admission.
     Travel(Travel),
-    /// Currently owned continuation only.
+    /// Currently owned continuation only. `BoxAcquireControl` specifically certifies
+    /// successful COPDF, not a timer-based assumption that proximity grants22.
     Cue(Cue),
 }
 /// Exact qualified player anchor and facing/delayed travel direction.
@@ -320,8 +321,6 @@ pub enum ContactKind {
     Resident,
     /// First new Down contact, never Interact.
     BoxWarning,
-    /// Second new Down contact after warning/delay.
-    BoxOpen,
 }
 /// Source-qualified callback/bump admission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -333,13 +332,27 @@ pub struct ContactSpec {
     /// Source bump/settled pose.
     pub result: Anchor,
 }
+/// Inclusive raw Ark coordinate predicate, independently qualified from first contact.
+/// It does not impose facing, button edges or movement admission.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct BoxOpeningGate {
+    /// Inclusive [left, top, right, bottom]; source gate is [120,368,152,400].
+    pub raw_bounds: [u16; 4],
+}
+impl BoxOpeningGate {
+    pub(crate) fn contains(self, (x, y): (u16, u16)) -> bool {
+        let [left, top, right, bottom] = self.raw_bounds;
+        (left..=right).contains(&x) && (top..=bottom).contains(&y)
+    }
+}
 /// Opt-in source contract, bound by the enclosing aggregate data identity.
 #[derive(Debug)]
 pub struct PandoraData {
     pub(crate) text: PandoraText,
     pub(crate) rooms: Vec<ProfileRoom>,
     pub(crate) motions: Vec<MotionSpec>,
-    pub(crate) contacts: [ContactSpec; 3],
+    pub(crate) contacts: [ContactSpec; 2],
+    pub(crate) opening_gate: BoxOpeningGate,
     pub(crate) objects: Vec<SourceObject>,
     pub(crate) cellar_up_lanes: bool,
 }
@@ -361,9 +374,10 @@ impl MotionKey {
             Self::Cue(Cue::Returned(TourLeave44)) => (0x44, 0x42, true),
             Self::Cue(Cue::Returned(TourLeave42)) => (0x42, 0x43, true),
             Self::Cue(Cue::Returned(TourLeave43)) => (0x43, 0x41, true),
-            Self::Cue(Cue::Returned(BoxWarning | OpeningFirst | OpeningSecond | OpeningThird)) => {
-                (0x21, 0x21, false)
-            }
+            Self::Cue(
+                Cue::BoxAcquireControl
+                | Cue::Returned(BoxWarning | OpeningFirst | OpeningSecond | OpeningThird),
+            ) => (0x21, 0x21, false),
             Self::Cue(Cue::Returned(
                 TourIntro | TourOne | TourTwo | TourThree | TourFour | TourFive | TourSix,
             )) => (0x41, 0x41, false),
@@ -387,7 +401,8 @@ impl PandoraData {
         text: PandoraText,
         rooms: Vec<ProfileRoom>,
         motions: Vec<MotionSpec>,
-        contacts: [ContactSpec; 3],
+        contacts: [ContactSpec; 2],
+        opening_gate: BoxOpeningGate,
         objects: Vec<SourceObject>,
         cellar_up_lanes: bool,
     ) -> Result<Self, SliceError> {
@@ -402,12 +417,22 @@ impl PandoraData {
                 return Err(SliceError::Data);
             }
         }
-        if contacts.iter().map(|c| c.kind).ne([
-            ContactKind::Resident,
-            ContactKind::BoxWarning,
-            ContactKind::BoxOpen,
-        ]) {
+        if contacts
+            .iter()
+            .map(|c| c.kind)
+            .ne([ContactKind::Resident, ContactKind::BoxWarning])
+        {
             return Err(SliceError::Data);
+        }
+        let [left, top, right, bottom] = opening_gate.raw_bounds;
+        if left > right || top > bottom {
+            return Err(SliceError::Data);
+        }
+        for (x, y) in [(left, top), (right, bottom)] {
+            rooms[CollisionKey::Box as usize]
+                .room
+                .validate_position(x, y)
+                .map_err(|_| SliceError::Data)?;
         }
         for contact in &contacts {
             let key = if contact.kind == ContactKind::Resident {
@@ -504,6 +529,7 @@ impl PandoraData {
             rooms,
             motions,
             contacts,
+            opening_gate,
             objects,
             cellar_up_lanes,
         };

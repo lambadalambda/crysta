@@ -15,7 +15,8 @@ let pandora = PandoraData::new(
     text,
     rooms,             // Vec<ProfileRoom>, CollisionKey::ALL order
     motions,           // Vec<MotionSpec>, missing entries fail closed
-    contacts,          // [resident, first box contact, second box contact]
+    contacts,          // [resident, first box contact/recoil witness]
+    opening_gate,      // BoxOpeningGate { raw_bounds: [120,368,152,400] }
     source_pots,       // sorted Vec<pots::SourceObject>, maximum64
     cellar_up_lanes,   // explicit compiler qualification assertion
 )?;
@@ -50,8 +51,21 @@ The host owns source resident/table occupancy; an open synthetic test room is
 
 `ContactSpec { kind, trigger: Anchor, result: Anchor }` admits exact callback
 anchors. `Anchor` contains player coordinates and facing. The map13 resident uses
-Interact; box warning/opening require collision-resolved **Down contact**, never
-Interact. Box contact kinds are selected by the graph's authoritative local flags.
+Interact. The first box callback retains an exact compiler-qualified witness:
+raw `(136,370)` Down, with the admitted recoil endpoint `(136,359)`. The source
+first-contact rectangle is X123..149/Y370..400, but core does not broaden walking,
+poses or recoil admission to that whole rectangle.
+
+Opening is **not a second callback or Down edge**. `BoxOpeningGate` supplies the
+inclusive raw-coordinate rectangle (source X120..152/Y368..400). Core polls it with
+local1 AND local2, independently of facing and neutral/held input. Raw Y359 remains
+outside. A successful predicate takes masked control in `Cue::BoxAcquireControl`
+without granting22. Only its compiler-qualified completion certifies successful
+COPDF `$888EA6` (`$097C & $0810 == 0`); it then grants22 and starts `BoxReload`.
+The compiler must not emit that completion merely because proximity passed or a
+guessed timer elapsed. Missing readiness motion data fail atomically while masked,
+without grant/reload. COPC1's32 actor-delay units are not assumed to be32 video frames.
+See main's corrected `docs/pandora-navigation.md` source contract (e98a7cc).
 
 `MotionKey` is either a fixed `Travel` or a currently owned `Cue`:
 
@@ -134,7 +148,7 @@ alone discards the ledger. `current_room()` returns the immutable story variant;
 consumed-cell overlays are private to pot collision and exposed separately for art.
 
 The warning requires two acknowledgements, its qualified return/delay cue, then a
-second contact. Opening sets `$22` before reload. The mandatory tour owns control
+facing-independent proximity poll and successful COPDF handoff. Opening sets `$22` before reload. The mandatory tour owns control
 across blank-text gaps and all forced loads. `$243` is granted on the final return;
 `$244` only after the final four-page request returns. The endpoint is controllable
 map41, **not** equipment acquisition, free inventory-room transitions or world return.
@@ -142,7 +156,7 @@ map41, **not** equipment acquisition, free inventory-room transitions or world r
 ## Canonical snapshots
 
 Disabled data retain the exact **181-byte version1/profile9** encoding. Opt-in data
-use **300-byte version2/profile10**, bound to the same aggregate identity and tick:
+use **300-byte version2/profile11**, bound to the same aggregate identity and tick:
 
 | Byte range | Meaning |
 |---|---|
@@ -181,3 +195,13 @@ pass. These are **not** new native aggregate navigation/pacing or browser accept
 Source-qualified new motion/contact data, host compiler/transport/render integration
 and final aggregate acceptance remain parent/navigation-owned. The capability must
 remain disabled on the live host until those gates pass. The owned issue stays open.
+
+### Correction-in-progress: shared-sheet lifetime
+
+Navigation e98a7cc also corrects the old per-visit patch model: AFCBB3 remains
+resident across B/C/D/E/20. Its tile/attribute patches and pot removals must survive
+those scene loads, while locals/counter and occupancy reset. A/13/21 replace the
+resident sheet; A→D rebuilds the wooden door closed. The separate cache correction
+follows the polling correction; do not use the prior per-visit ledger description
+as an adapter contract. Source load effects after replacement with persistent292
+must be authenticated rather than inferred from that event alone.
