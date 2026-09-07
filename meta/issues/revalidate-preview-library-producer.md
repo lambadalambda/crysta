@@ -44,3 +44,22 @@ changed pinned identities until this issue is qualified:
 explicit inventory treatment because the native exporter now reaches the pure
 renderer through the library. `main.rs`, `room_server.rs`, and every frozen
 observer/migration/epoch/output file are unchanged. No descriptor was repinned.
+
+## Browser-adapter impact
+
+The browser-local adapter additionally changes two pinned identities:
+
+- `Cargo.lock`: expected
+  `fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537`,
+  adapter source currently
+  `23e335de25473b02230aae706ef19db003159c92dd1f3583303234d8134bd070`;
+- `crates/map-inspector/web/room-slice.html`: expected
+  `d4103bcfee965378ced16ee9bc74b2c04f0b1a7794e4802a877cb4c354744271`,
+  injected-seam source currently
+  `1dab2e1895a7db842d69188931e784d15f52c8d51758bc019b9d16bbf6225fad`.
+
+The final inventory must also bind root `Cargo.toml`, `crates/pandora-web/`, and
+`tools/pandora-preview/`. The native fallback request paths, `main.rs`,
+`room_server.rs`, and all frozen evidence remain unchanged. The full browser
+journey and same-output producer proof are deliberately deferred until the
+adapter source settles; this section records identities, not acceptance.

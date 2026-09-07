@@ -4,6 +4,28 @@
 This is a bounded semantic-preview acceptance tool, not a native-frame replay.
 The production host/controller/compiler remain parent-owned.
 
+## Browser-local Wasm preview stage
+
+The current source-derived preview can now run from a user-selected local ROM
+without `/state`, `/step`, `/new-game`, `/reset`, `/art.json`, or bitmap backend
+requests. The generated static app and exact commands are documented in
+[`tools/pandora-preview/README.md`](../tools/pandora-preview/README.md).
+A stateful `wasm-bindgen` facade owns `map_inspector::PandoraPreview` in a Web
+Worker; JavaScript only maps the existing closed endpoint protocol and converts
+owned art/BMP copies into the same renderer inputs. It does not implement game
+state, progression, art selection, camera policy, or input cadence.
+
+The shared controller remains unchanged in meaning: visible dialogue is blocking
+only when `dialogue_ready !== false`; visible-unready arrivals retain neutral
+Resume updates and disable acknowledgement. Interact5, acknowledgement6,
+choices7..9, and manual A/pot action10 remain distinct non-repeating commands.
+The native loopback transport remains the default when no runtime is injected.
+
+A bounded local smoke verified load, explicit New Game, movement, interaction,
+reset, invalid replacement, recovery, and zero gameplay/backend network requests.
+It is not a replay or renewal of the accepted continuous journey below, and it
+does not update its proof, producer, canvas, or output pins.
+
 ## Accepted continuous browser journey
 
 **The authorized New Game → final controllable map41 browser run passed.** The

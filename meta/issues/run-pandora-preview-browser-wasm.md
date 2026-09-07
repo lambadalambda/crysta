@@ -25,6 +25,39 @@ Add a stateful `wasm-bindgen` adapter and local-file bootstrap around the accept
 - Startup time and Wasm linear-memory capacity are measured without claiming total browser peak.
 - Independent correctness and architecture review finds no blocking issue.
 
+## Completion evidence
+
+Completed on branch `task/pandora-browser-wasm` with the facade in `a0e7d48` and
+the worker, shared transport, static build, and regressions in `42c09d9`.
+
+- `PandoraPreview` owns one authenticated Rust session in a dedicated Worker;
+  the browser adapter exposes only the closed state/step/New Game/reset/art/BMP
+  protocol and transfers ROM bytes from `File.arrayBuffer()` without backend
+  upload, persistence, cache, or service-worker paths.
+- Native facade tests, Wasm release build and Clippy, the no-`oracle` target-graph
+  check, seven worker/transport tests, and the shared native/injected UI
+  regressions pass. Workspace Clippy, tracker, safety, formatting, and diff checks
+  pass as well.
+- A real Chromium smoke at `http://127.0.0.1:8888/` covered load, explicit New
+  Game, movement, explicit off-target interaction, reset, malformed replacement,
+  and valid recovery. After startup, New Game, movement, interaction, and reset
+  issued zero network requests.
+- The generated Wasm and native facade matched complete state, art SHA, and all
+  six BMP SHAs over the 5,707-command focused route through map 12. The
+  visible-unready acknowledgement was snapshot-identical and neutral input
+  advanced arrival by one tick.
+- Local measurements were 346–370 ms for the file read, 540–657 ms for worker
+  compilation, 289,734,656 bytes of Wasm linear-memory capacity (not total
+  browser peak), and a 1,222,437-byte release Wasm.
+- Independent `openai/gpt-5.6-sol` correctness and architecture review completed
+  with no blocking findings.
+
+`cargo test --locked --workspace` remains intentionally red only at
+`fixture_current_producer_sources_match`: the gate first reports the documented
+`Cargo.lock` identity change. No producer, observation, epoch, or output pin was
+renewed. The full accepted 11,409-input/11,410-canvas browser journey, producer
+revalidation, caching, and deployment remain follow-up work.
+
 ## Notes
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
