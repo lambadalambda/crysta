@@ -83,8 +83,9 @@ matched the unchanged reviewed native expectation. The prior native HTTP full jo
 not rerun: legacy coverage in this stage is the unchanged house, conversation,
 Pandora helper suites and shared native/injected UI regressions. The prior
 accepted HTTP journey and its evidence remain the native full-route acceptance.
-The strict current-producer source gate remains deliberately red pending the
-separate producer revalidation issue; no source or output pin is renewed here.
+At the time of this accepted Wasm run, the strict current-producer source gate
+remained deliberately red pending separate producer revalidation; that later
+parent acceptance is recorded below without renewing observation or output pins.
 
 The accepted verifier was signed commit `2593b3d`. Private evidence is retained
 under this worktree's ignored `local/pandora-browser-wasm/`:
@@ -99,6 +100,37 @@ under this worktree's ignored `local/pandora-browser-wasm/`:
   `de5a4980a9bd927171cc03bc50fbe608b1ce8c3f403258bff935191368fa8b4b`;
 - complete provenance manifest SHA256
   `1ea232713c75ffe9e3e7fe9ef657062f2bb406d58c10ea129e480dfe6704d8b4`.
+
+### Parent producer and deployment closeout
+
+Parent independently accepted the library producer/source bridge at signed
+commits `0509ad4`, `6dedbbb`, `c98b8e6`, and `b60d7ff`. Normal and optimized
+chained bridge results matched the pinned `library-producer-bridge.json`
+byte-for-byte. The descriptor/current-source gate and mutation controls, all
+Python suites, full locked workspace tests with five private fixtures, strict
+workspace and Wasm Clippy, release Wasm build, no-`oracle` dependency graph, 43
+JavaScript tests, shared UI checks, and safety/tracker checks all passed. The
+ignored parent logs are `local/map-research/pandora-wasm-final-*.txt`; producer
+bridge evidence is under `local/map-inspector-library-parent/`. No production
+file changed after the qualified pins settled.
+
+The parent read-only audit of the accepted run's complete Wasm artifacts, native
+proof, 187 checkpoints, 34 source invocations, and 17-record HAR passed and is
+retained as `local/map-research/pandora-wasm-parent-full-audit.json`. This was an
+artifact audit, **not a second full browser journey**. The accepted journey above
+remains one continuous 11,409-UI-action run with 11,410 canvas comparisons; it
+continued after its static server was stopped, executed no original CPU, and
+made no ROM upload or gameplay/backend request. Its 289,734,656-byte measurement
+is Wasm linear-memory capacity, not total browser peak.
+
+A fresh static build then matched all 11 accepted site files byte-for-byte,
+including `pandora_web_bg.wasm` SHA256
+`bb3db0436c5b18596fb310a390950c39825987d098cc19ceb45d49c992f90a82`, as
+recorded in `local/map-research/pandora-wasm-final-site-parity.json`. A separate
+live smoke served that exact build at `http://127.0.0.1:8888/` and passed local
+ROM selection, actual New Game, one neutral update, and reset via New Game
+(`pandora-wasm-final-live-smoke.json`). That bounded smoke was not a replay of
+the accepted full journey.
 
 Reproduce on an isolated port by building as documented in
 `tools/pandora-preview/README.md`, serving the generated site on `8890`, starting

@@ -74,3 +74,4 @@
 - [x] [Expose the Pandora preview as a host-free Wasm library](issues/expose-pandora-preview-wasm-library.md)
 - [x] [Run the Pandora preview browser-locally through Wasm](issues/run-pandora-preview-browser-wasm.md)
 - [x] [Ship the bounded Pandora browser Wasm frontend](issues/ship-bounded-pandora-browser-wasm.md)
+- [x] [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)

@@ -117,7 +117,6 @@ qualification remain open.
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
-- [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

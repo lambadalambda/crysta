@@ -91,6 +91,32 @@ Independent static architecture/correctness and execution-capable reviews passed
 The latter reproduced normal/optimized historical, predecessor and library
 reports byte-for-byte, compared all ten files, ran both retained binaries in
 additional singleton `verify` processes, and passed the source/mutation gates.
-Parent reproduction/acceptance remains required, so this issue stays open. Full
-commands and private evidence locations are recorded in
+Full commands and private evidence locations are recorded in
 `tools/map-inspector-qualification/README.md`.
+
+## Parent acceptance
+
+Parent independently accepted the settled source bridge at signed commits
+`0509ad4`, `6dedbbb`, `c98b8e6`, and `b60d7ff`. Normal and optimized chained
+library-bridge reports matched `library-producer-bridge.json` byte-for-byte; the
+current descriptor/source gate, every Python suite, and its mutation controls
+passed. `cargo test --locked --workspace` passed with all five private fixtures,
+as did strict workspace and Wasm Clippy, release Wasm, the no-`oracle` graph
+check, 43 JavaScript tests, shared UI checks, repository safety, and tracker
+validation. Parent logs are retained under ignored
+`local/map-research/pandora-wasm-final-*.txt`; bridge and mutation evidence is
+under ignored `local/map-inspector-library-parent/`.
+
+The parent also audited the complete accepted Wasm journey artifacts, native
+proof, checkpoints, and HAR in
+`local/map-research/pandora-wasm-parent-full-audit.json`. That was a read-only
+evidence audit, not a second full journey: the accepted run remains the one
+11,409-UI-action/11,410-canvas run documented in `docs/pandora-browser.md`.
+Parent rebuilt the static site and found all 11 files byte-identical to those
+accepted artifacts, including Wasm SHA256
+`bb3db0436c5b18596fb310a390950c39825987d098cc19ceb45d49c992f90a82`;
+`local/map-research/pandora-wasm-final-site-parity.json` records the comparison.
+A separate live smoke on that exact rebuilt site at port 8888 covered local ROM
+selection, actual New Game, one neutral update, and reset via New Game; it was
+not another full journey (`pandora-wasm-final-live-smoke.json`). No production
+file changed after the qualified pins settled. Parent acceptance is complete.
