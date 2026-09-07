@@ -118,6 +118,7 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)
+- [Run the Pandora preview browser-locally through Wasm](issues/run-pandora-preview-browser-wasm.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

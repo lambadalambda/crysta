@@ -13,6 +13,7 @@
 - [ ] [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [ ] [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [ ] [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)
+- [ ] [Run the Pandora preview browser-locally through Wasm](issues/run-pandora-preview-browser-wasm.md)
 - [ ] [Implement the classic renderer](issues/classic-renderer.md)
 - [ ] [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [ ] [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
