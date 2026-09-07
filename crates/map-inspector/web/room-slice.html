@@ -236,6 +236,10 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
         manualStep(5, 'Interaction requested — paused. Resume to continue.');
       },
       newGame() { startSession('/new-game'); }, reset() { startSession('/reset'); }, demo() { startSession('/reset', true); }, reject,
+      invalidate(message) {
+        state = null; error = message; walkingPhase = null; pendingStart = null; activeStart = null;
+        mode = 'live'; demoIndex = 0; stop(message); notify();
+      },
     };
   }
   function bindInputs(controller, doc, win, buttons) {
@@ -757,7 +761,8 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     $('pandora-action-help').hidden = !pandora;
     $('scene-legend').textContent = pandora ? 'ROM-derived source poses, first background and effective door/pot patches. Actor movement and scene pacing use bounded semantic presentation.' : 'ROM-derived Ark, nine frozen residents and the table object, with natural colors and high-background occlusion. Doorway pacing remains simplified.';
     $('pot-action').disabled = !ready || !canDrive || !!error || busy || !walking || mode === 'demo' || state?.pot_action !== true;
-    $('new-game').disabled = false; $('reset').disabled = false; $('demo').disabled = !ready || !state || busy;
+    const localSessionMissing = localRuntimeRequested && state === null;
+    $('new-game').disabled = localSessionMissing; $('reset').disabled = localSessionMissing; $('demo').disabled = localSessionMissing || !ready || !state || busy;
     for (const button of buttons) button.disabled = !ready || !state || paused || !!error || mode === 'demo' || !walking;
     // Missing/unsupported art is a visible paused error, never a cyan fallback.
     // Host projection errors deliberately have no drawable scene. Preserve the
@@ -784,8 +789,13 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       }
     } else drawScene(ctx, null, null);
   }
+  const runtimeReady = globalThis.RoomSliceRuntime?.ready;
+  const localRuntimeRequested = runtimeReady !== undefined;
+  let runtime = null;
   const controller = createController({render, now: () => performance.now(), schedule: (fn, ms) => setTimeout(fn, ms), cancel: clearTimeout,
     async request(url, body) {
+      if (runtime) return runtime.request(url, body);
+      if (localRuntimeRequested) throw new Error('Wasm runtime unavailable');
       const abort = new AbortController(), timeout = setTimeout(() => abort.abort(), 5000);
       try {
         const response = await fetch(url, {method: body === undefined ? 'GET' : 'POST',
@@ -795,6 +805,17 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
       } finally { clearTimeout(timeout); }
     },
   });
+  function invalidatePresentation(message) {
+    ready = false; art = null; assetError = null;
+    delete canvas.dataset.scene; delete canvas.dataset.woodenDoorOpen;
+    for (const id of ['map','position','camera','tick','phase','actor-key']) $(id).textContent = '—';
+    $('dialogue-panel').hidden = true;
+    for (const id of ['dialogue-page','choice1-label','choice2-label']) {
+      const page = $(id); delete page.dataset.key; page.width = page.width;
+    }
+    controller.invalidate(message);
+    drawScene(ctx, null, null);
+  }
   $('pause').addEventListener('click', () => lastView.paused ? controller.resume() : controller.pause());
   $('step').addEventListener('click', () => controller.stepOnce());
   $('interact').addEventListener('click', () => controller.interact());
@@ -812,26 +833,34 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     context.putImageData(new ImageData(new Uint8ClampedArray(rgba), width, height), 0, 0);
     return raster;
   }
-  async function loadArt() {
+  async function loadArt(propagate = false) {
     let timer;
     try {
       const loading = (async () => {
-        const response = await fetch('/art.json', {cache:'no-store', signal:AbortSignal.timeout(5000)});
-        if (!response.ok) throw new Error(`Art HTTP ${response.status}`);
-        const bundle = await response.json(), manifest = backgroundManifest(bundle);
+        let bundle;
+        if (runtime) bundle = JSON.parse(new TextDecoder().decode(await runtime.loadArt()));
+        else {
+          const response = await fetch('/art.json', {cache:'no-store', signal:AbortSignal.timeout(5000)});
+          if (!response.ok) throw new Error(`Art HTTP ${response.status}`);
+          bundle = await response.json();
+        }
+        const manifest = backgroundManifest(bundle);
         // Iterate sheets, not maps: all indoor maps share one decode/preparation.
         const entries = await Promise.all(Object.entries(manifest).map(async ([key, sheet]) => {
-          const image = new Image();
-          await new Promise((resolve, reject) => {
-            image.onload = resolve; image.onerror = () => reject(new Error(`Could not load ${sheet.url}`));
-            image.src = sheet.url;
-          });
-          if (image.naturalWidth !== sheet.width || image.naturalHeight !== sheet.height) {
-            throw new Error(`Expected a ${sheet.width}×${sheet.height} background sheet at ${sheet.url}`);
-          }
-          const scratch = document.createElement('canvas'); scratch.width = sheet.width; scratch.height = sheet.height;
-          const context = scratch.getContext('2d'); context.drawImage(image, 0, 0);
-          return [key,context.getImageData(0, 0, sheet.width, sheet.height)];
+          const image = new Image(); let objectUrl = null;
+          try {
+            if (runtime) objectUrl = URL.createObjectURL(await runtime.loadBackground(sheet.url));
+            await new Promise((resolve, reject) => {
+              image.onload = resolve; image.onerror = () => reject(new Error(`Could not load ${sheet.url}`));
+              image.src = objectUrl ?? sheet.url;
+            });
+            if (image.naturalWidth !== sheet.width || image.naturalHeight !== sheet.height) {
+              throw new Error(`Expected a ${sheet.width}×${sheet.height} background sheet at ${sheet.url}`);
+            }
+            const scratch = document.createElement('canvas'); scratch.width = sheet.width; scratch.height = sheet.height;
+            const context = scratch.getContext('2d'); context.drawImage(image, 0, 0);
+            return [key,context.getImageData(0, 0, sheet.width, sheet.height)];
+          } finally { if (objectUrl !== null) URL.revokeObjectURL(objectUrl); }
         }));
         return {bundle,pixels:Object.fromEntries(entries)};
       })();
@@ -843,9 +872,14 @@ The client sends at most one step at a time, at up to 60 Hz; a slow connection s
     } catch (failure) {
       assetError = `Art load failed: ${failure.message || failure}. Reload this page to retry.`;
       controller.reject(assetError);
+      if (propagate) throw new Error(assetError);
     } finally { clearTimeout(timer); }
   }
-  loadArt(); controller.init();
+  if (runtimeReady) runtimeReady.then(module => {
+    runtime = module.runtime;
+    runtime.start({controller, loadArt: () => loadArt(true), invalidatePresentation});
+  }).catch(failure => invalidatePresentation(`Wasm startup failed: ${failure.message || failure}`));
+  else { loadArt(); controller.init(); }
 })();
 </script>
 </body>

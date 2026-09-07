@@ -48,8 +48,8 @@ class Target {
   getBoundingClientRect() { return {left: 0, top: 0, right: 50, bottom: 50}; }
 }
 // Run browser initialization too: helper-only tests cannot catch load/recovery bugs.
-function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null, mutateBundle = () => {}, mutateState = state => state, badDimensions = false, failBitmap = false} = {}) {
-  const elements = new Map(), timers = new Map(), requests = [], images = [], draws = []; let timerId = 0, key = actorKey, clock = 0;
+function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = false, dialogueKey = null, dialogueChoice = null, mutateBundle = () => {}, mutateState = state => state, badDimensions = false, failBitmap = false, injected = false, runtimeReject = false} = {}) {
+  const elements = new Map(), timers = new Map(), requests = [], runtimeRequests = [], assetRequests = [], images = [], draws = []; let timerId = 0, key = actorKey, clock = 0;
   const context = {fillRect(){},drawImage(...args){draws.push(args);},save(){},restore(){},translate(){},putImageData(){},
     getImageData(x,y,width,height){return {width,height,data:new Uint8ClampedArray(width*height*4)};}};
   const element = id => {
@@ -68,7 +68,11 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
     foreground:{'10':{width:1024,height:1280,runs:[]},'15':{width:512,height:1024,runs:[]}},
     dialogue_pages:{'page:1':{width:2,height:1,rgba:[255,255,255,255,0,0,0,0]},'option:2':{width:1,height:1,rgba:[1,2,3,255]}},choice_catalogs:{0:['page:1','option:2']}};
   bundle.scene_ids[10]=['ark'];mutateBundle(bundle);
-  const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,
+  const responseState = url => mutateState({...(url==='/reset'?initial():newGameState()),actor_key:key,
+    ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey,...(dialogueChoice===null?{}:{choice:dialogueChoice})},dialogue_acknowledgement:true,choice_interaction:true}:{}),
+    scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]});
+  const browser = {console,document:doc,window:win,performance:{now:()=>clock},AbortController,AbortSignal,Uint8ClampedArray,TextDecoder,
+    URL:{createObjectURL:value=>value,revokeObjectURL(){}},
     ImageData:class {constructor(data,width,height){Object.assign(this,{data,width,height});}},
     Image:class {set src(value){
       this.url=value;images.push(this);
@@ -77,12 +81,17 @@ function browserHarness({stallBitmap = false, actorKey = '0:0', invalidScene = f
       if(stallBitmap!==true && stallBitmap!==value) Promise.resolve().then(()=>failBitmap===true || failBitmap===value?this.onerror():this.onload());
     }},
     setTimeout(fn,ms){timers.set(++timerId,{fn,ms});return timerId;},clearTimeout(id){timers.delete(id);},
-    async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:mutateState({...(url==='/reset'?initial():newGameState()),actor_key:key,
-      ...(url==='/step'&&dialogueKey?{phase:'dialogue',dialogue:{key:dialogueKey,...(dialogueChoice===null?{}:{choice:dialogueChoice})},dialogue_acknowledgement:true,choice_interaction:true}:{}),
-      scene:[{id:'ark',key,position:invalidScene?[0,0]:url==='/reset'?[472,176]:[304,112]}]});}};},
+    async fetch(url,options){requests.push({url,...options});return {ok:true,async json(){return url==='/art.json'?bundle:responseState(url);}};},
   };
+  if(runtimeReject) browser.RoomSliceRuntime={ready:Promise.reject(new Error('module failed'))};
+  else if(injected) browser.RoomSliceRuntime={ready:Promise.resolve({runtime:{
+    start({controller,loadArt,invalidatePresentation}){loadArt().then(()=>controller.init(),error=>invalidatePresentation(String(error.message||error)));},
+    async request(url,body){runtimeRequests.push({url,body});return responseState(url);},
+    loadArt(){return new TextEncoder().encode(JSON.stringify(bundle));},
+    loadBackground(url){assetRequests.push(url);return url;},
+  }})};
   vm.runInNewContext(scripts[0][1], browser);
-  return {element,timers,requests,images,draws,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
+  return {element,timers,requests,runtimeRequests,assetRequests,images,draws,advance(ms){clock+=ms;},setDialogueKey(value){dialogueKey=value;},setKey(value){key=value;},fixScene(){invalidScene=false;}};
 }
 async function main() {
   const {fixture,check}=require('./pandora-render-check.js');
@@ -143,6 +152,25 @@ async function main() {
   await flush();await flush();assert.match(oldArtFailure.element('error').textContent,/sprite/);
   hostFailure='missing compiled camera';oldArtFailure.element('new-game').emit('click');await flush();await flush();
   assert.equal(oldArtFailure.element('error').textContent,hostFailure,'current host error takes precedence over stale art failure');
+
+  const injected = browserHarness({injected:true}); await flush(); await flush();
+  assert.equal(injected.requests.length,0,'injected runtime performs no backend fetch');
+  assert.deepEqual(injected.runtimeRequests,[{url:'/state',body:undefined}]);
+  assert.deepEqual(injected.assetRequests.sort(),['/exterior.bmp','/map.bmp']);
+  injected.element('new-game').emit('click');await flush();
+  assert.deepEqual(injected.runtimeRequests.at(-1),{url:'/new-game',body:''});
+
+  const rejectedRuntime = browserHarness({runtimeReject:true}); await flush(); await flush();
+  assert.match(rejectedRuntime.element('error').textContent,/Wasm startup failed/);
+  assert.equal(rejectedRuntime.element('new-game').disabled,true);
+  assert.equal(rejectedRuntime.element('reset').disabled,true);
+  rejectedRuntime.element('new-game').emit('click');await flush();
+  assert.equal(rejectedRuntime.requests.length,0,'failed injected runtime never falls back to HTTP');
+
+  const injectedFailure = browserHarness({injected:true,failBitmap:'/map.bmp'}); await flush(); await flush();
+  assert.match(injectedFailure.element('error').textContent,/Art load failed/);
+  assert.equal(injectedFailure.element('new-game').disabled,true);
+  assert.equal(injectedFailure.element('pause').disabled,true);
 
   const loaded = browserHarness(); await flush(); await flush();
   assert.deepEqual(loaded.images.map(image=>image.url).sort(),['/exterior.bmp','/map.bmp']);

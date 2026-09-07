@@ -31,10 +31,14 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy (warnings denied)
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Host-free Pandora Wasm library
+      - name: Host-free Pandora Wasm library and browser adapter
         run: |
           cargo build --locked --target wasm32-unknown-unknown -p map-inspector --lib
-          ! cargo tree --locked --target wasm32-unknown-unknown -p map-inspector --edges normal,build | grep 'oracle v'
+          cargo build --locked --target wasm32-unknown-unknown -p pandora-web --lib
+          cargo clippy --locked --target wasm32-unknown-unknown -p pandora-web --lib -- -D warnings
+          ! cargo tree --locked --target wasm32-unknown-unknown -p pandora-web --edges normal,build | grep 'oracle v'
+          node --test tools/pandora-preview/bootstrap.test.mjs
+          node crates/map-inspector/tests/room-slice-check.js
       - name: Tests (ROM-free; local tests skip without dumps)
         run: cargo test --workspace
       - name: Docs
