@@ -1,0 +1,222 @@
+{
+  "additional_source_hashes": {
+    "crates/map-inspector/src/pandora_navigation.rs": "d61c202d4ca0ea2f4b317a97f0519f5ff2d3486dfa9b91fcd0c2fde972f823ef",
+    "crates/map-inspector/src/pandora_progression.rs": "23459dba5e8fb694a84d98edf5d226eb68085f10fed34a298241719632dcdce2",
+    "crates/map-inspector/src/room_art.rs": "60c4a4990e627e93c62492788bcf2fa7b8e21033f11b7cf294c4203e88a9088a",
+    "crates/map-inspector/src/room_art/backgrounds.rs": "cd2103c61856cdbc97aef21c8f916e6cd81e9a0d1768ce176c5780f06aabd500",
+    "crates/map-inspector/src/room_art/carry.rs": "d742c0c1d224a9b566b4fef44ab60f39766143e9a808d662ad566f6e952a383d",
+    "crates/map-inspector/src/room_art/door.rs": "35c41562b970271a6b945cf6bc08ee936db9b1c2729c1d45754eb1082d348700",
+    "crates/map-inspector/src/room_art/pandora.rs": "3cfd5c4c5d6857c823d0f0627b1dfebc8bb4fdf84fdd2899ba3b8d24a9efd733",
+    "crates/map-inspector/src/room_art/world_patches.rs": "66dfb752bca22e0e8f1807811d306997e0e3261f5a4b8787973ebc89c474668f",
+    "crates/map-inspector/src/room_camera.rs": "95807029c537ffcdeb5d2a7eb3326127e4577d73e79c45dba02ff5f5c91a728a",
+    "crates/map-inspector/src/room_preview.rs": "885c2413fc9c2d7495b853381028a45a86e8ec640c1a42953d421b3de3b85594",
+    "crates/map-inspector/src/room_server.rs": "14043f8504ca57f6006875b64798ec7186c00239f63161b21ff6116876f00eff",
+    "crates/map-inspector/web/room-slice.html": "d4103bcfee965378ced16ee9bc74b2c04f0b1a7794e4802a877cb4c354744271"
+  },
+  "current_descriptor_sha256": "85de8d72d6f0a433345645f5dd86f5c80f8e1ffd18549fb357a59b2d97590714",
+  "epoch": "headless-sync-video-v1",
+  "inventory": {
+    "capture.json": {
+      "bytes": 62568,
+      "sha256": "a7f23508b13727e8ab26df65e153f7788fc37182111446a68e37c61dc83c664a"
+    },
+    "cgram-1600.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "cgram-1840.bin": {
+      "bytes": 512,
+      "sha256": "cad0fb7558f60d4bd45d5df447ad168bd3916d156826b770238eca614bb713e0"
+    },
+    "index.html": {
+      "bytes": 29651,
+      "sha256": "4f00920666d3dafa825a72262b4a94e99b21e331159777bceb43ea1967683cbf"
+    },
+    "reference-1600.bmp": {
+      "bytes": 184374,
+      "sha256": "1d46048a906051bdd3e0dc480fd15a05f77aa0c93239d22d18cb22bbb37c3a18"
+    },
+    "reference-1840.bmp": {
+      "bytes": 184374,
+      "sha256": "e2a5892872fbf2297941b8c22bd56b46d20fd0ea837e42ee3bad5b45320407e6"
+    },
+    "vram-1600.bin": {
+      "bytes": 65536,
+      "sha256": "1c2f6e689c751432cc6a423898fb32e175837864aa99808836dd302b53f4369a"
+    },
+    "vram-1840.bin": {
+      "bytes": 65536,
+      "sha256": "f1b3b11b3f94d6d640c2e9aba0de247e7832339ea3a398bac267edceac0927fd"
+    },
+    "wram-1600.bin": {
+      "bytes": 131072,
+      "sha256": "66c2710ba51a453f75a0a0f9fd5df768b2e74ca3dd87690b95af11b185c615eb"
+    },
+    "wram-1840.bin": {
+      "bytes": 131072,
+      "sha256": "04c2a05f1ab9749763dba308f163db937d3eeea1036a405b8524954852ee35de"
+    }
+  },
+  "main_delta": {
+    "anchor_utf8": "mod opening_qualification;\n",
+    "current_sha256": "2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d",
+    "insert_utf8": "pub mod pandora_navigation;\npub mod pandora_progression;\n",
+    "old_sha256": "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3"
+  },
+  "manifest_sha256": "a7f23508b13727e8ab26df65e153f7788fc37182111446a68e37c61dc83c664a",
+  "migration_sha256": "db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c",
+  "nonpixel_manifest_sha256": "7998be259cce4218983f03bb81e3bf189577958dc9f190ba38880036d680cb22",
+  "original_descriptor_sha256": "7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718",
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "producers": [
+    {
+      "additional_source_hashes": {
+        "crates/map-inspector/src/pandora_navigation.rs": "d61c202d4ca0ea2f4b317a97f0519f5ff2d3486dfa9b91fcd0c2fde972f823ef",
+        "crates/map-inspector/src/pandora_progression.rs": "23459dba5e8fb694a84d98edf5d226eb68085f10fed34a298241719632dcdce2",
+        "crates/map-inspector/src/room_art.rs": "60c4a4990e627e93c62492788bcf2fa7b8e21033f11b7cf294c4203e88a9088a",
+        "crates/map-inspector/src/room_art/backgrounds.rs": "cd2103c61856cdbc97aef21c8f916e6cd81e9a0d1768ce176c5780f06aabd500",
+        "crates/map-inspector/src/room_art/carry.rs": "d742c0c1d224a9b566b4fef44ab60f39766143e9a808d662ad566f6e952a383d",
+        "crates/map-inspector/src/room_art/door.rs": "35c41562b970271a6b945cf6bc08ee936db9b1c2729c1d45754eb1082d348700",
+        "crates/map-inspector/src/room_art/pandora.rs": "3cfd5c4c5d6857c823d0f0627b1dfebc8bb4fdf84fdd2899ba3b8d24a9efd733",
+        "crates/map-inspector/src/room_art/world_patches.rs": "66dfb752bca22e0e8f1807811d306997e0e3261f5a4b8787973ebc89c474668f",
+        "crates/map-inspector/src/room_camera.rs": "95807029c537ffcdeb5d2a7eb3326127e4577d73e79c45dba02ff5f5c91a728a",
+        "crates/map-inspector/src/room_preview.rs": "885c2413fc9c2d7495b853381028a45a86e8ec640c1a42953d421b3de3b85594",
+        "crates/map-inspector/src/room_server.rs": "14043f8504ca57f6006875b64798ec7186c00239f63161b21ff6116876f00eff",
+        "crates/map-inspector/web/room-slice.html": "d4103bcfee965378ced16ee9bc74b2c04f0b1a7794e4802a877cb4c354744271"
+      },
+      "binary_sha256": "4c74152dcf301fe24641c6545fe9d03c6d67158e35b219064b3d20450586b835",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "map-inspector"
+      ],
+      "build_env": {
+        "CARGO_TARGET_DIR": "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-a/target"
+      },
+      "build_log_sha256": "edac2439de2c9b2a619dda37d68d61e2394c3ba8d1f909a658d72717ee03b0a7",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)\n",
+      "commit": "204f3c30209812d0ae74a0e2c168ed93f37c84ff",
+      "cxx": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "descriptor_sha256": "85de8d72d6f0a433345645f5dd86f5c80f8e1ffd18549fb357a59b2d97590714",
+      "epoch": "headless-sync-video-v1",
+      "fresh_target": true,
+      "invocation": [
+        "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-a/map-inspector",
+        "capture",
+        "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+        "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm"
+      ],
+      "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+      "process": {
+        "exit_code": 0,
+        "finished_ns": 1788736346360305000,
+        "pid": 31891,
+        "run_id": "e7babb2b-fa82-4bf5-aa8a-dcdc7d5deb1e",
+        "started_ns": 1788736335697831000
+      },
+      "rom_path": "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+      "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: aarch64-apple-darwin\nrelease: 1.97.0\nLLVM version: 22.1.6\n",
+      "schema_version": 2,
+      "source_hashes": {
+        "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+        "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+        "crates/map-inspector/src/main.rs": "2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d",
+        "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+        "crates/oracle/build.rs": "185ea978cea84300ecc0ce5386535a0f05f912d78543a4b8dc38cf19a237c7c9",
+        "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+        "vendor/ares/ares-unity.cpp": "eae0abc62ba8ca0212e0ccd97c0719025e375a015fe8f8877d0ef515a256148c",
+        "vendor/ares/ares/ares/ares.hpp": "472466ef95fce2c0e8f8b4b862f333c049093ced617e8f62a84e749f07d4bb96",
+        "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+        "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+        "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+        "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+        "vendor/ares/shims.cpp": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+      },
+      "source_repo": "/Users/lainsoykaf/repos/ilar-task-preview-producer",
+      "sram_path": "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm",
+      "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "df0312c010d7e708309cf88ad76cc3f65e22300122e3f72430738ebd3e3c398a",
+      "target_dir": "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-a/target"
+    },
+    {
+      "additional_source_hashes": {
+        "crates/map-inspector/src/pandora_navigation.rs": "d61c202d4ca0ea2f4b317a97f0519f5ff2d3486dfa9b91fcd0c2fde972f823ef",
+        "crates/map-inspector/src/pandora_progression.rs": "23459dba5e8fb694a84d98edf5d226eb68085f10fed34a298241719632dcdce2",
+        "crates/map-inspector/src/room_art.rs": "60c4a4990e627e93c62492788bcf2fa7b8e21033f11b7cf294c4203e88a9088a",
+        "crates/map-inspector/src/room_art/backgrounds.rs": "cd2103c61856cdbc97aef21c8f916e6cd81e9a0d1768ce176c5780f06aabd500",
+        "crates/map-inspector/src/room_art/carry.rs": "d742c0c1d224a9b566b4fef44ab60f39766143e9a808d662ad566f6e952a383d",
+        "crates/map-inspector/src/room_art/door.rs": "35c41562b970271a6b945cf6bc08ee936db9b1c2729c1d45754eb1082d348700",
+        "crates/map-inspector/src/room_art/pandora.rs": "3cfd5c4c5d6857c823d0f0627b1dfebc8bb4fdf84fdd2899ba3b8d24a9efd733",
+        "crates/map-inspector/src/room_art/world_patches.rs": "66dfb752bca22e0e8f1807811d306997e0e3261f5a4b8787973ebc89c474668f",
+        "crates/map-inspector/src/room_camera.rs": "95807029c537ffcdeb5d2a7eb3326127e4577d73e79c45dba02ff5f5c91a728a",
+        "crates/map-inspector/src/room_preview.rs": "885c2413fc9c2d7495b853381028a45a86e8ec640c1a42953d421b3de3b85594",
+        "crates/map-inspector/src/room_server.rs": "14043f8504ca57f6006875b64798ec7186c00239f63161b21ff6116876f00eff",
+        "crates/map-inspector/web/room-slice.html": "d4103bcfee965378ced16ee9bc74b2c04f0b1a7794e4802a877cb4c354744271"
+      },
+      "binary_sha256": "20ec1f7c21c016c32ac24aa7eededd0903472dc92e9039695893516b48d106ac",
+      "build_command": [
+        "cargo",
+        "build",
+        "--locked",
+        "-p",
+        "map-inspector"
+      ],
+      "build_env": {
+        "CARGO_TARGET_DIR": "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-b/target"
+      },
+      "build_log_sha256": "ba23e7fbba3fe36b3204367fdc740b853bb0b2b9a842b49a4e7185819b3f4a7f",
+      "cargo": "cargo 1.97.0 (c980f4866 2026-06-30)\n",
+      "commit": "204f3c30209812d0ae74a0e2c168ed93f37c84ff",
+      "cxx": "Apple clang version 21.0.0 (clang-2100.1.1.101)\nTarget: arm64-apple-darwin25.5.0\nThread model: posix\nInstalledDir: /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin\n",
+      "descriptor_sha256": "85de8d72d6f0a433345645f5dd86f5c80f8e1ffd18549fb357a59b2d97590714",
+      "epoch": "headless-sync-video-v1",
+      "fresh_target": true,
+      "invocation": [
+        "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-b/map-inspector",
+        "capture",
+        "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+        "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm"
+      ],
+      "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+      "process": {
+        "exit_code": 0,
+        "finished_ns": 1788736386190628000,
+        "pid": 32710,
+        "run_id": "0c205332-0ed2-4488-a4c0-2743a7861056",
+        "started_ns": 1788736375311912000
+      },
+      "rom_path": "/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc",
+      "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+      "rustc": "rustc 1.97.0 (2d8144b78 2026-07-07)\nbinary: rustc\ncommit-hash: 2d8144b7880597b6e6d3dfd63a9a9efae3f533d3\ncommit-date: 2026-07-07\nhost: aarch64-apple-darwin\nrelease: 1.97.0\nLLVM version: 22.1.6\n",
+      "schema_version": 2,
+      "source_hashes": {
+        "Cargo.lock": "fa9a478c4abd6e3b147774669c862519c2205116c522e81cf1c2fd8f1254d537",
+        "crates/map-inspector/Cargo.toml": "0ccdd13a83c94c72934d48814d5d4a4fa86b50f2f36a4afd54c912be8981f0a5",
+        "crates/map-inspector/src/main.rs": "2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d",
+        "crates/map-inspector/web/viewer.html": "f17c69ed14635202fffbdda1efc1bf70364aeefb7315156469089f44b1a7403b",
+        "crates/oracle/build.rs": "185ea978cea84300ecc0ce5386535a0f05f912d78543a4b8dc38cf19a237c7c9",
+        "crates/oracle/src/lib.rs": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7",
+        "vendor/ares/ares-unity.cpp": "eae0abc62ba8ca0212e0ccd97c0719025e375a015fe8f8877d0ef515a256148c",
+        "vendor/ares/ares/ares/ares.hpp": "472466ef95fce2c0e8f8b4b862f333c049093ced617e8f62a84e749f07d4bb96",
+        "vendor/ares/ares/ares/node/video/screen.cpp": "3237bc0ec308abaf27e7283cde602aaca3abdfe57476b6a152e4b2b2e30ca217",
+        "vendor/ares/ares/sfc/ppu/color.cpp": "7862995814030f3d6931503a12761b04c4446eef969e74c7c815aecf341e984e",
+        "vendor/ares/ares/sfc/ppu/main.cpp": "dc6a9a8f383647d111b572cd5dc7644df076af66b9dd8a012779a025f2168780",
+        "vendor/ares/ares/sfc/system/serialization.cpp": "170016333b443d6e52f0c2c294bfb9f0b42682e88d4cce1801060b765aabf0a4",
+        "vendor/ares/shims.cpp": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+      },
+      "source_repo": "/Users/lainsoykaf/repos/ilar-task-preview-producer",
+      "sram_path": "/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm",
+      "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055",
+      "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdout_sha256": "698451d64345007782b5297a2e34c934c88b296265100034b65b2e1e4a0c48fd",
+      "target_dir": "/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/current-b/target"
+    }
+  ],
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "schema_version": 1,
+  "sram_sha256": "709c1cb67b8aff8db49cba05959f128b1c0a1ca32184c9bb62c415d537658055"
+}

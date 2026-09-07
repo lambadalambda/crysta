@@ -79,3 +79,30 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
   `main-negative-red.txt`, `identity-negative-red.txt`, `local-capture-green.txt`,
   `local-capture-clippy.txt`, `map-inspector-tests.txt`). Independent static
   correctness/architecture review approved the gate before the signed commit.
+
+## Final retained evidence (ready for parent reproduction)
+
+- Two new isolated builds at producer source commit `204f3c3`, each followed by
+  one singleton capture process, are retained under
+  `/Users/lainsoykaf/repos/ilar-task-preview-producer/local/map-inspector-preview/`:
+  `current-a` (PID 31891) and `current-b` (PID 32710). Authentic owned ROM/SRAM,
+  exact schedule, no save/restore, original conversion and process exit unchanged.
+- Both normal/optimized historical audits reproduce frozen `migration.json`.
+  Both bridge modes reproduce `producer-bridge.json` SHA-256:
+  `46a2b7fda7525c8c7da664b83ec182160b39f4a67d8d0e958c573cea606795c0`.
+  All ten files, complete manifests and nonpixel evidence are byte-identical
+  across accepted fixed A/B and current A/B. No observation pins renewed.
+- Execution-capable independent review rehashed the old blob, proved the exact
+  57-byte insertion, authenticated all sources/hooks and retained evidence,
+  independently decoded all BMPs, reproduced both audit modes, and ran both
+  current binaries as two further singleton verify processes (PIDs 35717/35762).
+  Complete retained manifests reproduced, exit 0, empty stderr. Approved without
+  blocking findings. Private review: `../ilar-task-preview-producer-review/local/review-output/`;
+  `independent-summary.json` SHA-256
+  `cf8ff09bc853e0dc8a3653f7842772df81e5abb54bff2451af556aa97d571fa2`.
+- Python validation is now 31 tests per mode (14 checker + 13 bridge + 4 recorder),
+  plus all 20 original mutation checks. Full package and Rust gate results above
+  remain green. Source/descriptor/gate/evidence reviews are independent and scoped.
+- Parent must reproduce the documented historical/bridge checks and full workspace
+  before archival/restarting its server. This issue remains open pending that
+  acceptance; shared indices, server and browser remain parent-owned.
