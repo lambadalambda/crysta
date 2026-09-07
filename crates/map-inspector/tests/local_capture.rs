@@ -1,7 +1,14 @@
 //! Optional end-to-end capture qualification, using a fresh oracle process.
 use std::{path::Path, process::Command};
 
+const CURRENT: &str =
+    include_str!("../../../tools/map-inspector-qualification/current-producer.json");
 const OBSERVER: &str = include_str!("../../../tools/map-inspector-qualification/observer.json");
+const MIGRATION: &str = include_str!("../../../tools/map-inspector-qualification/migration.json");
+const OBSERVER_SHA: &str = "7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718";
+const MIGRATION_SHA: &str = "db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c";
+const OLD_MAIN_SHA: &str = "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3";
+const MAIN: &str = "crates/map-inspector/src/main.rs";
 const ARCHIVE: &str = include_str!(
     "../../../tools/map-inspector-qualification/epochs/threaded-video-v0/reference.json"
 );
@@ -21,6 +28,22 @@ const SOURCE_FILES: &[&str] = &[
     "vendor/ares/ares/sfc/system/serialization.cpp",
 ];
 
+// Separate reviewed preview hooks; the historical 13-file inventory above is unchanged.
+const ADDITIONAL_FILES: &[&str] = &[
+    "crates/map-inspector/src/pandora_navigation.rs",
+    "crates/map-inspector/src/pandora_progression.rs",
+    "crates/map-inspector/src/room_art.rs",
+    "crates/map-inspector/src/room_art/backgrounds.rs",
+    "crates/map-inspector/src/room_art/carry.rs",
+    "crates/map-inspector/src/room_art/door.rs",
+    "crates/map-inspector/src/room_art/pandora.rs",
+    "crates/map-inspector/src/room_art/world_patches.rs",
+    "crates/map-inspector/src/room_camera.rs",
+    "crates/map-inspector/src/room_preview.rs",
+    "crates/map-inspector/src/room_server.rs",
+    "crates/map-inspector/web/room-slice.html",
+];
+
 fn sha256(bytes: &[u8]) -> String {
     use std::fmt::Write;
     rom::digests(bytes)
@@ -32,18 +55,22 @@ fn sha256(bytes: &[u8]) -> String {
         })
 }
 
-fn check_source_inventory(observer: &serde_json::Value) {
+fn check_inventory(hashes: &serde_json::Value, files: &[&str]) {
     use std::collections::BTreeSet;
     assert_eq!(
-        observer["source_hashes"]
+        hashes
             .as_object()
             .unwrap()
             .keys()
             .map(String::as_str)
             .collect::<BTreeSet<_>>(),
-        SOURCE_FILES.iter().copied().collect::<BTreeSet<_>>(),
-        "observer source inventory"
+        files.iter().copied().collect::<BTreeSet<_>>(),
+        "producer source inventory"
     );
+}
+
+fn check_source_inventory(observer: &serde_json::Value) {
+    check_inventory(&observer["source_hashes"], SOURCE_FILES);
 }
 
 #[test]
@@ -62,18 +89,121 @@ fn incomplete_observer_sources_are_rejected() {
     assert!(std::panic::catch_unwind(|| check_source_inventory(&empty)).is_err());
 }
 
-#[test]
-fn fixture_observer_sources_match() {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let observer: serde_json::Value = serde_json::from_str(OBSERVER).unwrap();
-    assert_eq!(observer["epoch"], "headless-sync-video-v1");
-    check_source_inventory(&observer);
-    for (name, expected) in observer["source_hashes"].as_object().unwrap() {
+fn check_producer_identity(current: &serde_json::Value) {
+    assert_eq!(sha256(OBSERVER.as_bytes()), OBSERVER_SHA);
+    assert_eq!(sha256(MIGRATION.as_bytes()), MIGRATION_SHA);
+    let original: serde_json::Value = serde_json::from_str(OBSERVER).unwrap();
+    assert_eq!(current["schema_version"], 1);
+    assert_eq!(current["epoch"], "headless-sync-video-v1");
+    assert_eq!(current["epoch"], original["epoch"]);
+    assert_eq!(current["policy"], original["policy"]);
+    assert_eq!(current["original_descriptor_sha256"], OBSERVER_SHA);
+    assert_eq!(current["migration_sha256"], MIGRATION_SHA);
+    check_source_inventory(current);
+    check_inventory(&current["additional_source_hashes"], ADDITIONAL_FILES);
+    for name in SOURCE_FILES.iter().copied().filter(|name| *name != MAIN) {
         assert_eq!(
-            sha256(&std::fs::read(root.join(name)).expect("read observer source")),
-            expected.as_str().unwrap(),
-            "observer source changed: {name}; review fixture policy before renewal"
+            current["source_hashes"][name],
+            original["source_hashes"][name]
         );
+    }
+}
+
+#[test]
+fn historical_identity_substitution_is_rejected() {
+    let current: serde_json::Value = serde_json::from_str(CURRENT).unwrap();
+    check_producer_identity(&current);
+    for field in [
+        "schema_version",
+        "epoch",
+        "policy",
+        "original_descriptor_sha256",
+        "migration_sha256",
+    ] {
+        let mut changed = current.clone();
+        changed[field] = serde_json::json!("substitution");
+        assert!(std::panic::catch_unwind(|| check_producer_identity(&changed)).is_err());
+    }
+    let old = serde_json::from_str(OBSERVER).unwrap();
+    assert!(std::panic::catch_unwind(|| check_producer_identity(&old)).is_err());
+}
+
+fn check_main_registration(main: &[u8]) {
+    const ANCHOR: &[u8] = b"mod opening_qualification;\n";
+    const INSERT: &[u8] = b"pub mod pandora_navigation;\npub mod pandora_progression;\n";
+    let registered = [ANCHOR, INSERT].concat();
+    let positions: Vec<_> = main
+        .windows(registered.len())
+        .enumerate()
+        .filter_map(|(index, bytes)| (bytes == registered).then_some(index))
+        .collect();
+    assert_eq!(positions.len(), 1, "exact registration anchor required");
+    let index = positions[0];
+    // Undo ONLY the exact anchored insertion and authenticate every remaining
+    // byte as the old producer. No line stripping or whitespace normalization.
+    let old = [
+        &main[..index + ANCHOR.len()],
+        &main[index + registered.len()..],
+    ]
+    .concat();
+    assert_eq!(sha256(&old), OLD_MAIN_SHA, "non-registration main change");
+}
+
+#[test]
+fn non_registration_main_changes_are_rejected() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let main = std::fs::read(root.join("crates/map-inspector/src/main.rs")).unwrap();
+    check_main_registration(&main);
+    let text = std::str::from_utf8(&main).unwrap();
+    for changed in [
+        format!("{text}\n"),
+        text.replace('\n', "\r\n"),
+        text.replace("fn main()", "fn changed()"),
+        text.replace("pub mod pandora_navigation;\n", ""),
+        text.replace("pub mod pandora_progression;\n", ""),
+        text.replace("mod opening_qualification;", "mod opening_qualification; "),
+    ] {
+        assert!(std::panic::catch_unwind(|| check_main_registration(changed.as_bytes())).is_err());
+    }
+}
+
+fn check_current_sources(root: &Path, current: &serde_json::Value) {
+    check_producer_identity(current);
+    for field in ["source_hashes", "additional_source_hashes"] {
+        for (name, expected) in current[field].as_object().unwrap() {
+            assert_eq!(
+                sha256(&std::fs::read(root.join(name)).expect("read producer source")),
+                expected.as_str().unwrap(),
+                "current producer source changed: {name}; explicitly revalidate before repinning"
+            );
+        }
+    }
+    check_main_registration(&std::fs::read(root.join(MAIN)).unwrap());
+}
+
+#[test]
+fn fixture_current_producer_sources_match() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let current = serde_json::from_str(CURRENT).unwrap();
+    check_current_sources(&root, &current);
+}
+
+#[test]
+fn incomplete_or_substituted_current_sources_are_rejected() {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let current: serde_json::Value = serde_json::from_str(CURRENT).unwrap();
+    for field in ["source_hashes", "additional_source_hashes"] {
+        for name in current[field].as_object().unwrap().keys() {
+            let mut changed = current.clone();
+            changed[field].as_object_mut().unwrap().remove(name);
+            assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
+            let mut changed = current.clone();
+            changed[field][name] = serde_json::json!("substituted digest");
+            assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
+        }
+        let mut changed = current.clone();
+        changed[field]["unexpected/source.rs"] = serde_json::json!("extra source");
+        assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
     }
 }
 

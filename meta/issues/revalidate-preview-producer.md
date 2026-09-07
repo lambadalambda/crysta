@@ -63,3 +63,19 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
   observer/migration/archive unchanged. Current Rust gate reproduced the expected
   old-main pin failure before switching descriptors. Capture/evidence acceptance
   and parent-independent reruns remain pending.
+
+## Current Rust source gate
+
+- Selects `current-producer.json` explicitly, authenticates frozen observer/report
+  identities, all original non-main hashes and both exact source inventories.
+  Independently undoes only the anchored two-registration insertion and requires
+  the original whole-file main hash. Runtime capture-test body is byte-identical
+  to `204f3c3`; no RGB, nonpixel or schedule assertion changed.
+- Source gate and new identity/main-negative controls followed red→green. All six
+  `local_capture` tests pass with owned inputs, including a fresh real `verify`
+  process; none skipped. Focused rustfmt and Clippy `-D warnings` pass.
+- Full package: 74 unit tests pass, 14 pre-existing explicit ignores; all 13
+  integration tests pass. Logs: `local/map-inspector-preview/` (`source-gate-red.txt`,
+  `main-negative-red.txt`, `identity-negative-red.txt`, `local-capture-green.txt`,
+  `local-capture-clippy.txt`, `map-inspector-tests.txt`). Independent static
+  correctness/architecture review approved the gate before the signed commit.
