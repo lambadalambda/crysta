@@ -314,3 +314,89 @@ fresh report. Any output difference requires investigation, never a pin rewrite.
   both `historical*.json` and `bridge*.json` audits.
 
 No server/browser ownership transfers or shared-index edits are part of this work.
+
+## Library/Wasm producer: explicit successor, same native output
+
+The separated producer is source commit `8ae412c36e92b870c34bd4676ef6d8450d5a289a`.
+It is qualified by the sibling `library-producer.json` descriptor and
+`library-producer-bridge.json` report. The predecessor descriptor and report
+remain byte-frozen at `85de8d72…0714` and `46a2b7fd…95c0`; the new bridge calls
+the old bridge with explicit historical, fixed and predecessor source trees
+before authenticating this successor. It is not a registry or fallback.
+
+The successor records exactly four real replacements (`Cargo.lock`,
+map-inspector `Cargo.toml`, `room_preview.rs`, and `room-slice.html`) with both
+old and current identities. Separate exact inventories bind the three library
+boundary files, public-preview qualification test, root workspace manifest,
+every file in `crates/pandora-web/`, and all nine files in
+`tools/pandora-preview/`. Unchanged predecessor sources remain derived from and
+checked against the frozen predecessor descriptor. The exact 57-byte `main.rs`
+insertion/reconstruction proof is unchanged.
+
+Native-host consumption was considered and deliberately left as the current
+shared-source implementation. The native exporter already reaches the pure
+renderer through the library boundary; constructing `PandoraPreview` directly
+would add architecture churn without fixing a correctness problem.
+
+Descriptor/report SHA-256:
+
+- `library-producer.json`: `00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143`
+- `library-producer-bridge.json`: `18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d`
+
+Private evidence is retained in this source worktree under
+`local/map-inspector-library-producer/{library-a,library-b}`. Both roots own a
+clean Cargo target, build log, copied binary, ten-file capture, stdout/stderr,
+and schema-3 process/toolchain envelope. They are two isolated builds and two
+singleton capture processes (PIDs 87534 and 88336); binary SHA-256 values are
+`b1ef58f1…8ced` and `8acee140…7aca`. All ten files and complete manifests match
+the accepted fixed roots and each other. The complete manifest remains
+`a7f23508…664a`; canonical nonpixels remain `7998be25…b22`. Post-review
+singleton `verify` processes (PIDs 94512 and 94571) parsed equal to each retained
+complete manifest, exited zero and emitted empty stderr; metadata is retained in
+`local/map-inspector-library-producer/retained-binary-review.json`.
+
+Reproduce the old → predecessor → library chain with explicit recorded sources:
+
+```sh
+T=tools/map-inspector-qualification
+ROOT=local/map-inspector-library-producer
+ROM='/Users/lainsoykaf/repos/terranigma/local/Tenchi Souzou (Japan).sfc'
+SRAM='/Users/lainsoykaf/repos/terranigma/local/saves/Terranigma.srm'
+OLD_REPO=/Users/lainsoykaf/repos/ilar-task-capture-old
+FIXED_REPO=/Users/lainsoykaf/repos/ilar-task-capture-renewal
+PRIOR_REPO=/Users/lainsoykaf/repos/ilar-task-preview-producer
+ACCEPTED="$FIXED_REPO/local/map-inspector-renewal"
+PRIOR="$PRIOR_REPO/local/map-inspector-preview"
+D="$T/library-producer.json"
+ARGS=("$ROM" "$SRAM" "$ACCEPTED/old" "$ACCEPTED/fixed-a" "$ACCEPTED/fixed-b" \
+  "$PRIOR/current-a" "$PRIOR/current-b" "$ROOT/library-a" "$ROOT/library-b" \
+  "$OLD_REPO" "$FIXED_REPO" "$PRIOR_REPO" . "$D")
+python3 -B "$T/library_bridge.py" "${ARGS[@]}" > "$ROOT/rechecked.json"
+cmp "$ROOT/rechecked.json" "$T/library-producer-bridge.json"
+python3 -O -B "$T/library_bridge.py" "${ARGS[@]}" > "$ROOT/rechecked-O.json"
+cmp "$ROOT/rechecked-O.json" "$T/library-producer-bridge.json"
+python3 -B "$T/test_library_bridge.py"
+python3 -O -B "$T/test_library_bridge.py"
+python3 -B "$T/test_capture.py"
+python3 -O -B "$T/test_capture.py"
+python3 -B "$T/test_library_mutations.py"
+cargo test --locked -p map-inspector --test local_capture
+```
+
+For two new isolated builds/processes, use new refused-if-existing roots:
+
+```sh
+FRESH=$(mktemp -d "$PWD/local/map-inspector-library-replay-XXXXXX")
+for RUN in library-a library-b; do
+  python3 -B "$T/capture.py" . "$FRESH/$RUN" "$ROM" "$SRAM" \
+    --library-descriptor "$D" --fixed-source-repo "$FIXED_REPO" \
+    --predecessor-source-repo "$PRIOR_REPO"
+done
+python3 -B "$T/library_bridge.py" "$ROM" "$SRAM" "$ACCEPTED/old" \
+  "$ACCEPTED/fixed-a" "$ACCEPTED/fixed-b" "$PRIOR/current-a" "$PRIOR/current-b" \
+  "$FRESH/library-a" "$FRESH/library-b" "$OLD_REPO" "$FIXED_REPO" \
+  "$PRIOR_REPO" . "$D" > "$FRESH/bridge.json"
+```
+
+Fresh envelopes differ by construction. Compare identities, bounded inventories,
+complete manifests, nonpixels and output bytes; never rewrite an output pin.

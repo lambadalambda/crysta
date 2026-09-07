@@ -64,3 +64,29 @@ The final inventory must also bind root `Cargo.toml`, `crates/pandora-web/`, and
 journey now passes through the settled adapter; only the same-output producer
 proof and source-bridge inventory remain deliberately deferred. This section
 records source identities, not producer acceptance.
+
+## Qualification handoff
+
+A sibling, explicit successor chain now authenticates production source
+`8ae412c36e92b870c34bd4676ef6d8450d5a289a` without changing the predecessor
+artifacts. `library-producer.json` is pinned at
+`00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143` and
+`library-producer-bridge.json` at
+`18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d`.
+The old descriptor/report remain `85de8d72…0714` and `46a2b7fd…95c0` and their
+normal/optimized audits remain callable against the recorded old/fixed/prior
+worktrees.
+
+Two clean native targets and two singleton capture processes are retained under
+ignored `local/map-inspector-library-producer/{library-a,library-b}`. Every one
+of the ten files, complete manifests, and nonpixel digest matches accepted
+fixed A/B and prior producer A/B. The exact main registration proof and all
+frozen observation/output artifacts remain unchanged.
+
+The native-host question is resolved by keeping the current shared-source
+implementation. It already consumes the separated pure-renderer boundary and
+there is no correctness blocker that justifies another host refactor.
+
+Independent review and parent reproduction are still required, so this issue
+remains open. Full commands and private evidence locations are recorded in
+`tools/map-inspector-qualification/README.md`.
