@@ -139,7 +139,35 @@
     for(const key of ['lifting','standing','walking','throwing','flight-miss','flight-hit'])insist(e.carry[key]>0,`Missing carry pixels ${key}`);
     insist(e.ark>0,'Missing Ark pixels');
   }
-  const helpers={projectRoute,checkState,createCommands,indexedPage,compareComposition,requireCoverage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls};
+  function bounded(value,label,ms=5000) {
+    let timer;
+    return Promise.race([
+      Promise.resolve(value),
+      new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(`${label} timeout`)),ms);}),
+    ]).finally(()=>clearTimeout(timer));
+  }
+  function createInspection({runtime,localRequested=runtime!==undefined,fetchFn=globalThis.fetch,timeout=ms=>AbortSignal.timeout(ms),deadlineMs=5000}) {
+    if(localRequested) {
+      insist(runtime && ['request','loadArt','loadBackground'].every(name=>typeof runtime[name]==='function'),'Requested browser-local Wasm runtime is unavailable');
+      return Object.freeze({
+        kind:'browser-local-wasm-worker',
+        state:()=>bounded(runtime.request('/state'),'Wasm state inspection',deadlineMs),
+        async art(){return JSON.parse(new TextDecoder().decode(await bounded(runtime.loadArt(),'Wasm art inspection',deadlineMs)));},
+        background:path=>bounded(runtime.loadBackground(path),'Wasm background inspection',deadlineMs),
+      });
+    }
+    const get=async path=>{const r=await fetchFn(path,{cache:'no-store',signal:timeout(5000)});insist(r.ok,`GET ${path}: ${r.status}`);return r.json();};
+    return Object.freeze({kind:'native-http',state:()=>get('/state'),art:()=>get('/art.json'),background:path=>path});
+  }
+  function checkLocalBootstrap(preview,$,state) {
+    insist(preview?.status==='ready','Browser-local Wasm bootstrap is not ready');
+    insist($('local-rom-status')?.dataset.kind==='ready','Local ROM status is not ready');
+    insist(!$('error')?.textContent,'Local ROM bootstrap has a UI error');
+    insist($('new-game') && !$('new-game').disabled,'Local New Game control is unavailable');
+    insist(state?.start_kind==='saved-checkpoint' && state.tick===0 && state.map_id===15 && state.x===472 && state.y===176,
+      'Local ROM did not construct the authenticated saved checkpoint');
+  }
+  const helpers={projectRoute,checkState,createCommands,bounded,createInspection,checkLocalBootstrap,indexedPage,compareComposition,requireCoverage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls};
   if(typeof module!=='undefined' && module.exports && typeof document==='undefined'){module.exports=helpers;return;}
   globalThis.PandoraBrowserHelpers=helpers;
   if(globalThis.PANDORA_BROWSER_HELPERS_ONLY)return 'PandoraBrowserHelpers ready (no input)';
@@ -154,7 +182,6 @@
     const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
     const digest=async bytes=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',bytes)),b=>b.toString(16).padStart(2,'0')).join('');
     const pinned=async(text,sha,label)=>{insist(typeof text==='string' && hash(sha) && await digest(new TextEncoder().encode(text))===sha,`${label} pin differs`);return JSON.parse(text);};
-    const get=async path=>{const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(5000)});insist(r.ok,`GET ${path}: ${r.status}`);return r.json();};
     const key=(type,key)=>document.dispatchEvent(new KeyboardEvent(type,{key,bubbles:true}));
     let controls,started=false;
     try {
@@ -167,7 +194,13 @@
         'Missing source fresh replay provenance');
       const plan=projectRoute(route,proof);run.projection={offlineTicks:plan.offlineTicks,uiTicks:plan.steps.length,omissions:plan.omissions,proofSha:globalThis.PANDORA_BROWSER_PROOF_SHA};
       insist(plan.offlineTicks===11590,'Fixed route action count differs');
-      const bundle=await get('/art.json'),before=await get('/state');
+      const localRuntimeRequested=globalThis.RoomSliceRuntime!==undefined;
+      const runtimeModule=localRuntimeRequested?await bounded(globalThis.RoomSliceRuntime.ready,'Wasm runtime readiness'):null;
+      const inspection=createInspection({runtime:runtimeModule?.runtime,localRequested:localRuntimeRequested});
+      const bundle=await inspection.art(),before=await inspection.state();
+      if(inspection.kind==='browser-local-wasm-worker')checkLocalBootstrap(globalThis.PandoraLocalPreview,$,before);
+      run.transport=inspection.kind;
+      run.bootstrap=inspection.kind==='browser-local-wasm-worker'?structuredClone(globalThis.PandoraLocalPreview):null;
       insist(before.pot_action===true && before.choice_interaction===true && before.dialogue_acknowledgement===true && before.world_background &&
         typeof before.owner==='string' && typeof before.dialogue_ready==='boolean','Enabled host contract is not ready');
       // Reuse the existing independent house/source contracts on their exact
@@ -186,10 +219,15 @@
       const make=(width,height,data)=>({width,height,data:new Uint8ClampedArray(data)});
       const update=(image,x,y,w,h,data)=>{for(let row=0;row<h;row++)image.data.set(data.subarray(row*w*4,(row+1)*w*4),((y+row)*image.width+x)*4);};
       const bases=Object.fromEntries(await Promise.all(Object.entries(R.backgroundManifest(bundle)).map(async([name,d])=>{
-        const image=new Image();await new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error(`Bitmap ${name}`));image.src=d.url;});
-        insist(image.width===d.width && image.height===d.height,`Source bitmap size ${name}`);
-        const canvas=document.createElement('canvas');canvas.width=d.width;canvas.height=d.height;
-        const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return [name,ctx.getImageData(0,0,d.width,d.height)];
+        const source=await inspection.background(d.url),local=inspection.kind==='browser-local-wasm-worker';
+        insist(!local || source instanceof Blob,`Wasm background ${name} is not an owned Blob`);
+        const objectUrl=local?URL.createObjectURL(source):null,image=new Image();
+        try {
+          await bounded(new Promise((resolve,reject)=>{image.onload=resolve;image.onerror=()=>reject(new Error(`Bitmap ${name}`));image.src=objectUrl??source;}),`Bitmap ${name} decode`);
+          insist(image.width===d.width && image.height===d.height,`Source bitmap size ${name}`);
+          const canvas=document.createElement('canvas');canvas.width=d.width;canvas.height=d.height;
+          const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);return [name,ctx.getImageData(0,0,d.width,d.height)];
+        } finally {if(objectUrl!==null)URL.revokeObjectURL(objectUrl);}
       })));
       const art=R.prepareArt(bundle,bases,make,update),backgroundColors={};
       started=true;controls.click('new-game');
@@ -197,7 +235,7 @@
       while($('position').textContent!=='304, 112' || $('tick').textContent!=='0' || $('pause').disabled || $('step').disabled) {
         insist(performance.now()<deadline,'New Game startup timeout');await sleep(10);
       }
-      let state=await get('/state');
+      let state=await inspection.state();
       insist(state.start_kind==='new-game' && state.tick===0 && state.map_id===15 && state.x===304 && state.y===112 && state.dialogue===null && state.owner==='player','Not a fresh New Game');
       checkState(state,plan.initial,0);run.initial=state;
       function raster(id,frame,key) {
@@ -258,14 +296,14 @@
           timer=setTimeout(()=>finish(new Error(`UI ack timeout for command ${step.command}`)),5000);
           try{latch.arm();controls.send(step.command,previous);}catch(error){finish(error);}
         });
-        state=await get('/state');checkState(state,step.state,run.lastTick);checkSemanticCheckpoint(step.offlineTick,state);pixels(state);
+        state=await inspection.state();checkState(state,step.state,run.lastTick);checkSemanticCheckpoint(step.offlineTick,state);pixels(state);
         run.offlineTick=step.offlineTick;checkpoint(previous,state,step);
       }
       insist(same(run.invocations,reference.invocations.map(i=>`text:${i.source.toString(16)}`)),'Missing/reordered direct34 source invocations');
       requireCoverage(run.evidence);
       insist(state.map_id===65 && state.x===136 && state.y===208 && state.owner==='player' && state.phase==='walking' && state.dialogue===null &&
         [0x26,0x28,0x27,0x2e,0x292,0x22,0x243,0x244].every(bit=>state.events.includes(bit)),'Final41 control/flags differ');
-      run.result={kind:'real-ui-pandora-cadence-projection',initial:run.initial,final:state,projection:run.projection,checkpoints:run.checkpoints,
+      run.result={kind:inspection.kind==='browser-local-wasm-worker'?'real-ui-pandora-cadence-projection-browser-local-wasm':'real-ui-pandora-cadence-projection',transport:run.transport,bootstrap:run.bootstrap,initial:run.initial,final:state,projection:run.projection,checkpoints:run.checkpoints,
         invocations:run.invocations,evidence:run.evidence,visualChecks:run.visualChecks,rasterEvidence:run.rasterEvidence,
         limits:'Source-composition semantic preview, not native scheduler frames/whole RGB. Offline tick and snapshot identities differ. Retry/refusal optional branch not replayed. No equipment acquisition or world return claim.'};
       run.status='passed';return run.result;

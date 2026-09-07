@@ -1,7 +1,7 @@
 'use strict';
 const {test}=require('node:test');
 const assert=require('node:assert/strict');
-const {projectRoute,checkState,createCommands,compareComposition,requireCoverage,indexedPage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls}=require('./verify-pandora-browser.js');
+const {projectRoute,checkState,createCommands,bounded,createInspection,checkLocalBootstrap,compareComposition,requireCoverage,indexedPage,checkSemanticCheckpoint,blockingDialogue,checkDialogueControls}=require('./verify-pandora-browser.js');
 const clone=structuredClone;
 function fixture() {
   const state=(tick,dialogue=null,x=304)=>({tick,dialogue,x,y:112,map_id:15,owner:dialogue?'dialogue':'player',events:[32,251]});
@@ -11,6 +11,56 @@ function fixture() {
   const projected=[offline[0],offline[1],{...offline[4],state:{...offline[4].state,tick:2}},{...offline[5],state:{...offline[5].state,tick:3}}];
   return {route:{actions:[[5,1],[2,1],[0,1],[6,1],[2,1]]},proof:{schema:1,offline,projected}};
 }
+test('browser-local inspection is read-only and never falls back to fetch',async()=>{
+  const calls=[],runtime={
+    request(...args){calls.push(['state',...args]);return Promise.resolve({tick:0});},
+    loadArt(){calls.push(['art']);return new TextEncoder().encode('{"frames":{}}');},
+    loadBackground(path){calls.push(['background',path]);return Promise.resolve(new Blob([path]));},
+  };
+  let fetches=0;
+  const inspection=createInspection({runtime,fetchFn:async()=>{fetches++;throw new Error('fetch forbidden');}});
+  assert.equal(inspection.kind,'browser-local-wasm-worker');
+  assert.deepEqual(await inspection.state(),{tick:0});
+  assert.deepEqual(await inspection.art(),{frames:{}});
+  assert.equal((await inspection.background('/map.bmp')) instanceof Blob,true);
+  assert.deepEqual(Object.keys(inspection).sort(),['art','background','kind','state']);
+  assert.deepEqual(calls,[['state','/state'],['art'],['background','/map.bmp']]);
+  assert.equal(fetches,0);
+});
+test('native inspection retains exact GET behavior',async()=>{
+  const calls=[],fetchFn=async(path,options)=>{calls.push([path,options]);return {ok:true,json:async()=>({path})};};
+  const inspection=createInspection({fetchFn,timeout:()=>({})});
+  assert.equal(inspection.kind,'native-http');
+  assert.deepEqual(await inspection.state(),{path:'/state'});
+  assert.deepEqual(await inspection.art(),{path:'/art.json'});
+  assert.equal(await inspection.background('/map.bmp'),'/map.bmp');
+  assert.deepEqual(calls.map(([path])=>path),['/state','/art.json']);
+});
+test('requested local inspection never downgrades and operations are bounded',async()=>{
+  for(const runtime of [undefined,null,{}, {request(){},loadArt(){},loadBackground:null}])
+    assert.throws(()=>createInspection({runtime,localRequested:true}),/unavailable/);
+  const never=new Promise(()=>{}),runtime={request:()=>never,loadArt:()=>never,loadBackground:()=>never};
+  const inspection=createInspection({runtime,deadlineMs:1});
+  await assert.rejects(inspection.state(),/timeout/);
+  await assert.rejects(inspection.art(),/timeout/);
+  await assert.rejects(inspection.background('/map.bmp'),/timeout/);
+  await assert.rejects(bounded(never,'runtime readiness',1),/readiness timeout/);
+});
+
+test('local bootstrap rejects every unready or non-checkpoint state',()=>{
+  const ready={status:'ready',read_ms:1,compile_ms:2,wasm_memory_bytes:3};
+  const state={start_kind:'saved-checkpoint',tick:0,map_id:15,x:472,y:176};
+  const $=id=>id==='local-rom-status'?{dataset:{kind:'ready'}}:id==='error'?{textContent:''}:id==='new-game'?{disabled:false}:null;
+  checkLocalBootstrap(ready,$,state);
+  for(const [preview,lookup,changed] of [
+    [{...ready,status:'error'},$,state],
+    [ready,id=>id==='local-rom-status'?{dataset:{kind:'error'}}:$(id),state],
+    [ready,id=>id==='error'?{textContent:'bad'}:$(id),state],
+    [ready,id=>id==='new-game'?{disabled:true}:$(id),state],
+    [ready,$,{...state,start_kind:'new-game'}],
+    [ready,$,{...state,x:471}],
+  ]) assert.throws(()=>checkLocalBootstrap(preview,lookup,changed));
+});
 test('projection omits only proven paused no-ops; keeps original and UI identities',()=>{
   const {route,proof}=fixture(),p=projectRoute(route,proof);
   assert.deepEqual(p.steps.map(s=>[s.command,s.offlineTick,s.state.tick]),[[5,1,1],[6,4,2],[2,5,3]]);
