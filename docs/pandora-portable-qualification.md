@@ -5,6 +5,37 @@ here enables the live host. The completed source/navigation qualification remain
 in [pandora-navigation.md](pandora-navigation.md); this document tracks the new
 `PandoraData` adapter and actual input-only continuation separately.
 
+## Host-free Wasm library boundary
+
+`map-inspector` now has an `rlib` target whose normal `wasm32-unknown-unknown`
+dependency closure is only `assets`, `rom`, `room-core`, and `serde_json`; the
+native `oracle` dependency is target-gated. `PandoraPreview::from_rom_bytes`
+authenticates an in-memory Japanese ROM and compiles the accepted Pandora
+profile. The stateful Rust API is deliberately small:
+
+- `step(u8)`, `new_game()`, `reset()`, and `state()` retain the existing input
+  protocol and schema-versioned `serde_json::Value` projection;
+- `art()`, `bitmap()`, `exterior_bitmap()`, and `extra_bitmap(key)` borrow
+  immutable source-derived buffers owned by the preview;
+- interior/exterior BMP construction is pure and in memory. The native
+  `render-map` command calls the same renderer before writing its unchanged
+  files; preview construction no longer exports and reads them back.
+
+The compile gate is
+`cargo build --locked --target wasm32-unknown-unknown -p map-inspector --lib`,
+plus a target-resolved graph check that rejects `oracle`. This is an `rlib`
+portability boundary, not a browser-loadable ABI. A follow-up state-owning
+`wasm-bindgen` facade must translate errors/JSON, copy borrowed output buffers,
+and supply local-file bootstrap and browser transport. Caching, input/render
+scheduling, deployment, and end-to-end browser qualification remain outside
+this stage; no gameplay/compiler logic belongs in JavaScript.
+
+The native capture producer still compiles the shared source modules in its
+historically pinned binary context. Moving that host to consume the library
+would alter the exact authenticated `main.rs` registration proof, so it is
+intentionally deferred to explicit same-output producer revalidation. The
+frozen observer, migration, epochs, and output pins are unchanged.
+
 ## Reproduction
 
 Requires the locally owned headerless Japanese ROM, SHA-256

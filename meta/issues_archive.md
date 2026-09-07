@@ -71,3 +71,4 @@
 - [x] [Render bounded Pandora world patches](issues/render-pandora-world-patches.md)
 - [x] [Revalidate the preview producer without renewing observation pins](issues/revalidate-preview-producer.md)
 - [x] [Verify the continuous Pandora browser journey](issues/verify-pandora-browser-journey.md)
+- [x] [Expose the Pandora preview as a host-free Wasm library](issues/expose-pandora-preview-wasm-library.md)

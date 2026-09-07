@@ -27,3 +27,22 @@ Separate the accepted source-derived Pandora preview/compiler/art path from the 
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - `browser-rom-bootstrap.md` and `webassembly-frontend.md` remain open; this is only their source-owned library prerequisite.
+
+## Completion
+
+Implemented in `ab68a7e`. The owned-ROM public API test pins the complete retained
+map15/map10 BMP byte hashes, checks direct in-memory renderer equality, preserves
+the accepted initial state and New Game/reset lifecycle, and confirms immutable
+art/background buffers. The existing library-unit Pandora itinerary reaches its
+accepted final source/snapshot state through restored input-only execution.
+
+Locked native focused tests, strict workspace/all-target Clippy, Rustdoc, the
+Wasm library build, and the target-resolved no-`oracle` graph check pass.
+Independent `openai/gpt-5.6-sol` correctness/architecture review found no
+remaining blocker after parity, locked CI, API documentation, and explicit pin
+tracking fixes.
+
+The strict current-producer gate intentionally reports its focused source
+identity mismatch; it was neither weakened nor repinned. Exact affected hashes,
+new inventory files, and required same-output evidence are tracked by
+[Revalidate the preview producer after library separation](revalidate-preview-library-producer.md).
