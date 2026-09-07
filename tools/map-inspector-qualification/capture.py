@@ -10,17 +10,34 @@ import time
 import uuid
 
 import bridge
+import library_bridge
 from check import source_hashes, sha, require, ROM, SRAM, POLICY
 
 
-def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None):
-    require((current_descriptor is None) == (fixed_source_repo is None),
-            'current descriptor and explicit historical fixed source must be supplied together')
+def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None,
+        library_descriptor=None, predecessor_source_repo=None):
+    current_mode = current_descriptor is not None
+    library_mode = library_descriptor is not None
+    require(not (current_mode and library_mode), 'select exactly one explicit descriptor mode')
+    require((fixed_source_repo is not None) == (current_mode or library_mode),
+            'descriptor mode and explicit historical fixed source must be supplied together')
+    require((predecessor_source_repo is not None) == library_mode,
+            'library descriptor and explicit predecessor source must be supplied together')
     repo, out, rom, save = [p.resolve() for p in (repo, out, rom, save)]
     descriptor = None
+    mode = None
     if current_descriptor is not None:
         descriptor = bridge.verify_current(repo, fixed_source_repo, current_descriptor)
         descriptor_sha = sha(current_descriptor.read_bytes())
+        mode = 'current'
+    elif library_descriptor is not None:
+        require(fixed_source_repo is not None,
+                'library mode requires explicit historical fixed source')
+        descriptor = library_bridge.verify_library_descriptor(
+            repo, predecessor_source_repo, fixed_source_repo, library_descriptor)
+        descriptor_sha = sha(library_descriptor.read_bytes())
+        mode = 'library'
+    if descriptor is not None:
         require(sha(rom.read_bytes()) == ROM and sha(save.read_bytes()) == SRAM and save.stat().st_size == 8192,
                 'owned ROM/SRAM mismatch')
     out.mkdir(parents=True, exist_ok=False)
@@ -62,15 +79,30 @@ def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None):
         'build_log_sha256': sha((out / 'build.log').read_bytes()),
     }
     if descriptor:
-        require(bridge.verify_current(repo, fixed_source_repo, current_descriptor) == descriptor and
-                sha(current_descriptor.read_bytes()) == descriptor_sha, 'sources/descriptor changed during capture')
-        provenance.update(schema_version=2, epoch=bridge.EPOCH, policy=POLICY,
-                          descriptor_sha256=descriptor_sha,
-                          additional_source_hashes=descriptor['additional_source_hashes'],
-                          fresh_target=True, source_repo=str(repo), rom_path=str(rom), sram_path=str(save),
+        if mode == 'current':
+            unchanged = bridge.verify_current(repo, fixed_source_repo, current_descriptor) == descriptor
+            unchanged = unchanged and sha(current_descriptor.read_bytes()) == descriptor_sha
+        else:
+            unchanged = library_bridge.verify_library_descriptor(
+                repo, predecessor_source_repo, fixed_source_repo, library_descriptor) == descriptor
+            unchanged = unchanged and sha(library_descriptor.read_bytes()) == descriptor_sha
+        require(unchanged, 'sources/descriptor changed during capture')
+        provenance.update(fresh_target=True, source_repo=str(repo), rom_path=str(rom), sram_path=str(save),
                           stdout_sha256=sha(stdout), stderr_sha256=sha(stderr),
                           process=dict(run_id=str(uuid.uuid4()), pid=process.pid, exit_code=process.returncode,
                                        started_ns=started, finished_ns=finished))
+        if mode == 'current':
+            provenance.update(schema_version=2, epoch=bridge.EPOCH, policy=POLICY,
+                              descriptor_sha256=descriptor_sha,
+                              additional_source_hashes=descriptor['additional_source_hashes'])
+        else:
+            predecessor = library_bridge.frozen_predecessor()[1]
+            provenance.update(schema_version=3, kind=library_bridge.KIND,
+                              epoch=library_bridge.EPOCH, policy=POLICY,
+                              descriptor_sha256=descriptor_sha,
+                              source_hashes=library_bridge.current_sources(descriptor, predecessor),
+                              **{field: descriptor[field] for field in
+                                 ('replaced_source_hashes', *library_bridge.GROUPS)})
     (out / 'producer.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
     print(out)
 
@@ -80,5 +112,7 @@ if __name__ == '__main__':
     for name in ('repo', 'out', 'rom', 'save'):
         parser.add_argument(name, type=Path)
     parser.add_argument('--current-descriptor', type=Path)
+    parser.add_argument('--library-descriptor', type=Path)
     parser.add_argument('--fixed-source-repo', type=Path)
+    parser.add_argument('--predecessor-source-repo', type=Path)
     run(**vars(parser.parse_args()))

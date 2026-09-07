@@ -10,6 +10,7 @@ from unittest.mock import MagicMock, patch
 import bridge
 import capture
 import check
+import library_bridge
 
 
 class RecorderGates(unittest.TestCase):
@@ -91,6 +92,37 @@ class RecorderGates(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'descriptor changed'):
             self.record()
         self.assertFalse((self.out / 'producer.json').exists())
+
+    def test_library_mode_rechecks_and_records_exact_schema_three_groups(self):
+        descriptor = check.load(check.HERE / 'library-producer.json')
+        predecessor = check.load(check.HERE / 'current-producer.json')
+        self.path.write_text(json.dumps(descriptor))
+        with patch.object(library_bridge, 'verify_library_descriptor', return_value=descriptor) as verify, \
+                patch.object(library_bridge, 'frozen_predecessor',
+                             return_value=(None, predecessor, None)):
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        fixed_source_repo=self.base / 'fixed',
+                        library_descriptor=self.path,
+                        predecessor_source_repo=self.base / 'predecessor')
+        self.assertEqual(verify.call_count, 2)
+        producer = check.load(self.out / 'producer.json')
+        self.assertEqual(producer['schema_version'], 3)
+        self.assertEqual(producer['kind'], library_bridge.KIND)
+        self.assertEqual(producer['source_hashes'],
+                         library_bridge.current_sources(descriptor, predecessor))
+        for field in ('replaced_source_hashes', *library_bridge.GROUPS):
+            self.assertEqual(producer[field], descriptor[field])
+
+    def test_library_mode_requires_all_explicit_source_repositories(self):
+        with self.assertRaisesRegex(ValueError, 'fixed source'):
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        library_descriptor=self.path,
+                        predecessor_source_repo=self.base / 'predecessor')
+        with self.assertRaisesRegex(ValueError, 'predecessor source'):
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        library_descriptor=self.path,
+                        fixed_source_repo=self.base / 'fixed')
+        self.assertFalse(self.out.exists())
 
 
 if __name__ == '__main__':
