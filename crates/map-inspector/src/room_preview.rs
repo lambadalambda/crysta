@@ -9,7 +9,8 @@ use room_core::{
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
 
-pub(super) struct Preview {
+/// Source-derived Pandora preview state and immutable presentation buffers.
+pub struct Preview {
     data: GameData,
     state: GameState,
     bitmap: Vec<u8>,
@@ -20,6 +21,21 @@ pub(super) struct Preview {
     fresh_start: bool,
 }
 impl Preview {
+    /// Authenticate Japanese ROM bytes and compile the accepted Pandora profile.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the bytes are not the qualified Japanese ROM or
+    /// any source-derived preview component fails validation.
+    #[allow(dead_code)] // The pinned native binary compiles this shared module separately.
+    pub fn from_rom_bytes(bytes: &[u8]) -> Result<Self> {
+        let rom = Rom::load(bytes)?;
+        if rom.revision() != rom::Revision::Japan {
+            return Err(invalid("Pandora preview requires the Japanese reference ROM").into());
+        }
+        Self::new_profile(&rom, true)
+    }
+
     pub(super) fn new(rom: &Rom) -> Result<Self> {
         Self::new_profile(rom, false)
     }
@@ -48,10 +64,8 @@ impl Preview {
                     .map(|camera| (id, camera))
             })
             .collect::<Result<BTreeMap<_, _>>>()?;
-        let viewer = crate::visual_export::export(rom, 15)?;
-        let bitmap = std::fs::read(viewer.with_file_name("map.bmp"))?;
-        let exterior = crate::visual_export::export(rom, 10)?;
-        let exterior_bitmap = std::fs::read(exterior.with_file_name("map.bmp"))?;
+        let bitmap = crate::visual_export::render(rom, 15)?.bitmap;
+        let exterior_bitmap = crate::visual_export::render(rom, 10)?.bitmap;
         Ok(Self {
             data,
             state,
@@ -63,19 +77,28 @@ impl Preview {
             fresh_start: false,
         })
     }
-    pub(super) fn art(&self) -> &[u8] {
+    /// Return the immutable actor/art manifest JSON bytes.
+    #[must_use]
+    pub fn art(&self) -> &[u8] {
         &self.art.bytes
     }
-    pub(super) fn bitmap(&self) -> &[u8] {
+    /// Return the house interior BMP bytes.
+    #[must_use]
+    pub fn bitmap(&self) -> &[u8] {
         &self.bitmap
     }
-    pub(super) fn exterior_bitmap(&self) -> &[u8] {
+    /// Return the house exterior BMP bytes.
+    #[must_use]
+    pub fn exterior_bitmap(&self) -> &[u8] {
         &self.exterior_bitmap
     }
-    pub(super) fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
+    /// Return a named Pandora background BMP, when compiled.
+    #[must_use]
+    pub fn extra_bitmap(&self, key: &str) -> Option<&[u8]> {
         self.art.extra_bitmap(key)
     }
-    pub(super) fn step(&mut self, button: u8) {
+    /// Apply one existing preview input code (`0..=10`).
+    pub fn step(&mut self, button: u8) {
         if self.error.is_some() {
             return;
         }
@@ -110,12 +133,14 @@ impl Preview {
             self.error = Some(error.to_string());
         }
     }
-    pub(super) fn new_game(&mut self) {
+    /// Start the accepted source-derived New Game path.
+    pub fn new_game(&mut self) {
         self.state = GameState::new_game(&self.data, Policy::SemanticPreview);
         self.fresh_start = true;
         self.error = None;
     }
-    pub(super) fn reset(&mut self) {
+    /// Reset to the accepted saved checkpoint.
+    pub fn reset(&mut self) {
         self.state = GameState::new(&self.data, Policy::SemanticPreview);
         self.fresh_start = false;
         self.error = None;
@@ -170,7 +195,9 @@ impl Preview {
         Ok(visual)
     }
 
-    pub(super) fn state(&self) -> Value {
+    /// Return the current schema-versioned preview state.
+    #[must_use]
+    pub fn state(&self) -> Value {
         let output = self.state.output();
         let actor_key = crate::room_art::frame_key(output.animation);
         let dialogue = self.state.dialogue(&self.data);
@@ -215,7 +242,9 @@ impl Preview {
             "snapshot_sha256":sha256(&self.state.snapshot())});
         match self.visuals() {
             Ok(Value::Object(fields)) => {
-                state.as_object_mut().expect("state object").extend(fields);
+                if let Some(object) = state.as_object_mut() {
+                    object.extend(fields);
+                }
             }
             Ok(_) => unreachable!("visuals constructs an object"),
             Err(error) => state["error"] = json!(error.to_string()),

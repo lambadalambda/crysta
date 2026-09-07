@@ -25,11 +25,16 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy (warnings denied)
         run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Host-free Pandora Wasm library
+        run: |
+          cargo build --locked --target wasm32-unknown-unknown -p map-inspector --lib
+          ! cargo tree --locked --target wasm32-unknown-unknown -p map-inspector --edges normal,build | grep 'oracle v'
       - name: Tests (ROM-free; local tests skip without dumps)
         run: cargo test --workspace
       - name: Docs
