@@ -46,10 +46,13 @@ The accepted local run used a real `File` selection at
 `http://127.0.0.1:8890/`, authenticated the owned 4 MiB Japanese ROM, observed the
 saved checkpoint, and clicked New Game explicitly. The static server was stopped
 after the verifier and worker had loaded; the journey continued to completion
-without it. The final HAR contains five static startup records and twelve browser-local Blob
-image reads. A cumulative session request capture additionally contains one
-expected favicon 404; neither capture has a POST, ROM upload, gameplay endpoint,
-or non-loopback network origin.
+without it. The accepted final HAR has 17 records: five static startup records
+and twelve browser-local Blob image reads. The separate 35-record
+`network.json` is cumulative agent-browser session history across the preliminary
+and accepted runs (11 loopback HTTP records, 24 Blob reads), not a second
+final-run count; it additionally contains one expected favicon 404. Neither
+capture has a POST, ROM upload, gameplay endpoint, or non-loopback network
+origin.
 
 | Browser-local Wasm acceptance | Result |
 |---|---|
@@ -65,7 +68,13 @@ or non-loopback network origin.
 Browser bootstrap measured a 362.3 ms file read and 656.7 ms worker compile.
 Wasm linear-memory capacity was 289,734,656 bytes; this is not total browser
 peak and excludes JavaScript/browser copies, decoded canvases, and process
-memory. The generated release Wasm was 1,222,939 bytes. Generated site and full
+memory. Full acceptance used the same tracked production source as the stage-2
+smoke. Its locally generated `pandora_web_bg.wasm` was 1,222,939 bytes with
+SHA256 `bb3db0436c5b18596fb310a390950c39825987d098cc19ceb45d49c992f90a82`.
+The earlier smoke recorded 1,222,437 bytes, but that ignored artifact and its
+complete compiler/build provenance were not retained. Build metadata or tooling
+state may explain the 502-byte difference, but the exact cause cannot be proven;
+no byte-for-byte binary identity is claimed. Generated site and full
 run evidence remain ignored under `local/` and contain no ROM or extracted
 asset files.
 
@@ -87,9 +96,9 @@ under this worktree's ignored `local/pandora-browser-wasm/`:
 - network HAR SHA256
   `691cb416337ef822c632e9c394440ca98e2ed2212433be88bb87b92e89c0736a`;
 - audit SHA256
-  `b3d9684190a27f7034668d4f8e4e14bac9110f10346c3070e44b38ab2567687e`;
+  `de5a4980a9bd927171cc03bc50fbe608b1ce8c3f403258bff935191368fa8b4b`;
 - complete provenance manifest SHA256
-  `7940168ac78f692ff3c82eb250be9483e72c33121cf350cdffeb232638a42488`.
+  `1ea232713c75ffe9e3e7fe9ef657062f2bb406d58c10ea129e480dfe6704d8b4`.
 
 Reproduce on an isolated port by building as documented in
 `tools/pandora-preview/README.md`, serving the generated site on `8890`, starting
