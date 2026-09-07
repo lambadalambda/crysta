@@ -26,6 +26,78 @@ reset, invalid replacement, recovery, and zero gameplay/backend network requests
 It is not a replay or renewal of the accepted continuous journey below, and it
 does not update its proof, producer, canvas, or output pins.
 
+## Full browser-local Wasm acceptance
+
+The bounded browser runtime is qualified separately from the general browser ROM
+bootstrap and WebAssembly release work, which remain open. The full verifier uses
+the existing independently reviewed native cadence proof as expectation data and
+observes the worker only through state, art, and background reads. New Game and
+every subsequent input are dispatched through the actual shared UI controls; the
+verifier has no step, reset, New Game, parity-replay, or generic worker-request
+capability.
+
+The local verifier fails closed when the injected runtime is missing, malformed,
+stalled, or returns a non-Blob background. Native HTTP inspection remains
+available only when no runtime was requested. Both paths retain the same complete
+field, raw-snapshot, text-raster, source-semantic, and independent full-canvas
+checks.
+
+The accepted local run used a real `File` selection at
+`http://127.0.0.1:8890/`, authenticated the owned 4 MiB Japanese ROM, observed the
+saved checkpoint, and clicked New Game explicitly. The static server was stopped
+after the verifier and worker had loaded; the journey continued to completion
+without it. The final HAR contains five static startup records and twelve browser-local Blob
+image reads. A cumulative session request capture additionally contains one
+expected favicon 404; neither capture has a POST, ROM upload, gameplay endpoint,
+or non-loopback network origin.
+
+| Browser-local Wasm acceptance | Result |
+|---|---|
+| Original / projected inputs | 11590 / **11409** |
+| Proved blocking-dialogue omissions | **181** |
+| Retained visible-unready updates | **18** |
+| Full 256×224 canvas comparisons | **11410**, including New Game tick 0 |
+| Semantic/readiness checkpoints | **187** |
+| Direct source invocation order | **34** |
+| Final state | tick11409, map`$0041`,(136,208), walking/player, no dialogue/error |
+| Final projected snapshot | `8aab7a37cb0c1115438e8f177c7213fabb0cee14f94d7eaed0cf58635c7484d5` |
+
+Browser bootstrap measured a 362.3 ms file read and 656.7 ms worker compile.
+Wasm linear-memory capacity was 289,734,656 bytes; this is not total browser
+peak and excludes JavaScript/browser copies, decoded canvases, and process
+memory. The generated release Wasm was 1,222,939 bytes. Generated site and full
+run evidence remain ignored under `local/` and contain no ROM or extracted
+asset files.
+
+Current source identity was recorded, and every projected Wasm observation
+matched the unchanged reviewed native expectation. The prior native HTTP full journey was
+not rerun: legacy coverage in this stage is the unchanged house, conversation,
+Pandora helper suites and shared native/injected UI regressions. The prior
+accepted HTTP journey and its evidence remain the native full-route acceptance.
+The strict current-producer source gate remains deliberately red pending the
+separate producer revalidation issue; no source or output pin is renewed here.
+
+The accepted verifier was signed commit `2593b3d`. Private evidence is retained
+under this worktree's ignored `local/pandora-browser-wasm/`:
+
+- `full-result.json` SHA256
+  `3667755a93cffdc21fab90597be5545e2312de7608b59745b47b2df34e3c669a`;
+- independent final runtime state SHA256
+  `6a8a28d4569369d28fbd0b37ad12a4cb8cee88d11d553945389da1f3c161ccf2`;
+- network HAR SHA256
+  `691cb416337ef822c632e9c394440ca98e2ed2212433be88bb87b92e89c0736a`;
+- audit SHA256
+  `b3d9684190a27f7034668d4f8e4e14bac9110f10346c3070e44b38ab2567687e`;
+- complete provenance manifest SHA256
+  `7940168ac78f692ff3c82eb250be9483e72c33121cf350cdffeb232638a42488`.
+
+Reproduce on an isolated port by building as documented in
+`tools/pandora-preview/README.md`, serving the generated site on `8890`, starting
+a named `agent-browser` HAR capture, selecting the ROM through `#local-rom`, and
+loading the three verifier helpers plus the reviewed proof as documented in this
+file's Running section. Retain the returned promise in the page and use one
+completion wait rather than a long evaluator call or repeated status polling.
+
 ## Accepted continuous browser journey
 
 **The authorized New Game → final controllable map41 browser run passed.** The

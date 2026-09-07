@@ -61,5 +61,6 @@ The browser-local adapter additionally changes two pinned identities:
 The final inventory must also bind root `Cargo.toml`, `crates/pandora-web/`, and
 `tools/pandora-preview/`. The native fallback request paths, `main.rs`,
 `room_server.rs`, and all frozen evidence remain unchanged. The full browser
-journey and same-output producer proof are deliberately deferred until the
-adapter source settles; this section records identities, not acceptance.
+journey now passes through the settled adapter; only the same-output producer
+proof and source-bridge inventory remain deliberately deferred. This section
+records source identities, not producer acceptance.
