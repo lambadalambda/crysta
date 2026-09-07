@@ -87,3 +87,11 @@ returns an optional exact Ark key plus typed overlay; source NPC scenes remain u
   `pandora-world-host.txt`. Synthetic finite poses/diagnostic BG, not a journey.
 - Latest live house-only UI passes511,2244 and1671 real-input regressions; its pot
   action remains hidden. Aggregate host wiring/final issue acceptance remain open.
+
+## Parent acceptance
+
+The continuous browser journey now covers actual GameState→host carry wiring,
+with nonvacuous lift/stand/walk/throw and miss/hit flight pixels. Parent component
+pixel/depth/negative controls and final workspace/producer gates pass; see
+[umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance). This closes
+the older integration hold without widening finite source-pose/lifetime claims.

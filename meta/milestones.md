@@ -117,14 +117,6 @@ qualification remain open.
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
-- [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
-- [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
-- [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
-- [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
-- [Render bounded Pandora carrying and pot flight](issues/render-pandora-carrying.md)
-- [Render bounded Pandora world patches](issues/render-pandora-world-patches.md)
-- [Revalidate the preview producer without renewing observation pins](issues/revalidate-preview-producer.md)
-- [Verify the continuous Pandora browser journey](issues/verify-pandora-browser-journey.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

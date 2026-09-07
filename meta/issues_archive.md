@@ -62,3 +62,12 @@
 - [x] [Render bounded Pandora source scenes in the preview](issues/render-pandora-source-scenes.md)
 
 - [x] [Renew map-inspector fixture for completed video publication](issues/renew-map-inspector-observer-fixture.md)
+
+- [x] [Open Pandora’s Box in the portable slice](issues/open-pandora-portable-slice.md)
+- [x] [Port the bounded Pandora route and sequence](issues/port-pandora-sequence.md)
+- [x] [Qualify bounded Pandora navigation and contact admission](issues/qualify-pandora-navigation.md)
+- [x] [Implement bounded Pandora story state and continuation](issues/port-pandora-story-state.md)
+- [x] [Render bounded Pandora carrying and pot flight](issues/render-pandora-carrying.md)
+- [x] [Render bounded Pandora world patches](issues/render-pandora-world-patches.md)
+- [x] [Revalidate the preview producer without renewing observation pins](issues/revalidate-preview-producer.md)
+- [x] [Verify the continuous Pandora browser journey](issues/verify-pandora-browser-journey.md)

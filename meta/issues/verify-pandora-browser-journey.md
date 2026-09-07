@@ -58,3 +58,12 @@ Parent: [Port the bounded Pandora route and sequence](port-pandora-sequence.md).
   full-array comparison and actual artifact/hash/Git-linkage checks. Continuous
   fresh raw-core mirrors reject concealed input failure; only the global tick is
   erased in read-only continuation hashing. The pinned proof is expectation only.
+
+## Parent acceptance
+
+Parent reproduced the complete post-run audit and verified the exact served HTML
+and result bytes; private browser evidence is also retained in parent
+`local/pandora-browser/`. Final producer/workspace gates and live startup smoke
+checks pass; see [umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance).
+The accepted journey remains one continuous input-only run, not an additional
+native replay. Bitmap-load timeout hardening remains optional and out of scope.

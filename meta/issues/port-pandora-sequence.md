@@ -106,3 +106,12 @@ Implement only the maps, source assets and semantic state transitions required b
   Clippy pass. Independently reviewed; existing host still uses the old path.
 
 - Parent transport now reserves canonical command10 for native A/pot action, capability-gated Lift / throw (Z), separate from B/Interact/acknowledgements. Manual submission pauses and Resume advances delayed A/recovery; no automatic story advancement. TDD covers same-origin/two-byte parsing, segmented transport, repeat/held-input rejection, dialogue isolation and actual inline button dispatch. Live profile stays disabled pending the qualified aggregate compiler/route.
+
+## Parent acceptance
+
+Continuous browser acceptance and the final producer bridge are complete. Parent
+full workspace/private-fixture tests, strict Clippy, Wasm and browser-helper gates
+pass; the qualified profile is live and checkpoint/New Game/reset smoke-tested.
+See [umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance) for the
+final logs, preserved house regressions, source pins and bounded endpoint. This
+supersedes the integration holds above; it does not extend the qualified route.

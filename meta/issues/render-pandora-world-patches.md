@@ -79,3 +79,12 @@ acceptance. Frontend evidence does not complete those acceptance criteria.
 - Registering the reusable navigation module changes the whole-file `main.rs`
   observer pin. That gate is intentionally not repinned yet: unchanged capture
   recipe/source and freshly reproduced outputs must be independently revalidated.
+
+## Parent acceptance
+
+The continuous browser journey verifies authoritative live patches, shared-sheet
+continuity/reloads and visible required wooden/cellar-door and consumed-pot cells.
+Parent source-palette/mask controls, canvas controls and the final producer bridge
+pass; see [umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance).
+Offscreen changes earn state evidence only. Opaque-low source patches are distinct
+from synthetic transparency/high-mask controls. The older integration hold is closed.

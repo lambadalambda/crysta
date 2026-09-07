@@ -106,3 +106,13 @@ Registering ROM-only preview modules changes the whole-file map-inspector produc
 - Parent must reproduce the documented historical/bridge checks and full workspace
   before archival/restarting its server. This issue remains open pending that
   acceptance; shared indices, server and browser remain parent-owned.
+
+## Parent acceptance
+
+Parent recomputed both historical/bridge modes byte-for-byte against the frozen
+reports and separately authenticated its own source descriptor/exact main delta.
+All31 Python tests per mode,20 mutations, full workspace including the current
+Rust sourcegate/fresh capture, strict Clippy and Wasm pass. Private reproduction:
+`local/map-inspector-preview-parent/`; final logs and live restart are recorded in
+[umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance).
+No observation pins, historical envelopes or unrenewed legacy wrapper claims changed.

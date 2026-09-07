@@ -179,3 +179,13 @@ Compose the existing house state with a fixed CPU-free Pandora continuation grap
   Wasm, and six unchanged host room_preview tests passed. The newer11590-tick offline
   aggregate/hash remains parent qualification; it was not rerun in this older core
   worktree. Issue remains open for host/browser acceptance.
+
+## Parent acceptance
+
+Compiler replay, restored host projections and the continuous input-only browser
+journey now qualify actual API integration, prerequisites, persistent effects,
+mandatory tour and regained control. Final private-fixture/workspace, Clippy,
+Wasm and producer gates pass; see
+[umbrella acceptance](open-pandora-portable-slice.md#parent-acceptance).
+The earlier integration holds are resolved. Replaced-sheet C reentry with persistent
+`$292` remains deliberately fail-closed outside the admitted route.
