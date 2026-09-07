@@ -353,7 +353,13 @@ the accepted fixed roots and each other. The complete manifest remains
 `a7f23508…664a`; canonical nonpixels remain `7998be25…b22`. Post-review
 singleton `verify` processes (PIDs 94512 and 94571) parsed equal to each retained
 complete manifest, exited zero and emitted empty stderr; metadata is retained in
-`local/map-inspector-library-producer/retained-binary-review.json`.
+`local/map-inspector-library-producer/retained-binary-review.json`. An independent
+execution-capable GPT-5.6-Sol review then reproduced all three bridge stages in
+normal and optimized Python, byte-matched every report, independently compared
+all ten files across the five successor roots, reran the focused gates, and ran
+both retained binaries in fresh singleton `verify` processes (PIDs 98813/98872).
+Both parsed manifests matched exactly with empty stderr. Its private command and
+hash records are under `/tmp/ilar-final-review-98347`.
 
 Reproduce the old → predecessor → library chain with explicit recorded sources:
 

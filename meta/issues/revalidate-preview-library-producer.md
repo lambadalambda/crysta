@@ -87,6 +87,10 @@ The native-host question is resolved by keeping the current shared-source
 implementation. It already consumes the separated pure-renderer boundary and
 there is no correctness blocker that justifies another host refactor.
 
-Independent review and parent reproduction are still required, so this issue
-remains open. Full commands and private evidence locations are recorded in
+Independent static architecture/correctness and execution-capable reviews passed.
+The latter reproduced normal/optimized historical, predecessor and library
+reports byte-for-byte, compared all ten files, ran both retained binaries in
+additional singleton `verify` processes, and passed the source/mutation gates.
+Parent reproduction/acceptance remains required, so this issue stays open. Full
+commands and private evidence locations are recorded in
 `tools/map-inspector-qualification/README.md`.
