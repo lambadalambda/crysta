@@ -12,6 +12,7 @@
 - [ ] [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [ ] [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [ ] [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
+- [ ] [Expose the Pandora preview as a host-free Wasm library](issues/expose-pandora-preview-wasm-library.md)
 - [ ] [Implement the classic renderer](issues/classic-renderer.md)
 - [ ] [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [ ] [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
