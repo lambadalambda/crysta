@@ -171,6 +171,7 @@ qualification remain open.
 - [Ship the desktop frontend](issues/desktop-frontend.md)
 - [Implement browser ROM and asset bootstrap](issues/browser-rom-bootstrap.md)
 - [Ship the WebAssembly frontend and web platform services](issues/webassembly-frontend.md)
+- [Ship the bounded Pandora browser Wasm frontend](issues/ship-bounded-pandora-browser-wasm.md)
 
 <a id="m8-enhancements-and-extensibility"></a>
 ## M8 — Enhancements and extensibility
