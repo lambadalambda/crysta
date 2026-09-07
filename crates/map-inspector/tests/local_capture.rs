@@ -1,13 +1,24 @@
 //! Optional end-to-end capture qualification, using a fresh oracle process.
 use std::{path::Path, process::Command};
 
-const CURRENT: &str =
+const PREDECESSOR: &str =
     include_str!("../../../tools/map-inspector-qualification/current-producer.json");
+const PREDECESSOR_BRIDGE: &str =
+    include_str!("../../../tools/map-inspector-qualification/producer-bridge.json");
+const LIBRARY: &str =
+    include_str!("../../../tools/map-inspector-qualification/library-producer.json");
+const LIBRARY_BRIDGE: &str =
+    include_str!("../../../tools/map-inspector-qualification/library-producer-bridge.json");
 const OBSERVER: &str = include_str!("../../../tools/map-inspector-qualification/observer.json");
 const MIGRATION: &str = include_str!("../../../tools/map-inspector-qualification/migration.json");
 const OBSERVER_SHA: &str = "7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718";
 const MIGRATION_SHA: &str = "db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c";
 const OLD_MAIN_SHA: &str = "7736b543c442e6e4c2789fb13f6f177d1335e78f11810d5023a49c313b27a4d3";
+const PREDECESSOR_SHA: &str = "85de8d72d6f0a433345645f5dd86f5c80f8e1ffd18549fb357a59b2d97590714";
+const PREDECESSOR_BRIDGE_SHA: &str =
+    "46a2b7fda7525c8c7da664b83ec182160b39f4a67d8d0e958c573cea606795c0";
+const LIBRARY_SHA: &str = "00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143";
+const LIBRARY_BRIDGE_SHA: &str = "18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d";
 const MAIN: &str = "crates/map-inspector/src/main.rs";
 const ARCHIVE: &str = include_str!(
     "../../../tools/map-inspector-qualification/epochs/threaded-video-v0/reference.json"
@@ -42,6 +53,49 @@ const ADDITIONAL_FILES: &[&str] = &[
     "crates/map-inspector/src/room_preview.rs",
     "crates/map-inspector/src/room_server.rs",
     "crates/map-inspector/web/room-slice.html",
+];
+
+const REPLACED_FILES: &[&str] = &[
+    "Cargo.lock",
+    "crates/map-inspector/Cargo.toml",
+    "crates/map-inspector/src/room_preview.rs",
+    "crates/map-inspector/web/room-slice.html",
+];
+const LIBRARY_FILES: &[&str] = &[
+    "crates/map-inspector/src/lib.rs",
+    "crates/map-inspector/src/static_background.rs",
+    "crates/map-inspector/src/visual_export.rs",
+];
+const QUALIFICATION_FILES: &[&str] = &["crates/map-inspector/tests/public_preview.rs"];
+const ADAPTER_FILES: &[&str] = &[
+    "Cargo.toml",
+    "crates/pandora-web/Cargo.toml",
+    "crates/pandora-web/examples/parity.rs",
+    "crates/pandora-web/src/lib.rs",
+    "crates/pandora-web/tests/session.rs",
+    "tools/pandora-preview/README.md",
+    "tools/pandora-preview/bootstrap.mjs",
+    "tools/pandora-preview/bootstrap.test.mjs",
+    "tools/pandora-preview/build.sh",
+    "tools/pandora-preview/main.mjs",
+    "tools/pandora-preview/parity-actions.json",
+    "tools/pandora-preview/parity.mjs",
+    "tools/pandora-preview/runtime-loader.js",
+    "tools/pandora-preview/worker.mjs",
+];
+const LIBRARY_FIELDS: &[&str] = &[
+    "schema_version",
+    "kind",
+    "epoch",
+    "policy",
+    "original_descriptor_sha256",
+    "migration_sha256",
+    "predecessor_descriptor_sha256",
+    "predecessor_bridge_sha256",
+    "replaced_source_hashes",
+    "library_source_hashes",
+    "qualification_source_hashes",
+    "adapter_source_hashes",
 ];
 
 fn sha256(bytes: &[u8]) -> String {
@@ -111,8 +165,8 @@ fn check_producer_identity(current: &serde_json::Value) {
 
 #[test]
 fn historical_identity_substitution_is_rejected() {
-    let current: serde_json::Value = serde_json::from_str(CURRENT).unwrap();
-    check_producer_identity(&current);
+    let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
+    check_producer_identity(&predecessor);
     for field in [
         "schema_version",
         "epoch",
@@ -120,7 +174,7 @@ fn historical_identity_substitution_is_rejected() {
         "original_descriptor_sha256",
         "migration_sha256",
     ] {
-        let mut changed = current.clone();
+        let mut changed = predecessor.clone();
         changed[field] = serde_json::json!("substitution");
         assert!(std::panic::catch_unwind(|| check_producer_identity(&changed)).is_err());
     }
@@ -167,14 +221,94 @@ fn non_registration_main_changes_are_rejected() {
     }
 }
 
-fn check_current_sources(root: &Path, current: &serde_json::Value) {
-    check_producer_identity(current);
+fn predecessor_hash<'a>(predecessor: &'a serde_json::Value, name: &str) -> &'a str {
+    predecessor["source_hashes"][name]
+        .as_str()
+        .or_else(|| predecessor["additional_source_hashes"][name].as_str())
+        .expect("predecessor source identity")
+}
+
+fn check_library_identity(library: &serde_json::Value, predecessor: &serde_json::Value) {
+    use std::collections::BTreeSet;
+    assert_eq!(sha256(PREDECESSOR.as_bytes()), PREDECESSOR_SHA);
+    assert_eq!(
+        sha256(PREDECESSOR_BRIDGE.as_bytes()),
+        PREDECESSOR_BRIDGE_SHA
+    );
+    assert_eq!(sha256(LIBRARY.as_bytes()), LIBRARY_SHA);
+    assert_eq!(sha256(LIBRARY_BRIDGE.as_bytes()), LIBRARY_BRIDGE_SHA);
+    check_producer_identity(predecessor);
+    assert_eq!(
+        library
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        LIBRARY_FIELDS.iter().copied().collect::<BTreeSet<_>>()
+    );
+    assert_eq!(library["schema_version"], 1);
+    assert_eq!(library["kind"], "map-inspector-library-producer");
+    assert_eq!(library["epoch"], predecessor["epoch"]);
+    assert_eq!(library["policy"], predecessor["policy"]);
+    assert_eq!(library["original_descriptor_sha256"], OBSERVER_SHA);
+    assert_eq!(library["migration_sha256"], MIGRATION_SHA);
+    assert_eq!(library["predecessor_descriptor_sha256"], PREDECESSOR_SHA);
+    assert_eq!(library["predecessor_bridge_sha256"], PREDECESSOR_BRIDGE_SHA);
+    check_inventory(&library["replaced_source_hashes"], REPLACED_FILES);
+    check_inventory(&library["library_source_hashes"], LIBRARY_FILES);
+    check_inventory(&library["qualification_source_hashes"], QUALIFICATION_FILES);
+    check_inventory(&library["adapter_source_hashes"], ADAPTER_FILES);
+    for name in REPLACED_FILES {
+        check_inventory(
+            &library["replaced_source_hashes"][name],
+            &["predecessor_sha256", "current_sha256"],
+        );
+        assert_eq!(
+            library["replaced_source_hashes"][name]["predecessor_sha256"],
+            predecessor_hash(predecessor, name)
+        );
+        assert_ne!(
+            library["replaced_source_hashes"][name]["current_sha256"],
+            library["replaced_source_hashes"][name]["predecessor_sha256"]
+        );
+    }
+    let report: serde_json::Value = serde_json::from_str(LIBRARY_BRIDGE).unwrap();
+    assert_eq!(report["library_descriptor_sha256"], LIBRARY_SHA);
+    assert_eq!(report["predecessor_descriptor_sha256"], PREDECESSOR_SHA);
+    assert_eq!(report["predecessor_bridge_sha256"], PREDECESSOR_BRIDGE_SHA);
+    assert_eq!(report["migration_sha256"], MIGRATION_SHA);
+    assert_eq!(
+        report["nonpixel_manifest_sha256"],
+        "7998be259cce4218983f03bb81e3bf189577958dc9f190ba38880036d680cb22"
+    );
+}
+
+fn check_library_sources(root: &Path, library: &serde_json::Value) {
+    let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
+    check_library_identity(library, &predecessor);
     for field in ["source_hashes", "additional_source_hashes"] {
-        for (name, expected) in current[field].as_object().unwrap() {
+        for (name, expected) in predecessor[field].as_object().unwrap() {
+            let expected = library["replaced_source_hashes"][name]["current_sha256"]
+                .as_str()
+                .unwrap_or_else(|| expected.as_str().unwrap());
             assert_eq!(
-                sha256(&std::fs::read(root.join(name)).expect("read producer source")),
+                sha256(&std::fs::read(root.join(name)).expect("read predecessor source")),
+                expected,
+                "library producer source changed: {name}; explicitly revalidate before repinning"
+            );
+        }
+    }
+    for field in [
+        "library_source_hashes",
+        "qualification_source_hashes",
+        "adapter_source_hashes",
+    ] {
+        for (name, expected) in library[field].as_object().unwrap() {
+            assert_eq!(
+                sha256(&std::fs::read(root.join(name)).expect("read library source")),
                 expected.as_str().unwrap(),
-                "current producer source changed: {name}; explicitly revalidate before repinning"
+                "library producer source changed: {name}; explicitly revalidate before repinning"
             );
         }
     }
@@ -182,28 +316,87 @@ fn check_current_sources(root: &Path, current: &serde_json::Value) {
 }
 
 #[test]
-fn fixture_current_producer_sources_match() {
+fn fixture_library_producer_sources_match() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let current = serde_json::from_str(CURRENT).unwrap();
-    check_current_sources(&root, &current);
+    let library = serde_json::from_str(LIBRARY).unwrap();
+    check_library_sources(&root, &library);
 }
 
 #[test]
-fn incomplete_or_substituted_current_sources_are_rejected() {
+fn library_identity_inventory_and_delta_mutations_are_rejected() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let current: serde_json::Value = serde_json::from_str(CURRENT).unwrap();
-    for field in ["source_hashes", "additional_source_hashes"] {
-        for name in current[field].as_object().unwrap().keys() {
-            let mut changed = current.clone();
-            changed[field].as_object_mut().unwrap().remove(name);
-            assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
-            let mut changed = current.clone();
-            changed[field][name] = serde_json::json!("substituted digest");
-            assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
+    let library: serde_json::Value = serde_json::from_str(LIBRARY).unwrap();
+    for field in LIBRARY_FIELDS {
+        let mut changed = library.clone();
+        changed.as_object_mut().unwrap().remove(*field);
+        assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
+    }
+    let mut extra = library.clone();
+    extra["fallback"] = serde_json::json!(true);
+    assert!(std::panic::catch_unwind(|| check_library_sources(&root, &extra)).is_err());
+    for field in [
+        "kind",
+        "epoch",
+        "policy",
+        "original_descriptor_sha256",
+        "migration_sha256",
+        "predecessor_descriptor_sha256",
+        "predecessor_bridge_sha256",
+    ] {
+        let mut changed = library.clone();
+        changed[field] = serde_json::json!("substitution");
+        assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
+    }
+    for (field, files) in [
+        ("replaced_source_hashes", REPLACED_FILES),
+        ("library_source_hashes", LIBRARY_FILES),
+        ("qualification_source_hashes", QUALIFICATION_FILES),
+        ("adapter_source_hashes", ADAPTER_FILES),
+    ] {
+        for name in files {
+            let mut changed = library.clone();
+            changed[field].as_object_mut().unwrap().remove(*name);
+            assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
+            let mut changed = library.clone();
+            if field == "replaced_source_hashes" {
+                changed[field][name]["current_sha256"] = serde_json::json!("substitution");
+            } else {
+                changed[field][name] = serde_json::json!("substitution");
+            }
+            assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
+            if field == "replaced_source_hashes" {
+                for identity in ["predecessor_sha256", "current_sha256"] {
+                    let mut changed = library.clone();
+                    changed[field][name]
+                        .as_object_mut()
+                        .unwrap()
+                        .remove(identity);
+                    assert!(
+                        std::panic::catch_unwind(|| check_library_sources(&root, &changed))
+                            .is_err()
+                    );
+                }
+                let mut changed = library.clone();
+                changed[field][name]["predecessor_sha256"] = serde_json::json!("substitution");
+                assert!(
+                    std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err()
+                );
+                let mut changed = library.clone();
+                changed[field][name]["extra"] = serde_json::json!("reseal");
+                assert!(
+                    std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err()
+                );
+                let mut changed = library.clone();
+                changed[field][name]["current_sha256"] =
+                    changed[field][name]["predecessor_sha256"].clone();
+                assert!(
+                    std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err()
+                );
+            }
         }
-        let mut changed = current.clone();
-        changed[field]["unexpected/source.rs"] = serde_json::json!("extra source");
-        assert!(std::panic::catch_unwind(|| check_current_sources(&root, &changed)).is_err());
+        let mut changed = library.clone();
+        changed[field]["unexpected/source"] = serde_json::json!("fallback");
+        assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
     }
 }
 
