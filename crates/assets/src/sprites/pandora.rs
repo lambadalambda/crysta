@@ -1,13 +1,13 @@
 //! Additive bounded Pandora presentation; no event VM or NPC scheduler.
 use super::{
-    Arc, Bgr555, Graphics, HouseFrame, HouseGraphicsKey, HousePoseKey, Loader, Range, SpriteError,
-    SpriteFrame, Tile4bpp, bank_range, cpu, cpu_address, decode_tiles_4bpp, frame_table_end,
-    pointer, take, word,
+    bank_range, cpu, cpu_address, decode_tiles_4bpp, frame_table_end, pointer, take, word, Arc,
+    Bgr555, Graphics, HouseFrame, HouseGraphicsKey, HousePoseKey, Loader, Range, SpriteError,
+    SpriteFrame, Tile4bpp,
 };
 #[path = "pandora_phases.rs"]
 mod phase_data;
-pub use phase_data::{PandoraActorPhase, PandoraMotion, PandoraPhase, PandoraSceneLimit};
 use phase_data::{motions, phases};
+pub use phase_data::{PandoraActorPhase, PandoraMotion, PandoraPhase, PandoraSceneLimit};
 
 /// Graphics origin, independent of native dynamic VRAM placement.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

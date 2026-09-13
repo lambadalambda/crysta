@@ -195,10 +195,9 @@ mod tests {
         put(&mut r, 0xfc75, &[0, 0x80, 0xcd]);
         put(&mut r, 0xd_8020, &colors);
         let n = HouseNpc::from_rom(&r).unwrap();
-        assert!(
-            n.source_ranges()
-                .contains(&(0x3e_8000..0x3e_8000 + packet.len()))
-        );
+        assert!(n
+            .source_ranges()
+            .contains(&(0x3e_8000..0x3e_8000 + packet.len())));
         assert!(n.source_ranges().contains(&(0xd_8020..0xd_8040)));
     }
     #[test]

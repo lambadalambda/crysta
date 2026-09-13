@@ -1,5 +1,7 @@
 //! Fixed source-qualified B request graph, independent of font/raster decoding.
-use crate::events::{EventCursor, EventFlags, EventOp, EventWait, FlagBlock, FlagSequence, StoryFlags};
+use crate::events::{
+    EventCursor, EventFlags, EventOp, EventWait, FlagBlock, FlagSequence, StoryFlags,
+};
 use crate::slice::SliceError;
 use alloc::{vec, vec::Vec};
 

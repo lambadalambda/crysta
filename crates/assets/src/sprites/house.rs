@@ -1,9 +1,9 @@
 //! ROM-backed fresh house actor presentation, not native scene behavior.
 
-use super::{SpriteError, SpriteFrame, bank_range, take, word};
+use super::{bank_range, take, word, SpriteError, SpriteFrame};
 use crate::{
     compression,
-    graphics::{Bgr555, Tile4bpp, decode_tiles_4bpp},
+    graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp},
 };
 use std::{collections::HashMap, ops::Range, sync::Arc};
 

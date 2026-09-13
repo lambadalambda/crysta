@@ -1,5 +1,5 @@
 //! Finite source endpoints. These are not elapsed-time snapshots or NPC AI.
-use super::{Loader, SpriteError, cpu, cpu_address, pointer};
+use super::{cpu, cpu_address, pointer, Loader, SpriteError};
 
 /// One source instance in a parent-selected phase. Bounds are visual, not collision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

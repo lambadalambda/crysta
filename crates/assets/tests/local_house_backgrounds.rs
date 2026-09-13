@@ -4,10 +4,13 @@ use rom::{Revision, Rom};
 
 fn hash(bytes: &[u8]) -> String {
     use std::fmt::Write;
-    rom::digests(bytes).sha256.iter().fold(String::new(), |mut hex, byte| {
-        write!(hex, "{byte:02x}").unwrap();
-        hex
-    })
+    rom::digests(bytes)
+        .sha256
+        .iter()
+        .fold(String::new(), |mut hex, byte| {
+            write!(hex, "{byte:02x}").unwrap();
+            hex
+        })
 }
 
 #[test]

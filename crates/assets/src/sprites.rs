@@ -8,7 +8,7 @@ pub use house::{HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseSce
 mod house_npc;
 pub use house_npc::HouseNpc;
 
-use crate::graphics::{Bgr555, GraphicsError, Tile4bpp, decode_tiles_4bpp};
+use crate::graphics::{decode_tiles_4bpp, Bgr555, GraphicsError, Tile4bpp};
 use std::{fmt, ops::Range};
 
 /// Invalid or unsupported sprite source.
@@ -62,7 +62,11 @@ impl SpriteComponent {
     /// Component side length, in pixels (8 or 16).
     #[must_use]
     pub const fn size(self) -> u8 {
-        if self.0[0] == 1 { 16 } else { 8 }
+        if self.0[0] == 1 {
+            16
+        } else {
+            8
+        }
     }
     /// Original tile/attribute word. Low nine bits address source tiles, not VRAM slots.
     #[must_use]

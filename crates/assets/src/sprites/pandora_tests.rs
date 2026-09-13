@@ -147,13 +147,11 @@ fn phase_source_positions_and_qualified_membership() {
             (0x83_8c1e, [120, 512])
         ]
     );
-    assert!(
-        scenes
-            .phase("box-opening")
-            .unwrap()
-            .limits()
-            .contains(&PandoraSceneLimit::OpeningPalette)
-    );
+    assert!(scenes
+        .phase("box-opening")
+        .unwrap()
+        .limits()
+        .contains(&PandoraSceneLimit::OpeningPalette));
     assert_eq!(
         scenes.phase("tour-control").unwrap().actors()[0].priority_override,
         Some(3)
@@ -164,13 +162,11 @@ fn phase_source_positions_and_qualified_membership() {
             .iter()
             .find(|a| a.source_id == motion.actor)
             .unwrap();
-        assert!(
-            scenes
-                .get(actor.art_id)
-                .unwrap()
-                .list(motion.selector)
-                .is_some()
-        );
+        assert!(scenes
+            .get(actor.art_id)
+            .unwrap()
+            .list(motion.selector)
+            .is_some());
     }
     for id in [0x96_e1a6, 0x96_e1ab] {
         assert!(scenes.get(id).unwrap().list(60).is_some());
