@@ -1,5 +1,7 @@
 # Open Issues
 
+- [ ] [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
+- [ ] [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [ ] [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)

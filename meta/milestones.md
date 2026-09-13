@@ -21,8 +21,13 @@ issue files; the open issue index remains the authoritative work queue.
 
 ### Issues
 
-None remaining; M0 is complete. Verification record:
-[ROM-backed run](../docs/rom-verification.md).
+M0's capabilities are complete; verification record:
+[ROM-backed run](../docs/rom-verification.md). The formatting half of the
+quality-gate criterion later regressed through rustfmt drift and is tracked
+below. Lint, test, docs, safety and tracker gates still pass.
+
+- [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
+- [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)
 
 <a id="m1-reference-oracle"></a>
 ## M1 — Reference oracle
