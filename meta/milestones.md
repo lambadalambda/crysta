@@ -121,6 +121,7 @@ qualification remain open.
 - [Port map loading, transitions, and collision](issues/port-map-loading-collision.md)
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
+- [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
