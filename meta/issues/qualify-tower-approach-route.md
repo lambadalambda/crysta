@@ -65,3 +65,29 @@ it is not portable implementation.
 - If the segment turns out to need combat, the actor/combat port becomes a hard
   prerequisite for the slice rather than a parallel track. Determining that is
   part of this issue's value, so resolve it early and report it.
+
+## Qualification in progress
+
+- The accepted baseline reproduces on this machine: `replay.sh` produced a fresh
+  root of 2,682 artifacts and the strict checker passed normally and under `-O`.
+  Source, checker and epoch suites pass 6/13/11 in both modes. No pins touched.
+- [Discovery harness](../../tools/pandora-tower-discovery/README.md) added.
+  It replays the accepted prefix once and holds the probe's stdin open, so
+  exploration past the endpoint costs seconds per command instead of a full
+  boot-to-endpoint replay. Same discipline as the accepted route: one empty-SRAM
+  Session, input-only, no warp, patch, save or state restore.
+- First session: 149 commands, frames 41,788 → 53,634, itinerary retained as
+  `discovery-route.jsonl`. **The continuation did not fire.** Final flags are
+  exactly the documented endpoint set, with no `$23`, no `$FE` and no map change.
+  The reachable area, its two pockets, the blocking floor object and the
+  unreachable arches are tabulated in the harness README.
+- Behavioral finding worth carrying into any future sweep: `Start` opens an
+  invisible state that swallows all input until `Start` is pressed again, while
+  leaving map, position, flags and script unchanged. It silently invalidated the
+  first sweep, which read as uniform geometry blocking. Assert `control` reaches
+  `160` under a held direction before trusting a sweep's negative result.
+- Next: either an exhaustive reachable-tile sweep with that assertion, or read
+  the `$88AF3F/AF43` guard directly, which depends on
+  [Reverse the event script bytecode](reverse-event-bytecode.md). The second is
+  likely cheaper than brute force and would also settle whether the trigger is
+  positional at all.
