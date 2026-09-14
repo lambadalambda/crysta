@@ -95,8 +95,8 @@ it is not portable implementation.
   at `$89D2E5`, which dispatches through
   `$0084D4` to `$80:A395`: `TYX` / `JSL $80ED75` / `BCS $80A396`, looping on the
   `JSL` while carry is set.
-  **The gate is `$80ED75` evaluated for slot `$1040`.** Each link is confirmed by
-  a live trace (`A=X=0x0122`, `Y=0x1040`, return address `$89D2E7`).
+  Each link is confirmed by a live trace (`A=X=0x0122`, `Y=0x1040`, return
+  address `$89D2E7`).
 - The trace probe's endpoint was verified against the accepted capture before any
   of that was trusted: identical frame, map, position, facing, control, script
   and flag set.
@@ -109,7 +109,21 @@ it is not portable implementation.
   All eight selector bits reach the dispatch index, so the documented
   125-selector bound in `docs/rom-map.md` is a scan artefact, and `$80:A395` is
   unclassified.
-- Next: decode `$80ED75` and establish what it tests for this actor. That is now
-  a single bounded predicate rather than an open search, and it is the input to
-  deciding whether any of this needs
-  [Reverse the event script bytecode](reverse-event-bytecode.md).
+- **Correction:** `$80ED75` is not a gate, and the earlier note here calling it
+  one was wrong. It is an animation-frame stepper. Its carry-set return means it
+  hit the list terminator, zeroed the step at `$80ED51` and wants calling again;
+  `$80A395`'s `BCS` exists to skip that terminator inside one call. Predicted by
+  evaluating the routine against captured WRAM (the guide's list is in `$7E`
+  at base `$7000`, selector 3, step 16, and `$7E:7070` is `$FFFF`), then
+  confirmed by profiling: across two frames, three of four calls fall through
+  and one takes the reset path.
+- `COP $91` ends in `PLA / PLA / RTL`, yielding to the actor dispatcher without
+  advancing the actor's script pointer, so field `$0A` stays at `$D2E5` forever.
+  The guide loops by design; it is idle-animating, not waiting on the player.
+- Net: the endpoint is **quiescent, not gated**. Nothing in map `$41` is waiting
+  on a condition a player could satisfy, which rules out the whole class of
+  "find the trigger in this room" approaches.
+- Next: test whether the accepted route's direct `$2E` branch can reach the
+  continuation at all, by qualifying the alternative `$2F` refusal/retry branch
+  that the archived discovery reference explored. That is now the highest-value
+  experiment, and it needs a new route rather than more exploration of this one.

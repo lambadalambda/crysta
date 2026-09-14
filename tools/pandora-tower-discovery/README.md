@@ -185,11 +185,42 @@ The trace confirms every link: stopping at `$80A395` gives `A=X=0x0122` (exactly
 `2 * $91`), `Y=0x1040` (the guide's slot), and a return address of `$89D2E7` on
 the stack, reached through the dispatcher's indirect jump.
 
-**The gate is therefore `$80ED75`, evaluated for actor slot `$1040`.** Its first
-instructions read the actor's bank byte at `slot+$12` and a long-indexed word at
-`$7F0008,X`. Reading that as "wait until this actor's motion completes" is an
-inference, not a verified claim; confirming it is the next step and needs the
-handler decoded properly rather than eyeballed.
+`$80ED75` is not a gate. Decoding it, and profiling `$80ED40..$80EDA0` over two
+frames, shows an animation-frame stepper:
+
+```
+PHB / SEP #$20 / LDA $0012,X / PHA / PLB     ; data bank from the actor's field $12
+REP #$20 / LDA $7F0008,X / BMI $80ED51       ; list selector
+ASL / CLC / ADC $0010,X / TAY                ; entry = base + 2*selector
+LDA $0020,X / ASL / ASL / CLC / ADC $0000,Y  ; + 4*step
+CLC / ADC $0010,X / TAY / LDA $0000,Y
+BMI $80ED51                                  ; terminator -> reset path
+...
+$80ED51: STZ $0020,X                         ; step := 0, restart the list
+         (clear $000E,X and $7F000C/0E/10/12,X unless $0006,X bit $40)
+$80ED72: SEC / PLB / RTL                     ; "I reset; call me again"
+```
+
+For the guide, field `$12` = `$7E`, so the list lives in WRAM at base `$7000`
+with selector 3 and step `$20`. At the endpoint the step is `16`, and
+`$7E:7070` — the 16th entry — is `$FFFF`, the terminator. Evaluating the routine
+by hand against the captured WRAM predicts the reset path, and the profile
+confirms it: of four calls across two frames, three fall through at `$80ED9E`
+and one takes `$80ED51`..`$80ED74`. The carry-set return exists so `$80A395`
+can skip the terminator within one call, not because anything is blocked.
+
+**So the guide is idle-animating, not waiting.** `COP $91` ends in
+`PLA / PLA / RTL`, which discards the COP return address and yields to the actor
+dispatcher without advancing the actor's script pointer — field `$0A` stays at
+`$D2E5` indefinitely. Looping on that COP forever is what the script is written
+to do.
+
+That makes the endpoint quiescent rather than gated: the controller has ended,
+and no script is waiting on a condition a player could satisfy. Whatever starts
+the continuation is not running in map `$41` at all. The strongest remaining
+hypothesis is that the accepted route's `$2E` branch cannot reach it, and that
+testing the alternative `$2F` refusal/retry branch — which the archived
+discovery reference explored — matters more than anything further in this room.
 
 ### The ROM map's COP table bound is too small
 
