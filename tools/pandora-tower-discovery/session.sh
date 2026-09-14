@@ -19,15 +19,24 @@ rm -rf "$dir"
 mkdir -p "$dir"
 fifo=$dir/in
 mkfifo "$fifo"
-probe=local/house-conversation-qualification/probe
-binary=${CARGO_TARGET_DIR:-$probe/target}/release/house-conversation-probe
-[ -x "$binary" ] || sh tools/house-conversation-qualification/build.sh
+# PROBE=trace swaps the walking probe for the breakpoint probe; both replay the
+# accepted prefix identically and read the same command protocol.
+if [ "${PROBE:-walk}" = "trace" ]; then
+  probe=local/pandora-tower-discovery/trace-probe
+  binary=${CARGO_TARGET_DIR:-$probe/target}/release/tower-trace-probe
+  [ -x "$binary" ] || sh tools/pandora-tower-discovery/build.sh
+else
+  probe=local/house-conversation-qualification/probe
+  binary=${CARGO_TARGET_DIR:-$probe/target}/release/house-conversation-probe
+  [ -x "$binary" ] || sh tools/house-conversation-qualification/build.sh
+fi
 [ -x "$binary" ] || { echo "probe binary missing: $binary" >&2; exit 1; }
 # Holder keeps a writer open so the probe never sees EOF between shells.
 sleep 86400 >"$fifo" &
 echo $! >"$dir/holder.pid"
 "$binary" "$rom" "$dir/journey" <"$fifo" >"$dir/out.jsonl" 2>"$dir/err.log" &
 echo $! >"$dir/probe.pid"
+echo "${PROBE:-walk}" >"$dir/probe.kind"
 grep -v '^{"finish":true}$' tools/pandora-qualification/route.jsonl >"$dir/prefix.jsonl"
 count=$(wc -l <"$dir/prefix.jsonl")
 # Background: the prefix is far larger than the FIFO buffer, so this write only
