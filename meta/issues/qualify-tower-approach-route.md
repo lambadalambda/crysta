@@ -135,6 +135,14 @@ it is not portable implementation.
   reachable exit, no script waiting on them, and both branches park there. The
   candidates are a missed interaction, a departure the route's input interrupted,
   or a continuation that belongs to a later phase and is never meant to run here.
-- Next: replay the discovery route under the trace probe and breakpoint
-  `$88AF3F` there, to confirm directly that the branch does not merely fail to
-  set the flags but never reaches the write. A session is in progress.
+- Confirmed directly: replaying the discovery route under the trace probe
+  reproduces its semantic endpoint (frame 48,259, map `$41`, `(120,192)`, flags
+  `$20,$22,$26,$27,$28,$2F,$3F,$42,$FB,$243,$244,$292`) and breakpoints
+  identically to the accepted branch. `$88AF3F` is not reached; `$89D2E5` runs
+  every frame from `$80C745` with the same registers. No pixel claim is renewed.
+- Next: establish how map `$41` is meant to be left. Concrete options, cheapest
+  first: profile a whole-bank execution range at the endpoint to find any script
+  still polling anything; compare the endpoint actor roster against the tour's
+  mid-point to see whether a departure actor was expected and is missing; and
+  check whether the route's own input interrupted a scripted departure by
+  replaying the tour's tail with no input at all.

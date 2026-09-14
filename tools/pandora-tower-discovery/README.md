@@ -248,6 +248,14 @@ deliberately **not renewed** — `check.py --discovery` rejects it under current
 provenance. The semantic observations above are the best available evidence for
 where that journey ended, not a renewed claim.
 
+Replaying that route under the trace probe confirms it directly, and
+independently reproduces the archived semantic endpoint: frame 48,259, map `$41`,
+`(120,192)`, flags `$20,$22,$26,$27,$28,$2F,$3F,$42,$FB,$243,$244,$292`.
+Breakpointing there is indistinguishable from the accepted branch — `$88AF3F` is
+not reached, while `$89D2E5` is reached every frame from `$80C745` with the same
+registers (`a=$D2E4`, `x=$1040`, `y=$1280`). Same guide loop, same absent
+continuation. (Semantic reproduction only; no pixel claim is renewed.)
+
 That removes the branch hypothesis. Whatever starts the continuation is not
 selected by the `$2E`/`$2F` choice, which leaves the question of how the player
 is meant to leave map `$41` at all, given it has no reachable exit and no script
