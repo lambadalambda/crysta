@@ -222,6 +222,37 @@ hypothesis is that the accepted route's `$2E` branch cannot reach it, and that
 testing the alternative `$2F` refusal/retry branch — which the archived
 discovery reference explored — matters more than anything further in this room.
 
+### Both story branches converge on the same quiescent hall
+
+The obvious follow-up was that the accepted route's direct `$2E` branch might be
+unable to reach the continuation, and that C's longer `$2F` refusal/retry branch
+would. The archived discovery reference refutes that. Its final retained points
+put the `$2F` journey in the *same room at the same position* as the accepted
+one:
+
+| | accepted (`$2E`) | discovery (`$2F`) |
+|---|---|---|
+| endpoint | map `$41`, `(120,192)` | map `$41`, `(120,192)` |
+| tour flags | `$243`, `$244` set | `$243`, `$244` set |
+| continuation | no `$23`, no `$FE` | no `$23`, no `$FE` |
+| branch flags | `$2E` | `$2F`, plus `$3F` and `$42` |
+
+Its `tutorial_map_path` is `[65, 68, 66, 67, 65]` — the same forced
+`41 → 44 → 42 → 43 → 41` tour. So the refusal branch does more on the way (it
+retains missing-prerequisite, cancellation, refusal and second-hit controls, and
+carries `$3F`/`$42`) and still lands in the same terminal hall state.
+
+Caveat on provenance: this reads the archived
+`epochs/threaded-video-v0/discovery-reference.json`, whose observer epoch is
+deliberately **not renewed** — `check.py --discovery` rejects it under current
+provenance. The semantic observations above are the best available evidence for
+where that journey ended, not a renewed claim.
+
+That removes the branch hypothesis. Whatever starts the continuation is not
+selected by the `$2E`/`$2F` choice, which leaves the question of how the player
+is meant to leave map `$41` at all, given it has no reachable exit and no script
+waiting on them.
+
 ### The ROM map's COP table bound is too small
 
 `docs/rom-map.md` documents COP selectors `$00..$7C` as 125 pointers at

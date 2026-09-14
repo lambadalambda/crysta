@@ -37,12 +37,17 @@ echo $! >"$dir/holder.pid"
 "$binary" "$rom" "$dir/journey" <"$fifo" >"$dir/out.jsonl" 2>"$dir/err.log" &
 echo $! >"$dir/probe.pid"
 echo "${PROBE:-walk}" >"$dir/probe.kind"
-grep -v '^{"finish":true}$' tools/pandora-qualification/route.jsonl >"$dir/prefix.jsonl"
+# PREFIX replays a different accepted itinerary, e.g. the archived discovery
+# route that explored C's refusal branch. Its finish command is stripped so the
+# session stays open for interactive stepping.
+prefix_source=${PREFIX:-tools/pandora-qualification/route.jsonl}
+grep -v '^{"finish":true}$' "$prefix_source" >"$dir/prefix.jsonl"
 count=$(wc -l <"$dir/prefix.jsonl")
 # Background: the prefix is far larger than the FIFO buffer, so this write only
 # completes as the probe consumes it. Foregrounding it makes the script look
 # hung for the whole replay and puts the probe in reach of a Ctrl-C.
 cat "$dir/prefix.jsonl" >"$fifo" &
-printf 'prefix queued (%s commands); probe pid %s\n' "$count" "$(cat "$dir/probe.pid")"
+printf 'prefix queued (%s commands from %s); probe pid %s\n' \
+  "$count" "$prefix_source" "$(cat "$dir/probe.pid")"
 printf 'replay takes ~15 minutes; wait for %s checkpoints:\n' "$((count + 1))"
 printf '  grep -c %s %s/out.jsonl\n' "'\"kind\":\"checkpoint\"'" "$dir"

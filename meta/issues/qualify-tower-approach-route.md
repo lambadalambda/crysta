@@ -123,7 +123,18 @@ it is not portable implementation.
 - Net: the endpoint is **quiescent, not gated**. Nothing in map `$41` is waiting
   on a condition a player could satisfy, which rules out the whole class of
   "find the trigger in this room" approaches.
-- Next: test whether the accepted route's direct `$2E` branch can reach the
-  continuation at all, by qualifying the alternative `$2F` refusal/retry branch
-  that the archived discovery reference explored. That is now the highest-value
-  experiment, and it needs a new route rather than more exploration of this one.
+- The `$2E`-vs-`$2F` branch hypothesis is **refuted**. The archived discovery
+  reference's own retained points end its `$2F` refusal journey in map `$41` at
+  `(120,192)` — the same room and position as the accepted `$2E` endpoint — with
+  `$243`/`$244` set, no `$23` and no `$FE`, and the same forced
+  `41 → 44 → 42 → 43 → 41` tour path. It carries `$2F`, `$3F` and `$42` instead
+  of `$2E`, and still lands in the same terminal hall. Note that the discovery
+  observer epoch is unrenewed, so this is the best available semantic evidence,
+  not a renewed claim.
+- Open question, reframed: how is the player meant to leave map `$41`? It has no
+  reachable exit, no script waiting on them, and both branches park there. The
+  candidates are a missed interaction, a departure the route's input interrupted,
+  or a continuation that belongs to a later phase and is never meant to run here.
+- Next: replay the discovery route under the trace probe and breakpoint
+  `$88AF3F` there, to confirm directly that the branch does not merely fail to
+  set the flags but never reaches the write. A session is in progress.
