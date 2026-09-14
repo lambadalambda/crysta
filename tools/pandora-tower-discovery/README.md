@@ -261,6 +261,49 @@ selected by the `$2E`/`$2F` choice, which leaves the question of how the player
 is meant to leave map `$41` at all, given it has no reachable exit and no script
 waiting on them.
 
+### Three departure hypotheses, all tested
+
+With the branch hypothesis gone, the question became how the player is meant to
+leave map `$41`. Three candidates were tested; none survives.
+
+**Is any script still polling?** No. Profiling whole banks over two frames at the
+endpoint: bank `$88` executes **zero instructions** — the controller bank that
+contains `$88AF3F` is entirely dormant, not merely un-triggered. Bank `$89`
+executes nine addresses, each exactly twice, i.e. once per frame: `$89D2E5` (the
+guide's COP), `$89D2AC` and `$89D49B` (`RTL` stubs), and `$89DCA4/AC`,
+`$89DCC9/D1`, `$89DCEE/F6` — the three arch figures ticking. Nothing polls
+anything.
+
+**Was a departure actor expected and missing?** No. Comparing actor rosters
+across the tour, the controller actor's script moves `$89D48B` → `$89D49B` at
+`tutorial-052`: from the last request script to an `RTL` stub, immediately after
+`$89D495` sets `$244`. Ending inert is what that actor is written to do.
+
+**Did our own input interrupt a scripted departure?** No. Replaying the accepted
+prefix truncated at `tutorial-052` — so the last directional presses are absent
+entirely — and then idling **10,000 frames with zero input** leaves the player at
+`(136,208)`, map `$41`, flags unchanged.
+
+### The collision overlay code does not predict passability here
+
+Worth recording for [decoding map and collision
+formats](../../meta/issues/decode-map-collision-formats.md). Reading the runtime
+layer at `$7E:A000` and calibrating `(raw >> 8) & $FE` against measured movement
+(`$1C` on walls actually hit, `$18` on furniture actually bumped, `$00` where the
+player actually walked) suggests an open column at `x=96` running from `y=176` up
+to `y=80`, and an open row `y=80` reaching the arch centres at `x=64/128/192`.
+
+**That prediction is false.** A column-wise probe — walking right as far as
+possible at each row, which the serpentine sweep never did, since it only tested
+vertical movement at each row's extreme — gives rightward limits of `x=72` at
+`y=144` and `y=156`, `x=120` at `y=176`, and the full `x=232` at `y=192`. The
+`x=96` cells that the code calls open cannot be entered from any row. The
+docs' warning that this code is "not verified passability" holds, and map `$41`
+is a concrete counter-example.
+
+The measured envelope stands as the sweep recorded it, and the arches remain
+unreachable on foot.
+
 ### The ROM map's COP table bound is too small
 
 `docs/rom-map.md` documents COP selectors `$00..$7C` as 125 pointers at

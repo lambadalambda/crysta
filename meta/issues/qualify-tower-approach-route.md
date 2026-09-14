@@ -140,9 +140,30 @@ it is not portable implementation.
   `$20,$22,$26,$27,$28,$2F,$3F,$42,$FB,$243,$244,$292`) and breakpoints
   identically to the accepted branch. `$88AF3F` is not reached; `$89D2E5` runs
   every frame from `$80C745` with the same registers. No pixel claim is renewed.
-- Next: establish how map `$41` is meant to be left. Concrete options, cheapest
-  first: profile a whole-bank execution range at the endpoint to find any script
-  still polling anything; compare the endpoint actor roster against the tour's
-  mid-point to see whether a departure actor was expected and is missing; and
-  check whether the route's own input interrupted a scripted departure by
-  replaying the tour's tail with no input at all.
+- All three departure hypotheses tested; none survives. **Nothing polls:** over
+  two frames at the endpoint, bank `$88` executes zero instructions, so the
+  controller bank holding `$88AF3F` is dormant rather than un-triggered; bank
+  `$89` runs nine addresses once per frame each, all actor ticks. **Nothing is
+  missing:** the controller actor moves `$89D48B` → `$89D49B` at `tutorial-052`,
+  from the last request script to an `RTL` stub, right after `$89D495` sets
+  `$244` — an inert ending by design. **Nothing was interrupted:** replaying the
+  prefix truncated at `tutorial-052`, with the trailing directional presses
+  absent, then idling 10,000 frames with zero input, leaves state unchanged.
+- Recorded against [decoding map and collision
+  formats](decode-map-collision-formats.md): the community overlay code
+  `(raw >> 8) & $FE` does **not** predict passability in map `$41`. Calibrated
+  against measured movement it implies an open column at `x=96` from `y=176` up
+  to `y=80` and an open row `y=80` reaching the arch centres; a column-wise probe
+  refutes that, with rightward limits `x=72` at `y=144`/`y=156`, `x=120` at
+  `y=176`, and full traversal only at `y=192`. A concrete counter-example for
+  that hypothesis.
+- Methodological note: the serpentine sweep only tested vertical movement at each
+  row's extreme, so it could not have found an interior column. Column-wise
+  probing is the missing complement; it confirmed the same envelope here, but the
+  gap was real.
+- Next: the box interior is terminal in this session, so the remaining
+  possibilities sit earlier in the route or outside it. Candidates: whether the
+  accepted route reaches `$41` in a state the game does not otherwise produce
+  (compare against a non-route arrival), and whether `$88AF3F`'s bank is entered
+  from a map change that the hall cannot reach, making the continuation belong to
+  a later phase rather than this one.
