@@ -84,10 +84,32 @@ it is not portable implementation.
 - Behavioral finding worth carrying into any future sweep: `Start` opens an
   invisible state that swallows all input until `Start` is pressed again, while
   leaving map, position, flags and script unchanged. It silently invalidated the
-  first sweep, which read as uniform geometry blocking. Assert `control` reaches
-  `160` under a held direction before trusting a sweep's negative result.
-- Next: either an exhaustive reachable-tile sweep with that assertion, or read
-  the `$88AF3F/AF43` guard directly, which depends on
-  [Reverse the event script bytecode](reverse-event-bytecode.md). The second is
-  likely cheaper than brute force and would also settle whether the trigger is
-  positional at all.
+  first sweep, which read as uniform geometry blocking. `sweep.sh` now stops when
+  `control` does not reach `160` under a held direction.
+- Breakpoint session (`trace-probe.rs`, `Session::trace_until_pc`) found the
+  gate. Across ~2.4 s of idle at the endpoint — the probe's 2M-instruction cap,
+  about 144 frames, which is the binding budget — `$88AF3F` is not reached, and
+  neither is the `$8087C2` position predicate, so nothing is polling for a spot.
+  `$88AE64`, the controller that ran the box sequence and the tour, has ended.
+  The only live entity is the guide actor in slot `$1040`, parked on `COP $91`
+  at `$89D2E5`, which dispatches through
+  `$0084D4` to `$80:A395`: `TYX` / `JSL $80ED75` / `BCS $80A396`, looping on the
+  `JSL` while carry is set.
+  **The gate is `$80ED75` evaluated for slot `$1040`.** Each link is confirmed by
+  a live trace (`A=X=0x0122`, `Y=0x1040`, return address `$89D2E7`).
+- The trace probe's endpoint was verified against the accepted capture before any
+  of that was trusted: identical frame, map, position, facing, control, script
+  and flag set.
+- A rerun sweep at 13-19px rows with `control` verified at 160 throughout found
+  no progression either, so the positional hypothesis is tested and negative
+  against 32px-scale trigger boxes. It remains sampling, not proof. Movement also
+  needs ~7 frames of held input before admission; shorter row steps silently move
+  nothing, which is what broke the first attempt.
+- Spun out: [Correct the COP service table bound](correct-cop-table-bound.md).
+  All eight selector bits reach the dispatch index, so the documented
+  125-selector bound in `docs/rom-map.md` is a scan artefact, and `$80:A395` is
+  unclassified.
+- Next: decode `$80ED75` and establish what it tests for this actor. That is now
+  a single bounded predicate rather than an open search, and it is the input to
+  deciding whether any of this needs
+  [Reverse the event script bytecode](reverse-event-bytecode.md).

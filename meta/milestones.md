@@ -64,9 +64,13 @@ Core swap: ares (ISC) replaced LakeSnes per
 
 ### Issues
 
-None remaining; M2 is complete. The Japanese reconstruction matches all
-4,194,304 bytes, and the final map verification is recorded in
-[ROM code, data, and dispatch map](../docs/rom-map.md).
+The Japanese reconstruction matches all 4,194,304 bytes, and the map
+verification is recorded in
+[ROM code, data, and dispatch map](../docs/rom-map.md). M2's capabilities are
+complete; one published bound in that map was later found to contradict observed
+execution and is tracked below.
+
+- [Correct the COP service table bound](issues/correct-cop-table-bound.md)
 
 <a id="m3-content-and-script-pipeline"></a>
 ## M3 — Content and script pipeline
