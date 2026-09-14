@@ -21,6 +21,8 @@ MAP = 0x47E
 POSITION = 0x1000
 FACING = 0x1014
 CONTROL = 0x980
+# `control` while a direction is held and accepted; see the README on Start.
+CONTROL_HELD = 160
 
 # The accepted endpoint set recorded in docs/pandora-progression.md.
 ENDPOINT_FLAGS = frozenset(
@@ -59,7 +61,36 @@ def progressed(wram: bytes) -> dict:
     }
 
 
+def sweep_line(path: str, wram: bytes) -> str:
+    """One compact sweep row, loud about progression and about dead input."""
+    state = observe(wram)
+    change = progressed(wram)
+    label = path.rsplit("/", 1)[-1].removesuffix(".wram")
+    note = ""
+    if change["new_flags"] or change["lost_flags"] or change["left_hall"]:
+        note = f"  *** PROGRESSED {change} ***"
+    elif state["control"] != CONTROL_HELD:
+        # A held direction that never raised control means the result says
+        # nothing about geometry; see the Start note in the README.
+        note = f"  !!! control={state['control']}, input not accepted; result void"
+    return f"{label}: map={state['map']} pos={state['position']}{note}"
+
+
 def main() -> int:
+    if sys.argv[1:2] == ["--sweep"]:
+        # Exit non-zero on progression or on dead input, so a sweep driver can
+        # stop instead of printing a page of readings nobody checks.
+        status = 0
+        for path in sys.argv[2:]:
+            with open(path, "rb") as handle:
+                wram = handle.read()
+            print(sweep_line(path, wram))
+            change = progressed(wram)
+            if change["new_flags"] or change["lost_flags"] or change["left_hall"]:
+                status = 2
+            elif observe(wram)["control"] != CONTROL_HELD:
+                status = 3
+        return status
     for path in sys.argv[1:]:
         with open(path, "rb") as handle:
             wram = handle.read()

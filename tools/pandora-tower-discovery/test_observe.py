@@ -84,5 +84,25 @@ class TestObserve(unittest.TestCase):
         self.assertEqual(change["lost_flags"], [0x244])
 
 
+class TestSweepLine(unittest.TestCase):
+    def test_quiet_row_is_quiet(self):
+        line = observe.sweep_line(
+            "x/fb-1-Left.wram", wram(observe.ENDPOINT_FLAGS, control=observe.CONTROL_HELD)
+        )
+        self.assertEqual(line, "fb-1-Left: map=65 pos=[120, 192]")
+
+    def test_dead_input_is_called_out(self):
+        # The failure mode that silently invalidated a whole sweep.
+        line = observe.sweep_line("x/a.wram", wram(observe.ENDPOINT_FLAGS, control=0))
+        self.assertIn("result void", line)
+
+    def test_progression_outranks_dead_input(self):
+        line = observe.sweep_line(
+            "x/a.wram", wram(set(observe.ENDPOINT_FLAGS) | {0x23}, control=0)
+        )
+        self.assertIn("PROGRESSED", line)
+        self.assertNotIn("result void", line)
+
+
 if __name__ == "__main__":
     unittest.main()
