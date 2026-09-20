@@ -6,8 +6,9 @@
 //! `INC $36` runs by byte search mis-read operand data as opcodes.
 //!
 //! Immediate operands are one or two bytes depending on the `M` and `X` status
-//! flags, so a walk has to track `SEP`/`REP`. Anything that leaves those flags
-//! in a state the walk cannot know -- `PLP`, `RTI` -- ends it.
+//! flags, so a walk has to track `SEP`/`REP`. This does not model `PLP` or
+//! `XCE`, which leave the widths in a state it cannot know; a caller that walks
+//! real code has to treat those as the end of what it understands.
 
 /// Instruction length in bytes, indexed by opcode, with immediates counted as
 /// their eight-bit form.
@@ -69,7 +70,10 @@ pub fn instruction_length(opcode: u8, widths: Widths) -> usize {
 pub fn step(image: &[u8], at: usize, widths: &mut Widths) -> Option<usize> {
     let opcode = *image.get(at)?;
     let length = instruction_length(opcode, *widths);
+    // Bounds first: a refused step must not leave the caller's widths changed.
+    image.get(at + length - 1)?;
     // SEP sets the flag bits it names, narrowing; REP clears them, widening.
+    // The length above is unaffected, both being two bytes either way.
     if matches!(opcode, 0xE2 | 0xC2) {
         let operand = *image.get(at + 1)?;
         let wide = opcode == 0xC2;
@@ -80,7 +84,7 @@ pub fn step(image: &[u8], at: usize, widths: &mut Widths) -> Option<usize> {
             widths.index16 = wide;
         }
     }
-    image.get(at + length - 1).map(|_| at + length)
+    Some(at + length)
 }
 
 #[cfg(test)]
