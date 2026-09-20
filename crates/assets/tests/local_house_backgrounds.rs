@@ -76,7 +76,9 @@ fn all_six_house_profiles_share_the_unchanged_complete_natural_background() {
             "f390bfcaf76ff322de892ca50514b387bce1c2c29b949376ea6e6d409dec2010"
         );
     }
-    for id in [0xe, 0x20, 0x21] {
+    // $000E, $0020 and $0021 are now decoded through the script projection as
+    // part of the Crysta slice; these remain outside the qualified set.
+    for id in [0x09, 0x22, 0x41] {
         assert!(StaticBackground::from_rom(rom.image(), id).is_err());
     }
 }

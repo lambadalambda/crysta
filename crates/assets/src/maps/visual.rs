@@ -108,7 +108,11 @@ impl StaticBackground {
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
         let (loads, graphics_size) = match map_id {
             0x128 => (cavern_loads(image)?, 0x4000),
+            // Seven maps keep their independently qualified fixed offsets.
             0x000A..=0x000D | 0x000F..=0x0011 => (room_loads(image, map_id)?, 0x6000),
+            // The rest of the Crysta slice resolves through the loading-script
+            // projection. See meta/issues/playable-crysta-slice.md.
+            0x000E | 0x0012..=0x0021 => (projected_loads(image, map_id)?, 0x6000),
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
@@ -116,6 +120,16 @@ impl StaticBackground {
             }
         };
         Self::from_loads(image, &loads, graphics_size)
+    }
+
+    /// Decodes through the loading-script projection, bypassing the fixed
+    /// offsets, so a test can cross-check the two routes against each other.
+    ///
+    /// # Errors
+    /// As [`Self::from_rom`].
+    #[doc(hidden)]
+    pub fn from_projection_for_test(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
+        Self::from_loads(image, &projected_loads(image, map_id)?, 0x6000)
     }
 
     fn from_loads(
@@ -486,6 +500,62 @@ const ROOM_SUBSCRIPTS: &[(usize, u32)] = &[
     (0xcf, 0x98_83f6),
     (0x10, 0x98_819c),
 ];
+/// Selects a map's background loads by their transfer operands.
+///
+/// The operand bytes after each opcode are the VRAM destination and size, so
+/// this asks for "the load that targets BG1 tiles" rather than "the first
+/// graphics load". That distinction is load bearing: map `$000F` loads OBJ art
+/// before its background, and several maps load a second layer and a third
+/// metatile set this recipe does not consume, so a positional rule picks the
+/// wrong resource.
+///
+/// This is one evidence-backed recipe for the room/exterior family, not an
+/// implementation of every loading mode. [`room_loads`] independently encodes
+/// the same selection for seven maps from qualified fixed offsets, and a test
+/// asserts the two agree wherever both apply.
+/// Destination operands in the background profile's storage order: BG1 tiles,
+/// the map's own palette, metatile definitions, the attribute table, the first
+/// layer, and the shared palette.
+const WANTED_LOADS: [(ResourceKind, &[u8]); 6] = [
+    (ResourceKind::Graphics, &[0x00, 0x30, 0x03]),
+    (ResourceKind::Palette, &[0x00, 0x60, 0x20]),
+    (ResourceKind::Metatiles, &[0x00, 0x40, 0x00, 0x01]),
+    (ResourceKind::Metatiles, &[0x00, 0x08, 0x00, 0x81]),
+    (ResourceKind::Layer, &[0x01]),
+    (ResourceKind::Palette, &[0x00, 0x20, 0x00]),
+];
+fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
+    let program =
+        scripts::resolve_map(image, id, Limits::default()).map_err(VisualMapError::Script)?;
+    let loads: Vec<Load> = program
+        .instructions
+        .iter()
+        .filter_map(|i| match i.command {
+            Command::Resource { kind, source } => {
+                Some((kind, source.normalized().value() as usize, i.bytes.clone()))
+            }
+            _ => None,
+        })
+        .collect();
+    let mut selected = Vec::with_capacity(WANTED_LOADS.len());
+    for (kind, operand) in WANTED_LOADS {
+        let mut matching = loads
+            .iter()
+            .filter(|(k, _, bytes)| *k == kind && bytes.get(1..1 + operand.len()) == Some(operand));
+        let found = matching.next().ok_or(VisualMapError::Unsupported(
+            "map does not load a required background resource",
+        ))?;
+        // An ambiguous recipe must not be resolved by taking the first match.
+        if matching.next().is_some() {
+            return Err(VisualMapError::Unsupported(
+                "map repeats a background resource destination",
+            ));
+        }
+        selected.push(found.clone());
+    }
+    Ok(selected)
+}
+
 fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
     let entry: u32 = match id {

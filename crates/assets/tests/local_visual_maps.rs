@@ -216,3 +216,78 @@ fn room_resources_match_qualified_runtime_except_documented_effects() {
         }
     }
 }
+
+/// The Crysta slice: the town exterior, the first house and every building in
+/// it. See `meta/issues/playable-crysta-slice.md`.
+const CRYSTA: std::ops::RangeInclusive<u16> = 0x000A..=0x0021;
+/// The seven maps whose loads come from independently qualified fixed offsets.
+const QUALIFIED_OFFSETS: [u16; 7] = [0x0A, 0x0B, 0x0C, 0x0D, 0x0F, 0x10, 0x11];
+
+#[test]
+fn every_crysta_map_decodes_a_background_and_collision_grid() {
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let mut decoded = 0;
+    for id in CRYSTA {
+        let scene = StaticBackground::from_rom(rom.image(), id)
+            .unwrap_or_else(|e| panic!("map {id:#06x}: {e}"));
+        let attributes: &[u8; 512] = scene.resources()[3]
+            .decoded()
+            .try_into()
+            .expect("512-byte attribute table");
+        let cells = scene.layer().attributed_cells(attributes);
+        assert_eq!(
+            cells.len(),
+            scene.layer().width() * scene.layer().height(),
+            "map {id:#06x} cell count"
+        );
+        assert!(!cells.is_empty(), "map {id:#06x} has no cells");
+        // A map nothing can stand on would be a decode failure, not a room.
+        assert!(
+            cells
+                .iter()
+                .any(|c| c.qualified_passability() == Some(assets::maps::Passability::Walkable)),
+            "map {id:#06x} has no walkable cell"
+        );
+        decoded += 1;
+    }
+    assert_eq!(decoded, 24, "the slice is 24 maps");
+}
+
+#[test]
+fn the_projection_reproduces_the_qualified_fixed_offsets() {
+    // Two independent routes to the same resources: fixed offsets qualified
+    // per map, and selection by VRAM destination through the script
+    // projection. Agreement on the overlap is what licenses using the
+    // projection for the maps the fixed offsets never covered.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    for id in QUALIFIED_OFFSETS {
+        let scene = StaticBackground::from_rom(rom.image(), id).unwrap();
+        let projected = StaticBackground::from_projection_for_test(rom.image(), id)
+            .unwrap_or_else(|e| panic!("map {id:#06x} projection: {e}"));
+        assert_eq!(
+            scene.layer().source_range(),
+            projected.layer().source_range(),
+            "map {id:#06x} layer"
+        );
+        assert!(
+            scene
+                .resources()
+                .iter()
+                .map(assets::maps::visual::VisualResource::source_range)
+                .eq(projected
+                    .resources()
+                    .iter()
+                    .map(assets::maps::visual::VisualResource::source_range)),
+            "map {id:#06x} resources"
+        );
+        assert_eq!(
+            scene.palette(),
+            projected.palette(),
+            "map {id:#06x} palette"
+        );
+    }
+}

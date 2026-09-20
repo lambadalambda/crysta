@@ -47,7 +47,8 @@ fn compiler_returns_source_resources_full_grid_pixels_and_separate_policies() {
     for id in [0xb, 0xc, 0xd, 0xf, 0x10, 0x11, 0x128, 0x45] {
         assert!(PandoraBackground::from_rom(&image, id).is_err());
     }
-    for id in [0xe, 0x13, 0x20, 0x21, 0x41, 0x42, 0x43, 0x44] {
+    // $000A..=$0021 is now the qualified Crysta slice; these stay outside it.
+    for id in [0x09, 0x22, 0x41, 0x42, 0x43, 0x44] {
         assert!(super::super::StaticBackground::from_rom(&image, id).is_err());
     }
 }
