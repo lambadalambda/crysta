@@ -84,8 +84,8 @@ impl MapCell {
     #[must_use]
     pub const fn qualified_passability(self) -> Option<Passability> {
         match self.base_attribute() {
-            0 | 22 => Some(Passability::Walkable),
-            12 | 14 => Some(Passability::Solid),
+            0 | 2 | 22 => Some(Passability::Walkable),
+            12 | 14 | 16 => Some(Passability::Solid),
             _ => None,
         }
     }
@@ -101,9 +101,9 @@ pub enum Passability {
 }
 
 /// Attributes a qualified collision point was observed to occupy.
-pub const QUALIFIED_WALKABLE: &[u8] = &[0, 22];
+pub const QUALIFIED_WALKABLE: &[u8] = &[0, 2, 22];
 /// Attributes observed to stop a sustained directional press.
-pub const QUALIFIED_SOLID: &[u8] = &[12, 14];
+pub const QUALIFIED_SOLID: &[u8] = &[12, 14, 16];
 
 /// Invalid input to the qualified runtime map reader.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -285,10 +285,16 @@ mod collision_tests {
             (0x1868, 12, Some(Passability::Solid)),
             (0x1869, 12, Some(Passability::Solid)),
             (0x183b, 12, Some(Passability::Solid)),
+            (0x1c20, 14, Some(Passability::Solid)),
             (0x0001, 0, Some(Passability::Walkable)), // stood on
             (0x00ac, 0, Some(Passability::Walkable)),
             (0x2cd2, 22, Some(Passability::Walkable)),
             (0x2cd5, 22, Some(Passability::Walkable)),
+            // Walked through: map $000F cell (24,12) carried the player into
+            // map $0010, so this attribute admits movement.
+            (0x0436, 2, Some(Passability::Walkable)),
+            // Refused a sustained press from the only reachable side.
+            (0x2043, 16, Some(Passability::Solid)),
         ] {
             let cell = MapCell(raw);
             assert_eq!(cell.base_attribute(), base, "base attribute of {raw:#06x}");
@@ -316,11 +322,11 @@ mod collision_tests {
 
     #[test]
     fn unqualified_attributes_are_unknown_rather_than_walkable() {
-        // Map $000F also carries base attributes 2, 5, 16 and 29. No sample
-        // resolves them, so the decoder must not silently admit the player.
-        // 76 and 78 are deliberately absent: they are 12 and 14 with the
-        // dynamic bit, not attributes this map contains.
-        for base in [2u8, 5, 16, 29] {
+        // The Crysta slice also carries base attributes 5, 6, 7, 8, 21, 25 and
+        // 29. No sample resolves them, so the decoder must not silently admit
+        // the player. 76 and 78 are deliberately absent: they are 12 and 14
+        // with the dynamic bit, not attributes any map contains.
+        for base in [5u8, 6, 7, 8, 21, 25, 29] {
             assert_eq!(initialized(0x40, base).qualified_passability(), None);
         }
         let qualified: Vec<u8> = (0..0x40u8)
