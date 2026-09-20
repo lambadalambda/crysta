@@ -126,6 +126,7 @@ are recorded even when the actual loader might skip a cached transfer.
 | `$08 FF` | 4 | Jump without a new frame, or return if current call is flagged |
 | `$08 F8` | 2 | Return from a call; at root, continue |
 | `$08 FA` | 4 | Replace pending subscript; zero cancels it |
+| `$08 FD` | 6 | Jump through the subscript table when an event flag matches |
 | `$08 FE` | 4 | Return from flagged call; otherwise skip its opaque word |
 | `$08 FC` | 4 | Record audio selection; do not execute the global audio scan |
 | `$08 00` | 4 | Record display configuration; do not execute hardware changes |
@@ -137,12 +138,56 @@ wrong. Unflagged FF uses a direct subscript index within the bounded table.
 Flagged FF returns **without** looking up its operand, even if that operand would
 be an invalid table index.
 
+### `$08 FD`: the event-flag branch
+
+This is the only state-dependent instruction the projection evaluates, and the
+only one whose result depends on anything outside the ROM. It is six bytes,
+`08 FD <condition> <target>`, and `$86:907D` implements it as:
+
+```text
+LDA [$62],Y : BMI set_path
+AND #$7FFF : JSL $80BBC7 : BCS skip : BRA take   ; clear sense
+set_path: AND #$7FFF : JSL $80BBC7 : BCS take    ; set sense
+skip: INY x4 : RTS                  ; skip both operand words
+take: INY x2 : JSR $902C : RTS      ; jump through the subscript table
+```
+
+`$80:BBC7` wraps `$80:BBA6`, the event-flag test: flag `n` is bit `n & 7` of
+byte `(n & $0FFF) >> 3` counting from `$7E:06C0`, selected through the mask
+table at `$80:BBD3`. So the flag index is `condition & $0FFF`, and condition
+bit 15 selects the sense — set means branch-if-set, clear means branch-if-clear.
+Bits 12..14 reach neither, because `$86:907D` clears bit 15 and `$80:BBA6`
+masks to `$0FFF`.
+
+`resolve_map` evaluates this against a fresh game, where no flag is set;
+`resolve_map_with_events` takes an explicit bitmap. A script containing no
+`$FD` resolves identically for any bitmap.
+
+Flags past the end of a supplied bitmap are **refused**, not read as clear:
+answering a branch with no evidence would pick a loading path outright. Map
+`$0176` is the only entry that branches on a flag above 511 (663, byte `$52`),
+which the 64-byte event block recorded in `docs/opening-doorway.md` does not
+reach. `EventFlags::AllClear` covers every flag by construction.
+
+`AllClear` is not the measured new-game state: a new game sets flags 32 and
+251 (`docs/new-game-bootstrap.md`). No branch in the table references either,
+so the two agree on 1,103 of 1,104 maps — the exception being `$0176` above,
+where a faithful 64-byte bitmap is refused and `AllClear` resolves.
+
+Supporting this one instruction took the Crysta slice from **3 of 24 maps
+resolving to 24 of 24**, and the whole table from **557 of 1,104 to 900**. Its
+absence was the single reason map loading still needed a per-map allowlist
+there. The 30 flags branched on span 35..=663.
+
 Pending FA state is global to the loading path, not scoped to a call. A nested
 `$00` returns before considering it. At root END, a nonzero pending index is
 loaded and cleared; that stream can schedule another one. Root F8 is not END.
 
-`$08 FD` depends on game flags via `$80:BBC7` and is rejected. Other unknown
-control variants fail as well. FC's global audio-list scan and display effects
+`$08 FD` depends on game flags via `$80:BBC7` and is evaluated against a
+caller-supplied bitmap; see below. Other unknown control variants fail. Note
+that the dispatch chain at `$86:8C17` has no `CMP #$FE`, so hardware treats
+every byte outside the chain the way it treats `$FE`; this projection refuses
+them instead, which is stricter than hardware rather than a claim about it. FC's global audio-list scan and display effects
 are outside this projection; their nested operations are not included in its
 instruction path. This is why the result is not advertised as a general event
 interpreter or an exact full-machine side-effect trace.

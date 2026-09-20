@@ -77,3 +77,4 @@
 - [x] [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)
 - [x] [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
 - [x] [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)
+- [x] [Decode the loading script's event-flag branch](issues/decode-script-flag-branch.md)

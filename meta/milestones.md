@@ -130,6 +130,7 @@ qualification remain open.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
+- [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

@@ -16,6 +16,7 @@
 - [ ] [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [ ] [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [ ] [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
+- [ ] [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
 - [ ] [Implement the classic renderer](issues/classic-renderer.md)
 - [ ] [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [ ] [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
