@@ -10,6 +10,7 @@ This is the parent for that program; each capability lands as its own issue.
 ## Dependencies
 
 - [Complete the Crysta and Pandora vertical slice](opening-vertical-slice.md)
+- [Reverse the event script bytecode](reverse-event-bytecode.md)
 
 ## Scope
 
@@ -62,7 +63,19 @@ scale to 24, and would not converge. The remaining work is instead to make the
 - **Connectivity: 6 of 24 maps**, blocked by one mechanism worth 17 of the
   remaining 18. See
   [the door-entry trigger](decode-door-entry-trigger.md).
-- **Actors, dialogue and progression: not started.**
+- **Connectivity, with doorways: 24 of 24.** Doors are opened by facing and
+  interacting, measured live on the town's own front door; modelling an exit
+  rectangle as enterable from an adjacent walkable cell reaches the whole
+  slice. Not yet implemented in the portable core.
+- **Actors: the spawn record is decoded**, ten bytes with the origin at
+  `(tile_x * 16 + 8, tile_y * 16)`, verified against all nine documented
+  residents. A per-map roster is **blocked**: the table at `$83:8020 + id*2`
+  points at a script stream rather than a record array, so enumerating
+  residents needs
+  [the event script bytecode](reverse-event-bytecode.md). That is the real
+  dependency for the "residents are present and interactable" criterion, and
+  it was not visible when this issue was written.
+- **Dialogue and progression: not started.**
 
 ## Requirements
 

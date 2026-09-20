@@ -641,3 +641,43 @@ normal and optimized Python, as does the complete asset test suite. A freshly
 compiled legacy export (`legacy-export-v4`) remains byte-identical to the
 original first-NPC metadata, tiles, both compositions and all three raster
 products; the earlier census golden also remains unchanged.
+
+## Spawn record format
+
+Verified against all nine documented origins in the table above. Each actor
+spawn is a ten-byte record opening with `$01`:
+
+| Byte | Meaning |
+| ---: | --- |
+| 0 | `$01`, the spawn opcode |
+| 1 | tile X |
+| 2 | tile Y |
+| 3 | `$00` |
+| 4..7 | script pointer |
+| 7..10 | second pointer |
+
+The origin is **`(tile_x * 16 + 8, tile_y * 16)`**, not `tile * 16`. That half-cell
+horizontal bias is what makes the decode checkable: all nine records reproduce
+their documented origins exactly, and no other reading does.
+
+```text
+$83:8B96  01 07 07 00 ...  -> ( 7,  7) -> (120, 112)
+$83:8C0A  01 05 1a 00 ...  -> ( 5, 26) -> ( 88, 416)
+$83:8C14  01 03 18 00 ...  -> ( 3, 24) -> ( 56, 384)
+$83:8C1E  01 04 17 00 ...  -> ( 4, 23) -> ( 72, 368)
+$83:8C28  01 06 17 00 ...  -> ( 6, 23) -> (104, 368)
+$83:8CB4  01 04 2a 00 ...  -> ( 4, 42) -> ( 72, 672)
+$83:8D7C  01 1a 1a 00 ...  -> (26, 26) -> (424, 416)
+$83:8D86  01 1b 1a 00 ...  -> (27, 26) -> (440, 416)
+$83:8DE2  01 1b 28 00 ...  -> (27, 40) -> (440, 640)
+```
+
+### What this does not give
+
+A per-map roster. The table at `$83:8020 + map_id * 2`, loaded by
+`$80:F3F1..F42D`, points at a **script stream**, not a record array: map `$000B`
+resolves to `$83:90E4`, whose bytes are opcodes `00`, `06`, `fd`, `fa`, `01`,
+`fb`, `ff` interleaved with operands, and the documented `$83:8B96` record is
+reached through it rather than listed in it. Enumerating residents for an
+arbitrary map therefore needs the actor/event script decoded, which is
+[Reverse the event script bytecode](../meta/issues/reverse-event-bytecode.md).
