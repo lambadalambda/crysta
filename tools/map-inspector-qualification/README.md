@@ -326,19 +326,22 @@ before authenticating this successor. It is not a registry or fallback.
 
 The successor records exactly four real replacements (`Cargo.lock`,
 map-inspector `Cargo.toml`, `room_preview.rs`, and `room-slice.html`) with both
-old and current identities. Separate exact inventories bind the three library
+old and current identities. `main.rs` was replaced later, by the separate repin
+stage below; this stage's four are unchanged. Separate exact inventories bind the three library
 boundary files, public-preview qualification test, root workspace manifest,
 every file in `crates/pandora-web/`, and all nine files in
 `tools/pandora-preview/`. Unchanged predecessor sources remain derived from and
 checked against the frozen predecessor descriptor. The exact 57-byte `main.rs`
-insertion/reconstruction proof is unchanged.
+insertion/reconstruction proof is unchanged at this stage; the repin stage below
+adds a second exact delta on top of it.
 
 Native-host consumption was considered and deliberately left as the current
 shared-source implementation. The native exporter already reaches the pure
 renderer through the library boundary; constructing `PandoraPreview` directly
 would add architecture churn without fixing a correctness problem.
 
-Descriptor/report SHA-256:
+Descriptor/report SHA-256 (both still current; the repin stage freezes rather
+than rewrites them):
 
 - `library-producer.json`: `00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143`
 - `library-producer-bridge.json`: `18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d`
@@ -406,3 +409,115 @@ python3 -B "$T/library_bridge.py" "$ROM" "$SRAM" "$ACCEPTED/old" \
 
 Fresh envelopes differ by construction. Compare identities, bounded inventories,
 complete manifests, nonpixels and output bytes; never rewrite an output pin.
+
+## Repin producer: explicit successor, rustfmt-only source delta
+
+`crates/map-inspector/src/main.rs` was the last file failing
+`cargo fmt --all -- --check`. Its only rustfmt diff is a declaration reorder,
+`mod house_progression;` / `mod house_profiles;` → `mod house_profiles;` /
+`mod house_progression;`. Module declaration order is inert, but a pinned
+producer source does not get changed on that argument alone.
+
+This is a **third stage**, built the same way as the library stage: the
+library descriptor and report stay byte-frozen at `00298d93…6143` and
+`18cfd3ec…0b75d`, and the successor records exactly one replacement over them.
+`observer.json`, `migration.json`, `current-producer.json`, `producer-bridge.json`
+and `epochs/` are untouched. No output pin was renewed.
+
+| Identity | Value |
+| --- | --- |
+| Library main (frozen predecessor) | `2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d` |
+| Reformatted main | `5eeb11bd799b75b4c41561e876a03d4a50056a72a1fe71292eb318cf017173ed` |
+| `repin-producer.json` | `e58a0f232a8ce9cc86186e515a9156ca32c4fd992c4a7f38cd859c117a247c33` |
+| `repin-producer-bridge.json` | `5fed82d65b682ca001dfa55b3ce6f9c60f9911d7b9cd0313e461e688b167173f` |
+
+### Two exact deltas, not a relaxed gate
+
+The old main is reconstructed by undoing **two** exact anchored deltas: the
+reorder, then the unchanged 57-byte registration insertion. It still
+reconstructs to `7736b543…a4d3`. Neither side strips lines nor normalizes
+whitespace; each delta must occur exactly once in the current file, and each
+anchor must occur exactly once in the authenticated old blob. That second
+requirement is what makes the reconstruction injective — the accepted set is a
+**singleton**, so no other `main.rs` passes.
+
+`bridge.verify_main_delta` keeps the registration-only model, which is still
+correct for the predecessor and library stages;
+`repin_bridge.verify_repin_main_delta` wraps it for this one.
+
+### Output neutrality
+
+Two fresh isolated builds of the reformatted producer,
+`local/map-inspector-repin/{repin-a,repin-b}`, each with its own clean Cargo
+target, build log, copied binary and one singleton capture process. Both
+reproduce the frozen library producer's output exactly:
+
+- all ten capture files, **855,207 bytes** per root, byte-identical to each
+  other and to the frozen inventory (which carries per-file sizes and SHA-256,
+  so matching it is byte equality with the accepted output);
+- complete manifest `a7f23508…664a`;
+- canonical nonpixel manifest `7998be25…0cb22`.
+
+### Why this stage has its own comparison
+
+`compare_to_frozen` replaces `bridge.compare_unchanged` rather than calling it.
+The five accepted capture roots the library audit consumes were retained under
+ignored `local/` in worktrees that no longer exist, and `migration.json` pins
+their `binary_sha256` and build-log identities from builds the README itself
+records as not bit-reproducible. That chain therefore cannot be re-derived by
+anyone, now or later — it is not a property of this change. The frozen report's
+own inventory is the strongest still-available expectation, and this stage is
+checked against it.
+
+The source worktrees were restored from Git (`7c5c90b` fixed, `ad0c049`
+predecessor) and the descriptor chain reproduces against them unmocked.
+
+### Reproduce
+
+```sh
+T=tools/map-inspector-qualification
+R=local/map-inspector-repin
+ROM='local/Tenchi Souzou (Japan).sfc'
+SRAM=local/saves/Terranigma.srm
+FIXED_REPO=../ilar-task-capture-renewal   # git worktree add --detach "$FIXED_REPO" 7c5c90b
+D="$T/repin-producer.json"
+for OPT in '' -O; do
+  python3 $OPT -B "$T/repin_bridge.py" "$ROM" "$SRAM" "$R/repin-a" "$R/repin-b" \
+    "$FIXED_REPO" . "$D" > "$R/recheck$OPT.json"
+  cmp "$R/recheck$OPT.json" "$T/repin-producer-bridge.json"
+  python3 $OPT -B "$T/test_repin_bridge.py"
+done
+python3 -B "$T/test_repin_mutations.py"
+cargo test --locked -p map-inspector --test local_capture
+```
+
+For two new isolated builds, use new refused-if-existing roots:
+
+```sh
+FRESH=$(mktemp -d "$PWD/local/map-inspector-repin-replay-XXXXXX")
+for RUN in repin-a repin-b; do
+  python3 -B "$T/capture.py" . "$FRESH/$RUN" "$ROM" "$SRAM" \
+    --repin-descriptor "$D" --fixed-source-repo "$FIXED_REPO"
+done
+```
+
+### Gates
+
+The Rust sourcegate resolves expected sources latest-stage-first: repin over
+library over frozen predecessor. `check_repin_report` additionally requires
+every retained producer envelope in the report to bind to the repin descriptor
+— same `descriptor_sha256`, `kind` and `replaced_source_hashes`, and a
+`source_hashes` main identity equal to the declared replacement, with two
+distinct run IDs and targets. A report whose header and body disagree is
+rejected; an earlier draft of this work had exactly that defect and no gate
+caught it.
+
+`test_repin_mutations.py` disables each of the nine repin gates in turn and
+requires a red test, in normal and `-O` Python: descriptor fields, predecessor
+identity, replacement inventory, real-delta, unchanged-source, reorder anchor,
+old-main injectivity, producer fields and bounded producer sources. 18/18
+detected; records are retained under ignored `local/map-inspector-repin/`.
+
+`test_capture.py` covers the recorder's repin branch: schema-4 envelope shape,
+inherited (not restated) group inventories, the required fixed-source argument
+and descriptor-mode exclusivity.

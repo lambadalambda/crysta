@@ -1,7 +1,6 @@
 # Open Issues
 
-- [ ] [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
-- [ ] [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)
+- [ ] [Consolidate the qualification stage template](issues/consolidate-stage-template.md)
 - [ ] [Correct the COP service table bound](issues/correct-cop-table-bound.md)
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)

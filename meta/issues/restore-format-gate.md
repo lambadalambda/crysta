@@ -49,14 +49,19 @@ unmet for formatting only. Lint, test and tracker gates still pass.
   help here because no available rustfmt matches the tree.
 - Eight of the nine affected files are unpinned and safe to reformat.
 
-## Remaining gap
+## Remaining gap — closed
 
-`crates/map-inspector/src/main.rs` is a pinned library-producer source. Its
+`crates/map-inspector/src/main.rs` was a pinned library-producer source. Its
 only diff is a `mod house_progression;` / `mod house_profiles;` declaration
 reorder, which is behaviorally inert but still a byte change, and
-`check_library_sources` fails with "library producer source changed; explicitly
-revalidate before repinning". Repinning requires the ROM-backed revalidation and
+`check_library_sources` failed with "library producer source changed; explicitly
+revalidate before repinning". Repinning required the ROM-backed revalidation and
 independent review that
 [the library producer revalidation](revalidate-preview-library-producer.md)
-established, so it is not folded into a formatting commit. Tracked separately by
+established, so it was not folded into a formatting commit. It was tracked
+separately and has since been done by
 [Repin the formatted library producer source](repin-formatted-producer-source.md).
+
+`cargo fmt --all -- --check` now passes on the committed tree with **no excluded
+files**, so every criterion above is met and the M0 formatting exit criterion is
+restored.

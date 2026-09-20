@@ -75,3 +75,5 @@
 - [x] [Run the Pandora preview browser-locally through Wasm](issues/run-pandora-preview-browser-wasm.md)
 - [x] [Ship the bounded Pandora browser Wasm frontend](issues/ship-bounded-pandora-browser-wasm.md)
 - [x] [Revalidate the preview producer after library separation](issues/revalidate-preview-library-producer.md)
+- [x] [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
+- [x] [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)

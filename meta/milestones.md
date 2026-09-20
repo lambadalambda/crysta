@@ -21,13 +21,15 @@ issue files; the open issue index remains the authoritative work queue.
 
 ### Issues
 
-M0's capabilities are complete; verification record:
+None remaining; M0 is complete. Verification record:
 [ROM-backed run](../docs/rom-verification.md). The formatting half of the
-quality-gate criterion later regressed through rustfmt drift and is tracked
-below. Lint, test, docs, safety and tracker gates still pass.
+quality-gate criterion regressed through rustfmt drift and has been repaired:
+`cargo fmt --all -- --check` passes with no excluded files, the last holdout
+being a pinned producer source that was reformatted under an evidenced repin.
+Lint, test, docs, safety and tracker gates pass. One maintainability follow-up
+from that repin's review is tracked below; it changes no pin.
 
-- [Restore the formatting gate under current stable rustfmt](issues/restore-format-gate.md)
-- [Repin the formatted library producer source](issues/repin-formatted-producer-source.md)
+- [Consolidate the qualification stage template](issues/consolidate-stage-template.md)
 
 <a id="m1-reference-oracle"></a>
 ## M1 — Reference oracle
