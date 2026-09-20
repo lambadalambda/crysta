@@ -10,7 +10,6 @@ This is the parent for that program; each capability lands as its own issue.
 ## Dependencies
 
 - [Complete the Crysta and Pandora vertical slice](opening-vertical-slice.md)
-- [Reverse the event script bytecode](reverse-event-bytecode.md)
 
 ## Scope
 
@@ -67,15 +66,41 @@ scale to 24, and would not converge. The remaining work is instead to make the
   interacting, measured live on the town's own front door; modelling an exit
   rectangle as enterable from an adjacent walkable cell reaches the whole
   slice. Not yet implemented in the portable core.
-- **Actors: the spawn record is decoded**, ten bytes with the origin at
-  `(tile_x * 16 + 8, tile_y * 16)`, verified against all nine documented
-  residents. A per-map roster is **blocked**: the table at `$83:8020 + id*2`
-  points at a script stream rather than a record array, so enumerating
-  residents needs
-  [the event script bytecode](reverse-event-bytecode.md). That is the real
-  dependency for the "residents are present and interactable" criterion, and
-  it was not visible when this issue was written.
-- **Dialogue and progression: not started.**
+- **Actors: every map's spawn list decodes.** All 24 lists, 115 records, with
+  every element length read from the interpreter at `$80:F4EA` rather than
+  fitted. All nine documented residents decode at their source addresses, and
+  origins are cross-checked against actor positions measured in the running
+  game.
+- **Spawn conditions are evaluated.** `$FA` is a conditional branch through
+  `$80:BBC7`, the same flag routine the loading scripts use, with the sense on
+  bit 15 and chains accumulating as parity. Following those branches against
+  the measured new-game flags resolves all 24 lists, reproduces every
+  documented resident, and matches the census's counts in four of six rooms —
+  the two that exceed it each hold a documented hidden actor. The `$4000` and
+  `$2000` condition variants are refused rather than guessed.
+- **A played traversal walks all 24 maps.** The collision reference is settled
+  from source: `$80:940D` computes the sample as `(x - 8, y - 16)`, the same
+  corner the exit probe uses, so the player occupies a 16x16 box and
+  cell-indexed pathfinding was simply the wrong model. Expressed in pixels
+  instead, with every edge produced by stepping `room-core` until the player
+  actually moved a cell, the player reaches an onward exit approach from its
+  arrival position in every map. That is the graph connectivity result
+  confirmed by simulation rather than asserted.
+- **`room-core`'s qualified material aliases are installed.** `TownSolid25`,
+  `ClosedDoorPartial5` and `StairOpen29` were already qualified but had to be
+  opted into per room; the Crysta builder now does so. The core consequently
+  agrees with the measured town band instead of refusing to classify it.
+- **Dialogue and progression are one dependency, not two.** A spawn record's
+  pointers are scripts, not text: decoding all 189 pointer fields as dialogue
+  yields five single-page results, which is coincidence rather than lines. The
+  documented chain runs record → script → callback → text, with the `$0026`
+  flag written inside it, so both capabilities need
+  [the actor script VM](decode-actor-script-vm.md). **That VM now decodes the
+  documented chain**: scripts are native code whose commands are `COP`
+  signatures, and walking the callback `$88:8EDE` yields its dialogue source
+  and its progression flag at the hand-documented sites. What remains is
+  following branches, accounting for the remaining services, and establishing
+  the path from a spawn record to its script.
 
 ## Requirements
 

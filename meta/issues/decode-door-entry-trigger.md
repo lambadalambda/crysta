@@ -30,7 +30,9 @@ rectangles sit on attribute-14 cells, and the measured collision offset puts
 the player's sample inside that solid cell at the required position. Driving
 the emulator to the house's own front door confirms it: from the arrival point
 `(504,769)`, holding Up moves one pixel to `y=768` and stops, at every x across
-the opening including the exactly-aligned `x=496`. No transition occurs.
+the opening including `x=496`. No transition occurs. (That sweep is in any
+case not a control for this door: the probe formula puts `x=496..503` in tile
+column 30, and the door is column 31.)
 
 The eighth entrance, `$000A -> $0015` at cell `(32,12)`, *is* on a walkable
 attribute-2 cell. It is unreached for an unrelated reason: no decoded path
@@ -47,8 +49,10 @@ probe_y = (player_y - 16) & ($085E | $0F)   -> $0960, tile $0964
 
 The masks are power-of-two wrap masks, not the extent minus one. Measured live
 in the town: standing at `(496,768)` writes `(488,752)` and tile `(30,47)`,
-which `ExitList::probe_origin` now reproduces. The scan is additionally gated
-by `$097C` bit 4, and needs a non-zero exit-list pointer at `$0480`.
+which `ExitList::probe_origin` now reproduces. The scan additionally requires `$097C` bit 4 to be **set** — `$8D:879F` takes
+the no-match tail when it is clear — and a non-zero exit-list pointer at
+`$0480`. The probe never observed that bit set at sample time, so the recorded
+`exit_gate` corroborates nothing about it.
 
 **This makes the conflict exact.** The house's own front door is the `1x1` rect
 at tile `(31,46)`. Firing it needs `probe_y` in `736..=751`, so player `y` in
@@ -88,8 +92,15 @@ house's interior wooden door — face it, release movement, press Interact —
 which is corroboration rather than a new mechanic.
 
 **Modelling an exit rectangle as enterable from an orthogonally adjacent
-walkable cell reaches all 24 maps**, up from 6. That model is asserted by
+walkable cell reaches all 24 maps**, up from 6, asserted by
 `doorway_interaction_connects_the_whole_slice`.
+
+Measured on that predicate, **entry from below alone also reaches 24/24**;
+lateral-only and above-only each reach 6. So no map in the slice needs a
+non-below entry, and the lateral and above arms are unexercised. The real
+untested generalization is therefore from the measured `1x1` door to the `1x5`
+rectangle that `$000C` uses for `$000B` — not from below to four sides. `$000B`
+is itself entered from below, at `$000C` cell `(8,21)`.
 
 One observed lead for the alignment question: walking into the *working*
 `$000F` doorway snapped the player's x from 399 to 392 with only Down held, so
@@ -97,8 +108,13 @@ the game does move the player during a doorway approach.
 
 ## Remaining
 
-- Only one door was confirmed live. The other seven town entrances, and the
-  `1x5` rectangle into `$000B`, are covered by the model but not measured.
+- Only one door was confirmed live, a `1x1`. The other seven town entrances
+  and the `1x5` rectangle into `$000B` are covered by the model but not
+  measured, and the fine test behaves very differently across those sizes: a
+  `1x5` admits a 65-pixel window where a `1x1` admits one pixel.
+- The ~100-frame `control == 0` window after the action press is **not**
+  door-specific: the same signature appears when interacting with a plain wall,
+  where nothing opens. It is not evidence on its own.
 - The routine that suspends collision and drives the walk-in is not located.
   `$097C` bit 15 is set throughout it, and `$097C` bit 4 suppresses the exit
   scan, so that word is where to look.
