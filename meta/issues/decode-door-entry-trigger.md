@@ -59,11 +59,51 @@ solid attribute-14 door cell. The exit requires the corner to be exactly where
 collision forbids it.
 
 So these doors are not entered by ordinary walking, and no amount of alignment
-fixes that. What remains is to find the mechanism that does enter them.
+fixes that. The already-qualified `room-core` collision agrees independently:
+asked how far Up the player can reach at that door, it stops at `y=768`,
+probe tile `(31,47)`, from every starting x.
 
-One observed lead: walking into the *working* `$000F` doorway snapped the
-player's x from 399 to 392 with only Down held, so the game does move the
-player during a doorway approach.
+## The mechanism: face the door and interact
+
+Measured live. Standing at `(504,768)` in the town facing Up, pressing the
+action button and then holding Up walks the player **through** the solid
+attribute-14 door cell:
+
+```text
+f12015  Up   pos (504,768)  ctrl 160  probe tile (31,47)
+f12016  Up   pos (504,767)  ctrl 160  probe tile (31,46)   <- past the stop
+f12026  Up   pos (504,752)  ctrl 160  probe tile (31,46)
+f12027  Up   pos (504,751)  ctrl   0  gate $8000           <- transition begins
+f12043  Up   pos (504,735)  ctrl   0  gate $8000
+f12044       map $000A -> $000D
+```
+
+Collision is suspended for that walk: `y=767` and everything below it are
+positions ordinary movement refuses. Holding Up for 150 frames *without* the
+action press leaves the player at `y=768` indefinitely, so the interaction is
+what opens the door.
+
+This is the same pattern `docs/playable-house.md` already documents for the
+house's interior wooden door — face it, release movement, press Interact —
+which is corroboration rather than a new mechanic.
+
+**Modelling an exit rectangle as enterable from an orthogonally adjacent
+walkable cell reaches all 24 maps**, up from 6. That model is asserted by
+`doorway_interaction_connects_the_whole_slice`.
+
+One observed lead for the alignment question: walking into the *working*
+`$000F` doorway snapped the player's x from 399 to 392 with only Down held, so
+the game does move the player during a doorway approach.
+
+## Remaining
+
+- Only one door was confirmed live. The other seven town entrances, and the
+  `1x5` rectangle into `$000B`, are covered by the model but not measured.
+- The routine that suspends collision and drives the walk-in is not located.
+  `$097C` bit 15 is set throughout it, and `$097C` bit 4 suppresses the exit
+  scan, so that word is where to look.
+- Nothing is implemented in the portable core yet: `room-core` reproduces the
+  refusal, not the interaction.
 
 ## This one mechanism is worth 17 maps
 

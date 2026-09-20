@@ -189,34 +189,27 @@ fn open_grid(room: &Room, width: u16, height: u16) -> Vec<bool> {
         .collect()
 }
 
-/// Maps reachable today by walking decoded geometry through decoded exits.
+/// Maps reachable by walking decoded geometry alone, with no door interaction.
 ///
-/// This is the measured frontier, not the target. See
-/// `meta/issues/decode-door-entry-trigger.md` for what the rest needs.
-const REACHABLE_TODAY: [u16; 6] = [0x000A, 0x000C, 0x000D, 0x000F, 0x0010, 0x0011];
+/// Doorways whose rectangle sits on solid cells cannot be walked into, so this
+/// is the frontier without the interaction measured below.
+const WALKING_ONLY: [u16; 6] = [0x000A, 0x000C, 0x000D, 0x000F, 0x0010, 0x0011];
 
-#[test]
-fn walking_decoded_geometry_reaches_the_measured_set_of_maps() {
-    // Connectivity over decoded data only: four-directional movement across
-    // cells the collision decode calls walkable, plus the static exit records.
-    // Nothing here is a hand-written room graph.
-    //
-    // It deliberately asserts the exact set rather than a lower bound, so that
-    // decoding a new exit or attribute fails this test and forces the frontier
-    // to be restated rather than quietly drifting.
-    let Some(cartridge) = owned_rom() else {
-        return;
-    };
+/// Connectivity over decoded data: four-directional movement across cells the
+/// collision decode calls walkable, plus the static exit records.
+///
+/// `doorways` models the measured interaction: standing in a walkable cell
+/// orthogonally adjacent to an exit rectangle, facing it and interacting.
+fn reachable_maps(cartridge: &Rom, doorways: bool) -> Vec<u16> {
     let mut grids: HashMap<u16, (Vec<bool>, u16, u16)> = HashMap::new();
     let mut exits: HashMap<u16, Vec<assets::maps::exits::ExitRecord>> = HashMap::new();
     for map in CRYSTA {
-        let (room, width, height) = crysta_room(&cartridge, map);
+        let (room, width, height) = crysta_room(cartridge, map);
         grids.insert(map, (open_grid(&room, width, height), width, height));
         let list = assets::maps::exits::ExitList::from_rom(cartridge.image(), map)
             .unwrap_or_else(|e| panic!("map {map:#06x} exits: {e}"));
         exits.insert(map, list.records().to_vec());
     }
-
     // The fresh game begins in the bedroom, map $000F.
     let start = (0x000Fu16, 19usize, 7usize);
     let mut seen: HashSet<(u16, usize, usize)> = HashSet::new();
@@ -228,14 +221,17 @@ fn walking_decoded_geometry_reaches_the_measured_set_of_maps() {
 
     while let Some((map, col, row)) = queue.pop_front() {
         let (grid, width, height) = &grids[&map];
-        // Standing anywhere in an exit rectangle leaves the map. The record's
-        // own fine test is tighter than this, so treating the whole rectangle
-        // as a trigger is the generous reading; it still does not connect the
-        // town, which is the point.
         for record in &exits[&map] {
             let (rx, ry) = (usize::from(record.x()), usize::from(record.y()));
             let (rw, rh) = (usize::from(record.width()), usize::from(record.height()));
-            if rw == 0 || rh == 0 || col < rx || row < ry || col >= rx + rw || row >= ry + rh {
+            if rw == 0 || rh == 0 {
+                continue;
+            }
+            let inside = col >= rx && row >= ry && col < rx + rw && row < ry + rh;
+            let adjacent = doorways
+                && ((rx..rx + rw).contains(&col) && (row + 1 == ry || row == ry + rh)
+                    || (ry..ry + rh).contains(&row) && (col + 1 == rx || col == rx + rw));
+            if !(inside || adjacent) {
                 continue;
             }
             let Ok(dest) = record.direct_destination() else {
@@ -245,8 +241,8 @@ fn walking_decoded_geometry_reaches_the_measured_set_of_maps() {
                 continue; // Leaves the slice, e.g. the wider world.
             }
             let (dx, dy) = record.destination_position();
-            let node = (dest, usize::from(dx) / 16, usize::from(dy) / 16);
             maps.insert(dest);
+            let node = (dest, usize::from(dx) / 16, usize::from(dy) / 16);
             if seen.insert(node) {
                 queue.push_back(node);
             }
@@ -270,13 +266,40 @@ fn walking_decoded_geometry_reaches_the_measured_set_of_maps() {
             }
         }
     }
-
     let mut reached: Vec<u16> = maps.into_iter().collect();
     reached.sort_unstable();
-    assert_eq!(
-        reached, REACHABLE_TODAY,
-        "reachable map set changed; restate the frontier"
-    );
+    reached
+}
+
+#[test]
+fn walking_alone_reaches_only_part_of_the_slice() {
+    // Asserts the exact set rather than a lower bound, so decoding a new
+    // mechanism fails this and forces the frontier to be restated.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    assert_eq!(reachable_maps(&cartridge, false), WALKING_ONLY);
+}
+
+#[test]
+fn doorway_interaction_connects_the_whole_slice() {
+    // Measured in the reference emulator: standing below the house's own front
+    // door in the town at (504,768), facing Up and pressing the action button,
+    // then holding Up, walks the player through the solid attribute-14 door
+    // cell and into map $000D. Collision is suspended for that walk: the
+    // player passes y=767 down to y=735, which ordinary movement refuses.
+    //
+    // This models that as "an exit rectangle is enterable from a walkable cell
+    // orthogonally adjacent to it". One door was confirmed live; the model's
+    // generality across the other town entrances is not yet verified, which is
+    // why this asserts reachability rather than claiming the mechanism is
+    // fully qualified.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let reached = reachable_maps(&cartridge, true);
+    assert_eq!(reached.len(), 24, "reached {reached:x?}");
+    assert!(CRYSTA.eq(reached.iter().copied()));
 }
 
 #[test]
