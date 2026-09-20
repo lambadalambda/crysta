@@ -165,6 +165,21 @@ impl HouseDialogue {
             choices: [decode_choice(image, 0)?, decode_choice(image, 1)?],
         })
     }
+    /// Decodes the pages at one source address discovered by the caller.
+    ///
+    /// `from_rom` compiles a fixed list of qualified sources. This decodes an
+    /// arbitrary one, for a caller that found it some other way — an actor
+    /// spawn record's script pointer, for instance. It validates the same
+    /// commands, so an address that is not dialogue is rejected rather than
+    /// returning noise, but a successful decode is not by itself evidence that
+    /// the address *is* a text source.
+    ///
+    /// # Errors
+    /// Rejects unsupported addresses, truncation and unsupported commands.
+    pub fn decode_at(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
+        decode(image, source)
+    }
+
     /// Source-ID lookup. Page index is a stable zero-based key within the text ID;
     /// hosts can assign sequential numeric page keys scoped to the ROM identity.
     #[must_use]

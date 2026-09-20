@@ -7,6 +7,8 @@
 
 use std::fmt;
 
+pub mod actor_script;
+pub mod actors;
 pub mod exits;
 pub mod scripts;
 mod static_layer;
