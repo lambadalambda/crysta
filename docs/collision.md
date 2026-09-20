@@ -88,13 +88,19 @@ moved it from `y=192` to `y=336` **and changed the map from `$000F` to
 attribute admits movement. The transition belongs to the exit record rather
 than the attribute: most attribute-`2` cells lie outside any exit rectangle.
 
-That contact also pinned the horizontal offset, which the serpentine sweeps
-could not. The press was refused at `x=402` and admitted at `x=399` against a
-cell spanning `384..399`, so `dx` is `-2..=0`. Attribute `2` had been reported
-offset-dependent precisely because `dx` in `5..=7` put the blocking cell one
-column over; those offsets are now excluded and the ambiguity resolves to
-walkable. This is exactly the differing sub-cell phase the earlier analysis
-said was missing.
+That contact also resolved attribute `2`, though **not** in the way first
+recorded here. The original claim was that the press was "refused at `x=402`
+and admitted at `x=399`", narrowing `dx` to `-2..=0`. The frame trace refutes
+it: at `x=399` with Down held, `y` does not change for eight frames while the
+game slides `x` to `392`, and vertical motion only begins at `392`. The player
+was never admitted at `399`; it was moved. That slide is the same doorway snap
+recorded in
+[the door-entry issue](../meta/issues/decode-door-entry-trigger.md).
+
+What actually excludes `dx` in `5..=7` is occupancy: the player stands on
+attribute-`2` cells around `(392, 198..225)`, while the `(379,192)` down-stall
+only calls attribute `2` solid under `dx >= 5`. Re-running `derive.py` on these
+inputs reports `dx` in `-2..=4`, not `-2..=0`.
 
 Attribute `16` sits in a one-cell alcove whose only open side is below. A
 sustained press from that side was refused across seven attempts of 50 frames.
@@ -140,15 +146,20 @@ only at `>= 60`, where the contact count collapses to 15.
 
 ## What is not established
 
-- **The reference point is still a box.** `dx` is `-2..=0` from the doorway
-  contact, but `dy` remains `-12..=-1` relative to the player word at
-  `$7E:1000/$1002`: no vertical contact yet occurs at a differing sub-cell
-  phase. The serpentine stalls all halt at `x % 16 == 8`, which is why they
-  carried no sub-cell information. The search is bounded a priori to a
-  sprite-extent window
+- **The reference is settled, and it is not the point these sweeps measure.**
+  `$80:940D` computes the collision sample as `(x - 8, y - 16)` — the same
+  corner the exit probe uses — and `room-core` reads a 16x16 box from it. So
+  the player occupies a box, not a point, and the `dx` in `-2..=4` / `dy` in
+  `-12..=-8` this derivation reports are simply the range a single-point model
+  cannot distinguish; `dx = -8` is not even inside it. Treat these ranges as
+  what the sweeps constrain, not as the game's model. The attribute partition
+  they establish is unaffected, because it does not depend on which offset
+  inside the range is correct. The serpentine stalls all halt at
+  `x % 16 == 8`, which is why they carried no sub-cell information. The search
+  is bounded a priori to a sprite-extent window
   (`dx` in `-16..15`, `dy` in `-24..7`) to exclude mirror solutions; on this
   data that window is inert, and widening it to `+/-32` changes nothing.
-- **Seven attributes remain undecoded**, 525 cells.
+- **Six attributes remain undecoded**, 296 cells.
   `qualified_passability()` returns `None` for them: an uncovered attribute is
   unknown, not walkable. The exterior's four are the ones that matter for
   walking the town, and reaching map `$000A` needs the `$0026` progression
@@ -200,11 +211,45 @@ ROUTE
 "$P" "$ROM" "$D/vertical"   < /tmp/vertical.jsonl   > "$D/vertical.jsonl"
 python3 tools/collision-qualification/derive.py \
   "$D/horizontal/layer-000f.json" "$D/horizontal.jsonl" "$D/vertical.jsonl"
-
-python3 -B tools/collision-qualification/test_derive.py   # 12 ROM-free controls
 ```
 
-Each sweep takes well under a minute after the ~6,800-frame input-only boot.
-`derive.py` prints `NO CONSISTENT OFFSET` rather than a best fit when samples
-contradict a single-point model, refuses samples that span maps, and warns if
-the consistent offsets touch the edge of the search window.
+The town needs the qualified route that talks to the room B resident, opens the
+gate and steps outside, as a prefix:
+
+```sh
+python3 - <<'ROUTE' > /tmp/town.jsonl
+import json
+prefix = [l.strip() for l in open('tools/house-conversation-qualification/route.jsonl')
+          if l.strip() and '"finish"' not in l]
+c = [json.loads(l) for l in prefix]
+for i in range(18):
+    d = 'Right' if i % 2 == 0 else 'Left'
+    c.append({'label': f'h{i:02d}-{d.lower()}', 'frames': 150, 'buttons': [d]})
+    c.append({'label': f'h{i:02d}-up', 'frames': 18, 'buttons': ['Up']})
+for i in range(14):
+    d = 'Down' if i % 2 == 0 else 'Up'
+    c.append({'label': f'v{i:02d}-{d.lower()}', 'frames': 150, 'buttons': [d]})
+    c.append({'label': f'v{i:02d}-right', 'frames': 18, 'buttons': ['Right']})
+c.append({'finish': True})
+print('\n'.join(json.dumps(x) for x in c))
+ROUTE
+
+"$P" "$ROM" "$D/town" < /tmp/town.jsonl > "$D/town.jsonl"
+python3 tools/collision-qualification/derive.py \
+  "$D/town/layer-000a.json" "$D/town.jsonl"
+
+python3 -B tools/collision-qualification/test_derive.py   # 16 ROM-free controls
+```
+
+`derive.py` reads raw probe output directly: it keeps only frames where the
+control word says ordinary walking is admitted, and only those belonging to the
+layer's own map. Both filters are load bearing. Without the control filter the
+town sweeps report `NO CONSISTENT OFFSET`, because the scripted arrival walks
+the player *through* the solid door cell, which is the same unsoundness class
+as the stall and layer-dump defects above.
+
+Each sweep takes well under a minute after the ~6,800-frame input-only boot;
+the town run also pays for its route prefix. `derive.py` prints
+`NO CONSISTENT OFFSET` rather than a best fit when samples contradict a
+single-point model, refuses samples that span maps, and warns if the consistent
+offsets touch the edge of the search window.
