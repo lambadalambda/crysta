@@ -19,7 +19,28 @@ const PREDECESSOR_BRIDGE_SHA: &str =
     "46a2b7fda7525c8c7da664b83ec182160b39f4a67d8d0e958c573cea606795c0";
 const LIBRARY_SHA: &str = "00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143";
 const LIBRARY_BRIDGE_SHA: &str = "18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d";
+const REPIN: &str = include_str!("../../../tools/map-inspector-qualification/repin-producer.json");
+const REPIN_BRIDGE: &str =
+    include_str!("../../../tools/map-inspector-qualification/repin-producer-bridge.json");
+const REPIN_SHA: &str = "e58a0f232a8ce9cc86186e515a9156ca32c4fd992c4a7f38cd859c117a247c33";
+const REPIN_BRIDGE_SHA: &str = "5fed82d65b682ca001dfa55b3ce6f9c60f9911d7b9cd0313e461e688b167173f";
+const REPIN_FILES: &[&str] = &["crates/map-inspector/src/main.rs"];
+const REPIN_FIELDS: &[&str] = &[
+    "schema_version",
+    "kind",
+    "epoch",
+    "policy",
+    "original_descriptor_sha256",
+    "migration_sha256",
+    "predecessor_descriptor_sha256",
+    "predecessor_bridge_sha256",
+    "replaced_source_hashes",
+];
 const MAIN: &str = "crates/map-inspector/src/main.rs";
+// The rustfmt declaration-order repair, pinned as an exact byte delta so the
+// reformatted producer still reconstructs to OLD_MAIN_SHA.
+const PINNED_MODS: &[u8] = b"mod house_progression;\nmod house_profiles;\n";
+const FORMATTED_MODS: &[u8] = b"mod house_profiles;\nmod house_progression;\n";
 const ARCHIVE: &str = include_str!(
     "../../../tools/map-inspector-qualification/epochs/threaded-video-v0/reference.json"
 );
@@ -182,25 +203,47 @@ fn historical_identity_substitution_is_rejected() {
     assert!(std::panic::catch_unwind(|| check_producer_identity(&old)).is_err());
 }
 
+fn positions(source: &[u8], find: &[u8]) -> Vec<usize> {
+    source
+        .windows(find.len())
+        .enumerate()
+        .filter_map(|(index, bytes)| (bytes == find).then_some(index))
+        .collect()
+}
+
+fn count(source: &[u8], find: &[u8]) -> usize {
+    positions(source, find).len()
+}
+
+fn replace_exactly_once(source: &[u8], find: &[u8], replace: &[u8], what: &str) -> Vec<u8> {
+    let found = positions(source, find);
+    assert_eq!(found.len(), 1, "exact {what} anchor required");
+    let index = found[0];
+    [&source[..index], replace, &source[index + find.len()..]].concat()
+}
+
 fn check_main_registration(main: &[u8]) {
     const ANCHOR: &[u8] = b"mod opening_qualification;\n";
     const INSERT: &[u8] = b"pub mod pandora_navigation;\npub mod pandora_progression;\n";
-    let registered = [ANCHOR, INSERT].concat();
-    let positions: Vec<_> = main
-        .windows(registered.len())
-        .enumerate()
-        .filter_map(|(index, bytes)| (bytes == registered).then_some(index))
-        .collect();
-    assert_eq!(positions.len(), 1, "exact registration anchor required");
-    let index = positions[0];
-    // Undo ONLY the exact anchored insertion and authenticate every remaining
-    // byte as the old producer. No line stripping or whitespace normalization.
-    let old = [
-        &main[..index + ANCHOR.len()],
-        &main[index + registered.len()..],
-    ]
-    .concat();
+    // Undo ONLY the two exact deltas that separate this file from the old
+    // producer -- the rustfmt module reorder and the anchored registration
+    // insertion -- then authenticate every remaining byte. No line stripping
+    // or whitespace normalization.
+    let ordered = replace_exactly_once(main, FORMATTED_MODS, PINNED_MODS, "module-order");
+    let old = replace_exactly_once(&ordered, &[ANCHOR, INSERT].concat(), ANCHOR, "registration");
     assert_eq!(sha256(&old), OLD_MAIN_SHA, "non-registration main change");
+    // Injectivity: the reconstruction is only a proof if the old blob offers a
+    // single site for each delta, so no second main.rs can reconstruct to it.
+    assert_eq!(
+        count(&old, ANCHOR),
+        1,
+        "ambiguous registration anchor in old main"
+    );
+    assert_eq!(
+        count(&old, PINNED_MODS),
+        1,
+        "ambiguous module order in old main"
+    );
 }
 
 #[test]
@@ -209,6 +252,8 @@ fn non_registration_main_changes_are_rejected() {
     let main = std::fs::read(root.join("crates/map-inspector/src/main.rs")).unwrap();
     check_main_registration(&main);
     let text = std::str::from_utf8(&main).unwrap();
+    let pinned_mods = std::str::from_utf8(PINNED_MODS).unwrap();
+    let formatted_mods = std::str::from_utf8(FORMATTED_MODS).unwrap();
     for changed in [
         format!("{text}\n"),
         text.replace('\n', "\r\n"),
@@ -216,6 +261,12 @@ fn non_registration_main_changes_are_rejected() {
         text.replace("pub mod pandora_navigation;\n", ""),
         text.replace("pub mod pandora_progression;\n", ""),
         text.replace("mod opening_qualification;", "mod opening_qualification; "),
+        // The reorder is pinned in its formatted direction, is required, and
+        // must stay unambiguous.
+        formatted_mods.to_string(),
+        text.replace(formatted_mods, pinned_mods),
+        text.replace(formatted_mods, ""),
+        format!("{text}{formatted_mods}"),
     ] {
         assert!(std::panic::catch_unwind(|| check_main_registration(changed.as_bytes())).is_err());
     }
@@ -284,13 +335,108 @@ fn check_library_identity(library: &serde_json::Value, predecessor: &serde_json:
     );
 }
 
+/// The repin stage authenticates the frozen library stage by hash, then records
+/// exactly one replacement over it. Unchanged sources stay derived from the
+/// frozen descriptors; there is deliberately no field in which to reseal one.
+fn check_repin_identity(repin: &serde_json::Value, library: &serde_json::Value) {
+    use std::collections::BTreeSet;
+    assert_eq!(sha256(REPIN.as_bytes()), REPIN_SHA);
+    assert_eq!(sha256(REPIN_BRIDGE.as_bytes()), REPIN_BRIDGE_SHA);
+    assert_eq!(
+        repin
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<BTreeSet<_>>(),
+        REPIN_FIELDS.iter().copied().collect::<BTreeSet<_>>()
+    );
+    assert_eq!(repin["schema_version"], 1);
+    assert_eq!(repin["kind"], "map-inspector-repin-producer");
+    assert_eq!(repin["epoch"], library["epoch"]);
+    assert_eq!(repin["policy"], library["policy"]);
+    assert_eq!(repin["original_descriptor_sha256"], OBSERVER_SHA);
+    assert_eq!(repin["migration_sha256"], MIGRATION_SHA);
+    assert_eq!(repin["predecessor_descriptor_sha256"], LIBRARY_SHA);
+    assert_eq!(repin["predecessor_bridge_sha256"], LIBRARY_BRIDGE_SHA);
+    check_inventory(&repin["replaced_source_hashes"], REPIN_FILES);
+    for name in REPIN_FILES {
+        check_inventory(
+            &repin["replaced_source_hashes"][name],
+            &["predecessor_sha256", "current_sha256"],
+        );
+        assert_ne!(
+            repin["replaced_source_hashes"][name]["current_sha256"],
+            repin["replaced_source_hashes"][name]["predecessor_sha256"]
+        );
+        // The declared pre-state must be the frozen stage's actual identity,
+        // not a plausible-looking hash. Checked here so a clean checkout, which
+        // never runs the Python bridge, still rejects a fabricated predecessor.
+        let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
+        let declared = repin["replaced_source_hashes"][name]["predecessor_sha256"]
+            .as_str()
+            .expect("declared predecessor identity");
+        let frozen = library["replaced_source_hashes"][name]["current_sha256"]
+            .as_str()
+            .unwrap_or_else(|| predecessor_hash(&predecessor, name));
+        assert_eq!(
+            declared, frozen,
+            "declared pre-state is not the frozen stage"
+        );
+    }
+    check_repin_report(REPIN_BRIDGE, repin);
+}
+
+/// A report whose header and body disagree is exactly the defect this stage
+/// exists to avoid: every retained envelope must bind to this descriptor.
+fn check_repin_report(report: &str, repin: &serde_json::Value) {
+    let report: serde_json::Value = serde_json::from_str(report).unwrap();
+    assert_eq!(report["repin_descriptor_sha256"], REPIN_SHA);
+    assert_eq!(report["predecessor_descriptor_sha256"], LIBRARY_SHA);
+    assert_eq!(report["predecessor_bridge_sha256"], LIBRARY_BRIDGE_SHA);
+    assert_eq!(report["migration_sha256"], MIGRATION_SHA);
+    assert_eq!(
+        report["nonpixel_manifest_sha256"],
+        "7998be259cce4218983f03bb81e3bf189577958dc9f190ba38880036d680cb22"
+    );
+    let producers = report["producers"].as_array().expect("retained producers");
+    assert_eq!(
+        producers.len(),
+        2,
+        "two isolated producer envelopes required"
+    );
+    for producer in producers {
+        assert_eq!(producer["descriptor_sha256"], REPIN_SHA);
+        assert_eq!(producer["kind"], repin["kind"]);
+        assert_eq!(
+            producer["replaced_source_hashes"],
+            repin["replaced_source_hashes"]
+        );
+        for name in REPIN_FILES {
+            assert_eq!(
+                producer["source_hashes"][name],
+                repin["replaced_source_hashes"][name]["current_sha256"]
+            );
+        }
+    }
+    assert_ne!(
+        producers[0]["process"]["run_id"],
+        producers[1]["process"]["run_id"]
+    );
+    assert_ne!(producers[0]["target_dir"], producers[1]["target_dir"]);
+}
+
 fn check_library_sources(root: &Path, library: &serde_json::Value) {
     let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
+    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
     check_library_identity(library, &predecessor);
+    check_repin_identity(&repin, library);
     for field in ["source_hashes", "additional_source_hashes"] {
         for (name, expected) in predecessor[field].as_object().unwrap() {
-            let expected = library["replaced_source_hashes"][name]["current_sha256"]
+            // Latest stage wins: repin over library over frozen predecessor.
+            let expected = repin["replaced_source_hashes"][name]["current_sha256"]
                 .as_str()
+                .or_else(|| library["replaced_source_hashes"][name]["current_sha256"].as_str())
                 .unwrap_or_else(|| expected.as_str().unwrap());
             assert_eq!(
                 sha256(&std::fs::read(root.join(name)).expect("read predecessor source")),
@@ -398,6 +544,92 @@ fn library_identity_inventory_and_delta_mutations_are_rejected() {
         changed[field]["unexpected/source"] = serde_json::json!("fallback");
         assert!(std::panic::catch_unwind(|| check_library_sources(&root, &changed)).is_err());
     }
+}
+
+#[test]
+fn repin_identity_and_report_binding_mutations_are_rejected() {
+    let library: serde_json::Value = serde_json::from_str(LIBRARY).unwrap();
+    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
+    check_repin_identity(&repin, &library);
+    for field in REPIN_FIELDS {
+        let mut changed = repin.clone();
+        changed.as_object_mut().unwrap().remove(*field);
+        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+    }
+    let mut extra = repin.clone();
+    extra["fallback"] = serde_json::json!(true);
+    assert!(std::panic::catch_unwind(|| check_repin_identity(&extra, &library)).is_err());
+    for field in [
+        "kind",
+        "epoch",
+        "policy",
+        "original_descriptor_sha256",
+        "migration_sha256",
+        "predecessor_descriptor_sha256",
+        "predecessor_bridge_sha256",
+    ] {
+        let mut changed = repin.clone();
+        changed[field] = serde_json::json!("substitution");
+        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+    }
+    // Substituting the frozen library descriptor for the repin descriptor, and
+    // resealing a replacement as a non-delta, are both rejected.
+    assert!(std::panic::catch_unwind(|| check_repin_identity(&library, &library)).is_err());
+    for name in REPIN_FILES {
+        for identity in ["predecessor_sha256", "current_sha256"] {
+            let mut changed = repin.clone();
+            changed["replaced_source_hashes"][name]
+                .as_object_mut()
+                .unwrap()
+                .remove(identity);
+            assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+        }
+        let mut changed = repin.clone();
+        changed["replaced_source_hashes"][name]["current_sha256"] =
+            changed["replaced_source_hashes"][name]["predecessor_sha256"].clone();
+        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+        let mut changed = repin.clone();
+        changed["replaced_source_hashes"][name]["extra"] = serde_json::json!("reseal");
+        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+    }
+    let mut changed = repin.clone();
+    changed["replaced_source_hashes"]["unexpected/source"] = serde_json::json!("fallback");
+    assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+}
+
+#[test]
+fn repin_report_bodies_must_bind_to_the_repin_descriptor() {
+    // The defect this guards: a report whose header names one descriptor while
+    // its retained producer envelopes still describe the previous one.
+    let library: serde_json::Value = serde_json::from_str(LIBRARY).unwrap();
+    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
+    let report: serde_json::Value = serde_json::from_str(REPIN_BRIDGE).unwrap();
+    for index in 0..2 {
+        for field in ["descriptor_sha256", "kind", "replaced_source_hashes"] {
+            let mut changed = report.clone();
+            changed["producers"][index][field] = serde_json::json!("stale");
+            let changed = serde_json::to_string(&changed).unwrap();
+            assert!(
+                std::panic::catch_unwind(|| check_repin_report(&changed, &repin)).is_err(),
+                "stale producers[{index}].{field} must be rejected"
+            );
+        }
+        let mut changed = report.clone();
+        changed["producers"][index]["source_hashes"][REPIN_FILES[0]] =
+            repin["replaced_source_hashes"][REPIN_FILES[0]]["predecessor_sha256"].clone();
+        let changed = serde_json::to_string(&changed).unwrap();
+        assert!(std::panic::catch_unwind(|| check_repin_report(&changed, &repin)).is_err());
+    }
+    let mut shared = report.clone();
+    shared["producers"][1]["process"]["run_id"] =
+        shared["producers"][0]["process"]["run_id"].clone();
+    let shared = serde_json::to_string(&shared).unwrap();
+    assert!(std::panic::catch_unwind(|| check_repin_report(&shared, &repin)).is_err());
+    let mut single = report;
+    single["producers"] = serde_json::json!([]);
+    let single = serde_json::to_string(&single).unwrap();
+    assert!(std::panic::catch_unwind(|| check_repin_report(&single, &repin)).is_err());
+    let _ = library;
 }
 
 #[test]

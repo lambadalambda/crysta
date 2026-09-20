@@ -132,8 +132,14 @@ def verify_library_producer(root, descriptor, descriptor_sha, repo, rom, save):
     predecessor = frozen_predecessor()[1]
     require(producer['source_hashes'] == current_sources(descriptor, predecessor),
             'recorded bounded source inventory mismatch')
+    verify_producer_envelope(root, producer, repo, rom, save)
+    return producer
+
+
+def verify_producer_envelope(root, producer, repo, rom, save):
+    """Build/input/process provenance shared by every descriptor-mode stage."""
     require(producer['rom_sha256'] == check.ROM and producer['sram_sha256'] == check.SRAM,
-            'recorded library input mismatch')
+            'recorded producer input mismatch')
     for name, field in (('map-inspector', 'binary_sha256'), ('build.log', 'build_log_sha256'),
                         ('stdout.txt', 'stdout_sha256'), ('stderr.txt', 'stderr_sha256')):
         require(sha((root / name).read_bytes()) == producer[field], f'retained {name} mismatch')
@@ -144,7 +150,7 @@ def verify_library_producer(root, descriptor, descriptor_sha, repo, rom, save):
     require(producer['build_env']['CARGO_TARGET_DIR'] == producer['target_dir'], 'build target env mismatch')
     require(producer['source_repo'] == str(repo.resolve()) and
             producer['rom_path'] == str(rom.resolve()) and producer['sram_path'] == str(save.resolve()),
-            'recorded library source/input path substitution')
+            'recorded producer source/input path substitution')
     require(producer['invocation'] == [str(root.resolve() / 'map-inspector'), 'capture',
                                      producer['rom_path'], producer['sram_path']],
             'unexpected capture invocation')
@@ -153,7 +159,6 @@ def verify_library_producer(root, descriptor, descriptor_sha, repo, rom, save):
             isinstance(process['run_id'], str) and process['run_id'] and
             process['pid'] > 0 and process['exit_code'] == 0 and
             process['started_ns'] < process['finished_ns'], 'invalid process provenance')
-    return producer
 
 
 def audit(rom, save, old, accepted_a, accepted_b, prior_a, prior_b, library_a, library_b,

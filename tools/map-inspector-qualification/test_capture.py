@@ -11,6 +11,7 @@ import bridge
 import capture
 import check
 import library_bridge
+import repin_bridge
 
 
 class RecorderGates(unittest.TestCase):
@@ -112,6 +113,43 @@ class RecorderGates(unittest.TestCase):
                          library_bridge.current_sources(descriptor, predecessor))
         for field in ('replaced_source_hashes', *library_bridge.GROUPS):
             self.assertEqual(producer[field], descriptor[field])
+
+    def test_repin_mode_rechecks_and_records_exact_schema_four(self):
+        descriptor = check.load(check.HERE / 'repin-producer.json')
+        self.path.write_text(json.dumps(descriptor))
+        with patch.object(repin_bridge, 'verify_repin_descriptor',
+                          return_value=descriptor) as verify:
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        fixed_source_repo=self.base / 'fixed',
+                        repin_descriptor=self.path)
+        self.assertEqual(verify.call_count, 2)
+        producer = check.load(self.out / 'producer.json')
+        self.assertEqual(producer['schema_version'], 4)
+        self.assertEqual(producer['kind'], repin_bridge.KIND)
+        self.assertEqual(producer['source_hashes'], repin_bridge.current_sources(descriptor))
+        self.assertEqual(producer['replaced_source_hashes'],
+                         descriptor['replaced_source_hashes'])
+        # The repin stage inherits unchanged groups from the frozen library
+        # descriptor rather than restating them.
+        for field in library_bridge.GROUPS:
+            self.assertNotIn(field, producer)
+
+    def test_repin_mode_requires_explicit_fixed_source_repository(self):
+        with self.assertRaisesRegex(ValueError, 'fixed source'):
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        repin_descriptor=self.path)
+        self.assertFalse(self.out.exists())
+
+    def test_descriptor_modes_are_mutually_exclusive(self):
+        for extra in ({'library_descriptor': self.path,
+                       'predecessor_source_repo': self.base / 'predecessor'},
+                      {'current_descriptor': self.path}):
+            with self.subTest(other=sorted(extra)), \
+                    self.assertRaisesRegex(ValueError, 'exactly one explicit descriptor mode'):
+                capture.run(self.repo, self.out, self.rom, self.save,
+                            fixed_source_repo=self.base / 'fixed',
+                            repin_descriptor=self.path, **extra)
+        self.assertFalse(self.out.exists())
 
     def test_library_mode_requires_all_explicit_source_repositories(self):
         with self.assertRaisesRegex(ValueError, 'fixed source'):

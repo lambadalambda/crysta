@@ -1,0 +1,16 @@
+{
+  "epoch": "headless-sync-video-v1",
+  "kind": "map-inspector-repin-producer",
+  "migration_sha256": "db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c",
+  "original_descriptor_sha256": "7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718",
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "predecessor_bridge_sha256": "18cfd3ec329e70159d3ad7613dd73f826d03b55c573274661337f9277060b75d",
+  "predecessor_descriptor_sha256": "00298d9350a143abeb83bb95ae093feba81d6c9850ab4722bf015834d88f6143",
+  "replaced_source_hashes": {
+    "crates/map-inspector/src/main.rs": {
+      "current_sha256": "5eeb11bd799b75b4c41561e876a03d4a50056a72a1fe71292eb318cf017173ed",
+      "predecessor_sha256": "2f77608e3d004f4cc480d1b650073b5e16d680e230437570aa0ed1c1b4504e2d"
+    }
+  },
+  "schema_version": 1
+}

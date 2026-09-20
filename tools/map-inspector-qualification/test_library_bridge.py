@@ -10,16 +10,38 @@ from unittest.mock import patch
 import bridge
 import check
 import library_bridge as library
+import repin_bridge as repin
 
 
 class LibraryDescriptorGates(unittest.TestCase):
+    def library_repo(self):
+        """Materialize the tree as the frozen library producer saw it.
+
+        The working tree has since moved on by exactly one rustfmt reorder (see
+        repin-producer.json), so these ROM-free controls reconstruct the library
+        stage instead of reading whatever HEAD happens to be.
+        """
+        root = Path(self.temp.name) / 'library-repo'
+        names = set(library.current_sources(self.descriptor, self.predecessor))
+        names.update(*library.GROUPS.values())
+        names.add(bridge.MAIN)
+        for name in names:
+            target = root / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes((check.REPO / name).read_bytes())
+        main = (check.REPO / bridge.MAIN).read_bytes()
+        (root / bridge.MAIN).write_bytes(
+            main.replace(repin.FORMATTED_MODS, repin.PINNED_MODS, 1))
+        # Resolved: the envelope gate compares recorded paths against repo.resolve().
+        return root.resolve()
+
     def setUp(self):
-        self.repo = check.REPO
         self.descriptor = check.load(check.HERE / 'library-producer.json')
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.path = Path(self.temp.name) / 'descriptor.json'
         self.predecessor = check.load(check.HERE / 'current-producer.json')
+        self.repo = self.library_repo()
         self.fixed = Path(self.temp.name) / 'fixed'
         main = (self.repo / bridge.MAIN).read_bytes()
         registered = bridge.ANCHOR + bridge.REGISTRATIONS
