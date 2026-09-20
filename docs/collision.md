@@ -58,6 +58,10 @@ solid:    [12, 14] for 156/192 offsets
           UNRESOLVED (offset-dependent): [2]
 ```
 
+That is the sweeps' own verdict, and it stands: serpentine walking alone does
+not resolve attribute `2`. The doorway contact below does, by excluding the
+offsets that made it ambiguous.
+
 `derive.py` solves for a collision reference offset rather than assuming one,
 keeping every offset where no attribute both stops a sustained press and is
 stood on.
@@ -66,12 +70,39 @@ stood on.
 | --- | --- | --- |
 | `0` | collision point stands on it, ~60 cells | `Walkable` |
 | `22` | collision point stands on it, 3–8 cells | `Walkable` |
+| `2` | **walked through**, carrying the player between maps | `Walkable` |
 | `12` | stops a sustained press from Up, Down and Right | `Solid` |
 | `14` | stops a sustained press from all four directions | `Solid` |
-| `2` | **offset-dependent**; solid under 36 of 192 offsets | not decoded |
+| `16` | refuses a sustained press from its only open side | `Solid` |
 
 That `12` and `14` each block from *opposing* directions rules out the obvious
 rival reading, that they are one-way ledges or elevation edges.
+
+### The doorway contact, and what it settled
+
+Attribute `2` forms one-cell gaps in walls; map `$000F`'s grid shows `#2#`
+twice along its row-12 wall. Walking the player into the gap at cell `(24,12)`
+moved it from `y=192` to `y=336` **and changed the map from `$000F` to
+`$0010`**, an edge the static exit graph independently predicts. So the
+attribute admits movement. The transition belongs to the exit record rather
+than the attribute: most attribute-`2` cells lie outside any exit rectangle.
+
+That contact also pinned the horizontal offset, which the serpentine sweeps
+could not. The press was refused at `x=402` and admitted at `x=399` against a
+cell spanning `384..399`, so `dx` is `-2..=0`. Attribute `2` had been reported
+offset-dependent precisely because `dx` in `5..=7` put the blocking cell one
+column over; those offsets are now excluded and the ambiguity resolves to
+walkable. This is exactly the differing sub-cell phase the earlier analysis
+said was missing.
+
+Attribute `16` sits in a one-cell alcove whose only open side is below. A
+sustained press from that side was refused across seven attempts of 50 frames.
+
+### Coverage across the slice
+
+**47,091 of 47,616 cells (98.9%)** across all 24 Crysta maps now resolve. What
+remains is `5` (8 cells), `21` (48, in `$0012`–`$0019`), `29` (65, in 17 maps)
+and the town exterior's own `6`, `7`, `8` and `25` (404 cells, map `$000A`).
 
 ### Threshold sensitivity
 
@@ -83,21 +114,19 @@ only at `>= 60`, where the contact count collapses to 15.
 
 ## What is not established
 
-- **Attribute `2` is unresolved.** It is called solid by 36 of 192 consistent
-  offsets, from a single down-stall at `(379,192)` where `dx >= 5` rounds into
-  a different column. One more contact against it would settle it.
-- **The reference point is a box, not a pixel.** Consistent offsets span `dx`
-  in `-8..=7` and `dy` in `-12..=-1` relative to the player word at
-  `$7E:1000/$1002`. The `dx` span is exactly one cell period because every
-  horizontal stall halts at `x % 16 == 8`, so the horizontal contacts carry no
-  sub-cell information at all. Pinning it needs contacts at differing sub-cell
-  phases. The search is also bounded a priori to a sprite-extent window
+- **The reference point is still a box.** `dx` is `-2..=0` from the doorway
+  contact, but `dy` remains `-12..=-1` relative to the player word at
+  `$7E:1000/$1002`: no vertical contact yet occurs at a differing sub-cell
+  phase. The serpentine stalls all halt at `x % 16 == 8`, which is why they
+  carried no sub-cell information. The search is bounded a priori to a
+  sprite-extent window
   (`dx` in `-16..15`, `dy` in `-24..7`) to exclude mirror solutions; on this
   data that window is inert, and widening it to `+/-32` changes nothing.
-- **Coverage is four base attributes across 66 cells**, roughly 12% of the
-  room's floor, in one map. Map `$000F` also carries `5`, `16` and `29`.
-  `qualified_passability()` returns `None` for those: an uncovered attribute is
-  unknown, not walkable. Other maps are untouched.
+- **Seven attributes remain undecoded**, 525 cells.
+  `qualified_passability()` returns `None` for them: an uncovered attribute is
+  unknown, not walkable. The exterior's four are the ones that matter for
+  walking the town, and reaching map `$000A` needs the `$0026` progression
+  gate.
 - **The admission routine has not been traced.** Everything here is inferred
   from observed movement. Until the predicate is found and disassembled, a
   second input (facing, object bits, an actor plane, a per-map table) could
