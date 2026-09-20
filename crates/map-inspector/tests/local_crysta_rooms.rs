@@ -7,6 +7,7 @@
 use assets::maps::visual::StaticBackground;
 use rom::{Revision, Rom};
 use room_core::{Direction, FrameInput, Room, WalkingState};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::path::Path;
 
 /// Town exterior, the first house, and every building in it.
@@ -173,5 +174,150 @@ fn rooms_refuse_to_walk_into_the_towns_impassable_band() {
     assert!(
         approached > 0,
         "every approach was stationary, so nothing was actually refused"
+    );
+}
+
+/// Cells the player can occupy, by the measured passability partition.
+fn open_grid(room: &Room, width: u16, height: u16) -> Vec<bool> {
+    room.cells()
+        .iter()
+        .map(|raw| {
+            assets::maps::MapCell::from_raw(*raw).qualified_passability()
+                == Some(assets::maps::Passability::Walkable)
+        })
+        .take(usize::from(width) * usize::from(height))
+        .collect()
+}
+
+/// Maps reachable today by walking decoded geometry through decoded exits.
+///
+/// This is the measured frontier, not the target. See
+/// `meta/issues/decode-door-entry-trigger.md` for what the rest needs.
+const REACHABLE_TODAY: [u16; 6] = [0x000A, 0x000C, 0x000D, 0x000F, 0x0010, 0x0011];
+
+#[test]
+fn walking_decoded_geometry_reaches_the_measured_set_of_maps() {
+    // Connectivity over decoded data only: four-directional movement across
+    // cells the collision decode calls walkable, plus the static exit records.
+    // Nothing here is a hand-written room graph.
+    //
+    // It deliberately asserts the exact set rather than a lower bound, so that
+    // decoding a new exit or attribute fails this test and forces the frontier
+    // to be restated rather than quietly drifting.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut grids: HashMap<u16, (Vec<bool>, u16, u16)> = HashMap::new();
+    let mut exits: HashMap<u16, Vec<assets::maps::exits::ExitRecord>> = HashMap::new();
+    for map in CRYSTA {
+        let (room, width, height) = crysta_room(&cartridge, map);
+        grids.insert(map, (open_grid(&room, width, height), width, height));
+        let list = assets::maps::exits::ExitList::from_rom(cartridge.image(), map)
+            .unwrap_or_else(|e| panic!("map {map:#06x} exits: {e}"));
+        exits.insert(map, list.records().to_vec());
+    }
+
+    // The fresh game begins in the bedroom, map $000F.
+    let start = (0x000Fu16, 19usize, 7usize);
+    let mut seen: HashSet<(u16, usize, usize)> = HashSet::new();
+    let mut maps: HashSet<u16> = HashSet::new();
+    let mut queue = VecDeque::new();
+    seen.insert(start);
+    maps.insert(start.0);
+    queue.push_back(start);
+
+    while let Some((map, col, row)) = queue.pop_front() {
+        let (grid, width, height) = &grids[&map];
+        // Standing anywhere in an exit rectangle leaves the map. The record's
+        // own fine test is tighter than this, so treating the whole rectangle
+        // as a trigger is the generous reading; it still does not connect the
+        // town, which is the point.
+        for record in &exits[&map] {
+            let (rx, ry) = (usize::from(record.x()), usize::from(record.y()));
+            let (rw, rh) = (usize::from(record.width()), usize::from(record.height()));
+            if rw == 0 || rh == 0 || col < rx || row < ry || col >= rx + rw || row >= ry + rh {
+                continue;
+            }
+            let Ok(dest) = record.direct_destination() else {
+                continue; // Conditional destinations are not decoded.
+            };
+            if !grids.contains_key(&dest) {
+                continue; // Leaves the slice, e.g. the wider world.
+            }
+            let (dx, dy) = record.destination_position();
+            let node = (dest, usize::from(dx) / 16, usize::from(dy) / 16);
+            maps.insert(dest);
+            if seen.insert(node) {
+                queue.push_back(node);
+            }
+        }
+        for (ux, uy) in [(1i32, 0i32), (-1, 0), (0, 1), (0, -1)] {
+            let (Ok(nc), Ok(nr)) = (
+                usize::try_from(i32::try_from(col).unwrap() + ux),
+                usize::try_from(i32::try_from(row).unwrap() + uy),
+            ) else {
+                continue;
+            };
+            if nc >= usize::from(*width) || nr >= usize::from(*height) {
+                continue;
+            }
+            if !grid[nr * usize::from(*width) + nc] {
+                continue;
+            }
+            let node = (map, nc, nr);
+            if seen.insert(node) {
+                queue.push_back(node);
+            }
+        }
+    }
+
+    let mut reached: Vec<u16> = maps.into_iter().collect();
+    reached.sort_unstable();
+    assert_eq!(
+        reached, REACHABLE_TODAY,
+        "reachable map set changed; restate the frontier"
+    );
+}
+
+#[test]
+fn most_town_entrances_sit_on_cells_the_player_cannot_stand_on() {
+    // This is what stops the other eighteen maps, stated as a fact about the
+    // data. Each town entrance is a 1x1 rectangle, and the fine geometry test
+    // admits a single origin for those, which for seven of the eight would put
+    // the player's body inside a solid wall cell. The eighth is walkable, and
+    // is unreached for a different reason: no decoded path leads to it.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let (room, width, _) = crysta_room(&cartridge, 0x000A);
+    let (mut solid, mut walkable) = (0, 0);
+    for record in assets::maps::exits::ExitList::from_rom(cartridge.image(), 0x000A)
+        .unwrap()
+        .records()
+    {
+        if record.width() != 1 || record.height() != 1 {
+            continue;
+        }
+        let (col, row) = (usize::from(record.x()), usize::from(record.y()));
+        let cell = assets::maps::MapCell::from_raw(room.cells()[row * usize::from(width) + col]);
+        // Whatever the doorway cell is, the cell below it is standable: the
+        // player approaches from there.
+        let below =
+            assets::maps::MapCell::from_raw(room.cells()[(row + 1) * usize::from(width) + col]);
+        assert_eq!(
+            below.qualified_passability(),
+            Some(assets::maps::Passability::Walkable),
+            "cell below entrance ({col},{row}) is not standable"
+        );
+        match cell.qualified_passability() {
+            Some(assets::maps::Passability::Solid) => solid += 1,
+            Some(assets::maps::Passability::Walkable) => walkable += 1,
+            other => panic!("entrance ({col},{row}) has passability {other:?}"),
+        }
+    }
+    assert_eq!(
+        (solid, walkable),
+        (7, 1),
+        "town entrance cell classification"
     );
 }
