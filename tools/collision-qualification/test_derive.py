@@ -143,6 +143,40 @@ class DeriveGates(unittest.TestCase):
         self.assertEqual(len(loaded), 16)
         self.assertEqual(loaded[0]['position'], [64, 32])
 
+    def test_an_actor_in_the_target_cell_is_not_wall_contact(self):
+        # A resident standing in a doorway stalls the player exactly like a
+        # wall. Scoring it as terrain would invent a collision.
+        held = [(32, 32)] * derive.STALL_FRAMES
+        clear = frames([('a', ['Right'], held)])
+        self.assertEqual(derive.stalls(clear), [(32, 32, 1, 0)])
+        blocked = frames([('a', ['Right'], held)])
+        for row in blocked:
+            row['actors'] = [[48, 32]]
+        self.assertEqual(derive.stalls(blocked), [])
+        # Ark's own shadow shares the player's position and must be ignored,
+        # or it would disqualify every contact ever measured.
+        shadow = frames([('a', ['Right'], held)])
+        for row in shadow:
+            row['actors'] = [[32, 32]]
+        self.assertEqual(derive.stalls(shadow), [(32, 32, 1, 0)])
+        # An actor behind the player is not what stopped it.
+        behind = frames([('a', ['Right'], held)])
+        for row in behind:
+            row['actors'] = [[16, 32]]
+        self.assertEqual(derive.stalls(behind), [(32, 32, 1, 0)])
+        # An actor somewhere else does not disqualify the contact.
+        elsewhere = frames([('a', ['Right'], held)])
+        for row in elsewhere:
+            row['actors'] = [[400, 400]]
+        self.assertEqual(derive.stalls(elsewhere), [(32, 32, 1, 0)])
+
+    def test_absent_actor_field_is_treated_as_no_actors(self):
+        held = [(32, 32)] * derive.STALL_FRAMES
+        rows = frames([('a', ['Right'], held)])
+        for row in rows:
+            row.pop('actors', None)
+        self.assertEqual(derive.stalls(rows), [(32, 32, 1, 0)])
+
 
 if __name__ == '__main__':
     unittest.main()

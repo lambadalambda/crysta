@@ -54,12 +54,41 @@ def runs(frames):
     return out
 
 
+# How close a live actor must be, in the pressed direction, to make a stall
+# ambiguous. One cell plus half a cell of slack: deliberately conservative,
+# because a missed terrain contact only costs coverage while an invented one
+# corrupts the decode.
+ACTOR_CLEARANCE = 24
+
+
+def blocked_by_actor(frame, x, y, ux, uy):
+    """Whether a live actor could be what stopped the player.
+
+    Terrain is not the only thing that stops a player. A resident standing in
+    a doorway produces exactly the same sustained stall as a wall, and reading
+    that as solid terrain would invent a collision the map does not have.
+
+    Actors at the player's exact position are ignored: the slot table contains
+    Ark's own shadow, which tracks the player and would otherwise disqualify
+    every contact ever measured.
+    """
+    for ax, ay in frame.get('actors', []):
+        if (ax, ay) == (x, y):
+            continue
+        ahead = (ax - x) * ux + (ay - y) * uy
+        lateral = abs((ax - x) * uy) + abs((ay - y) * ux)
+        if 0 < ahead <= ACTOR_CLEARANCE and lateral <= ACTOR_CLEARANCE:
+            return True
+    return False
+
+
 def stalls(frames):
     """Positions pressed against something for STALL_FRAMES with no movement.
 
-    The tail must also hold one `control` value throughout. A stall that spans
-    a dialogue, transition or any other state where input is not admitted is
-    not wall contact, and scoring it as such would invent a solid cell.
+    The tail must hold one `control` value throughout: a stall spanning a
+    dialogue, transition or any other state where input is not admitted is not
+    wall contact. Stalls with an actor in or beside the target cell are
+    discarded for the same reason.
     """
     found = []
     for key, group in runs(frames):
@@ -71,7 +100,10 @@ def stalls(frames):
         if len({t.get('control') for t in tail}) != 1:
             continue
         x, y = tail[0]['position']
-        found.append((x, y, *DIRECTIONS[key]))
+        ux, uy = DIRECTIONS[key]
+        if any(blocked_by_actor(t, x, y, ux, uy) for t in tail):
+            continue
+        found.append((x, y, ux, uy))
     return found
 
 

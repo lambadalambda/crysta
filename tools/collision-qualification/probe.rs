@@ -37,7 +37,17 @@ fn word(w: &[u8], p: usize) -> u16 {
 
 /// Per-frame movement sample. Position is the loader's own player word pair,
 /// not a sprite or camera derivation.
+///
+/// Live actor positions are recorded because terrain is not the only thing
+/// that stops a player: a resident standing in a doorway produces exactly the
+/// same sustained stall as a wall, and reading that as solid terrain would
+/// invent a collision the map does not have.
 fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
+    let actors: Vec<Value> = (0x1040..0x2000)
+        .step_by(0x40)
+        .filter(|&p| word(w, p + 10) != 0)
+        .map(|p| json!([word(w, p), word(w, p + 2)]))
+        .collect();
     json!({
         "kind": "frame", "label": label, "frame": frames, "held": held,
         "map": word(w, 0x47e),
@@ -45,16 +55,22 @@ fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
         "facing": word(w, 0x1014),
         "control": word(w, 0x980),
         "flags": word(w, 0x1004),
+        "actors": actors,
     })
 }
 
 /// Writes the decoded runtime layer for the current map, once per map id.
 ///
 /// Raw words are preserved; no collision meaning is imposed here.
+///
+/// Only dumps once the map has settled, meaning input is admitted. A layer
+/// read mid-transition has not had its attribute pass applied yet: map `$000A`
+/// captured that way reads as 5,120 cells of attribute zero, which would make
+/// every wall look walkable.
 fn dump_layer(s: &Session, out: &std::path::Path, seen: &mut Vec<u16>) {
     let w = s.wram_image();
     let id = word(&w, 0x47e);
-    if seen.contains(&id) {
+    if seen.contains(&id) || word(&w, 0x980) != 160 {
         return;
     }
     let Ok(map) = LoadedMap::from_wram(&w) else {
@@ -157,8 +173,8 @@ fn main() {
                 &held,
                 s.frame_state().frames,
             ));
+            dump_layer(&s, out, &mut seen);
         }
-        dump_layer(&s, out, &mut seen);
     }
     panic!("itinerary missing finish");
 }

@@ -85,7 +85,7 @@ impl MapCell {
     pub const fn qualified_passability(self) -> Option<Passability> {
         match self.base_attribute() {
             0 | 2 | 22 => Some(Passability::Walkable),
-            12 | 14 | 16 => Some(Passability::Solid),
+            12 | 14 | 16 | 25 => Some(Passability::Solid),
             _ => None,
         }
     }
@@ -103,7 +103,7 @@ pub enum Passability {
 /// Attributes a qualified collision point was observed to occupy.
 pub const QUALIFIED_WALKABLE: &[u8] = &[0, 2, 22];
 /// Attributes observed to stop a sustained directional press.
-pub const QUALIFIED_SOLID: &[u8] = &[12, 14, 16];
+pub const QUALIFIED_SOLID: &[u8] = &[12, 14, 16, 25];
 
 /// Invalid input to the qualified runtime map reader.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -295,6 +295,9 @@ mod collision_tests {
             (0x0436, 2, Some(Passability::Walkable)),
             // Refused a sustained press from the only reachable side.
             (0x2043, 16, Some(Passability::Solid)),
+            // The town exterior's impassable band, solid under every
+            // consistent offset of the map $000A sweep.
+            (0x3243, 25, Some(Passability::Solid)),
         ] {
             let cell = MapCell(raw);
             assert_eq!(cell.base_attribute(), base, "base attribute of {raw:#06x}");
@@ -322,11 +325,11 @@ mod collision_tests {
 
     #[test]
     fn unqualified_attributes_are_unknown_rather_than_walkable() {
-        // The Crysta slice also carries base attributes 5, 6, 7, 8, 21, 25 and
-        // 29. No sample resolves them, so the decoder must not silently admit
-        // the player. 76 and 78 are deliberately absent: they are 12 and 14
+        // The Crysta slice also carries base attributes 5, 6, 7, 8, 21 and 29.
+        // No sample resolves them, so the decoder must not silently admit the
+        // player. 76 and 78 are deliberately absent: they are 12 and 14
         // with the dynamic bit, not attributes any map contains.
-        for base in [5u8, 6, 7, 8, 21, 25, 29] {
+        for base in [5u8, 6, 7, 8, 21, 29] {
             assert_eq!(initialized(0x40, base).qualified_passability(), None);
         }
         let qualified: Vec<u8> = (0..0x40u8)

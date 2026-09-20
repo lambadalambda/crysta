@@ -74,6 +74,7 @@ stood on.
 | `12` | stops a sustained press from Up, Down and Right | `Solid` |
 | `14` | stops a sustained press from all four directions | `Solid` |
 | `16` | refuses a sustained press from its only open side | `Solid` |
+| `25` | solid under every consistent offset of the town sweeps | `Solid` |
 
 That `12` and `14` each block from *opposing* directions rules out the obvious
 rival reading, that they are one-way ledges or elevation edges.
@@ -100,9 +101,34 @@ sustained press from that side was refused across seven attempts of 50 frames.
 
 ### Coverage across the slice
 
-**47,091 of 47,616 cells (98.9%)** across all 24 Crysta maps now resolve. What
+**47,320 of 47,616 cells (99.4%)** across all 24 Crysta maps now resolve. What
 remains is `5` (8 cells), `21` (48, in `$0012`–`$0019`), `29` (65, in 17 maps)
-and the town exterior's own `6`, `7`, `8` and `25` (404 cells, map `$000A`).
+and the town's `6`, `7`, `8` (175 cells, map `$000A` only).
+
+### The town, and what walking it needed
+
+Reaching map `$000A` runs the qualified route that talks to the room B
+resident, opens the gate and steps outside. Two serpentine sweeps there, 10,178
+frames over 4,514 positions with 30 sustained contacts, derive `{0, 22}`
+walkable and `{12, 14, 25}` solid under **all 112 consistent offsets** —
+independently reproducing the house's partition in a different map, and adding
+`25`. That attribute forms a band running the full height of the town, and the
+player never crosses it.
+
+The town also forced two corrections the house never exposed:
+
+- **Actors stop players too.** A resident standing in front of Ark produces
+  exactly the same sustained stall as a wall. `derive.py` now discards a
+  contact with a live actor within 24px in the pressed direction. The slot
+  table includes Ark's own shadow at the player's exact position, which must be
+  ignored or it disqualifies every contact ever measured.
+- **A layer read mid-transition is not the map.** The probe originally dumped
+  on first sight of a new map id, which for `$000A` caught it before its
+  attribute pass: 5,120 cells of attribute zero, every wall apparently
+  walkable. It now waits for input to be admitted. The corrected runtime layer
+  matches the static ROM decode exactly, which is a cross-check the earlier
+  capture would have failed silently. `derive.py` reported
+  `NO CONSISTENT OFFSET` on the bad data rather than fitting it.
 
 ### Threshold sensitivity
 
