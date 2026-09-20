@@ -125,10 +125,18 @@ impl StaticBackground {
     /// Decodes through the loading-script projection, bypassing the fixed
     /// offsets, so a test can cross-check the two routes against each other.
     ///
+    /// Restricted to the same allowlist as [`Self::from_rom`]: this is a route
+    /// comparison, not a way to decode a map that is not qualified.
+    ///
     /// # Errors
-    /// As [`Self::from_rom`].
+    /// As [`Self::from_rom`], and rejects map IDs outside the slice.
     #[doc(hidden)]
     pub fn from_projection_for_test(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
+        if !(0x000A..=0x0021).contains(&map_id) {
+            return Err(VisualMapError::Unsupported(
+                "unqualified static background map ID",
+            ));
+        }
         Self::from_loads(image, &projected_loads(image, map_id)?, 0x6000)
     }
 
@@ -524,6 +532,41 @@ const WANTED_LOADS: [(ResourceKind, &[u8]); 6] = [
     (ResourceKind::Layer, &[0x01]),
     (ResourceKind::Palette, &[0x00, 0x20, 0x00]),
 ];
+/// Whether a load is one this profile knowingly does not consume.
+///
+/// Listing these explicitly is what lets an unrecognised transfer be refused
+/// rather than silently dropped, which would let a map render from a partial
+/// recipe with no diagnostic.
+///
+/// The last arm is a **known gap, not a qualified skip**. Maps `$001D` and
+/// `$001E` issue a partial re-transfer from the metatile-definition source to
+/// an unmodelled destination (`$1F/$11`). Its effect on the definitions this
+/// recipe consumes is not decoded, so those two backgrounds may be wrong. The
+/// attribute table is a separate transfer, so collision is unaffected.
+/// Exposes [`is_known_unconsumed`] so a test can exercise the completeness
+/// check that refuses an unrecognised transfer.
+#[doc(hidden)]
+#[must_use]
+pub fn is_known_unconsumed_for_test(kind: ResourceKind, bytes: &[u8]) -> bool {
+    is_known_unconsumed(kind, bytes)
+}
+
+fn is_known_unconsumed(kind: ResourceKind, bytes: &[u8]) -> bool {
+    const SKIPPED: [(ResourceKind, &[u8]); 5] = [
+        // $000F's OBJ art and its $90 CGRAM palette.
+        (ResourceKind::Graphics, &[0x00, 0x10, 0x00]),
+        (ResourceKind::Palette, &[0x00, 0x20, 0x90]),
+        // The second layer and third metatile set, and the shared OBJ graphics.
+        (ResourceKind::Layer, &[0x02]),
+        (ResourceKind::Metatiles, &[0x00, 0x40, 0x00, 0x02]),
+        (ResourceKind::Graphics, &[0x00, 0x08, 0x00]),
+    ];
+    SKIPPED
+        .iter()
+        .any(|(want, operand)| kind == *want && bytes.get(1..1 + operand.len()) == Some(*operand))
+        || (kind == ResourceKind::Metatiles && bytes.get(3..5) == Some(&[0x1F, 0x11]))
+}
+
 fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     let program =
         scripts::resolve_map(image, id, Limits::default()).map_err(VisualMapError::Script)?;
@@ -548,10 +591,22 @@ fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         // An ambiguous recipe must not be resolved by taking the first match.
         if matching.next().is_some() {
             return Err(VisualMapError::Unsupported(
-                "map repeats a background resource destination",
+                "map repeats a background resource operand",
             ));
         }
         selected.push(found.clone());
+    }
+    // Every load this profile does not consume must be one it knows it skips.
+    // Silently dropping an unrecognised transfer would let a map render from a
+    // partial recipe with no diagnostic.
+    let skipped = loads
+        .iter()
+        .filter(|(kind, _, bytes)| is_known_unconsumed(*kind, bytes))
+        .count();
+    if selected.len() + skipped != loads.len() {
+        return Err(VisualMapError::Unsupported(
+            "map loads an unqualified background resource",
+        ));
     }
     Ok(selected)
 }

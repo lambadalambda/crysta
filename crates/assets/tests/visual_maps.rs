@@ -138,3 +138,64 @@ fn named_background_preserves_cavern_and_rejects_unqualified_maps() {
         assert!(StaticBackground::from_rom(&image, id).is_err());
     }
 }
+
+/// An unrecognised transfer must be refused, not dropped.
+///
+/// The earlier ambiguity check was unreachable: replacing its condition with
+/// `false` left the whole suite green, because the selector simply ignored any
+/// load it did not match. This exercises the completeness check instead.
+#[test]
+fn projected_recipes_refuse_an_unrecognised_transfer() {
+    use assets::maps::scripts::ResourceKind;
+    // Every load must be either consumed or a known skip.
+    for (kind, bytes, known) in [
+        // Consumed slots.
+        (
+            ResourceKind::Graphics,
+            &[0x80u8, 0x00, 0x30, 0x03][..],
+            false,
+        ),
+        (ResourceKind::Palette, &[0x40, 0x00, 0x60, 0x20][..], false),
+        // Known skips.
+        (ResourceKind::Graphics, &[0x80, 0x00, 0x10, 0x00][..], true),
+        (ResourceKind::Palette, &[0x40, 0x00, 0x20, 0x90][..], true),
+        (ResourceKind::Layer, &[0x10, 0x02][..], true),
+        (
+            ResourceKind::Metatiles,
+            &[0x20, 0x00, 0x40, 0x00, 0x02][..],
+            true,
+        ),
+        (ResourceKind::Graphics, &[0x80, 0x00, 0x08, 0x00][..], true),
+        // The $001D/$001E partial metatile re-transfer.
+        (
+            ResourceKind::Metatiles,
+            &[0x20, 0x07, 0x08, 0x1F, 0x11][..],
+            true,
+        ),
+        // Anything else is unqualified.
+        (
+            ResourceKind::Metatiles,
+            &[0x20, 0x00, 0x40, 0x00, 0x09][..],
+            false,
+        ),
+        (ResourceKind::Layer, &[0x10, 0x07][..], false),
+        (ResourceKind::Audio, &[0x02, 0x00, 0x00][..], false),
+    ] {
+        assert_eq!(
+            assets::maps::visual::is_known_unconsumed_for_test(kind, bytes),
+            known,
+            "{kind:?} {bytes:02x?}"
+        );
+    }
+}
+
+#[test]
+fn the_projection_comparison_route_keeps_the_same_allowlist() {
+    // It is a route comparison, not a way to decode an unqualified map.
+    for map in [0x0009u16, 0x0022, 0x0041, 0x0128] {
+        assert!(
+            assets::maps::visual::StaticBackground::from_projection_for_test(&[], map).is_err(),
+            "map {map:#06x}"
+        );
+    }
+}
