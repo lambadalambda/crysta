@@ -19,6 +19,8 @@ baserom.*
 
 # Rust and local tooling
 /target/
+__pycache__/
+*.pyc
 .env
 .env.*
 !.env.example
