@@ -15,13 +15,24 @@ DIRECTIONS = {'Right': (1, 0), 'Left': (-1, 0), 'Up': (0, -1), 'Down': (0, 1)}
 STALL_FRAMES = 20
 
 
-def load(run):
+# The control word while ordinary walking is admitted. Frames outside it are
+# scripted: arrivals and transitions move the player through cells walking
+# cannot reach, so scoring them as occupancy invents walkable terrain.
+WALKING_CONTROL = 160
+
+
+def load(run, map_id=None):
     frames = []
     with open(run) as handle:
         for line in handle:
             row = json.loads(line)
-            if row.get('kind') == 'frame' and row.get('label') != 'boot':
-                frames.append(row)
+            if row.get('kind') != 'frame' or row.get('label') == 'boot':
+                continue
+            if row.get('control') not in (None, WALKING_CONTROL):
+                continue
+            if map_id is not None and row.get('map') not in (None, map_id):
+                continue
+            frames.append(row)
     return frames
 
 
@@ -164,7 +175,7 @@ def main():
         layer = json.load(handle)
     frames = []
     for run in sys.argv[2:]:
-        frames.extend(load(run))
+        frames.extend(load(run, layer.get('map')))
     check_one_map(frames, layer)
     results, points, contacts, cells, distinct = solve(frames, layer)
     dx_edge = (DX_WINDOW[0], DX_WINDOW[-1])

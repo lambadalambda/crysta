@@ -177,6 +177,35 @@ class DeriveGates(unittest.TestCase):
             row.pop('actors', None)
         self.assertEqual(derive.stalls(rows), [(32, 32, 1, 0)])
 
+    def test_load_drops_scripted_frames_and_other_maps(self):
+        # Arrivals and transitions move the player through cells walking cannot
+        # reach. Counting them as occupancy would invent walkable terrain, which
+        # is what made the town sweeps unreproducible from raw probe output.
+        import tempfile as tf
+        rows = frames([('walk', ['Right'], [(32, 32)])], control=160, map_id=0xF)
+        rows += frames([('arrive', ['Right'], [(64, 64)])], control=0, map_id=0xF)
+        rows += frames([('elsewhere', ['Right'], [(96, 96)])], control=160, map_id=0x41)
+        with tf.TemporaryDirectory() as d:
+            run = Path(d) / 'run.jsonl'
+            run.write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
+            everything = derive.load(run)
+            one_map = derive.load(run, 0xF)
+        # The scripted frame is always dropped; the other map only when asked.
+        self.assertEqual([r['position'] for r in everything], [[32, 32], [96, 96]])
+        self.assertEqual([r['position'] for r in one_map], [[32, 32]])
+
+    def test_frames_without_a_control_field_are_kept(self):
+        import tempfile as tf
+        rows = frames([('walk', ['Right'], [(32, 32)])])
+        for row in rows:
+            row.pop('control')
+            row.pop('map')
+        with tf.TemporaryDirectory() as d:
+            run = Path(d) / 'run.jsonl'
+            run.write_text('\n'.join(json.dumps(r) for r in rows) + '\n')
+            self.assertEqual(len(derive.load(run)), 1)
+            self.assertEqual(len(derive.load(run, 0xF)), 1)
+
 
 if __name__ == '__main__':
     unittest.main()

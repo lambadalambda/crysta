@@ -46,7 +46,14 @@ fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
     let actors: Vec<Value> = (0x1040..0x2000)
         .step_by(0x40)
         .filter(|&p| word(w, p + 10) != 0)
-        .map(|p| json!([word(w, p), word(w, p + 2)]))
+        .map(|p| {
+            json!({
+                "position": [word(w, p), word(w, p + 2)],
+                // Actor script pointer: low word at +10, bank at +12.
+                "script": u32::from(word(w, p + 10)) | (u32::from(w[p + 12]) << 16),
+                "slot": p,
+            })
+        })
         .collect();
     json!({
         "kind": "frame", "label": label, "frame": frames, "held": held,
@@ -57,8 +64,9 @@ fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
         "flags": word(w, 0x1004),
         "actors": actors,
         // The exit geometry scan at $8D:8797 reads none of the player words.
-        // Its fine test compares $095E/$0960 in pixels, its coarse test
-        // $0962/$0964 in tiles, and $097C bit 4 suppresses it entirely.
+        // Its fine test compares $095E/$0960 in pixels and its coarse test
+        // $0962/$0964 in tiles. $097C bit 4 must be SET for the scan to run:
+        // $8D:879F branches to the no-match tail when it is clear.
         "probe": [word(w, 0x95e), word(w, 0x960)],
         "probe_tile": [w[0x962], w[0x964]],
         "exit_gate": word(w, 0x97c),
