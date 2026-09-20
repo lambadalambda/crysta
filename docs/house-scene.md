@@ -649,16 +649,22 @@ spawn is a ten-byte record opening with `$01`:
 
 | Byte | Meaning |
 | ---: | --- |
-| 0 | `$01`, the spawn opcode |
+| 0 | record opcode; `$01` for the nine below, but `$00` and `$FD` records carry positions too |
 | 1 | tile X |
 | 2 | tile Y |
-| 3 | `$00` |
+| 3 | usually `$00`; `$83:8C32` carries `$80` here |
 | 4..7 | script pointer |
 | 7..10 | second pointer |
 
 The origin is **`(tile_x * 16 + 8, tile_y * 16)`**, not `tile * 16`. That half-cell
 horizontal bias is what makes the decode checkable: all nine records reproduce
-their documented origins exactly, and no other reading does.
+their documented origins exactly. Brute-forcing `origin = (s*rec[i]+bx,
+s'*rec[j]+by)` over byte indices, scales and offsets yields exactly one fit, and
+the scale is pinned by differences (tile 26 to 27 is 16 pixels) rather than by
+residues alone.
+
+The encoding is not limited to `$01` records: `$00` and `$FD` records use it as
+well, and far more than nine rows in the inventory above fit it.
 
 ```text
 $83:8B96  01 07 07 00 ...  -> ( 7,  7) -> (120, 112)
@@ -672,12 +678,78 @@ $83:8D86  01 1b 1a 00 ...  -> (27, 26) -> (440, 416)
 $83:8DE2  01 1b 28 00 ...  -> (27, 40) -> (440, 640)
 ```
 
-### What this does not give
+### The per-map list
 
-A per-map roster. The table at `$83:8020 + map_id * 2`, loaded by
-`$80:F3F1..F42D`, points at a **script stream**, not a record array: map `$000B`
-resolves to `$83:90E4`, whose bytes are opcodes `00`, `06`, `fd`, `fa`, `01`,
-`fb`, `ff` interleaved with operands, and the documented `$83:8B96` record is
-reached through it rather than listed in it. Enumerating residents for an
-arbitrary map therefore needs the actor/event script decoded, which is
-[Reverse the event script bytecode](../meta/issues/reverse-event-bytecode.md).
+The loader at `$80:F3FD` is `LDX $0480` / `LDA $828000,X` / `LDA $838000,X`, so
+the table base is **`$83:8000`**, indexed by map ID times two. Every map in the
+Crysta slice resolves to a list, and all nine documented records above are
+reached from their map's list:
+
+```text
+map $000B -> list $83:8B7C   (contains $8B96)
+map $000C -> list $83:8BF0   (contains $8C0A, $8C14, $8C1E, $8C28)
+map $000D -> list $83:8CA1   (contains $8CB4)
+map $0010 -> list $83:8D69   (contains $8D7C, $8D86)
+map $0011 -> list $83:8DCF   (contains $8DE2)
+```
+
+`$83:8D69` is the same address this document's own table already names at the
+`$82:8020 = 0` row, which is the cross-check that the base is right.
+
+### Stream grammar
+
+The list ends at `$FF`; `$80:F4A4` terminates the walk there, so bytes after
+the terminator are `$FA` branch targets rather than fall-through. Element
+lengths come from the interpreter at `$80:F4EA` and its handlers:
+
+| Opcode | Length | Source |
+| --- | ---: | --- |
+| `$00`, `$01` | 10, or **16** when byte 3's top two bits are both set | `$80:F564` reads four further fields |
+| `$FD` | 7 | `$80:F5F9` |
+| `$FB`, `$FE` | 5 | |
+| `$FF` | 2 | terminator, `$80:F4A4` |
+| `$FA` | 5, or **7** when the condition word is non-negative with bits in `$F800` | `$80:F759`, `$80:F76C` |
+
+`$FA` is a chained event-flag condition, evaluated through `$80:BBC7` — the
+same routine the map loading scripts use. `$80:F76C` branches on bit 15 *before*
+masking `$F800`, so a negative word takes the short form. Getting that order
+wrong misparses exactly one map, `$0021`.
+
+All 24 Crysta lists decode end to end under this grammar, 115 records total.
+`assets::maps::actors::SpawnList` implements it and refuses an opcode outside
+the set rather than resynchronising.
+
+### Conditions
+
+`$FA <condition> <target>` is a conditional branch, not a marker. `$80:F760`
+tests the flag through `$80:BBC7` — the same routine the loading scripts use,
+so the index is `word & $0FFF` — and then:
+
+- a non-negative word reaches `$80:F7DB` and **branches when the flag is set**;
+- a negative word reaches `$80:F7E1` and **branches when it is clear**.
+
+Note this is the opposite convention to the loading script's `$08 FD`.
+
+A chained condition accumulates: `$80:F787` adds each word's result with `ADC`
+and `$80:F765` re-normalises with `AND #$0001`, so a chain is the **parity** of
+its results, with the sense taken from the last word read. The `$4000` and
+`$2000` variants at `$80:F773` and `$80:F778` take other paths and are not
+decoded; `SpawnList::resolve` refuses them.
+
+Following those branches against the measured new-game flag state resolves all
+24 Crysta lists. Every resident the census documents for the six visited rooms
+is present, and the `$01` records reproduce its counts in four of them. The two
+that exceed it each contain a documented hidden actor — map `$000D`'s excess is
+exactly the `(120,720)` occupancy actor named above — which is what identifies
+the difference as the census's own exclusion rather than a decode error.
+
+### What is not decoded
+
+The `$4000`/`$2000` condition variants. The scripts each record points at are
+not executed, so this says which actors are installed, not what they do.
+
+The installer at `$80:F52B` stores `tile * 16` with no bias, yet the running
+game reports the origin eight pixels right. That `+8` is applied after
+installation and its source is not decoded; the origins above are what the game
+shows, cross-checked against actor positions read out of WRAM while walking the
+reference emulator.
