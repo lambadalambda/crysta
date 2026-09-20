@@ -37,6 +37,10 @@ Model map metadata, tile arrangements, placements, regions, transitions, and col
   deliverable using a qualified runtime checkpoint, without claiming complete
   static map decoding.
 
+- [Trace and qualify the movement collision predicate](qualify-collision-predicate.md):
+  settle "connect collision values to observed player behavior" from the
+  admission routine itself rather than from the unverified community mask.
+
 ## Notes
 
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)

@@ -100,8 +100,12 @@ Cell address is `$7E:A000 + 2 * (y * width_in_cells + x)`. The reader caps the
 layer at `$4000` bytes, before the next imported buffer boundary `$7E:E000`;
 this is a conservative supported-layout bound, not proof of all runtime buffers.
 Raw words are preserved losslessly. `raw & $01FF` is a candidate metatile index,
-not an SNES VRAM tile number. `(raw >> 8) & $FE` is the community collision-overlay
-code; it is **not verified passability**. Dynamic/object bits remain preserved.
+not an SNES VRAM tile number. Initialization writes the metatile attribute into
+bits 9..15, and the community overlay code `(raw >> 8) & $FE` is exactly twice
+that value, so the two are the same field in different scales. Bit 15 is then
+reused during play, so only bits 9..14 are unambiguous on a runtime layer.
+Four base attributes now have [measured movement semantics](collision.md); the
+rest are **not verified passability**. Raw words are preserved either way.
 The conflicting imported field `$7E:081E` is intentionally not used.
 
 ## Provenance and unresolved work
@@ -111,8 +115,11 @@ The conflicting imported field `$7E:081E` is intentionally not used.
 - The [community collision overlay](https://gist.github.com/Skarsnik/547e36239987adf65e888ca0de6d91b9)
   hosted by Skarsnik (crediting Gunty and `@wzl_`) supplies the high-byte mask and
   open/solid/water leads. It was studied, not
-  copied. No license was established for its implementation. Those labels remain
-  hypotheses; Right movement alone does not qualify wall or water semantics.
+  copied. No license was established for its implementation. Its mask is now
+  known to be exactly `2 * attribute`, so it reads the right field; the
+  open/solid/water *labels* remain hypotheses. Measured play has since qualified
+  four attribute values in one map, including one the raw position word walks
+  over but which actually stops movement. See [collision](collision.md).
 - A Japanese static-ROM scan found `STA $0826` at normalized `$00F690` and
   `STA $082A` at `$00F69A`. Surrounding instructions read bytes through `[$6E],Y`,
   mask with `$00FF`, then `XBA`. A probe from label 1100 failed to reach
@@ -125,7 +132,9 @@ The conflicting imported field `$7E:081E` is intentionally not used.
 The [map-ID script projection](map-scripts.md) now handles a bounded loading
 subset. Still required: conditional loading and final composition, broader metatile/graphics reconstruction,
 indoor/outdoor/dungeon/world-map coverage, placements/regions/transitions, and
-trace-qualified collision behavior. This tool is a visual aid for that work,
+trace-qualified collision behavior — the attribute semantics in
+[collision](collision.md) are measured from movement, not yet read off the
+admission routine. This tool is a visual aid for that work,
 not a portable gameplay collision API or an asset pack.
 
 ## Validation

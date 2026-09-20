@@ -3,6 +3,7 @@
 - [ ] [Consolidate the qualification stage template](issues/consolidate-stage-template.md)
 - [ ] [Correct the COP service table bound](issues/correct-cop-table-bound.md)
 - [ ] [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
+- [ ] [Trace and qualify the movement collision predicate](issues/qualify-collision-predicate.md)
 - [ ] [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
 - [ ] [Decode text and gameplay data tables](issues/decode-text-gameplay-data.md)
 - [ ] [Reverse the event script bytecode](issues/reverse-event-bytecode.md)
