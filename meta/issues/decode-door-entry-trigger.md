@@ -65,6 +65,29 @@ One observed lead: walking into the *working* `$000F` doorway snapped the
 player's x from 399 to 392 with only Down held, so the game does move the
 player during a doorway approach.
 
+## This one mechanism is worth 17 maps
+
+Re-running the connectivity search while assuming a solid exit rectangle can be
+entered from the walkable cell below it:
+
+```text
+                                 today:  6/24 maps
+ + one-cell doors enterable from below: 23/24 maps
+            + doors + attr 29 walkable: 23/24
+       + doors + attr 29, 5, 21 walkable: 23/24
++ doors + every remaining attr walkable: 23/24
+```
+
+So the undecoded attributes contribute **nothing** to connectivity, and this
+single mechanism is the whole gap. The one map it still misses is `$000B`,
+whose only entrance is `$000C`'s `1x5` rectangle at `(8,16)` — rows of
+`14,14,12,14,14`, solid all the way down, so it is the same class of doorway
+rather than a different problem.
+
+Note the fine test is far more permissive for a tall rectangle: `5 * 16 - 15`
+gives a 65-pixel window, against a single pixel for `1x1`. Any proposed
+mechanism has to explain both.
+
 ## Requirements
 
 - Find the mechanism that enters a one-cell door, given that the scan itself

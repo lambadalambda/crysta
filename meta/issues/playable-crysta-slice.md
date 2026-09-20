@@ -47,6 +47,23 @@ scale to 24, and would not converge. The remaining work is instead to make the
 5. **Events and progression.** The gates that open doors, starting with
    `$0026` for the house exterior.
 
+## Progress
+
+- **Map loading: done.** All 24 maps decode a background and a collision grid
+  from ROM. Seventeen had no qualified profile before. The generic path selects
+  loads by their VRAM destination operands, and reproduces the seven
+  independently qualified fixed-offset profiles exactly.
+- **Collision: 99.4% of cells.** `0`, `2` and `22` walkable; `12`, `14`, `16`
+  and `25` solid, measured from movement in two maps. What remains is `5`, `6`,
+  `7`, `8`, `21` and `29`, 296 cells, and none of them affects connectivity.
+- **Portable core: every map walks.** Each of the 24 becomes a `room-core`
+  room with no hand-written profile, and the core refuses to cross the town's
+  impassable band.
+- **Connectivity: 6 of 24 maps**, blocked by one mechanism worth 17 of the
+  remaining 18. See
+  [the door-entry trigger](decode-door-entry-trigger.md).
+- **Actors, dialogue and progression: not started.**
+
 ## Requirements
 
 - Each capability is qualified and landed separately, with its own evidence.
