@@ -1,7 +1,8 @@
 //! Bounded Japanese map-loading script projection, not a gameplay event VM.
 //!
 //! Resource operands and executed instruction bytes are preserved. Calls, jumps,
-//! deferred streams and returns are followed; state-dependent branches fail.
+//! deferred streams and returns are followed. The one state-dependent branch,
+//! `$08 FD`, is evaluated against caller-supplied event flags.
 //! Audio/display operations are recorded but not executed. See `docs/map-scripts.md`.
 use rom::{AddressError, RuntimeRomAddress};
 use std::fmt;
@@ -12,6 +13,38 @@ pub const MAP_COUNT: u16 = 0x450;
 pub const SUBSCRIPT_COUNT: u16 = 0xD3;
 const MAP_TABLE: usize = 0x06_959C;
 const SUBSCRIPT_TABLE: usize = 0x06_A28C;
+
+/// The event-flag state a loading script's branches are evaluated against.
+///
+/// Mirrors `$80:BBA6`: flag `n` is bit `n & 7` of byte `(n & $0FFF) >> 3`,
+/// counting from `$7E:06C0`.
+#[derive(Debug, Clone, Copy)]
+pub enum EventFlags<'a> {
+    /// Every flag reads clear.
+    ///
+    /// This is **not** the measured new-game state, which sets flags 32 and
+    /// 251; see `docs/new-game-bootstrap.md`. No branch in the Japanese map
+    /// table references either, so the two agree today, but a caller that
+    /// wants the real thing should supply it as a [`Self::Bitmap`].
+    AllClear,
+    /// A caller-owned copy of the bitmap at `$7E:06C0`.
+    ///
+    /// A branch on a flag past the end of this slice is refused rather than
+    /// answered, because silently reading an uncovered flag as clear would
+    /// pick a path on no evidence.
+    Bitmap(&'a [u8]),
+}
+impl EventFlags<'_> {
+    /// Whether one flag is set, or `None` when a bitmap does not cover it.
+    #[must_use]
+    pub fn get(self, flag: u16) -> Option<bool> {
+        let index = usize::from(flag & 0x0FFF);
+        match self {
+            Self::AllClear => Some(false),
+            Self::Bitmap(bitmap) => bitmap.get(index / 8).map(|b| b >> (index % 8) & 1 != 0),
+        }
+    }
+}
 
 /// Work and stack limits; allocation is bounded by these values.
 #[derive(Debug, Clone, Copy)]
@@ -69,6 +102,11 @@ pub enum ScriptError {
     InstructionLimit,
     /// A call would exceed the stack budget.
     CallDepth,
+    /// A branch read a flag the supplied bitmap does not cover.
+    EventFlagUncovered {
+        /// Flag index the script asked for.
+        flag: u16,
+    },
 }
 impl fmt::Display for ScriptError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -134,6 +172,19 @@ pub enum Command {
     Return,
     /// `$08 FA`: replace the pending subscript, followed at root END (zero clears).
     Defer(u16),
+    /// `$08 FD`: jump through the subscript table when an event flag matches.
+    ///
+    /// Six bytes: `08 FD <condition> <target>`. `$86:907D` masks the condition
+    /// with `$7FFF`, tests it through `$80:BBC7`, and takes the jump on carry
+    /// when condition bit 15 is set or on no-carry when it is clear.
+    BranchOnEventFlag {
+        /// Flag index, `condition & $0FFF`, addressing `$7E:06C0` bit-wise.
+        flag: u16,
+        /// Whether the jump is taken when the flag is set.
+        jump_if_set: bool,
+        /// Subscript index jumped to when taken.
+        target: u16,
+    },
     /// `$08 FE`: unwind a flagged call, otherwise skip the opaque operand word.
     EndIfFlagged,
     /// `$08 FC`: select audio through the global audio list; not executed here.
@@ -240,12 +291,19 @@ impl Cursor {
             (1, Command::End)
         } else if opcode == 8 {
             let sub = get(2)?[1];
-            let length = if sub == 0xF8 { 2 } else { 4 };
-            if !matches!(sub, 0 | 0xF8..=0xFC | 0xFE | 0xFF) {
+            // $FD carries a second operand word; $F8 carries none.
+            let length = match sub {
+                0xF8 => 2,
+                0xFD => 6,
+                _ => 4,
+            };
+            if !matches!(sub, 0 | 0xF8..=0xFE | 0xFF) {
                 return Err(unsupported(sub));
             }
             let bytes = get(length)?;
-            let word = if length == 4 {
+            // $F8 is the only two-byte control; every longer one carries an
+            // operand word here, and $FD carries a second one after it.
+            let word = if length >= 4 {
                 u16::from_le_bytes([bytes[2], bytes[3]])
             } else {
                 0
@@ -263,6 +321,11 @@ impl Cursor {
                     }
                 }
                 0xFA => Command::Defer(word),
+                0xFD => Command::BranchOnEventFlag {
+                    flag: word & 0x0FFF,
+                    jump_if_set: word & 0x8000 != 0,
+                    target: u16::from_le_bytes([bytes[4], bytes[5]]),
+                },
                 0xFC => Command::AudioSelection,
                 0xFE => Command::EndIfFlagged,
                 0xFF => Command::Jump(word),
@@ -311,8 +374,26 @@ impl Cursor {
 ///
 /// # Errors
 /// Rejects bad table indices/pointers, truncated or bank-crossing instructions,
-/// unqualified commands/flags, state-dependent branches and exhausted budgets.
+/// unqualified commands, uncovered event flags and exhausted budgets.
 pub fn resolve_map(image: &[u8], map_id: u16, limits: Limits) -> Result<MapProgram, ScriptError> {
+    resolve_map_with_events(image, map_id, limits, EventFlags::AllClear)
+}
+
+/// Resolves one map's loading path against an explicit event-flag bitmap.
+///
+/// Flag state only affects scripts containing `$08 FD`; every other script
+/// resolves identically for any bitmap. [`resolve_map`] is this function with
+/// [`EventFlags::AllClear`].
+///
+/// # Errors
+///
+/// As [`resolve_map`].
+pub fn resolve_map_with_events(
+    image: &[u8],
+    map_id: u16,
+    limits: Limits,
+    events: EventFlags<'_>,
+) -> Result<MapProgram, ScriptError> {
     if limits.instructions == 0 || limits.instructions > 65536 || limits.call_depth > 64 {
         return Err(ScriptError::InvalidLimits);
     }
@@ -362,6 +443,21 @@ pub fn resolve_map(image: &[u8], map_id: u16, limits: Limits) -> Result<MapProgr
                 cursor.offset = 0;
             }
             Command::Defer(index) => pending = index,
+            Command::BranchOnEventFlag {
+                flag,
+                jump_if_set,
+                target,
+            } => {
+                let set = events
+                    .get(flag)
+                    .ok_or(ScriptError::EventFlagUncovered { flag })?;
+                // Not taken simply continues: the instruction length already
+                // skipped both operand words, exactly as $86:9097 does.
+                if set == jump_if_set {
+                    cursor.base = entry(image, target, true)?;
+                    cursor.offset = 0;
+                }
+            }
             _ => {}
         }
         instructions.push(instruction);

@@ -1,5 +1,7 @@
 //! Synthetic map-loading streams and tables, never extracted script bytes.
-use assets::maps::scripts::{resolve_map, unpack_pointer, Command, Limits, ResourceKind};
+use assets::maps::scripts::{
+    resolve_map, resolve_map_with_events, unpack_pointer, Command, EventFlags, Limits, ResourceKind,
+};
 
 const MAP_TABLE: usize = 0x06_959C;
 const SUB_TABLE: usize = 0x06_A28C;
@@ -100,7 +102,7 @@ fn bounds_ids_operands_control_flow_and_unknown_behavior() {
     assert!(resolve_map(&[], 0, Limits::default()).is_err());
     for root in [
         &[0x80][..],
-        &[8, 0xFD, 0, 0, 1, 0],
+        &[8, 0xF7, 0, 0],
         &[8, 0xF9, 1, 0x40],
         &[8, 0xFF, 0xD3, 0],
         &[3],
@@ -366,4 +368,160 @@ fn resource_pointer_must_refer_to_bytes_present_in_the_input_image() {
             needed: 1
         })
     ));
+}
+
+/// `08 FD <condition> <target>`: branch through the subscript table on an
+/// event flag. Condition bit 15 selects the sense; `$0FFF` is the flag index.
+fn branch(condition: u16, target: u16) -> Vec<u8> {
+    let [c0, c1] = condition.to_le_bytes();
+    let [t0, t1] = target.to_le_bytes();
+    vec![8, 0xFD, c0, c1, t0, t1]
+}
+
+/// The subscript loads layer `$C00400`; falling through loads `$C00300`.
+fn branch_image(condition: u16) -> Vec<u8> {
+    let mut root = branch(condition, 1);
+    root.extend_from_slice(&[0x10, 1, 0, 3, 0, 0]);
+    image(&root, &[0x10, 2, 0, 4, 0, 0])
+}
+
+fn layers(bytes: &[u8], events: EventFlags<'_>) -> Vec<u32> {
+    resolve_map_with_events(bytes, 0, Limits::default(), events)
+        .unwrap()
+        .instructions
+        .iter()
+        .filter_map(|instruction| match &instruction.command {
+            Command::Resource {
+                kind: ResourceKind::Layer,
+                source,
+            } => Some(source.value()),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn event_flag_branch_takes_both_senses() {
+    let mut set = vec![0; 64];
+    set[3] |= 1 << 5; // flag 29
+    let set = EventFlags::Bitmap(&set);
+    let clear = EventFlags::AllClear;
+    // Bit 15 clear: taken when the flag is clear.
+    let clear_sense = branch_image(29);
+    assert_eq!(layers(&clear_sense, clear), [0xC0_0400]);
+    assert_eq!(layers(&clear_sense, set), [0xC0_0300]);
+    // Bit 15 set: taken when the flag is set.
+    let set_sense = branch_image(0x8000 | 0x001D);
+    assert_eq!(layers(&set_sense, clear), [0xC0_0300]);
+    assert_eq!(layers(&set_sense, set), [0xC0_0400]);
+}
+
+#[test]
+fn event_flag_branch_retains_six_operand_bytes() {
+    let bytes = branch_image(0x8000 | 0x0123);
+    let program = resolve_map(&bytes, 0, Limits::default()).unwrap();
+    let instruction = &program.instructions[0];
+    assert_eq!(
+        instruction.command,
+        Command::BranchOnEventFlag {
+            flag: 0x123,
+            jump_if_set: true,
+            target: 1,
+        }
+    );
+    assert_eq!(instruction.bytes, branch(0x8000 | 0x0123, 1));
+    for instruction in &program.instructions {
+        let start = instruction.address.normalized().value() as usize;
+        assert_eq!(
+            instruction.bytes,
+            bytes[start..start + instruction.bytes.len()]
+        );
+    }
+}
+
+#[test]
+fn event_flag_branch_masks_the_index_like_the_hardware() {
+    // $80:BBA6 masks the index with $0FFF after $86:907D clears bit 15, so
+    // bits 12..14 select neither a flag nor the sense.
+    let bytes = branch_image(0x7000 | 0x001D);
+    assert_eq!(
+        bytes[0x102..0x104],
+        (0x7000u16 | 0x001D).to_le_bytes(),
+        "operand retained verbatim"
+    );
+    let program = resolve_map(&bytes, 0, Limits::default()).unwrap();
+    assert_eq!(
+        program.instructions[0].command,
+        Command::BranchOnEventFlag {
+            flag: 29,
+            jump_if_set: false,
+            target: 1,
+        }
+    );
+}
+
+#[test]
+fn event_flag_branch_rejects_an_out_of_range_target() {
+    let bytes = branch_image_target(0x00D3);
+    assert!(resolve_map(&bytes, 0, Limits::default()).is_err());
+    assert!(resolve_map(&branch_image_target(0xFFFF), 0, Limits::default()).is_err());
+}
+
+fn branch_image_target(target: u16) -> Vec<u8> {
+    let mut root = branch(0, target);
+    root.extend_from_slice(&[0x10, 1, 0, 3, 0, 0]);
+    image(&root, &[0x10, 2, 0, 4, 0, 0])
+}
+
+#[test]
+fn flag_free_scripts_resolve_identically_for_any_flags() {
+    // Adding branch support must not move a script that has no $FD.
+    let bytes = image(
+        &[8, 0xF9, 1, 0, 0x10, 1, 0, 3, 0, 0],
+        &[0x10, 2, 0, 4, 0, 8, 0xF8],
+    );
+    let fresh = resolve_map(&bytes, 0, Limits::default()).unwrap();
+    let all = vec![0xFF; 512];
+    let set =
+        resolve_map_with_events(&bytes, 0, Limits::default(), EventFlags::Bitmap(&all)).unwrap();
+    assert_eq!(fresh, set);
+}
+
+#[test]
+fn event_flag_bitmap_matches_the_hardware_index_arithmetic() {
+    let mut bitmap = vec![0; 512];
+    for flag in [0u16, 1, 7, 8, 29, 428, 4095] {
+        bitmap[usize::from(flag) / 8] |= 1 << (flag % 8);
+    }
+    let flags = EventFlags::Bitmap(&bitmap);
+    for flag in [0u16, 1, 7, 8, 29, 428, 4095] {
+        assert_eq!(flags.get(flag), Some(true), "flag {flag}");
+        // Bits above $0FFF alias onto the same flag, as $80:BBA6 masks them.
+        assert_eq!(flags.get(flag | 0x1000), Some(true), "aliased flag {flag}");
+    }
+    for flag in [2u16, 9, 30, 429] {
+        assert_eq!(flags.get(flag), Some(false), "flag {flag} must be clear");
+    }
+    // A bitmap that does not reach the flag refuses rather than answering.
+    assert_eq!(EventFlags::Bitmap(&[]).get(4095), None);
+    assert_eq!(EventFlags::Bitmap(&bitmap).get(4096 + 8), Some(true));
+    // AllClear covers every flag by construction.
+    assert_eq!(EventFlags::AllClear.get(0), Some(false));
+    assert_eq!(EventFlags::AllClear.get(4095), Some(false));
+}
+
+#[test]
+fn a_branch_on_an_uncovered_flag_is_refused_rather_than_guessed() {
+    // Reading an uncovered flag as clear would pick a path on no evidence.
+    let bytes = branch_image(663);
+    let short = vec![0; 64];
+    assert!(
+        resolve_map_with_events(&bytes, 0, Limits::default(), EventFlags::Bitmap(&short)).is_err()
+    );
+    // A bitmap that reaches the flag resolves, and so does AllClear.
+    let long = vec![0; 128];
+    assert!(
+        resolve_map_with_events(&bytes, 0, Limits::default(), EventFlags::Bitmap(&long)).is_ok()
+    );
+    assert!(resolve_map(&bytes, 0, Limits::default()).is_ok());
 }
