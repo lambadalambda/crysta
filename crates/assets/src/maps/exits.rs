@@ -217,6 +217,25 @@ impl ExitList {
             start..start + self.source.len()
         })
     }
+    /// The origin the geometry scan compares, derived from a player position.
+    ///
+    /// `$87:91B3` computes it as `(x - 8) & (mask_x | $0F)` and
+    /// `(y - 16) & (mask_y | $0F)`, storing the pixel pair at `$7E:095E/$0960`
+    /// and its tile pair at `$0962/$0964`. The masks come from `$085A/$085E`,
+    /// which wrap the coordinate to the loaded map. They are power-of-two wrap
+    /// masks, not the extent minus one: a 1280-pixel-tall map uses `2047`,
+    /// because `1279` would clear bit 9 of a valid coordinate.
+    ///
+    /// This is a bounding corner, not the player position, and not the
+    /// collision sample: callers must not conflate the three.
+    #[must_use]
+    pub const fn probe_origin(x: u16, y: u16, mask_x: u16, mask_y: u16) -> (u16, u16) {
+        (
+            x.wrapping_sub(8) & (mask_x | 0x0F),
+            y.wrapping_sub(16) & (mask_y | 0x0F),
+        )
+    }
+
     /// Reproduces the geometry scan at `$8D:8797..8838` for a player bounds origin.
     ///
     /// Inputs are the bounding origin, **not** the player position. The first

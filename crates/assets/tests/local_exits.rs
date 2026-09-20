@@ -78,3 +78,18 @@ fn digest(bytes: &[u8]) -> String {
             text
         })
 }
+
+#[test]
+fn probe_origin_reproduces_the_measured_runtime_pair() {
+    // Measured by driving the reference emulator: standing at (496,768) in the
+    // town writes $095E/$0960 = (488,752) and $0962/$0964 = (30,47).
+    // The masks are power-of-two wrap masks, not extent minus one: the town is
+    // 1024x1280 pixels, so the vertical mask is 2047 rather than 1279.
+    let (x, y) = ExitList::probe_origin(496, 768, 1023, 2047);
+    assert_eq!((x, y), (488, 752));
+    assert_eq!((x >> 4, y >> 4), (30, 47));
+    // The qualified opening doorway selection uses the same derivation.
+    assert_eq!(ExitList::probe_origin(392, 209, 511, 1023), (384, 193));
+    // The masks wrap to the loaded map rather than clamping.
+    assert_eq!(ExitList::probe_origin(4, 8, 511, 1023).0, 508);
+}

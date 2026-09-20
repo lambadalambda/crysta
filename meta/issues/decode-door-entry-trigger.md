@@ -36,15 +36,45 @@ The eighth entrance, `$000A -> $0015` at cell `(32,12)`, *is* on a walkable
 attribute-2 cell. It is unreached for an unrelated reason: no decoded path
 leads to it from the arrival point.
 
+## The scan is now decoded
+
+`$8D:8797..8838` is the scan, and `$87:91B3` is what feeds it:
+
+```text
+probe_x = (player_x -  8) & ($085A | $0F)   -> $095E, tile $0962
+probe_y = (player_y - 16) & ($085E | $0F)   -> $0960, tile $0964
+```
+
+The masks are power-of-two wrap masks, not the extent minus one. Measured live
+in the town: standing at `(496,768)` writes `(488,752)` and tile `(30,47)`,
+which `ExitList::probe_origin` now reproduces. The scan is additionally gated
+by `$097C` bit 4, and needs a non-zero exit-list pointer at `$0480`.
+
+**This makes the conflict exact.** The house's own front door is the `1x1` rect
+at tile `(31,46)`. Firing it needs `probe_y` in `736..=751`, so player `y` in
+`752..=767`. Holding Up there stops at `y=768`, one pixel short, because the
+collision sample and the exit probe are the same bounding corner: moving to
+`y=767` would put the corner at `751`, inside tile `(31,46)`, which is the
+solid attribute-14 door cell. The exit requires the corner to be exactly where
+collision forbids it.
+
+So these doors are not entered by ordinary walking, and no amount of alignment
+fixes that. What remains is to find the mechanism that does enter them.
+
+One observed lead: walking into the *working* `$000F` doorway snapped the
+player's x from 399 to 392 with only Down held, so the game does move the
+player during a doorway approach.
+
 ## Requirements
 
-- Establish how a one-cell exit is actually triggered, from the routine that
-  performs the check rather than by inference. The geometry scan is already
-  located at `$8D:8797..8838`; find its caller and what it passes.
-- Distinguish the collision sample point from the exit origin. They are
-  currently known to differ — collision was measured at `dx` in `-2..=0`,
-  `dy` in `-12..=-8` from the player word, while the exit origin is
-  `(x - 8, y - 16)` — and that difference is the heart of this issue.
+- Find the mechanism that enters a one-cell door, given that the scan itself
+  is decoded and provably cannot fire from a walked position.
+- Explain the doorway snap: entering `$000F`'s doorway moved the player's x
+  from 399 to 392 under Down alone.
+- Reconcile the collision sample with the exit probe. Sweeps measured collision
+  at `dx` in `-2..=0`, `dy` in `-12..=-8` from the player word, while the exit
+  probe is `(x-8, y-16)`. The door evidence suggests they are the same corner
+  and the sweep bound is loose; settle it.
 - Say whether door entry is ordinary movement at all, or an interaction with
   its own controller state. `docs/house-exterior.md` already assigns departure
   and arrival timing to the conversation/navigation owner, which is a hint.
