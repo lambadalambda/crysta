@@ -22,6 +22,15 @@ const LAYER_CAPACITY: usize = 0x4000;
 pub struct MapCell(u16);
 
 impl MapCell {
+    /// Wraps a raw cell word, for callers holding a grid outside this crate.
+    ///
+    /// Performs no validation: the word is preserved exactly, including its
+    /// dynamic bit. This only provides the accessors, it does not assert the
+    /// word came from a qualified layer.
+    #[must_use]
+    pub const fn from_raw(raw: u16) -> Self {
+        Self(raw)
+    }
     /// Original little-endian cell word.
     #[must_use]
     pub const fn raw(self) -> u16 {
