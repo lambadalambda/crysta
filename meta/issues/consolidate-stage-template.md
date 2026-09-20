@@ -8,6 +8,10 @@ bridge modules are roughly 85% copy-paste. The duplication is tolerable at
 three; it becomes the wrong shape at four. Consolidate the template and close
 the coverage gaps an independent review found in the newest stage.
 
+## Dependencies
+
+- [Repin the formatted library producer source](repin-formatted-producer-source.md)
+
 ## Requirements
 
 - Introduce a stage record in `bridge.py` carrying kind, descriptor/producer
