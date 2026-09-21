@@ -80,3 +80,4 @@
 - [x] [Decode the loading script's event-flag branch](issues/decode-script-flag-branch.md)
 - [x] [Decode the actor spawn stream's opcode lengths](issues/decode-actor-spawn-stream.md)
 - [x] [Derive resident art from spawn records across the Crysta slice](issues/crysta-resident-art.md)
+- [x] [Draw the resident lines the house text profile refuses](issues/crysta-refused-text-controls.md)
