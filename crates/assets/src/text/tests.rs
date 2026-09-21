@@ -40,16 +40,13 @@ fn subroutine_return_is_not_a_page_end() {
 
 #[test]
 fn unsupported_commands_and_choices_fail_closed() {
-    for command in [
-        0xc2, 0xc3, 0xc9, 0xcb, 0xcc, 0xcd, 0xce, 0xd6, 0xdb, 0xe3, 0xff,
-    ] {
+    for command in [0xc3, 0xc9, 0xcb, 0xcd, 0xce, 0xd6, 0xdb, 0xe3, 0xff] {
         assert!(
             decode(&image(&[command, 0xd3]), START).is_err(),
             "{command:02x}"
         );
     }
     assert!(decode(&image(&[0xc4, 0, 0xd3]), START).is_err());
-    assert!(decode(&image(&[0xd2, 2, 0xd3]), START).is_err());
     assert!(decode(&image(&[0xca, 6, 0, 0, 0xd3]), START).is_err());
 }
 
@@ -150,4 +147,65 @@ fn choice_catalog_retains_results_positions_and_navigation() {
 fn public_loader_rejects_unqualified_images() {
     assert!(HouseDialogue::from_rom(&[]).is_err());
     assert!(HouseDialogue::from_rom(&image(&[0xd3])).is_err());
+}
+
+#[test]
+fn window_anchor_clears_the_page_and_records_its_placement() {
+    // $DA ($85964D) opens the standard window at the bottom or the top,
+    // whichever the player is not standing in. Page content is unaffected.
+    let pages = decode(&image(&[0xda, 0x21, 0xd3]), START).unwrap();
+    assert_eq!(pages.len(), 1);
+    assert_eq!(pages[0].placement(), Placement::AwayFromPlayer);
+    assert_eq!(pages[0].width(), 224);
+    let pages = decode(&image(&[0xc0, 0x21, 0xd3]), START).unwrap();
+    assert_eq!(pages[0].placement(), Placement::Bottom);
+    assert!(decode(&image(&[0x21, 0xda, 0x21, 0xd3]), START).is_err());
+}
+
+#[test]
+fn long_calls_return_to_their_caller_in_every_profile() {
+    let mut rom = image(&[0xcc, 0x00, 0x90, 0x88, 0x24, 0xd3]);
+    rom[0x8_9000..0x8_9002].copy_from_slice(&[0x23, 0xd4]);
+    let pages = decode(&rom, START).unwrap();
+    assert_eq!(pages.len(), 1);
+    assert_eq!(pages[0].glyphs().len(), 2);
+    assert_eq!(pages[0].glyphs()[0].text_source, 0x88_9000);
+}
+
+#[test]
+fn speaker_calls_admit_rom_targets_and_refuse_wram_ones() {
+    let mut rom = image(&[0xd2, 2, 0xd3]);
+    rom[0x12_c44b..0x12_c44d].copy_from_slice(&0xc800_u16.to_le_bytes());
+    rom[0x12_c800..0x12_c802].copy_from_slice(&[0x23, 0xd4]);
+    let pages = decode(&rom, START).unwrap();
+    assert_eq!(pages[0].glyphs().len(), 1);
+    let mut rom = image(&[0xd2, 13, 0xd3]);
+    rom[0x12_c461..0x12_c463].copy_from_slice(&0x061c_u16.to_le_bytes());
+    assert!(decode(&rom, START).is_err());
+    // Past the table's 25 entries the words are subroutine bytes, not pointers.
+    let mut rom = image(&[0xd2, 25, 0xd3]);
+    rom[0x12_c479..0x12_c47b].copy_from_slice(&0xc800_u16.to_le_bytes());
+    rom[0x12_c800..0x12_c802].copy_from_slice(&[0x23, 0xd4]);
+    assert!(decode(&rom, START).is_err());
+}
+
+#[test]
+fn window_layouts_set_the_geometry_and_placement() {
+    // $C2 ($85982D): column, row, width, height in tiles.
+    let pages = decode(&image(&[0xc2, 3, 3, 25, 6, 0x21, 0xd3]), START).unwrap();
+    assert_eq!((pages[0].width(), pages[0].height()), (200, 48));
+    assert_eq!(pages[0].placement(), Placement::Tile { column: 3, row: 3 });
+    assert_eq!(pages[0].indexed().len(), 200 * 48);
+    for layout in [
+        [3, 3, 0, 6],
+        [3, 3, 25, 1],
+        [8, 3, 25, 6],
+        [3, 23, 25, 6],
+        [255, 3, 1, 6],
+        [3, 255, 25, 2],
+    ] {
+        let stream = [0xc2, layout[0], layout[1], layout[2], layout[3], 0x21, 0xd3];
+        assert!(decode(&image(&stream), START).is_err(), "{layout:?}");
+    }
+    assert!(decode(&image(&[0x21, 0xc2, 3, 3, 25, 6, 0x21, 0xd3]), START).is_err());
 }

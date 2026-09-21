@@ -56,6 +56,25 @@ pub enum Acknowledgement {
     None,
 }
 
+/// Where the native engine opens the window. Content stays page-relative;
+/// a host decides what to do with the anchor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Placement {
+    /// `$C0`/`$C1`: the standard window at tilemap base `$0504`, the bottom
+    /// of the screen.
+    Bottom,
+    /// `$DA` (`$85964D`): the standard window at the bottom, or at the top
+    /// when the player stands in the lower half of the screen.
+    AwayFromPlayer,
+    /// `$C2` (`$85982D`): a window at an explicit tile column and row.
+    Tile {
+        /// Tile column of the window's left edge.
+        column: u8,
+        /// Tile row of the window's top edge.
+        row: u8,
+    },
+}
+
 /// Provenance and placement of one native font record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DialogueGlyph {
@@ -76,6 +95,7 @@ pub struct DialoguePage {
     glyphs: Vec<DialogueGlyph>,
     boundary_source: u32,
     acknowledgement: Acknowledgement,
+    placement: Placement,
 }
 impl DialoguePage {
     /// Content width, without native frame/window effects.
@@ -114,6 +134,11 @@ impl DialoguePage {
     #[must_use]
     pub const fn acknowledgement(&self) -> Acknowledgement {
         self.acknowledgement
+    }
+    /// Where the native engine opened the window this page is shown in.
+    #[must_use]
+    pub const fn placement(&self) -> Placement {
+        self.placement
     }
 }
 
@@ -271,6 +296,7 @@ struct Decoder<'a> {
     stack: Vec<u32>,
     kana: bool,
     position: [u16; 2],
+    placement: Placement,
     page: DialoguePage,
     pages: Vec<DialoguePage>,
 }
@@ -299,7 +325,7 @@ impl Decoder<'_> {
         Ok(u16::from_le_bytes([self.next()?, self.next()?]))
     }
     fn clear(&mut self) {
-        self.page = blank_page(self.dimensions, self.transparent);
+        self.page = blank_page(self.dimensions, self.transparent, self.placement);
         self.position = [0, 0];
         self.kana = false;
     }
@@ -341,23 +367,44 @@ impl Decoder<'_> {
         self.page.acknowledgement = action;
         self.pages.push(std::mem::replace(
             &mut self.page,
-            blank_page(self.dimensions, self.transparent),
+            blank_page(self.dimensions, self.transparent, self.placement),
         ));
         self.position = [0, 0];
         self.kana = false;
         Ok(())
     }
+    /// `$C0`/`$C1` open the standard window; `$DA` (`$85964D`) opens it at
+    /// whichever of top and bottom the player is not standing in.
+    fn standard_window(&mut self, at: u32, command: u8) -> Result<(), TextError> {
+        if !self.page.glyphs.is_empty() {
+            return Err(invalid(at, "unacknowledged page clear"));
+        }
+        if command != 0xc0 {
+            self.dimensions = [224, 48];
+        }
+        self.placement = if command == 0xda {
+            Placement::AwayFromPlayer
+        } else {
+            Placement::Bottom
+        };
+        self.clear();
+        Ok(())
+    }
     fn custom_window(&mut self, at: u32) -> Result<(), TextError> {
-        let layout = [self.next()?, self.next()?, self.next()?, self.next()?];
-        // $85982D: column, tile row, tile width, tile height. Only this
-        // 24x6-tile window is required; other geometry is not silently padded.
-        if layout != [6, 6, 24, 6] {
-            return Err(invalid(at, "unsupported Pandora window layout"));
+        let [column, row, width, height] = [self.next()?, self.next()?, self.next()?, self.next()?];
+        // $85982D: tile column, row, width and height of a window on the
+        // 32x28-tile screen. Content is `width` tiles by `height / 2` glyph
+        // rows; a window with no glyph row or off the screen is refused.
+        let [right, bottom] = [(column, width), (row, height)]
+            .map(|(origin, extent)| u16::from(origin) + u16::from(extent));
+        if width == 0 || height < 2 || right > 32 || bottom > 28 {
+            return Err(invalid(at, "unsupported window layout"));
         }
         if !self.page.glyphs.is_empty() {
             return Err(invalid(at, "unacknowledged page clear"));
         }
-        self.dimensions = [u16::from(layout[2]) * 8, u16::from(layout[3] / 2) * 16];
+        self.dimensions = [u16::from(width) * 8, u16::from(height / 2) * 16];
+        self.placement = Placement::Tile { column, row };
         self.clear();
         Ok(())
     }
@@ -384,26 +431,29 @@ impl Decoder<'_> {
         Ok(())
     }
     fn call(&mut self, index: u8) -> Result<(), TextError> {
-        if !([0, 1, 7].contains(&index) || (self.pandora && index == 3)) {
-            return Err(invalid(
-                self.pc - 1,
-                "unsupported or recursive text subroutine",
-            ));
+        // $859C7A: the `$92C447` word table. Index 0 is the default name in
+        // WRAM, read from its initialization; the rest are ROM speaker-prefix
+        // subroutines, whose commands are validated like any other text. The
+        // table holds 25 entries, ending where its first subroutine begins.
+        if index >= 25 {
+            return Err(invalid(self.pc - 1, "text subroutine outside table"));
         }
         let pointer = bytes(self.image, 0x92_c447 + u32::from(index) * 2, 2)?;
         let address = u32::from(u16::from_le_bytes([pointer[0], pointer[1]]));
         let destination = if index == 0 && address == 0x610 {
             address
-        } else {
+        } else if address >= 0x8000 {
             0x92_0000 | address
+        } else {
+            return Err(invalid(self.pc - 1, "text subroutine outside ROM"));
         };
         self.enter(destination)
     }
 }
 fn empty_page() -> DialoguePage {
-    blank_page([224, 48], false)
+    blank_page([224, 48], false, Placement::Bottom)
 }
-fn blank_page(dimensions: [u16; 2], transparent: bool) -> DialoguePage {
+fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> DialoguePage {
     let background_index = if transparent { 0 } else { 3 };
     DialoguePage {
         pixels: vec![background_index; usize::from(dimensions[0]) * usize::from(dimensions[1])],
@@ -412,6 +462,7 @@ fn blank_page(dimensions: [u16; 2], transparent: bool) -> DialoguePage {
         glyphs: Vec::new(),
         boundary_source: 0,
         acknowledgement: Acknowledgement::End,
+        placement,
     }
 }
 fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
@@ -431,6 +482,7 @@ fn decode_profile(
         stack: Vec::new(),
         kana: false,
         position: [0, 0],
+        placement: Placement::Bottom,
         page: empty_page(),
         pages: Vec::new(),
     };
@@ -448,16 +500,8 @@ fn decode_profile(
                     ((0xb5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64),
                 )?;
             }
-            c if matches!(c, 0xc0 | 0xc1) || (c == 0xda && d.pandora) => {
-                if !d.page.glyphs.is_empty() {
-                    return Err(invalid(at, "unacknowledged page clear"));
-                }
-                if c != 0xc0 {
-                    d.dimensions = [224, 48];
-                }
-                d.clear();
-            }
-            0xc2 if d.pandora => d.custom_window(at)?,
+            c @ (0xc0 | 0xc1 | 0xda) => d.standard_window(at, c)?,
+            0xc2 => d.custom_window(at)?,
             0xc4 => match d.next()? {
                 1 => d.transparent = false,
                 0 if d.pandora => d.transparent = true,
@@ -480,7 +524,7 @@ fn decode_profile(
                 d.word()?; // qualified speaker color at $7F060A, not event/progression RAM
             }
             // $859A13/$859ECA save the banked return after a three-byte pointer.
-            0xcc if d.pandora => {
+            0xcc => {
                 let address = u32::from(d.word()?);
                 let destination = address | (u32::from(d.next()?) << 16);
                 d.enter(destination)?;

@@ -110,8 +110,10 @@ jump table **`$859198`**. Their command meanings are not interchangeable.
   glyphs align the next glyph to 8 pixels (+4). This affects speaker prefixes
   and the highlighted words in the first prompt, proven in native font cells.
 - `$D2` at `$859C7A..9C9B` calls the `$92C447` word-pointer table with a return
-  stack. Only indices 0, 1 and 7 are needed. Index 0 points to WRAM `$0610`;
-  indices 1 and 7 point to ROM speaker-prefix subroutines.
+  stack. Index 0 points to WRAM `$0610`; the seven house sources use indices
+  1 and 7, ROM speaker-prefix subroutines. Any index whose entry lies in ROM
+  is admitted, since the callee's commands are validated like any text;
+  other WRAM entries are refused.
 - Default-name branch **`$878C97..8CB6`** writes six immediate bytes to
   `$0610..0615`. The compiler reads those operands and checks their
   LDA-immediate/STA-absolute shape and destinations. It does not copy observed
@@ -135,7 +137,12 @@ jump table **`$859198`**. Their command meanings are not interchangeable.
 Supported text controls: `$C0/$C1` initial clear/window setup, `$C4 01` raw font,
 `$C5` delay, `$C6 00/04` palette, `$C7` sound, `$C8` speed, `$CA 05 word`
 speaker-color storage at `$7F060A`, `$CF` newline, `$D0/$D1` kana,
-`$D2 00/01/07` calls, `$D3/$D4/$D5` as above and `$DC` palette reset.
+`$D2 n` calls, `$D3/$D4/$D5` as above and `$DC` palette reset. Three controls
+first qualified for Pandora ([pandora-dialogue.md](pandora-dialogue.md)) are
+admitted in every profile because Crysta residents use them: `$DA` window
+anchor, `$C2` window layout and `$CC` long call. Each page records its
+`Placement`: the standard bottom window, `$DA`'s away-from-the-player window,
+or `$C2`'s tile column and row.
 Delay/sound/speed/color operands are consumed without native timing/audio/color
 effects; `$CA` cannot write arbitrary memory or progression flags. Unsupported
 text commands (including in-text selection commands distinct from these

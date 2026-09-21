@@ -1,4 +1,5 @@
 use super::*;
+use crate::text::Placement;
 
 #[test]
 fn pandora_loader_authenticates_before_decoding() {
@@ -139,7 +140,7 @@ fn adaptive_window_and_long_calls_keep_page_relative_content() {
     );
     assert_eq!(pages[0].glyphs()[0].text_source, 0x92_c800);
     assert_eq!(pages[0].boundary_source(), 0x88_8008);
-    assert!(super::super::decode(&image, 0x88_8000).is_err());
+    assert_eq!(pages[0].placement(), Placement::AwayFromPlayer);
 }
 
 #[test]
@@ -171,12 +172,7 @@ fn custom_window_size_is_not_the_house_stride() {
     assert_eq!((pages[0].width(), pages[0].height()), (192, 48));
     assert_eq!(pages[0].indexed().len(), 192 * 48);
     assert_eq!(pages[0].glyphs()[1].position, [0, 16]);
-    assert!(super::super::decode_profile(
-        &synthetic(&[0xc2, 6, 6, 23, 6, 0x21, 0xd3]),
-        0x88_8000,
-        true
-    )
-    .is_err());
+    assert_eq!(pages[0].placement(), Placement::Tile { column: 6, row: 6 });
 }
 
 #[test]
