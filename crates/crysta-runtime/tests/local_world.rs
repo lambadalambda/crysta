@@ -249,3 +249,106 @@ fn walking_is_still_bounded_by_collision() {
         }
     }
 }
+
+#[test]
+fn the_player_can_walk_up_to_a_resident_and_talk() {
+    use crysta_runtime::residents::Conversation;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    // The documented resident stands at (120,112) in map $000B. Stand in the
+    // cell below and face them.
+    let mut world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
+    assert!(
+        world.residents().iter().any(|r| r.cell() == (7, 7)),
+        "the resident must be present"
+    );
+    world.face(Direction::Up);
+    match world.talk() {
+        Some(Conversation::Unsupported { source }) => assert_eq!(source, 0x95B3),
+        other => panic!("expected the first-visit line, got {other:?}"),
+    }
+    // Facing away reaches nobody.
+    world.face(Direction::Down);
+    assert!(world.talk().is_none());
+}
+
+#[test]
+fn resident_occupancy_is_available_but_costs_connectivity() {
+    use crysta_runtime::world::occupy;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    // Occupancy blocks the collision cell, one row above the visual one,
+    // because movement samples at (x - 8, y - 16).
+    let world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
+    let resident = world
+        .residents()
+        .iter()
+        .find(|resident| resident.cell() == (7, 7))
+        .expect("the documented resident");
+    assert_eq!(resident.collision_cell(), (7, 6));
+
+    let built = crysta_runtime::room(image, 0x000B).unwrap();
+    let blocked = occupy(built, world.residents()).unwrap();
+    // The observable is the grid, not `walkable_cells`: blocking one cell does
+    // not stop its neighbours moving, so the census barely shifts.
+    let index = usize::from(resident.collision_cell().1) * usize::from(blocked.width)
+        + usize::from(resident.collision_cell().0);
+    assert_eq!(
+        blocked.room.cells()[index] >> 9,
+        14,
+        "the collision cell must carry a solid attribute"
+    );
+
+    // And a player walking into it is stopped.
+    let mut walking = room_core::WalkingState::new(120, 128);
+    for _ in 0..64 {
+        let _ = walking.step(
+            &blocked.room,
+            room_core::FrameInput {
+                direction: Some(Direction::Up),
+            },
+        );
+    }
+    assert!(
+        walking.y() >= 128,
+        "the resident must stop the player, ended at y={}",
+        walking.y()
+    );
+}
+
+#[test]
+fn talking_applies_the_flags_the_script_writes() {
+    use crysta_runtime::residents::Conversation;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    // Reach the already-met arm, whose script writes the $0026 progression
+    // flag, and check the world records it.
+    let mut events = crysta_runtime::world::new_game_flags();
+    for flag in [0x109usize, 0x03B, 0x296, 0x021, 0x028, 0x026] {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000B, 120, 112 + 16, events).unwrap();
+    world.face(Direction::Up);
+    let spoken = world.talk().expect("the resident is there");
+    let Conversation::Speaks { flags, .. } = &spoken else {
+        panic!("expected pages, got {spoken:?}");
+    };
+    // The script writes $0026 with bit 15 set, which means set rather than clear.
+    let written = flags
+        .iter()
+        .find(|flag| *flag & 0x0FFF == 0x0026)
+        .copied()
+        .expect("the progression flag must be written");
+    assert_ne!(written & 0x8000, 0, "bit 15 selects set over clear");
+    assert_ne!(
+        world.events()[0x026 / 8] & (1 << (0x026 % 8)),
+        0,
+        "the progression flag must be set after talking"
+    );
+}

@@ -4,8 +4,10 @@
 //! needs on top: the current map's room, and the exit geometry that carries the
 //! player into the next one.
 
+use crate::residents::{residents, talk_to, Conversation, Resident};
 use crate::{room, MapRoom, RoomError, MAPS};
 use assets::maps::exits::{ExitError, ExitList};
+use assets::maps::scripts::EventFlags;
 use room_core::{Direction, FrameInput, Room, Unqualified, WalkingState};
 use std::fmt;
 
@@ -17,6 +19,10 @@ pub struct World<'a> {
     room: MapRoom,
     exits: ExitList,
     walking: WalkingState,
+    /// Residents the spawn lists install for the current flags.
+    residents: Vec<Resident>,
+    /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
+    events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Whether an exit under the player may fire.
@@ -84,7 +90,25 @@ impl<'a> World<'a> {
     /// Refuses a map that cannot be built into a room or whose exits do not
     /// decode.
     pub fn enter(image: &'a [u8], map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
+        Self::enter_with_events(image, map, x, y, new_game_flags())
+    }
+
+    /// Places the player with an explicit event-flag bitmap.
+    ///
+    /// The flags decide who is present and what they say, so they belong to the
+    /// world rather than to each call.
+    ///
+    /// # Errors
+    /// As [`Self::enter`].
+    pub fn enter_with_events(
+        image: &'a [u8],
+        map: u16,
+        x: u16,
+        y: u16,
+        events: Vec<u8>,
+    ) -> Result<Self, WorldError> {
         let built = room(image, map)?;
+        let present = residents(image, map, EventFlags::Bitmap(&events)).unwrap_or_default();
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -95,6 +119,8 @@ impl<'a> World<'a> {
             room: built,
             exits,
             walking: WalkingState::new(x, y),
+            residents: present,
+            events,
             facing: Direction::Down,
             armed: false,
         })
@@ -154,6 +180,52 @@ impl<'a> World<'a> {
         }
     }
 
+    /// Residents present in the current map.
+    #[must_use]
+    pub fn residents(&self) -> &[Resident] {
+        &self.residents
+    }
+
+    /// The event-flag bitmap in force.
+    #[must_use]
+    pub fn events(&self) -> &[u8] {
+        &self.events
+    }
+
+    /// Talks to the resident the player is facing, if there is one.
+    ///
+    /// Applies the flags the conversation writes, so progression moves.
+    pub fn talk(&mut self) -> Option<Conversation> {
+        let (x, y) = self.position();
+        let (dx, dy) = facing_delta(self.facing);
+        let faced = (
+            (x / 16).wrapping_add_signed(dx),
+            (y / 16).wrapping_add_signed(dy),
+        );
+        let resident = self
+            .residents
+            .iter()
+            .find(|resident| resident.cell() == faced)?
+            .clone();
+        let spoken = talk_to(self.image, &resident, EventFlags::Bitmap(&self.events));
+        if let Conversation::Speaks { flags, .. } = &spoken {
+            for flag in flags {
+                let index = usize::from(flag & 0x0FFF);
+                let Some(byte) = self.events.get_mut(index / 8) else {
+                    continue;
+                };
+                // Bit 15 selects set over clear, the same encoding the loading
+                // scripts and the spawn stream use.
+                if flag & 0x8000 == 0 {
+                    *byte &= !(1 << (index % 8));
+                } else {
+                    *byte |= 1 << (index % 8);
+                }
+            }
+        }
+        Some(spoken)
+    }
+
     /// Opens the doorway the player is standing at or facing.
     ///
     /// Walking is not enough to leave most rooms. A town entrance is a single
@@ -173,12 +245,7 @@ impl<'a> World<'a> {
             return Step::Stayed;
         };
         let (tile_x, tile_y) = (origin_x / 16, origin_y / 16);
-        let (dx, dy) = match self.facing {
-            Direction::Up => (0, -1),
-            Direction::Down => (0, 1),
-            Direction::Left => (-1, 0),
-            Direction::Right => (1, 0),
-        };
+        let (dx, dy) = facing_delta(self.facing);
         let faced = (
             tile_x.wrapping_add_signed(dx),
             tile_y.wrapping_add_signed(dy),
@@ -204,8 +271,9 @@ impl<'a> World<'a> {
         }
         let (arrival_x, arrival_y) = record.destination_position();
         match Self::enter(self.image, destination, arrival_x, arrival_y) {
-            Ok(entered) => {
+            Ok(mut entered) => {
                 let from = self.map;
+                entered.events.clone_from(&self.events);
                 *self = entered;
                 Step::Entered {
                     from,
@@ -245,16 +313,83 @@ impl<'a> World<'a> {
             return None;
         }
         let (arrival_x, arrival_y) = record.destination_position();
-        let entered = Self::enter(self.image, destination, arrival_x, arrival_y).ok()?;
+        let entered = Self::enter_with_events(
+            self.image,
+            destination,
+            arrival_x,
+            arrival_y,
+            self.events.clone(),
+        )
+        .ok()?;
         let from = self.map;
         self.map = entered.map;
         self.room = entered.room;
         self.exits = entered.exits;
         self.walking = entered.walking;
+        self.residents = entered.residents;
         self.armed = false;
         Some(Step::Entered {
             from,
             to: destination,
         })
     }
+}
+
+/// Cell offset one step in a direction.
+const fn facing_delta(facing: Direction) -> (i16, i16) {
+    match facing {
+        Direction::Up => (0, -1),
+        Direction::Down => (0, 1),
+        Direction::Left => (-1, 0),
+        Direction::Right => (1, 0),
+    }
+}
+
+/// The measured new-game flag state: 32 and 251 are set.
+///
+/// `EventFlags::AllClear` is deliberately not this; see its documentation.
+#[must_use]
+pub fn new_game_flags() -> Vec<u8> {
+    let mut bitmap = vec![0u8; 512];
+    for flag in [32usize, 251] {
+        bitmap[flag / 8] |= 1 << (flag % 8);
+    }
+    bitmap
+}
+
+/// Rebuilds a room with each resident's cell made solid.
+///
+/// **Not applied by default, and the reason is measured.** A spawn list holds
+/// more than people: of the slice's 115 records only a handful reach dialogue,
+/// and making every one solid takes reachability from 19 maps to 2, because
+/// records sit on the cells doorway approaches need. Until records that are
+/// bodies can be told from records that are not, blocking them all costs more
+/// than it buys.
+///
+/// The cell blocked is [`Resident::collision_cell`], not the visual one:
+/// movement samples at `(x - 8, y - 16)`.
+///
+/// # Errors
+/// As [`World::enter`].
+pub fn occupy(built: MapRoom, present: &[Resident]) -> Result<MapRoom, WorldError> {
+    if present.is_empty() {
+        return Ok(built);
+    }
+    let mut cells = built.room.cells().to_vec();
+    for resident in present {
+        let (column, row) = resident.collision_cell();
+        if column >= built.width || row >= built.height {
+            continue;
+        }
+        cells[usize::from(row) * usize::from(built.width) + usize::from(column)] = 14 << 9;
+    }
+    let map = built.map;
+    let rebuilt = Room::new(built.width, built.height, cells)
+        .map_err(|source| RoomError::Refused { map, source })?
+        .with_material_policy(crate::qualified_policy(map, built.width, built.height))
+        .map_err(|source| RoomError::Policy { map, source })?;
+    Ok(MapRoom {
+        room: rebuilt,
+        ..built
+    })
 }

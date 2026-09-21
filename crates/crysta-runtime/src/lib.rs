@@ -16,6 +16,7 @@ use room_core::{
 };
 use std::fmt;
 
+pub mod residents;
 pub mod world;
 
 /// Maps the static exit graph bounds the Crysta slice to.

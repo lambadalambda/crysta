@@ -52,3 +52,47 @@ interacts.
 - Parent: [Play the Crysta slice free-roam in a native app](free-roam-crysta-app.md)
 - Dialogue decodes to rendered pixel pages, not text, so presenting it is a
   rendering concern rather than a string concern.
+
+## Progress: residents stand and speak, from their records
+
+`crysta_runtime::residents` joins the spawn stream to the script walker, and
+`World` carries the roster and the event-flag bitmap.
+
+### Talking runs the callback, not the entry script
+
+The entry script is what an actor does when it spawns; `$21` registers the
+**interaction** callback, and that is what talking runs. Collecting both gives
+the documented resident three pages where the chain has two — their ambient
+line and their conversation are different text.
+
+### The flags choose what is said, and the documented pages are not the first
+
+`$88:8EDE` is a six-way `$08` dispatch over progression. Each condition has bit
+15 set, so each branches when its flag is **clear**, and the arm
+`docs/house-dialogue.md` records is the fall-through — reached only with all six
+of `$109`, `$03B`, `$296`, `$021`, `$028`, `$026` set.
+
+On a new game the first branch fires instead and the resident gives their
+first-visit line at `$88:95B3`, which is a **choice prompt** the text decoder
+does not render. That is reported as `Unsupported`, distinct from `Silent`,
+because the script did reach text.
+
+Census over the slice's records under new-game flags: **4 speak, 6 unsupported,
+16 unaccounted, 89 silent.**
+
+### Occupancy is available but off, and the reason is measured
+
+A resident's collision cell is one row above the cell they visually stand in,
+because movement samples at `(x - 8, y - 16)`. `world::occupy` blocks it
+correctly, and is **not applied by default**: a spawn list is not a cast list,
+and making all 115 records solid takes reachability from 19 maps to 2, because
+records sit on the cells doorway approaches need.
+
+## Remaining
+
+- Choice prompts do not decode, so 6 residents reach text that cannot be shown.
+- 16 scripts stop at an unaccounted `COP` service.
+- 89 records register no interaction callback at all. Whether those are scenery
+  or residents whose callback the walker misses is not established.
+- Telling records that are bodies from records that are not would let occupancy
+  be turned on.
