@@ -82,10 +82,46 @@ disarms the trigger and stepping clear of every exit rearms it, or two maps
 ping-pong forever. `an_arrival_does_not_immediately_bounce_back` asserts this
 for every arrival the slice declares.
 
-## Remaining
+## Remaining: the five missing maps are one collision gap, not five problems
 
-Five maps are not reachable and the test pins the exact set rather than
-rounding it away: `$1A`, `$1B` and `$1C` are southern town houses, and `$20`
-and `$21` are the cellar and Pandora's Box. The latter two are reached through
-progression rather than geometry in the accepted route, so they are expected to
-need event flags; the three town houses are not yet explained.
+Chased to a single cause. **The doors are fine** — placing the player at the
+approach cell and interacting opens every one of them, including `$1B` and
+`$20`. What fails is *walking to* the approach.
+
+The town is fragmented by undecided collision attributes. Probing every
+standable cell in every direction:
+
+| Map | Clean probes | Refusals |
+| --- | ---: | --- |
+| `$0A` town | 14,247 | `UnsupportedType(6)` 647, `(7)` 518, `(8)` 261 |
+| `$1A` | 2,288 | none |
+| `$12` | 3,417 | `UnsupportedType(29)` 27 |
+
+`room-core` fails closed on an undecided attribute, so those 1,426 refusals are
+walls. They split the town into disjoint walk components: from the `$000D`
+arrival the player reaches 1,671 of the town's 3,951 standable cells, and the
+component containing the `$1B` door approach is a separate 265-cell pocket with
+**zero** overlap. `$1A` and `$1C` are only reachable through `$1B`, and `$1B`
+only from the town, so one pocket boundary costs three maps.
+
+A note on an earlier claim: `docs/collision.md` records the six undecided
+attributes as affecting 296 cells, and I had read that as not affecting
+connectivity. That was wrong. It is true of the *cell-level* model, where
+`regions()` puts both components in one region; it is false of movement, where
+the same attributes fail closed.
+
+### The existing sweeps cannot settle it
+
+Attributes 6, 7 and 8 are not merely unreported — they were never visited. Over
+**20,071 walking frames** across all five town recordings the collision point
+stood only on attributes 0 and 22, and sustained presses contacted only 0, 12,
+14 and 25. Neither occupancy nor contact evidence exists for 6, 7 or 8.
+
+So this needs new measurement, not re-analysis: sweeps that drive the player
+into those cells from the reachable side. That is
+[the collision predicate issue](qualify-collision-predicate.md), and it is what
+blocks the last five maps.
+
+`$20` and `$21` are the same shape of problem one map deeper: the `$0E` door
+into `$20` opens when the player stands at its approach, so what is missing is
+walk-reachability inside `$0E`.

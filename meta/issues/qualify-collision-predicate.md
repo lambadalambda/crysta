@@ -115,3 +115,35 @@ presents the mask as the open question.
 - The layer is snapshotted once per map, so in-run drift is not excluded —
   which matters precisely because bit 15 is written during play.
 - The map `$41` check that motivated this issue needs the tower prefix replay.
+
+## This now blocks free roam, and the existing data cannot close it
+
+Attributes 6, 7 and 8 fragment the town. Probing every standable cell in map
+`$000A` in every direction gives 14,247 clean probes against **1,426 refusals**:
+647 from attribute 6, 518 from 7, 261 from 8. `room-core` fails closed on an
+undecided attribute, so each is a wall, and the town splits into disjoint walk
+components — 1,671 cells reachable from the `$000D` arrival, and the pocket
+holding the `$001B` doorway approach is a separate 265 cells with zero overlap.
+
+That costs three maps outright: `$1A` and `$1C` are reachable only through
+`$1B`, and `$1B` only from the town.
+
+**The recorded sweeps cannot decide these three attributes.** Across 20,071
+walking frames in the five town recordings the collision point stood only on
+attributes 0 and 22, and sustained presses contacted only 0, 12, 14 and 25.
+Attributes 6, 7 and 8 were never occupied and never contacted, so there is no
+evidence to re-derive — the routes simply never went there.
+
+### What would close it
+
+New sweeps that drive the player into those cells from the reachable side. The
+probe already records what is needed; what is missing is routes that reach the
+component boundary. The boundary is large — 661 standable cells sit adjacent to
+the reachable component without being in it — so targets are not scarce.
+
+Tracing the admission routine would settle all six attributes at once, and
+`assets::cpu` now makes reading 65C816 straightforward, but the obvious
+candidates are not it: `$80:C469` and `$80:C47F` read `$7E:A000` and branch on
+`$88`, `$90`, `$A0` and `$C0`, which against the runtime word's high byte of
+`2 * attribute` are attributes 68, 72, 80 and 96 — the dynamic-bit range, not
+base passability.
