@@ -1,0 +1,288 @@
+//! Decoded sprite art for the slice: the player's frames and each resident's
+//! setup frame, rasterized once into pixels a renderer can blit.
+//!
+//! Everything here is derived from the ROM through [`assets::sprites`]. The
+//! rasters carry their own placement relative to the actor's origin, and a
+//! mirrored raster is composed here from the ROM's alternate anchors rather
+//! than flipped again by a renderer.
+
+use crate::residents::Resident;
+use assets::graphics::{Bgr555, Tile4bpp};
+use assets::maps::actors::SpawnList;
+use assets::maps::scripts::EventFlags;
+use assets::sprites::{
+    ArkSprites, HouseActor, RecordRefusal, ResidentPose, SpriteError, SpriteFrame, SpritePixel,
+};
+use room_core::{AnimationFrame, AnimationSet};
+use std::fmt;
+
+/// The OBJ priority ordinary sprites carry; anything else is unqualified.
+const ORDINARY_PRIORITY: u8 = 2;
+
+/// One sprite frame as pixels, placed relative to the actor's world origin.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Raster {
+    /// Width in pixels.
+    pub width: usize,
+    /// Height in pixels.
+    pub height: usize,
+    /// Offset of the top-left pixel from the actor's origin.
+    pub offset: (i16, i16),
+    /// Row-major `0xAARRGGBB`; alpha is `0xFF` or zero, nothing between.
+    pub pixels: Vec<u32>,
+}
+
+impl Raster {
+    /// Whether any pixel is opaque.
+    #[must_use]
+    pub fn is_visible(&self) -> bool {
+        self.pixels.iter().any(|pixel| pixel >> 24 != 0)
+    }
+}
+
+/// A frame the renderer cannot use.
+#[derive(Debug)]
+pub enum ArtError {
+    /// A component carries a priority other than the ordinary one.
+    Priority {
+        /// The priority found.
+        priority: u8,
+    },
+    /// A pixel names a palette entry outside the actor's sixteen.
+    Palette {
+        /// The CGRAM index found.
+        index: u8,
+    },
+    /// The sprite decoder refused the frame.
+    Sprite(SpriteError),
+}
+
+impl fmt::Display for ArtError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Priority { priority } => write!(f, "sprite priority {priority} is not ordinary"),
+            Self::Palette { index } => write!(f, "palette index {index} is outside the actor's"),
+            Self::Sprite(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+impl std::error::Error for ArtError {}
+
+impl From<SpriteError> for ArtError {
+    fn from(error: SpriteError) -> Self {
+        Self::Sprite(error)
+    }
+}
+
+/// Rasterizes one composition into placed pixels.
+///
+/// Mirroring selects the ROM's alternate placements and anchors as well as
+/// flipping tiles, which is why it is done here and not by the renderer.
+///
+/// # Errors
+/// Refuses a component outside the ordinary priority, a pixel outside the
+/// palette, and a tile the graphics do not hold.
+pub fn raster(
+    frame: &SpriteFrame,
+    tiles: &[Tile4bpp],
+    palette: &[Bgr555; 16],
+    palette_base: u8,
+    mirror: bool,
+) -> Result<Raster, ArtError> {
+    let (left, top, right, bottom) = frame.bounds(mirror, false);
+    // A composition without components folds to inverted bounds.
+    let (Some(width), Some(height)) = (
+        right
+            .checked_sub(left)
+            .and_then(|w| usize::try_from(w).ok()),
+        bottom
+            .checked_sub(top)
+            .and_then(|h| usize::try_from(h).ok()),
+    ) else {
+        return Err(ArtError::Sprite(SpriteError::Invalid(
+            "empty sprite composition",
+        )));
+    };
+    let mut pixels = Vec::with_capacity(width * height);
+    for y in top..bottom {
+        for x in left..right {
+            pixels.push(match frame.sample(tiles, mirror, false, x, y)? {
+                SpritePixel::Transparent => 0,
+                SpritePixel::Opaque {
+                    palette_index,
+                    priority,
+                    ..
+                } => {
+                    if priority != ORDINARY_PRIORITY {
+                        return Err(ArtError::Priority { priority });
+                    }
+                    let colour = palette_index
+                        .checked_sub(palette_base)
+                        .and_then(|index| palette.get(usize::from(index)))
+                        .ok_or(ArtError::Palette {
+                            index: palette_index,
+                        })?;
+                    let [r, g, b] = colour.rgb8();
+                    0xFF00_0000 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
+                }
+            });
+        }
+    }
+    Ok(Raster {
+        width,
+        height,
+        offset: (left, top),
+        pixels,
+    })
+}
+
+/// The player's twenty-eight ordinary frames: three standing, eighteen
+/// walking, and the horizontal ones again mirrored for facing left.
+#[derive(Debug, Clone)]
+pub struct ArkAtlas {
+    frames: Vec<(AnimationFrame, Raster)>,
+}
+
+impl ArkAtlas {
+    /// Rasterizes every ordinary frame from the ROM.
+    ///
+    /// # Errors
+    /// Propagates a sprite table the decoder refuses.
+    pub fn from_rom(image: &[u8]) -> Result<Self, ArtError> {
+        let sprites = ArkSprites::from_rom(image)?;
+        let mut frames = Vec::new();
+        for set in [AnimationSet::Standing, AnimationSet::Walking] {
+            let records = if set == AnimationSet::Standing { 1 } else { 6 };
+            for sequence in 0..3u8 {
+                for record in 0..records {
+                    for mirror_x in [false, true] {
+                        // Only the horizontal sequence has a mirrored twin.
+                        if mirror_x && sequence != 2 {
+                            continue;
+                        }
+                        let key = AnimationFrame {
+                            set,
+                            sequence,
+                            record,
+                            mirror_x,
+                        };
+                        let source = &sprites.frames()[frame_index(key)];
+                        let tiles = sprites
+                            .graphics(source.resource())
+                            .ok_or(SpriteError::Invalid("missing ordinary graphics"))?;
+                        let pixels = raster(
+                            source.composition(),
+                            tiles,
+                            sprites.palette(),
+                            128,
+                            mirror_x,
+                        )?;
+                        frames.push((key, pixels));
+                    }
+                }
+            }
+        }
+        Ok(Self { frames })
+    }
+
+    /// The raster for an animation key.
+    ///
+    /// # Panics
+    /// Every key [`room_core::AnimationState`] can produce is present, so a
+    /// miss is a programming error rather than a runtime condition.
+    #[must_use]
+    pub fn frame(&self, key: AnimationFrame) -> &Raster {
+        self.frames
+            .iter()
+            .find(|(candidate, _)| *candidate == key)
+            .map(|(_, raster)| raster)
+            .expect("every ordinary animation key is rasterized")
+    }
+
+    /// Number of frames held.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.frames.len()
+    }
+
+    /// Whether the atlas is empty, which it never is once built.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.frames.is_empty()
+    }
+}
+
+/// Position of an animation key in the ROM's frame list order: standing
+/// down/up/horizontal, then walking down/up/horizontal at six each.
+fn frame_index(frame: AnimationFrame) -> usize {
+    match frame.set {
+        AnimationSet::Standing => usize::from(frame.sequence),
+        AnimationSet::Walking => 3 + usize::from(frame.sequence) * 6 + usize::from(frame.record),
+    }
+}
+
+/// Why a resident has no art.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Placeholder {
+    /// The record installs no graphics resource, so the game draws nothing
+    /// for it either: a `$FD` or `$00` record is a script with a position,
+    /// not a body. Nothing should be drawn.
+    Invisible,
+    /// The record's descriptor, pose or frame was refused. Something stands
+    /// here in the game; what it looks like is not established.
+    Refused(String),
+    /// The record reuses a predecessor's resource, and that predecessor was
+    /// itself refused, so reusing it would draw the wrong body.
+    PredecessorRefused,
+}
+
+/// Setup art for each resident of a map, aligned with `present`.
+///
+/// Records are decoded in spawn-list order, present or not, because a record
+/// may reuse the resource or graphics of the record before it; the loader
+/// owns that chain and refuses a reuse whose predecessor it refused.
+#[must_use]
+pub fn residents_art(
+    image: &[u8],
+    map: u16,
+    present: &[Resident],
+    events: EventFlags<'_>,
+) -> Vec<Result<Raster, Placeholder>> {
+    let Ok(list) = SpawnList::from_rom(image, map) else {
+        return present
+            .iter()
+            .map(|_| Err(Placeholder::Refused("spawn list refused".into())))
+            .collect();
+    };
+    let decoded = HouseActor::from_records(image, map, list.records(), |record| {
+        ResidentPose::from_script(image, record, events).unwrap_or_default()
+    });
+    present
+        .iter()
+        .map(|resident| {
+            let found = list
+                .records()
+                .iter()
+                .position(|record| record.offset() == resident.record)
+                .map(|index| &decoded[index]);
+            match found {
+                None | Some(Err(RecordRefusal::NoDescriptor)) => Err(Placeholder::Invisible),
+                Some(Err(RecordRefusal::PredecessorRefused)) => {
+                    Err(Placeholder::PredecessorRefused)
+                }
+                Some(Err(RecordRefusal::Invalid(error))) => {
+                    Err(Placeholder::Refused(error.to_string()))
+                }
+                Some(Ok(actor)) => raster(
+                    actor.setup_frame().composition(),
+                    actor.graphics(),
+                    actor.palette(),
+                    actor.palette_base(),
+                    actor.hflip(),
+                )
+                .map_err(|error| Placeholder::Refused(error.to_string())),
+            }
+        })
+        .collect()
+}

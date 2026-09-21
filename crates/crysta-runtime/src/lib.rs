@@ -16,6 +16,7 @@ use room_core::{
 };
 use std::fmt;
 
+pub mod art;
 pub mod residents;
 pub mod world;
 

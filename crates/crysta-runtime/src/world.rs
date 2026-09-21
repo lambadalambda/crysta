@@ -8,7 +8,9 @@ use crate::residents::{residents, talk_to, Conversation, Resident};
 use crate::{room, MapRoom, RoomError, MAPS};
 use assets::maps::exits::{ExitError, ExitList};
 use assets::maps::scripts::EventFlags;
-use room_core::{Direction, FrameInput, Room, Unqualified, WalkingState};
+use room_core::{
+    AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
+};
 use std::fmt;
 
 /// A map the player is standing in, and where they are standing.
@@ -25,6 +27,8 @@ pub struct World<'a> {
     events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
+    /// Which of the player's ordinary frames is showing.
+    animation: AnimationState,
     /// Whether an exit under the player may fire.
     ///
     /// The player arrives standing on geometry that is often an exit in its own
@@ -122,6 +126,7 @@ impl<'a> World<'a> {
             residents: present,
             events,
             facing: Direction::Down,
+            animation: AnimationState::standing(Direction::Down),
             armed: false,
         })
     }
@@ -162,6 +167,17 @@ impl<'a> World<'a> {
     /// which is how a doorway gets faced from the cell in front of it.
     pub fn face(&mut self, direction: Direction) {
         self.facing = direction;
+        self.animation = AnimationState::standing(direction);
+    }
+
+    /// The player's current ordinary frame.
+    ///
+    /// Advanced once per successful step from the walking state's active
+    /// direction, as the qualified slice does, so a blocked step still walks
+    /// in place and a released direction stands at once.
+    #[must_use]
+    pub const fn animation(&self) -> AnimationFrame {
+        self.animation.frame()
     }
 
     /// Walks one frame, then applies any exit the player is standing on.
@@ -173,6 +189,7 @@ impl<'a> World<'a> {
         if let Err(refused) = self.walking.step(&self.room.room, FrameInput { direction }) {
             return Step::Refused(refused);
         }
+        self.animation.advance(self.walking.active_direction());
         match self.take_exit() {
             Some(step) => step,
             None if self.position() == before => Step::Stayed,
@@ -327,6 +344,9 @@ impl<'a> World<'a> {
         self.exits = entered.exits;
         self.walking = entered.walking;
         self.residents = entered.residents;
+        // Arriving stands the player facing the way they came in, as the
+        // qualified slice does on its own transitions.
+        self.animation = AnimationState::standing(self.facing);
         self.armed = false;
         Some(Step::Entered {
             from,
