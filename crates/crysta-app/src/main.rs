@@ -7,7 +7,7 @@
 mod frame;
 
 use assets::text::{Acknowledgement, DialoguePage};
-use crysta_runtime::art::{residents_art, ArkAtlas, Placeholder, Raster};
+use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Placeholder};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::world::World;
 use frame::{VIEW_HEIGHT, VIEW_WIDTH};
@@ -22,8 +22,9 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
-/// Map the player starts in, and where. The opening house's first room.
-const START: (u16, u16, u16) = (0x000B, 120, 128);
+/// Map the player starts in, and where: fresh startup places them at
+/// `(304,112)` in bedroom `$000F` (`docs/new-game-bootstrap.md`).
+const START: (u16, u16, u16) = (0x000F, 304, 112);
 
 /// What a resident whose art was refused is drawn as: a block, so that
 /// someone is visibly there and visibly not right.
@@ -151,7 +152,12 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
 /// Resident art for one roster: the map, the records present, the flags in
 /// force, and their rasters. The flags are part of the key because a
 /// resident's pose comes from their walked script, which branches on them.
-type RosterArt = (u16, Vec<usize>, Vec<u8>, Vec<Result<Raster, Placeholder>>);
+type RosterArt = (
+    u16,
+    Vec<usize>,
+    Vec<u8>,
+    Vec<Result<Animation, Placeholder>>,
+);
 
 /// A conversation being shown, one page at a time.
 struct Dialogue {
@@ -169,6 +175,8 @@ struct Session {
     /// which records were present, since the flags can change the roster.
     art: Option<RosterArt>,
     dialogue: Option<Dialogue>,
+    /// Frames simulated so far, which drives resident animation.
+    tick: u64,
 }
 
 impl Session {
@@ -180,6 +188,7 @@ impl Session {
             backgrounds: HashMap::new(),
             art: None,
             dialogue: None,
+            tick: 0,
         }
     }
 
@@ -188,6 +197,7 @@ impl Session {
     /// While a conversation is open the player stands still and the button
     /// turns pages; the last page's acknowledgement closes it.
     fn advance(&mut self, direction: Option<Direction>, interact: bool) {
+        self.tick += 1;
         if let Some(open) = &mut self.dialogue {
             if interact {
                 let last = open.index + 1 >= open.pages.len();
@@ -242,7 +252,7 @@ impl Session {
     }
 
     /// Resident art for the current roster, recomputed when the roster changes.
-    fn resident_art(&mut self) -> &[Result<Raster, Placeholder>] {
+    fn resident_art(&mut self) -> &[Result<Animation, Placeholder>] {
         let map = self.world.map();
         let records: Vec<usize> = self
             .world
@@ -282,6 +292,7 @@ impl Session {
             .map(|resident| resident.position)
             .collect();
         let art: Vec<_> = self.resident_art().to_vec();
+        let tick = self.tick;
         let Some(background) = self.background(cartridge) else {
             return (0, 0);
         };
@@ -301,7 +312,8 @@ impl Session {
                 continue;
             }
             match &art[index] {
-                Ok(raster) => {
+                Ok(animation) => {
+                    let raster = animation.frame_at(tick);
                     frame::draw_sprite(frame, background, camera, raster, residents[index]);
                 }
                 Err(Placeholder::Invisible) => {}
