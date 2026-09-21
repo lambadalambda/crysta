@@ -86,11 +86,19 @@ fn record_derived_art_matches_every_frozen_resident() {
         assert_eq!(actor.selector(), frozen.selector(), "{offset:#08x}");
         assert_eq!(actor.hflip(), frozen.hflip(), "{offset:#08x}");
         assert_eq!(actor.facing(), frozen.facing(), "{offset:#08x}");
-        assert_eq!(
-            actor.setup_frame().composition().source_bytes(),
-            frozen.setup_frame().composition().source_bytes(),
-            "{offset:#08x}"
-        );
+        // The whole pose list, not just the setup frame: the frozen loader
+        // keeps one or four records per resident, and the walked one must
+        // find the same records with the same durations.
+        assert_eq!(actor.frames().len(), frozen.frames().len(), "{offset:#08x}");
+        for (walked, kept) in actor.frames().iter().zip(frozen.frames()) {
+            assert_eq!(walked.duration(), kept.duration(), "{offset:#08x}");
+            assert_eq!(walked.facing(), kept.facing(), "{offset:#08x}");
+            assert_eq!(
+                walked.composition().source_bytes(),
+                kept.composition().source_bytes(),
+                "{offset:#08x}"
+            );
+        }
         assert_eq!(
             actor.graphics().len(),
             frozen.graphics().len(),

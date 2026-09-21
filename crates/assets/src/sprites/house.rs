@@ -236,7 +236,10 @@ impl HouseActor {
     /// predecessor; this one may have refused it, and then the reuse is
     /// refused too rather than handed the last body that happened to decode.
     /// Whether a `$00` or `$FD` record moves the native predecessor is not
-    /// established; here they do not.
+    /// established; here they do not. A `$00` record carries a descriptor
+    /// too, but every one in the slice has a movement-resource mode outside
+    /// the qualified set, so following it gains nothing and poisons three
+    /// more reuses.
     pub fn from_records(
         image: &[u8],
         map: u16,
@@ -312,7 +315,7 @@ impl HouseActor {
             .packet
             .as_ref()
             .ok_or(SpriteError::Invalid("cannot reuse a direct-ROM resource"))?;
-        let frame = decode_setup(
+        let frames = decode_sequence(
             &packet.bytes,
             ListSpec {
                 selector,
@@ -332,7 +335,7 @@ impl HouseActor {
             selector,
             hflip: pose.hflip,
             tie_rank: 0,
-            frames: vec![frame],
+            frames,
             resource,
             ranges: loader.ranges,
         })
@@ -980,16 +983,28 @@ fn decode_list(bytes: &[u8], spec: ListSpec) -> Result<Vec<HouseFrame>, SpriteEr
         .collect()
 }
 
-/// The first record of the sequence `spec.selector` names, with no claim
-/// about the list's length or timing. This is the frozen setup policy for a
-/// record found by walking rather than by profile.
-fn decode_setup(bytes: &[u8], spec: ListSpec) -> Result<HouseFrame, SpriteError> {
+/// Records one pose list may hold before it is treated as unterminated.
+const MAX_SEQUENCE_RECORDS: usize = 64;
+
+/// Every record of the sequence `spec.selector` names, up to its terminator.
+///
+/// The frozen loader knows each list's length and timing from its profile;
+/// a record found by walking does not, so the list is read to its `$FFFF`
+/// and each record keeps its own duration. The first is the setup frame.
+fn decode_sequence(bytes: &[u8], spec: ListSpec) -> Result<Vec<HouseFrame>, SpriteError> {
     let sequence = packed_sequence(bytes, spec.selector)?;
-    let record = take(bytes, sequence, 4)?;
-    if record[..2] == [0xff, 0xff] {
-        return Err(SpriteError::Invalid("empty house frame list"));
+    let mut frames = Vec::new();
+    for index in 0..=MAX_SEQUENCE_RECORDS {
+        let record = take(bytes, sequence + index * 4, 4)?;
+        if record[..2] == [0xff, 0xff] {
+            if frames.is_empty() {
+                return Err(SpriteError::Invalid("empty house frame list"));
+            }
+            return Ok(frames);
+        }
+        frames.push(decode_record(bytes, record, spec)?);
     }
-    decode_record(bytes, record, spec)
+    Err(SpriteError::Invalid("unterminated house frame list"))
 }
 
 /// One four-byte list record: duration, facing, composition anchor.
