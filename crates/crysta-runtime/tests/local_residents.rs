@@ -56,12 +56,15 @@ fn the_documented_resident_stands_where_the_game_puts_them() {
     assert_eq!(resident.cell(), (7, 7));
 }
 
-/// The six `$08` conditions guarding the documented resident's callback.
+/// The six `$08` conditions guarding the documented resident's callback, and
+/// the flag their entry script pairs with one of them.
 ///
-/// Each has bit 15 set, so each branches when its flag is **clear**. Setting
-/// all six is what makes the walk fall through to the arm
-/// `docs/house-dialogue.md` records.
-const ALREADY_MET: [u16; 6] = [0x109, 0x03B, 0x296, 0x021, 0x028, 0x026];
+/// Each condition has bit 15 set, so each branches when its flag is **clear**.
+/// Setting all six is what makes the walk fall through to the arm
+/// `docs/house-dialogue.md` records. The entry script opens with a `$47`
+/// despawn on the exclusive-or of `$027` and `$021`, so `$027` has to be set
+/// alongside `$021` or the resident is not in the room to talk to.
+const ALREADY_MET: [u16; 7] = [0x109, 0x03B, 0x296, 0x021, 0x028, 0x026, 0x027];
 
 #[test]
 fn the_documented_resident_speaks_their_own_pages() {
@@ -184,4 +187,30 @@ fn a_script_the_walker_cannot_follow_is_reported_not_silent() {
         speaks + silent + unaccounted + unsupported > 40,
         "too few residents were considered"
     );
+}
+
+#[test]
+fn a_resident_whose_despawn_condition_holds_is_absent() {
+    // `$88:8E50` opens with `COP 47` on the exclusive-or of `$027` and
+    // `$021`: the handler unlinks the actor when it holds. So the documented
+    // resident is present on a new game, gone with `$021` alone, and back
+    // when both are set.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let at_home = |flags: &[u8]| {
+        residents(image, 0x000B, EventFlags::Bitmap(flags))
+            .unwrap()
+            .iter()
+            .any(|resident| resident.position == (120, 112))
+    };
+    let fresh = new_game();
+    assert!(at_home(&fresh), "present on a new game");
+    let mut one = new_game();
+    one[0x21 / 8] |= 1 << (0x21 % 8);
+    assert!(!at_home(&one), "despawned with $021 alone");
+    let mut both = one.clone();
+    both[0x27 / 8] |= 1 << (0x27 % 8);
+    assert!(at_home(&both), "present again with $027 as well");
 }

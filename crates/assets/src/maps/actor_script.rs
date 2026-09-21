@@ -5,11 +5,12 @@
 //! the stream pointer `$36` by its own operand length, so lengths are read from
 //! the handlers rather than assumed.
 //!
-//! This walks a script and reports the two effects the Crysta slice needs —
-//! dialogue requests and event-flag writes — and refuses a service whose
-//! advance it cannot account for. It does not execute anything: conditions are
-//! not evaluated and branches are not followed, so the result is every effect
-//! the straight-line stream contains.
+//! This walks a script and reports the effects the Crysta slice needs —
+//! dialogue requests, event-flag writes and callback registration — and
+//! refuses a service whose advance it cannot account for. It does not execute
+//! anything. Given event flags it follows flag branches and stops at a despawn
+//! whose condition holds; without them it falls through every branch, so the
+//! result is every effect the straight-line stream contains.
 use std::fmt;
 
 const COP_TABLE: usize = 0x00_83B2;
@@ -24,31 +25,110 @@ pub const WRITE_FLAG: u8 = 0x07;
 pub const REGISTER_CALLBACK: u8 = 0x21;
 /// Branches on an event flag through `$80:BBA6`; see `$80:8678`.
 pub const BRANCH_ON_FLAG: u8 = 0x08;
+/// Branches on a chain of event-flag conditions, through `$80:8695`.
+///
+/// The chain is followed by a two-byte bank-relative target. When the chain
+/// holds the handler resumes there; otherwise `$80:8390` skips the target.
+pub const CHAINED_BRANCH: u8 = 0x09;
+/// Despawns on a chain of event-flag conditions, through `$80:963A`.
+///
+/// The same chain with no target. When it holds the handler calls `$80:BD57`,
+/// which unlinks the actor from the scene list, and abandons the stream with
+/// `PLA : PLA : RTL`; otherwise the walk proceeds at the next command.
+pub const CHAINED_DESPAWN: u8 = 0x47;
 /// Services that test a chain of event-flag conditions.
 ///
-/// `$80:8695` and `$80:963A` share an opening with [`BRANCH_ON_FLAG`] but,
-/// after testing a word, examine its high nibble: a bit in `$F000` selects a
-/// boolean combinator and pulls in a further condition word, while a clear
-/// nibble ends the chain. Their length is therefore a property of the stream,
-/// not of the handler, exactly as the spawn stream's `$FA` is -- there the mask
-/// is `$F800`.
-pub const CHAINED_CONDITION: [u8; 2] = [0x09, 0x47];
-/// Mask whose bits continue a chained condition.
-const CHAIN_CONTINUES: u16 = 0xF000;
+/// Both handlers open like [`BRANCH_ON_FLAG`] but, after testing a word,
+/// examine its high nibble. A bit in [`CHAIN_CONTINUES`] names a combinator and
+/// pulls in a further condition word; a clear nibble ends the chain, and so
+/// does [`CHAIN_NEGATES`], which is tested first and inverts the result. Their
+/// length is therefore a property of the stream, not of the handler, exactly
+/// as the spawn stream's `$FA` is -- there the mask is `$F800`.
+pub const CHAINED_CONDITION: [u8; 2] = [CHAINED_BRANCH, CHAINED_DESPAWN];
+/// Combinator bits that pull in a further condition word.
+///
+/// `$4000` ors the next flag in, `$2000` ands it, and `$1000` alone adds it
+/// and keeps the low bit -- an exclusive or. Checked in that order.
+const CHAIN_CONTINUES: u16 = 0x7000;
+/// Ends the chain and inverts the accumulated result; `$80:8717`.
+const CHAIN_NEGATES: u16 = 0x8000;
+
+/// Whether a chain word pulls in another.
+const fn chain_continues(word: u16) -> bool {
+    word & CHAIN_NEGATES == 0 && word & CHAIN_CONTINUES != 0
+}
 
 /// Operand bytes a chained condition consumes, starting at its first word.
 ///
-/// At least one word, then one more for as long as the previous word has a bit
-/// in [`CHAIN_CONTINUES`].
+/// At least one word, then one more for as long as the previous word
+/// continues the chain. The [`CHAINED_BRANCH`] target is not included.
 #[must_use]
 pub fn chained_condition_length(image: &[u8], first_word: usize) -> Option<usize> {
     let mut length = 0usize;
     for _ in 0..MAX_CHAIN_WORDS {
         let bytes = image.get(first_word + length..first_word + length + 2)?;
         length += 2;
-        if u16::from_le_bytes([bytes[0], bytes[1]]) & CHAIN_CONTINUES == 0 {
+        if !chain_continues(u16::from_le_bytes([bytes[0], bytes[1]])) {
             return Some(length);
         }
+    }
+    None
+}
+
+/// Evaluates a chained condition against event flags as `$80:8695` does.
+///
+/// The first word's flag seeds the result. Each continuing word names how the
+/// *next* word's flag joins it: or, and, or exclusive-or. And and exclusive-or
+/// short-circuit -- once the running result is false the remaining words are
+/// consumed without being tested, which matters because a later or would
+/// otherwise revive it. The terminating word's bit 15 inverts the result.
+///
+/// Returns `None` for truncation, a chain past [`MAX_CHAIN_WORDS`], or a flag
+/// outside the bitmap.
+#[must_use]
+pub fn chained_condition_holds(
+    image: &[u8],
+    first_word: usize,
+    flags: &super::scripts::EventFlags<'_>,
+) -> Option<bool> {
+    let read = |at: usize| {
+        image
+            .get(at..at + 2)
+            .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+    };
+    let mut at = first_word;
+    let mut current = read(at)?;
+    at += 2;
+    let mut result = flags.get(current & 0x0FFF)?;
+    // `$80:86F6`: the rest of the chain is read but no longer tested.
+    let mut settled = false;
+    for _ in 0..MAX_CHAIN_WORDS {
+        if current & CHAIN_NEGATES != 0 {
+            return Some(!result);
+        }
+        if current & CHAIN_CONTINUES == 0 {
+            return Some(result);
+        }
+        let next = read(at)?;
+        at += 2;
+        if !settled {
+            let flag = || flags.get(next & 0x0FFF);
+            if current & 0x4000 != 0 {
+                result |= flag()?;
+            } else if current & 0x2000 != 0 {
+                // `$80:86DE`: a false result skips the test as well as the
+                // rest of the chain.
+                result = result && flag()?;
+                settled = !result;
+            } else {
+                // `$80:86BA`: `ADC #0` then `AND #1`, unless the sum is zero,
+                // which abandons the chain at `$80:86CC`.
+                let sum = u8::from(result) + u8::from(flag()?);
+                result = sum & 1 == 1;
+                settled = sum == 0;
+            }
+        }
+        current = next;
     }
     None
 }
@@ -122,6 +202,16 @@ pub enum Stop {
         offset: usize,
         /// The bank-relative target named.
         target: u16,
+    },
+    /// A [`CHAINED_DESPAWN`] condition held, and the actor was removed.
+    ///
+    /// `$80:963A` calls `$80:BD57`, which unlinks the actor from the scene
+    /// list rooted at `$0DFC` through the `+$2C`/`+$2E` links, then abandons
+    /// the stream with `PLA : PLA : RTL`. Nothing after the command runs and
+    /// the actor is no longer in the room.
+    Despawned {
+        /// Normalized offset of the command.
+        offset: usize,
     },
 }
 
@@ -429,7 +519,9 @@ fn walk_inner(
         }
         let service = window[1];
         let length = if CHAINED_CONDITION.contains(&service) {
+            // The branch form carries its target after the chain.
             chained_condition_length(image, cursor + 2)
+                .map(|chain| chain + if service == CHAINED_BRANCH { 2 } else { 0 })
         } else {
             *derived[usize::from(service)].get_or_insert_with(|| operand_length(image, service))
         };
@@ -466,27 +558,49 @@ fn walk_inner(
         // compares a map ID against `$047E` -- and reading their operands as a
         // condition and a target sends the walk somewhere it can still decode,
         // which is the worst possible failure.
-        if service == BRANCH_ON_FLAG {
-            if let (Some(flags), Some(condition)) = (events, operand) {
+        //
+        // A chained condition is evaluated the same way, with its target
+        // sitting after the chain; the halt form has no target and ends the
+        // walk instead.
+        let taken = match (service, events, operand) {
+            (BRANCH_ON_FLAG, Some(flags), Some(condition)) => {
                 let set = flags
                     .get(condition & 0x0FFF)
                     .ok_or(ScriptError::Truncated { offset: cursor })?;
-                if super::actors::condition_takes_branch(condition, set) {
-                    let target = image
-                        .get(cursor + 4..cursor + 6)
-                        .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
-                        .ok_or(ScriptError::Truncated { offset: cursor })?;
-                    if target < 0x8000 {
-                        effects.stop = Stop::InvalidBranch {
-                            offset: cursor,
-                            target,
-                        };
-                        return Ok(effects);
-                    }
-                    cursor = bank | usize::from(target);
-                    continue;
-                }
+                // The target is the last operand word.
+                super::actors::condition_takes_branch(condition, set).then_some(cursor + length)
             }
+            (CHAINED_BRANCH, Some(flags), _) => {
+                let holds = chained_condition_holds(image, cursor + 2, &flags)
+                    .ok_or(ScriptError::Truncated { offset: cursor })?;
+                holds.then_some(cursor + length)
+            }
+            (CHAINED_DESPAWN, Some(flags), _) => {
+                let holds = chained_condition_holds(image, cursor + 2, &flags)
+                    .ok_or(ScriptError::Truncated { offset: cursor })?;
+                if holds {
+                    effects.stop = Stop::Despawned { offset: cursor };
+                    return Ok(effects);
+                }
+                // No target: the walk proceeds at the next command.
+                None
+            }
+            _ => None,
+        };
+        if let Some(target_at) = taken {
+            let target = image
+                .get(target_at..target_at + 2)
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]))
+                .ok_or(ScriptError::Truncated { offset: cursor })?;
+            if target < 0x8000 {
+                effects.stop = Stop::InvalidBranch {
+                    offset: cursor,
+                    target,
+                };
+                return Ok(effects);
+            }
+            cursor = bank | usize::from(target);
+            continue;
         }
         cursor += 2 + length;
     }

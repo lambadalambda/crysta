@@ -77,6 +77,12 @@ pub enum Conversation {
 
 /// Residents a map installs for a given event-flag state.
 ///
+/// The spawn list's own `$FA` conditions choose which records are installed.
+/// A record's entry script can then remove the actor again: `COP 47` despawns
+/// when its condition chain holds, and the documented resident's script opens
+/// with one. Such a record is left out, because the room the game shows does
+/// not contain them.
+///
 /// # Errors
 /// Propagates a spawn stream the decoder refuses.
 pub fn residents(
@@ -91,7 +97,19 @@ pub fn residents(
             record: record.offset(),
             script: record.script(),
         })
+        .filter(|resident| !despawns(image, resident, events))
         .collect())
+}
+
+/// Whether the resident's entry script removes them under these flags.
+///
+/// A script the walker cannot follow is kept: a refusal is not evidence of
+/// absence.
+fn despawns(image: &[u8], resident: &Resident, events: EventFlags<'_>) -> bool {
+    resident.script.is_some_and(|script| {
+        actor_script::walk_with_events(image, script, events)
+            .is_ok_and(|walked| matches!(walked.stop, actor_script::Stop::Despawned { .. }))
+    })
 }
 
 /// Walks a resident's interaction and decodes the dialogue it reaches.

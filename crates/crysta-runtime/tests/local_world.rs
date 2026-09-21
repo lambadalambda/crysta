@@ -328,9 +328,10 @@ fn talking_applies_the_flags_the_script_writes() {
     };
     let image = cartridge.image();
     // Reach the already-met arm, whose script writes the $0026 progression
-    // flag, and check the world records it.
+    // flag, and check the world records it. $027 keeps the resident in the
+    // room: their entry script despawns them when $027 and $021 disagree.
     let mut events = crysta_runtime::world::new_game_flags();
-    for flag in [0x109usize, 0x03B, 0x296, 0x021, 0x028, 0x026] {
+    for flag in [0x109usize, 0x03B, 0x296, 0x021, 0x028, 0x026, 0x027] {
         events[flag / 8] |= 1 << (flag % 8);
     }
     let mut world = World::enter_with_events(image, 0x000B, 120, 112 + 16, events).unwrap();

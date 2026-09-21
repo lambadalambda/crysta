@@ -616,3 +616,49 @@ fn only_the_flag_branch_service_is_followed_as_a_branch() {
         }
     }
 }
+
+#[test]
+fn a_chained_branch_carries_a_target_and_a_negated_word_ends_the_chain() {
+    use assets::maps::actor_script::{chained_condition_length, walk_with_events, Stop};
+    use assets::maps::scripts::EventFlags;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    // `02 09 2a 10 2c 00 e0 98` at $88:98AE: $102A chains, $002C ends, and
+    // the two bytes after are the target $98E0 -- which is a COP.
+    assert_eq!(chained_condition_length(image, 0x08_98B0), Some(4));
+    assert_eq!(
+        image[0x08_98E0..0x08_98E2],
+        [0x02, 0x13],
+        "target lands on a COP"
+    );
+    // `02 47 2a 10 2c 80 02 99` at $88:804D: $802C has bit 15, so the chain
+    // ends there and the halt form has no target; `02 99` is the next command.
+    assert_eq!(chained_condition_length(image, 0x08_804F), Some(4));
+    assert_eq!(
+        image[0x08_8053..0x08_8055],
+        [0x02, 0x99],
+        "the next COP follows"
+    );
+    // Walking the map-$0010 resident's script on a new game now reaches its
+    // ordinary loop: register callback, clear the mirror, select pose 2, wait.
+    let mut bitmap = vec![0u8; 512];
+    bitmap[4] |= 1;
+    bitmap[31] |= 1 << 3;
+    let walked = walk_with_events(image, 0x88_98AE, EventFlags::Bitmap(&bitmap)).unwrap();
+    let services: Vec<u8> = walked.commands.iter().map(|c| c.service).collect();
+    assert!(
+        services.ends_with(&[0x21, 0x65, 0x23, 0xB6, 0x80, 0x8E]),
+        "{services:02x?} stopping {:?}",
+        walked.stop
+    );
+    assert_eq!(
+        walked.stop,
+        Stop::EndOfCommands {
+            offset: 0x08_98DE,
+            opcode: 0x80
+        },
+        "the BRA back to the wait"
+    );
+}

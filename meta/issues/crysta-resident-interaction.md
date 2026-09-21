@@ -77,8 +77,29 @@ first-visit line at `$88:95B3`, which is a **choice prompt** the text decoder
 does not render. That is reported as `Unsupported`, distinct from `Silent`,
 because the script did reach text.
 
-Census over the slice's records under new-game flags: **4 speak, 6 unsupported,
-16 unaccounted, 89 silent.**
+Census over the slice's records under new-game flags, before the chained
+conditions were sized correctly: **4 speak, 6 unsupported, 16 unaccounted, 89
+silent.**
+
+### Chained conditions were sized wrongly, and `$47` is a despawn
+
+`COP 09` and `COP 47` test a chain of flag words. Reading their handlers,
+`$80:8695` and `$80:963A`: a word continues the chain when bit 15 is clear
+and any of `$7000` is set, where `$4000` ors the next flag in, `$2000` ands
+it and `$1000` exclusive-ors it; bit 15 ends the chain and inverts the
+result. The old rule took bit 15 as continuation. `$09` is followed by a
+two-byte branch target, which the old length did not include, so every walk
+past one stopped at the target bytes. `$47` has no target: when its chain
+holds the handler calls `$80:BD57`, which unlinks the actor from the scene
+list, and abandons the stream. The walker now evaluates both, and the roster
+leaves out a resident whose entry script despawns them.
+
+The documented resident's entry script opens with `$47` on the exclusive-or
+of `$027` and `$021`, so reaching their documented pages needs `$027` set
+alongside the six callback flags, or they are not in the room to talk to.
+
+Census after the fix: **16 speak, 14 unsupported, 17 unaccounted, 41
+silent.**
 
 ### Occupancy is available but off, and the reason is measured
 
@@ -90,8 +111,10 @@ records sit on the cells doorway approaches need.
 
 ## Remaining
 
-- Choice prompts do not decode, so 6 residents reach text that cannot be shown.
-- 16 scripts stop at an unaccounted `COP` service.
+- Choice prompts do not decode, so 14 residents reach text that cannot be
+  shown.
+- 17 scripts stop at an unaccounted `COP` service; `$06`, a call through a
+  long pointer that sits on the not-taken arm of most house scripts, is one.
 - 89 records register no interaction callback at all. Whether those are scenery
   or residents whose callback the walker misses is not established.
 - Telling records that are bodies from records that are not would let occupancy
