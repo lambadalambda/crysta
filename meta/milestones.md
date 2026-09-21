@@ -102,6 +102,7 @@ qualification remain open.
 
 - [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [Trace and qualify the movement collision predicate](issues/qualify-collision-predicate.md)
+- [Trace the player's movement admission routine](issues/trace-movement-admission-routine.md)
 - [Decode the door-entry trigger for one-cell exits](issues/decode-door-entry-trigger.md)
 - [Decode the actor script VM](issues/decode-actor-script-vm.md)
 - [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)
@@ -140,6 +141,7 @@ qualification remain open.
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
+- [Walkers stop and face the player who faces them](issues/crysta-walker-stops-for-player.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

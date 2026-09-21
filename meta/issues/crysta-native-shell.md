@@ -126,6 +126,8 @@ resident with their art status and what talking to them yields.
 - **The camera shows past the map's own region.** Several maps share one
   layer, so the window can include part of a neighbouring room. Clipping
   needs the per-map region.
-- **Walkers keep walking while spoken to**, and do not greet the player on
-  approach: `COP 59` and `COP 2E` are not modelled.
+- **Walkers do not greet the player on approach.** `COP 2E` tests a bit of
+  the held-button word `$0454`, and the runtime hands actors no buttons.
+  Walkers do stop and face a player who faces them, as `COP 23` has them do;
+  see [walkers stop and face the player](crysta-walker-stops-for-player.md).
 - No `.app` bundle yet; it runs as a binary.

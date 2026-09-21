@@ -100,5 +100,6 @@ wanderer's greeting on approach is not shown.
 - Step speed: eight frames a tile, against a velocity table `$80:8F32`
   reads that is not decoded.
 - The RNG: the runtime's own xorshift, seeded per map and record.
-- `COP 59`, the pause while being spoken to; a walker keeps walking during
-  a conversation.
+- `COP 59` turned out to be the scene pause, not a talk pause, and what
+  stops a walker for the player is `COP 23`; both are executed now. See
+  [walkers stop and face the player](crysta-walker-stops-for-player.md).
