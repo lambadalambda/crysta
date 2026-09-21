@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/rom", "crates/oracle", "crates/disasm", "crates/memory-map", "crates/assets", "crates/map-inspector", "crates/room-core", "crates/web-spike", "crates/pandora-web"]
+members = ["crates/rom", "crates/oracle", "crates/disasm", "crates/memory-map", "crates/assets", "crates/map-inspector", "crates/room-core", "crates/crysta-runtime", "crates/web-spike", "crates/pandora-web"]
 
 [workspace.package]
 version = "0.1.0"

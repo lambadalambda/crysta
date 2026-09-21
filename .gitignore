@@ -19,8 +19,6 @@ baserom.*
 
 # Rust and local tooling
 /target/
-# crysta-runtime sits outside the workspace and keeps its own build directory.
-crates/crysta-runtime/target/
 __pycache__/
 *.pyc
 .env

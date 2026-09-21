@@ -1,17 +1,10 @@
-# Deliberately outside the workspace: adding a member rewrites Cargo.lock,
-# which is a pinned producer source for the map-inspector capture gate. That
-# gate demands an evidenced repin, and a crate map-inspector does not depend on
-# is not grounds for one. Run this crate's tests explicitly:
-#   cargo test --manifest-path crates/crysta-runtime/Cargo.toml
-[workspace]
-
 [package]
 name = "crysta-runtime"
 description = "Free-roam simulation over the decoded 24-map Crysta slice"
-version = "0.1.0"
-edition = "2021"
-license = "MIT"
-repository = "https://github.com/lainsoykaf/terranigma"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
 
 [dependencies]
 assets = { path = "../assets" }
@@ -20,10 +13,5 @@ room-core = { path = "../room-core" }
 [dev-dependencies]
 rom = { path = "../rom" }
 
-[lints.rust]
-unsafe_code = "forbid"
-missing_docs = "warn"
-
-[lints.clippy]
-all = { level = "warn", priority = -1 }
-pedantic = "warn"
+[lints]
+workspace = true
