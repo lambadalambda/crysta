@@ -55,3 +55,32 @@ separates free roam from the qualified corridor.
 - Parent: [Play the Crysta slice free-roam in a native app](free-roam-crysta-app.md)
 - Where this lands matters: `map-inspector` is a qualification tool and should
   not become a runtime dependency. A new crate is the likely home.
+
+## Progress: done, and one finding that shapes the rest
+
+`crates/crysta-runtime` builds a `Room` for all 24 maps with no sample halo:
+**21,173 standable cells** across the slice, against the qualified preview's
+handful of halos.
+
+The finding: **several maps share one cell grid.** The six opening-house rooms
+are one 32x64 layer; the six southern town houses are one 48x32 layer; the two
+cellars sit in the house layer and differ from it only by palette. Only five
+distinct layers cover all 24 maps.
+
+A map is therefore a **region** of its layer, not a layer of its own. Which
+region is ROM data rather than a judgement — it is where that map's arrivals
+land — and for the `$1A` layer the six maps and six regions are a bijection.
+
+Two consequences for the work that follows:
+
+- **Free roam is safe on a shared layer.** The regions are separated by
+  collision, so the player cannot walk out of their map's room into a
+  neighbouring map's. `a_shared_layers_regions_are_separated_by_collision`
+  asserts no two adjacent standable cells straddle a region.
+- **Arrival and camera are per-map, not per-layer.** The transition work needs
+  the region, not just the grid.
+
+Two maps in the house layer resolve to a region another map also claims
+(`$0C` with `$10`, `$0D` with `$11`). Whether those are genuinely the same room
+reached under different progression, or the arrival-derived region is too
+coarse, is not yet established.
