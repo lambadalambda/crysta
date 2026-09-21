@@ -266,8 +266,8 @@ fn the_player_can_walk_up_to_a_resident_and_talk() {
     );
     world.face(Direction::Up);
     match world.talk() {
-        Some(Conversation::Unsupported { source }) => assert_eq!(source, 0x95B3),
-        other => panic!("expected the first-visit line, got {other:?}"),
+        Some(Conversation::Speaks { pages, .. }) => assert_eq!(pages.len(), 2),
+        other => panic!("expected the documented two pages, got {other:?}"),
     }
     // Facing away reaches nobody.
     world.face(Direction::Down);
@@ -317,13 +317,10 @@ fn talking_applies_the_flags_the_script_writes() {
         return;
     };
     let image = cartridge.image();
-    // Reach the already-met arm, whose script writes the $0026 progression
-    // flag, and check the world records it. $027 keeps the resident in the
-    // room: their entry script despawns them when $027 and $021 disagree.
-    let mut events = crysta_runtime::world::new_game_flags();
-    for flag in [0x109usize, 0x03B, 0x296, 0x021, 0x028, 0x026, 0x027] {
-        events[flag / 8] |= 1 << (flag % 8);
-    }
+    // On a new game the callback's dispatch falls through to the documented
+    // arm, whose script writes the $0026 progression flag; check the world
+    // records it.
+    let events = crysta_runtime::world::new_game_flags();
     let mut world = World::enter_with_events(image, 0x000B, 120, 112 + 16, events).unwrap();
     world.face(Direction::Up);
     let spoken = world.talk().expect("the resident is there");

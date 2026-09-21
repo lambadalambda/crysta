@@ -59,17 +59,19 @@ fn the_documented_resident_stands_where_the_game_puts_them() {
 /// The six `$08` conditions guarding the documented resident's callback, and
 /// the flag their entry script pairs with one of them.
 ///
-/// Each condition has bit 15 set, so each branches when its flag is **clear**.
-/// Setting all six is what makes the walk fall through to the arm
-/// `docs/house-dialogue.md` records. The entry script opens with a `$47`
-/// despawn on the exclusive-or of `$027` and `$021`, so `$027` has to be set
-/// alongside `$021` or the resident is not in the room to talk to.
-const ALREADY_MET: [u16; 7] = [0x109, 0x03B, 0x296, 0x021, 0x028, 0x026, 0x027];
+/// Each condition has bit 15 set, so each branches when its flag is **set**
+/// (`$80:8678`). On a new game none is, and the walk falls through to the
+/// arm `docs/house-dialogue.md` records. With all six set the first branch
+/// fires instead. The entry script opens with a `$47` despawn on the
+/// exclusive-or of `$027` and `$021`, so `$027` has to be set alongside
+/// `$021` or the resident is not in the room to talk to.
+const PROGRESSED: [u16; 7] = [0x109, 0x03B, 0x296, 0x021, 0x028, 0x026, 0x027];
 
 #[test]
 fn the_documented_resident_speaks_their_own_pages() {
     // record -> script -> callback -> text, every hop derived rather than
-    // tabulated, and the pages decoded from where the script points.
+    // tabulated, and the pages decoded from where the script points. The
+    // documented pages are what a new game shows.
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -79,12 +81,7 @@ fn the_documented_resident_speaks_their_own_pages() {
         .iter()
         .find(|resident| resident.position == (120, 112))
         .unwrap();
-    // The documented pages are the already-met arm, not the first-visit one.
-    let mut met = new_game();
-    for flag in ALREADY_MET {
-        met[usize::from(flag) / 8] |= 1 << (flag % 8);
-    }
-    match talk_to(cartridge.image(), resident, EventFlags::Bitmap(&met)) {
+    match talk_to(cartridge.image(), resident, EventFlags::Bitmap(&bitmap)) {
         Conversation::Speaks { pages, flags } => {
             assert_eq!(pages.len(), 2, "the resident's two pages");
             assert!(
@@ -102,24 +99,27 @@ fn the_documented_resident_speaks_their_own_pages() {
 }
 
 #[test]
-fn a_fresh_resident_says_something_different_from_a_met_one() {
+fn a_progressed_resident_says_something_different_from_a_fresh_one() {
     // The callback is a six-way dispatch over progression, so the flags choose
-    // what is said. On a new game the first branch fires and the resident
-    // gives their first-visit line, which is a choice prompt the text decoder
-    // does not render -- reported as unsupported, not as silence.
+    // what is said. With every gate set the first branch fires and the
+    // resident gives a later line at `$88:95B3`, which is a choice prompt the
+    // text decoder does not render -- reported as unsupported, not as silence.
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
-    let fresh = new_game();
-    let found = residents(image, 0x000B, EventFlags::Bitmap(&fresh)).unwrap();
+    let mut met = new_game();
+    for flag in PROGRESSED {
+        met[usize::from(flag) / 8] |= 1 << (flag % 8);
+    }
+    let found = residents(image, 0x000B, EventFlags::Bitmap(&met)).unwrap();
     let resident = found
         .iter()
         .find(|resident| resident.position == (120, 112))
         .unwrap();
-    match talk_to(image, resident, EventFlags::Bitmap(&fresh)) {
+    match talk_to(image, resident, EventFlags::Bitmap(&met)) {
         Conversation::Unsupported { source } => assert_eq!(source, 0x95B3),
-        other => panic!("expected the first-visit choice prompt, got {other:?}"),
+        other => panic!("expected the progressed choice prompt, got {other:?}"),
     }
 }
 

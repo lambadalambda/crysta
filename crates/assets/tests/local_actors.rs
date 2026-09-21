@@ -538,9 +538,10 @@ fn following_a_branch_needs_the_flags_that_decide_it() {
     assert_eq!(straight.text, [0x8FF0]);
 
     // With flags supplied, the first branch whose condition holds is taken, so
-    // the walk reports a different arm. Flag $0009 is the first condition.
+    // the walk reports a different arm. The first condition is $8109: bit 15
+    // set, so it branches when flag $109 is set ($80:8678).
     let mut bitmap = vec![0u8; 512];
-    bitmap[0x09 / 8] |= 1 << (0x09 % 8);
+    bitmap[0x109 / 8] |= 1 << (0x109 % 8);
     let taken = walk_with_events(image, 0x88_8EDE, EventFlags::Bitmap(&bitmap)).unwrap();
     assert_ne!(
         taken.commands.get(1).map(|command| command.offset),

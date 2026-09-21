@@ -101,6 +101,15 @@ alongside the six callback flags, or they are not in the room to talk to.
 Census after the fix: **16 speak, 14 unsupported, 17 unaccounted, 41
 silent.**
 
+### And the `$08` branch was inverted
+
+It had been evaluated with the spawn stream's `$FA` rule. `$80:8678` is the
+opposite sense: a word without bit 15 branches when the flag is clear, one
+with it branches when the flag is set. So the six-way dispatch above falls
+through to the documented pages on a **new game**, as `docs/house-dialogue.md`
+recorded, and the choice prompt at `$88:95B3` is a later line. Census with
+the sense corrected: **22 speak, 9 unsupported, 15 unaccounted, 42 silent.**
+
 ### Occupancy is available but off, and the reason is measured
 
 A resident's collision cell is one row above the cell they visually stand in,

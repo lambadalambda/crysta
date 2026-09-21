@@ -25,6 +25,20 @@ pub const WRITE_FLAG: u8 = 0x07;
 pub const REGISTER_CALLBACK: u8 = 0x21;
 /// Branches on an event flag through `$80:BBA6`; see `$80:8678`.
 pub const BRANCH_ON_FLAG: u8 = 0x08;
+
+/// Whether a [`BRANCH_ON_FLAG`] condition takes its branch.
+///
+/// `$80:8678` tests the sign first. A word without bit 15 branches when the
+/// flag is **clear** (`BCS` to the fall-through), a word with it branches
+/// when the flag is **set**. This is the opposite of the spawn stream's
+/// `$FA`, which [`super::actors::condition_takes_branch`] models, and the
+/// two must not be confused: the documented resident's six-way dispatch has
+/// bit 15 on every condition, so on a new game none of them branch and the
+/// walk falls through to the pages `docs/house-dialogue.md` records.
+#[must_use]
+pub const fn flag_branch_taken(word: u16, flag_set: bool) -> bool {
+    (word & 0x8000 != 0) == flag_set
+}
 /// Branches on a chain of event-flag conditions, through `$80:8695`.
 ///
 /// The chain is followed by a two-byte bank-relative target. When the chain
@@ -458,10 +472,10 @@ fn handler(image: &[u8], service: u8) -> Option<usize> {
 
 /// Walks one script, following flag branches against `events`.
 ///
-/// `$80:8678` tests the condition through `$80:BBA6` and, per its own branch
-/// structure, takes the branch when the flag is set for a non-negative
-/// condition word and when it is clear for a negative one — the same
-/// convention the spawn stream uses.
+/// `$80:8678` tests the condition through `$80:BBA6` and takes the branch
+/// when the flag is **clear** for a non-negative condition word and when it
+/// is **set** for a negative one; see [`flag_branch_taken`]. That is the
+/// opposite of the spawn stream's `$FA`.
 ///
 /// # Errors
 /// As [`walk`].
@@ -568,7 +582,7 @@ fn walk_inner(
                     .get(condition & 0x0FFF)
                     .ok_or(ScriptError::Truncated { offset: cursor })?;
                 // The target is the last operand word.
-                super::actors::condition_takes_branch(condition, set).then_some(cursor + length)
+                flag_branch_taken(condition, set).then_some(cursor + length)
             }
             (CHAINED_BRANCH, Some(flags), _) => {
                 let holds = chained_condition_holds(image, cursor + 2, &flags)
