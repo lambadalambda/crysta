@@ -32,3 +32,8 @@
 - [ ] [Add enhanced and widescreen rendering](issues/enhanced-widescreen-rendering.md)
 - [ ] [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [ ] [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
+- [ ] [Play the Crysta slice free-roam in a native app](issues/free-roam-crysta-app.md)
+- [ ] [Promote the Crysta room builder into a library](issues/crysta-room-library.md)
+- [ ] [Walk between Crysta maps through the real exit geometry](issues/crysta-map-transitions.md)
+- [ ] [Place Crysta residents and let the player talk to them](issues/crysta-resident-interaction.md)
+- [ ] [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
