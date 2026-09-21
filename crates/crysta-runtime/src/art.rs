@@ -11,7 +11,8 @@ use assets::graphics::{Bgr555, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{
-    ArkSprites, HouseActor, RecordRefusal, ResidentPose, SpriteError, SpriteFrame, SpritePixel,
+    ArkSprites, HouseActor, HouseFrame, RecordRefusal, ResidentPose, SpriteError, SpriteFrame,
+    SpritePixel,
 };
 use room_core::{AnimationFrame, AnimationSet};
 use std::fmt;
@@ -222,6 +223,35 @@ fn frame_index(frame: AnimationFrame) -> usize {
     }
 }
 
+/// A resident's pose list as rasters, cycled by each record's duration.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Animation {
+    /// One raster per record, in list order.
+    pub frames: Vec<Raster>,
+    /// Frames each record holds for; zero holds forever.
+    pub durations: Vec<u8>,
+}
+
+impl Animation {
+    /// The raster showing `tick` frames after the list started.
+    ///
+    /// The list loops: the ordinary loop re-selects the pose and waits for
+    /// it to resolve, so a resident cycles their records for as long as they
+    /// stand there. A record with zero duration ends the cycle on itself.
+    #[must_use]
+    pub fn frame_at(&self, tick: u64) -> &Raster {
+        let total: u64 = self.durations.iter().map(|d| u64::from(*d)).sum();
+        let mut remaining = if total == 0 { 0 } else { tick % total };
+        for (raster, duration) in self.frames.iter().zip(&self.durations) {
+            if *duration == 0 || remaining < u64::from(*duration) {
+                return raster;
+            }
+            remaining -= u64::from(*duration);
+        }
+        &self.frames[0]
+    }
+}
+
 /// Why a resident has no art.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Placeholder {
@@ -237,7 +267,7 @@ pub enum Placeholder {
     PredecessorRefused,
 }
 
-/// Setup art for each resident of a map, aligned with `present`.
+/// Animated art for each resident of a map, aligned with `present`.
 ///
 /// Records are decoded in spawn-list order, present or not, because a record
 /// may reuse the resource or graphics of the record before it; the loader
@@ -248,7 +278,7 @@ pub fn residents_art(
     map: u16,
     present: &[Resident],
     events: EventFlags<'_>,
-) -> Vec<Result<Raster, Placeholder>> {
+) -> Vec<Result<Animation, Placeholder>> {
     let Ok(list) = SpawnList::from_rom(image, map) else {
         return present
             .iter()
@@ -274,14 +304,24 @@ pub fn residents_art(
                 Some(Err(RecordRefusal::Invalid(error))) => {
                     Err(Placeholder::Refused(error.to_string()))
                 }
-                Some(Ok(actor)) => raster(
-                    actor.setup_frame().composition(),
-                    actor.graphics(),
-                    actor.palette(),
-                    actor.palette_base(),
-                    actor.hflip(),
-                )
-                .map_err(|error| Placeholder::Refused(error.to_string())),
+                Some(Ok(actor)) => actor
+                    .frames()
+                    .iter()
+                    .map(|frame| {
+                        raster(
+                            frame.composition(),
+                            actor.graphics(),
+                            actor.palette(),
+                            actor.palette_base(),
+                            actor.hflip(),
+                        )
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+                    .map(|frames| Animation {
+                        durations: actor.frames().iter().map(HouseFrame::duration).collect(),
+                        frames,
+                    })
+                    .map_err(|error| Placeholder::Refused(error.to_string())),
             }
         })
         .collect()

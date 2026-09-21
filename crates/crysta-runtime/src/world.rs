@@ -111,8 +111,13 @@ impl<'a> World<'a> {
         y: u16,
         events: Vec<u8>,
     ) -> Result<Self, WorldError> {
-        let built = room(image, map)?;
         let present = residents(image, map, EventFlags::Bitmap(&events)).unwrap_or_default();
+        let bodies: Vec<Resident> = present
+            .iter()
+            .filter(|resident| resident.body)
+            .cloned()
+            .collect();
+        let built = occupy(room(image, map)?, &bodies)?;
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -379,12 +384,10 @@ pub fn new_game_flags() -> Vec<u8> {
 
 /// Rebuilds a room with each resident's cell made solid.
 ///
-/// **Not applied by default, and the reason is measured.** A spawn list holds
-/// more than people: of the slice's 115 records only a handful reach dialogue,
-/// and making every one solid takes reachability from 19 maps to 2, because
-/// records sit on the cells doorway approaches need. Until records that are
-/// bodies can be told from records that are not, blocking them all costs more
-/// than it buys.
+/// Applied by [`World::enter`] to residents that are bodies, and only those:
+/// a spawn list holds more than people, and making every record solid takes
+/// reachability from 19 maps to 2, because script-only records sit on the
+/// cells doorway approaches need. A record that decodes to art is a body.
 ///
 /// The cell blocked is [`Resident::collision_cell`], not the visual one:
 /// movement samples at `(x - 8, y - 16)`.

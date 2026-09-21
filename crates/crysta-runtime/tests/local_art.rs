@@ -104,7 +104,8 @@ fn the_documented_resident_has_art_and_the_slice_mostly_does() {
         .iter()
         .position(|resident| resident.position == (120, 112))
         .unwrap();
-    let raster = art[index].as_ref().expect("the documented resident's art");
+    let animation = art[index].as_ref().expect("the documented resident's art");
+    let raster = animation.frame_at(0);
     assert!(raster.is_visible());
     // A body stands on its origin, reaching up from it.
     assert!(raster.offset.1 < 0, "{:?}", raster.offset);
@@ -148,6 +149,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             position: record.origin(),
             record: record.offset(),
             script: record.script(),
+            body: false,
         })
         .collect();
     let art = residents_art(image, 0x000A, &everyone, EventFlags::Bitmap(&flags));
@@ -170,4 +172,50 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
         .position(|resident| resident.record == 0x03_8A05)
         .unwrap();
     assert!(art[fine].is_ok(), "{:?}", art[fine]);
+}
+
+#[test]
+fn a_four_record_resident_cycles_by_duration() {
+    // Map $000C's residents keep four records at seven frames each, so the
+    // list is 28 frames long and every record shows for its seven.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let flags = new_game();
+    let present = residents(image, 0x000C, EventFlags::Bitmap(&flags)).unwrap();
+    let art = residents_art(image, 0x000C, &present, EventFlags::Bitmap(&flags));
+    let animated = art
+        .iter()
+        .filter_map(|entry| entry.as_ref().ok())
+        .find(|animation| animation.frames.len() == 4)
+        .expect("a four-record resident");
+    assert_eq!(animated.durations, vec![7, 7, 7, 7]);
+    assert!(std::ptr::eq(
+        animated.frame_at(0),
+        &raw const animated.frames[0]
+    ));
+    assert!(std::ptr::eq(
+        animated.frame_at(6),
+        &raw const animated.frames[0]
+    ));
+    assert!(std::ptr::eq(
+        animated.frame_at(7),
+        &raw const animated.frames[1]
+    ));
+    assert!(std::ptr::eq(
+        animated.frame_at(27),
+        &raw const animated.frames[3]
+    ));
+    assert!(std::ptr::eq(
+        animated.frame_at(28),
+        &raw const animated.frames[0]
+    ));
+    // A single zero-duration record holds.
+    let held = art
+        .iter()
+        .filter_map(|entry| entry.as_ref().ok())
+        .find(|animation| animation.durations == [0])
+        .expect("a held resident");
+    assert!(std::ptr::eq(held.frame_at(1000), &raw const held.frames[0]));
 }

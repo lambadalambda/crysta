@@ -275,48 +275,38 @@ fn the_player_can_walk_up_to_a_resident_and_talk() {
 }
 
 #[test]
-fn resident_occupancy_is_available_but_costs_connectivity() {
-    use crysta_runtime::world::occupy;
+fn a_resident_who_is_a_body_stops_the_player() {
+    // Occupancy blocks the collision cell, one row above the visual one,
+    // because movement samples at (x - 8, y - 16). It is applied on entry to
+    // residents that decode to a body, and to nobody else.
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
-    // Occupancy blocks the collision cell, one row above the visual one,
-    // because movement samples at (x - 8, y - 16).
-    let world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
+    let mut world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
     let resident = world
         .residents()
         .iter()
         .find(|resident| resident.cell() == (7, 7))
         .expect("the documented resident");
+    assert!(resident.body);
     assert_eq!(resident.collision_cell(), (7, 6));
-
-    let built = crysta_runtime::room(image, 0x000B).unwrap();
-    let blocked = occupy(built, world.residents()).unwrap();
-    // The observable is the grid, not `walkable_cells`: blocking one cell does
-    // not stop its neighbours moving, so the census barely shifts.
-    let index = usize::from(resident.collision_cell().1) * usize::from(blocked.width)
+    let index = usize::from(resident.collision_cell().1) * usize::from(world.dimensions().0)
         + usize::from(resident.collision_cell().0);
     assert_eq!(
-        blocked.room.cells()[index] >> 9,
+        world.room().cells()[index] >> 9,
         14,
         "the collision cell must carry a solid attribute"
     );
-
-    // And a player walking into it is stopped.
-    let mut walking = room_core::WalkingState::new(120, 128);
+    // Script-only records are not bodies.
+    assert!(world.residents().iter().any(|resident| !resident.body));
     for _ in 0..64 {
-        let _ = walking.step(
-            &blocked.room,
-            room_core::FrameInput {
-                direction: Some(Direction::Up),
-            },
-        );
+        world.step(Some(Direction::Up));
     }
     assert!(
-        walking.y() >= 128,
-        "the resident must stop the player, ended at y={}",
-        walking.y()
+        world.position().1 >= 128,
+        "the resident must stop the player, ended at {:?}",
+        world.position()
     );
 }
 

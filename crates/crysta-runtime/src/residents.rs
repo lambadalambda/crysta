@@ -8,6 +8,7 @@
 use assets::maps::actor_script::{self, ScriptEffects};
 use assets::maps::actors::{ResolveError, SpawnList};
 use assets::maps::scripts::EventFlags;
+use assets::sprites::{HouseActor, ResidentPose};
 use assets::text::{DialoguePage, HouseDialogue};
 
 /// Someone standing in a map.
@@ -19,6 +20,10 @@ pub struct Resident {
     pub record: usize,
     /// Runtime address of the script the record installs, when it has one.
     pub script: Option<u32>,
+    /// Whether the record decodes to a body: a descriptor whose art the
+    /// loader accepts. A script-only record and a refused one are not
+    /// bodies, and do not block movement.
+    pub body: bool,
 }
 
 impl Resident {
@@ -90,12 +95,26 @@ pub fn residents(
     map: u16,
     events: EventFlags<'_>,
 ) -> Result<Vec<Resident>, ResolveError> {
-    Ok(SpawnList::resolve(image, map, events)?
+    let present = SpawnList::resolve(image, map, events)?;
+    // Bodies are decided over the whole list, present or not, because a
+    // record may reuse the resource of the record before it.
+    let list = SpawnList::from_rom(image, map).map_err(ResolveError::Decode)?;
+    let decoded = HouseActor::from_records(image, map, list.records(), |record| {
+        ResidentPose::from_script(image, record, events).unwrap_or_default()
+    });
+    let is_body = |offset: usize| {
+        list.records()
+            .iter()
+            .position(|record| record.offset() == offset)
+            .is_some_and(|index| decoded[index].is_ok())
+    };
+    Ok(present
         .iter()
         .map(|record| Resident {
             position: record.origin(),
             record: record.offset(),
             script: record.script(),
+            body: is_body(record.offset()),
         })
         .filter(|resident| !despawns(image, resident, events))
         .collect())
