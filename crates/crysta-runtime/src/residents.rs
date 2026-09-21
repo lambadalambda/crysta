@@ -24,6 +24,16 @@ pub struct Resident {
     /// loader accepts. A script-only record and a refused one are not
     /// bodies, and do not block movement.
     pub body: bool,
+    /// The header's initial selector, where the script starts.
+    pub initial: u8,
+    /// Sequence the running script has selected.
+    pub selector: u8,
+    /// Horizontal mirror in force.
+    pub hflip: bool,
+    /// Frames since the selector or mirror last changed.
+    pub pose_age: u32,
+    /// Whether a step is under way.
+    pub walking: bool,
 }
 
 impl Resident {
@@ -102,19 +112,28 @@ pub fn residents(
     let decoded = HouseActor::from_records(image, map, list.records(), |record| {
         ResidentPose::from_script(image, record, events).unwrap_or_default()
     });
-    let is_body = |offset: usize| {
+    let decoded_for = |offset: usize| {
         list.records()
             .iter()
             .position(|record| record.offset() == offset)
-            .is_some_and(|index| decoded[index].is_ok())
+            .and_then(|index| decoded[index].as_ref().ok())
     };
     Ok(present
         .iter()
-        .map(|record| Resident {
-            position: record.origin(),
-            record: record.offset(),
-            script: record.script(),
-            body: is_body(record.offset()),
+        .map(|record| {
+            let actor = decoded_for(record.offset());
+            let initial = actor.map_or(0, HouseActor::initial);
+            Resident {
+                position: record.origin(),
+                record: record.offset(),
+                script: record.script(),
+                body: actor.is_some(),
+                initial,
+                selector: initial,
+                hflip: false,
+                pose_age: 0,
+                walking: false,
+            }
         })
         .filter(|resident| !despawns(image, resident, events))
         .collect())

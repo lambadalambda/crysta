@@ -267,7 +267,47 @@ pub enum Placeholder {
     PredecessorRefused,
 }
 
-/// Animated art for each resident of a map, aligned with `present`.
+/// A resident's decoded body: every sequence of their packet on demand.
+#[derive(Debug)]
+pub struct Body {
+    actor: HouseActor,
+}
+
+impl Body {
+    /// The animation for a sequence and mirror, as a running script selects
+    /// them: standing 0 to 2, walking 3 to 5.
+    ///
+    /// # Errors
+    /// Refuses a selector the packet does not hold, or frames outside the
+    /// qualified shape.
+    pub fn animation(&self, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
+        let frames = self.actor.sequence(selector, hflip)?;
+        let rasters = frames
+            .iter()
+            .map(|frame| {
+                raster(
+                    frame.composition(),
+                    self.actor.graphics(),
+                    self.actor.palette(),
+                    self.actor.palette_base(),
+                    hflip,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Animation {
+            durations: frames.iter().map(HouseFrame::duration).collect(),
+            frames: rasters,
+        })
+    }
+
+    /// The header's initial selector.
+    #[must_use]
+    pub const fn initial(&self) -> u8 {
+        self.actor.initial()
+    }
+}
+
+/// Bodies for each resident of a map, aligned with `present`.
 ///
 /// Records are decoded in spawn-list order, present or not, because a record
 /// may reuse the resource or graphics of the record before it; the loader
@@ -278,16 +318,20 @@ pub fn residents_art(
     map: u16,
     present: &[Resident],
     events: EventFlags<'_>,
-) -> Vec<Result<Animation, Placeholder>> {
+) -> Vec<Result<Body, Placeholder>> {
     let Ok(list) = SpawnList::from_rom(image, map) else {
         return present
             .iter()
             .map(|_| Err(Placeholder::Refused("spawn list refused".into())))
             .collect();
     };
-    let decoded = HouseActor::from_records(image, map, list.records(), |record| {
-        ResidentPose::from_script(image, record, events).unwrap_or_default()
-    });
+    let mut decoded: Vec<Option<Result<HouseActor, RecordRefusal>>> =
+        HouseActor::from_records(image, map, list.records(), |record| {
+            ResidentPose::from_script(image, record, events).unwrap_or_default()
+        })
+        .into_iter()
+        .map(Some)
+        .collect();
     present
         .iter()
         .map(|resident| {
@@ -295,7 +339,7 @@ pub fn residents_art(
                 .records()
                 .iter()
                 .position(|record| record.offset() == resident.record)
-                .map(|index| &decoded[index]);
+                .and_then(|index| decoded[index].take());
             match found {
                 None | Some(Err(RecordRefusal::NoDescriptor)) => Err(Placeholder::Invisible),
                 Some(Err(RecordRefusal::PredecessorRefused)) => {
@@ -304,24 +348,7 @@ pub fn residents_art(
                 Some(Err(RecordRefusal::Invalid(error))) => {
                     Err(Placeholder::Refused(error.to_string()))
                 }
-                Some(Ok(actor)) => actor
-                    .frames()
-                    .iter()
-                    .map(|frame| {
-                        raster(
-                            frame.composition(),
-                            actor.graphics(),
-                            actor.palette(),
-                            actor.palette_base(),
-                            actor.hflip(),
-                        )
-                    })
-                    .collect::<Result<Vec<_>, _>>()
-                    .map(|frames| Animation {
-                        durations: actor.frames().iter().map(HouseFrame::duration).collect(),
-                        frames,
-                    })
-                    .map_err(|error| Placeholder::Refused(error.to_string())),
+                Some(Ok(actor)) => Ok(Body { actor }),
             }
         })
         .collect()

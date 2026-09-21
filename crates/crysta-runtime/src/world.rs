@@ -4,6 +4,7 @@
 //! needs on top: the current map's room, and the exit geometry that carries the
 //! player into the next one.
 
+use crate::actors::{Actor, Surroundings};
 use crate::residents::{residents, talk_to, Conversation, Resident};
 use crate::{room, MapRoom, RoomError, MAPS};
 use assets::maps::exits::{ExitError, ExitList};
@@ -18,11 +19,19 @@ use std::fmt;
 pub struct World<'a> {
     image: &'a [u8],
     map: u16,
+    /// The map's room with the bodies present blocked in.
     room: MapRoom,
+    /// The map's room as built, before any body is blocked in.
+    base: MapRoom,
     exits: ExitList,
     walking: WalkingState,
-    /// Residents the spawn lists install for the current flags.
+    /// Residents the spawn lists install for the current flags, where their
+    /// running scripts have put them.
     residents: Vec<Resident>,
+    /// The running script of each resident, aligned with `residents`.
+    actors: Vec<Actor>,
+    /// Collision cells the bodies blocked when `room` was last rebuilt.
+    blocked: Vec<(u16, u16)>,
     /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
     events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
@@ -112,12 +121,19 @@ impl<'a> World<'a> {
         events: Vec<u8>,
     ) -> Result<Self, WorldError> {
         let present = residents(image, map, EventFlags::Bitmap(&events)).unwrap_or_default();
-        let bodies: Vec<Resident> = present
+        let actors = present
             .iter()
-            .filter(|resident| resident.body)
-            .cloned()
+            .enumerate()
+            .map(|(index, resident)| {
+                let seed = u32::from(map)
+                    .wrapping_mul(0x9E37_79B9)
+                    .wrapping_add(u32::try_from(index).unwrap_or(0).wrapping_mul(0x85EB_CA6B));
+                Actor::new(resident.position, resident.script, resident.initial, seed)
+            })
             .collect();
-        let built = occupy(room(image, map)?, &bodies)?;
+        let base = room(image, map)?;
+        let blocked = body_cells(&present);
+        let built = occupy(base.clone(), &bodies(&present))?;
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -126,9 +142,12 @@ impl<'a> World<'a> {
             image,
             map,
             room: built,
+            base,
             exits,
             walking: WalkingState::new(x, y),
             residents: present,
+            actors,
+            blocked,
             events,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -195,10 +214,67 @@ impl<'a> World<'a> {
             return Step::Refused(refused);
         }
         self.animation.advance(self.walking.active_direction());
-        match self.take_exit() {
-            Some(step) => step,
-            None if self.position() == before => Step::Stayed,
-            None => Step::Walked,
+        if let Some(step) = self.take_exit() {
+            return step;
+        }
+        self.run_actors();
+        if self.position() == before {
+            Step::Stayed
+        } else {
+            Step::Walked
+        }
+    }
+
+    /// Runs every resident's script for one frame and moves bodies.
+    ///
+    /// Each actor sees the player's cell and every other body's cell and
+    /// destination as occupied, so nobody steps onto anybody. When a body's
+    /// cell changes, the room is rebuilt from the base with the new cells
+    /// blocked, so the player is stopped by residents wherever they are.
+    fn run_actors(&mut self) {
+        let (x, y) = self.position();
+        let player = (x.saturating_sub(8) / 16, y.saturating_sub(16) / 16);
+        for index in 0..self.actors.len() {
+            let mut occupied = vec![player];
+            for (other, actor) in self.actors.iter().enumerate() {
+                if other != index && self.residents[other].body {
+                    occupied.push(actor.collision_cell());
+                    occupied.extend(actor.destination());
+                }
+            }
+            let around = Surroundings {
+                image: self.image,
+                events: &self.events,
+                cells: self.base.room.cells(),
+                width: self.base.width,
+                height: self.base.height,
+                occupied: &occupied,
+                player: (x, y),
+            };
+            self.actors[index].tick(&around);
+        }
+        let mut gone = Vec::new();
+        for (index, (resident, actor)) in self.residents.iter_mut().zip(&self.actors).enumerate() {
+            if actor.is_gone() {
+                gone.push(index);
+                continue;
+            }
+            resident.position = actor.position;
+            resident.selector = actor.selector;
+            resident.hflip = actor.hflip;
+            resident.pose_age = actor.pose_age;
+            resident.walking = actor.walking;
+        }
+        for index in gone.into_iter().rev() {
+            self.residents.remove(index);
+            self.actors.remove(index);
+        }
+        let cells = body_cells(&self.residents);
+        if cells != self.blocked {
+            if let Ok(rebuilt) = occupy(self.base.clone(), &bodies(&self.residents)) {
+                self.room = rebuilt;
+                self.blocked = cells;
+            }
         }
     }
 
@@ -346,9 +422,12 @@ impl<'a> World<'a> {
         let from = self.map;
         self.map = entered.map;
         self.room = entered.room;
+        self.base = entered.base;
         self.exits = entered.exits;
         self.walking = entered.walking;
         self.residents = entered.residents;
+        self.actors = entered.actors;
+        self.blocked = entered.blocked;
         // Arriving stands the player facing the way they came in, as the
         // qualified slice does on its own transitions.
         self.animation = AnimationState::standing(self.facing);
@@ -358,6 +437,24 @@ impl<'a> World<'a> {
             to: destination,
         })
     }
+}
+
+/// The residents that are bodies.
+fn bodies(present: &[Resident]) -> Vec<Resident> {
+    present
+        .iter()
+        .filter(|resident| resident.body)
+        .cloned()
+        .collect()
+}
+
+/// The collision cells the bodies stand on, in roster order.
+fn body_cells(present: &[Resident]) -> Vec<(u16, u16)> {
+    present
+        .iter()
+        .filter(|resident| resident.body)
+        .map(Resident::collision_cell)
+        .collect()
 }
 
 /// Cell offset one step in a direction.
