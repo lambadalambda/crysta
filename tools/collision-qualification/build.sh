@@ -6,6 +6,9 @@ mkdir -p "$probe/src"
 sed 's|../new-game-qualification/bootstrap.rs|bootstrap.rs|' \
   tools/collision-qualification/probe.rs >"$probe/src/main.rs"
 cp tools/new-game-qualification/bootstrap.rs "$probe/src/"
+mkdir -p "$probe/src/bin"
+sed 's|../new-game-qualification/bootstrap.rs|../bootstrap.rs|' \
+  tools/collision-qualification/trace.rs >"$probe/src/bin/trace.rs"
 cat >"$probe/Cargo.toml" <<'TOML'
 [package]
 name = "collision-probe"
