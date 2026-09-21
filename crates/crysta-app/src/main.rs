@@ -7,7 +7,7 @@
 mod frame;
 
 use assets::text::{Acknowledgement, DialoguePage};
-use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Placeholder};
+use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::world::World;
 use frame::{VIEW_HEIGHT, VIEW_WIDTH};
@@ -76,10 +76,28 @@ fn main() {
 /// Runs a step script and writes the composed view as a PPM.
 ///
 /// The script is comma-separated: `down:400` walks 400 frames down, `wait:5`
-/// stands for 5, and `talk` presses the interact button once.
+/// stands for 5, `talk` presses the interact button once, and `at:D:200:700`
+/// re-enters map `$000D` at (200,700) to look at a room directly.
 fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &str) {
     let mut session = Session::new(image);
     for step in script.split(',').filter(|step| !step.is_empty()) {
+        if let Some(rest) = step.strip_prefix("at:") {
+            let mut parts = rest.split(':');
+            let parsed = (
+                parts.next().and_then(|v| u16::from_str_radix(v, 16).ok()),
+                parts.next().and_then(|v| v.parse::<u16>().ok()),
+                parts.next().and_then(|v| v.parse::<u16>().ok()),
+            );
+            let (Some(map), Some(x), Some(y)) = parsed else {
+                eprintln!("bad placement in {step:?}");
+                std::process::exit(2);
+            };
+            session.world = World::enter(image, map, x, y).unwrap_or_else(|error| {
+                eprintln!("cannot enter {map:#06x}: {error}");
+                std::process::exit(1);
+            });
+            continue;
+        }
         let (what, count) = step.split_once(':').unwrap_or((step, "1"));
         let Ok(count) = count.parse::<usize>() else {
             eprintln!("bad step count in {step:?}");
@@ -114,13 +132,16 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
     }
     std::fs::write(path, out).expect("writing the frame");
     let roster = session.world.residents().to_vec();
-    let art = session.resident_art().to_vec();
-    for (resident, art) in roster.iter().zip(&art) {
-        let status = match art {
+    let statuses: Vec<String> = session
+        .resident_art()
+        .iter()
+        .map(|art| match art {
             Ok(_) => "drawn".to_string(),
             Err(Placeholder::Invisible) => "invisible".to_string(),
             Err(other) => format!("{other:?}"),
-        };
+        })
+        .collect();
+    for (resident, status) in roster.iter().zip(&statuses) {
         let events = assets::maps::scripts::EventFlags::Bitmap(session.world.events());
         let says = match crysta_runtime::residents::talk_to(session.image, resident, events) {
             Conversation::Speaks { pages, .. } => format!("speaks {} page(s)", pages.len()),
@@ -129,8 +150,11 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
             Conversation::Unaccounted { service } => format!("stops at COP ${service:02x}"),
         };
         println!(
-            "  resident {:#08x} at {:?}: {status}, {says}",
-            resident.record, resident.position
+            "  resident {:#08x} at {:?} pose {}{}: {status}, {says}",
+            resident.record,
+            resident.position,
+            resident.selector,
+            if resident.hflip { "m" } else { "" }
         );
     }
     println!(
@@ -152,12 +176,7 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
 /// Resident art for one roster: the map, the records present, the flags in
 /// force, and their rasters. The flags are part of the key because a
 /// resident's pose comes from their walked script, which branches on them.
-type RosterArt = (
-    u16,
-    Vec<usize>,
-    Vec<u8>,
-    Vec<Result<Animation, Placeholder>>,
-);
+type RosterArt = (u16, Vec<usize>, Vec<u8>, Vec<Result<Body, Placeholder>>);
 
 /// A conversation being shown, one page at a time.
 struct Dialogue {
@@ -174,6 +193,9 @@ struct Session {
     /// Resident art for the roster it was computed for, keyed by map and by
     /// which records were present, since the flags can change the roster.
     art: Option<RosterArt>,
+    /// Rasterized sequences by record, selector and mirror; `None` when the
+    /// packet has no such sequence.
+    sprites: HashMap<(usize, u8, bool), Option<Animation>>,
     dialogue: Option<Dialogue>,
     /// Frames simulated so far, which drives resident animation.
     tick: u64,
@@ -187,6 +209,7 @@ impl Session {
             atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
             backgrounds: HashMap::new(),
             art: None,
+            sprites: HashMap::new(),
             dialogue: None,
             tick: 0,
         }
@@ -240,19 +263,22 @@ impl Session {
     }
 
     /// Renders and caches the current map's background and its priority mask.
-    fn background(&mut self, cartridge: &rom::Rom) -> Option<&frame::Background> {
+    fn ensure_background(&mut self, cartridge: &rom::Rom) {
         let map = self.world.map();
         if let std::collections::hash_map::Entry::Vacant(slot) = self.backgrounds.entry(map) {
-            let rendered = map_inspector::render_static_background(cartridge, map).ok()?;
-            let mut decoded = frame::decode_bmp(&rendered.bitmap)?;
+            let Ok(rendered) = map_inspector::render_static_background(cartridge, map) else {
+                return;
+            };
+            let Some(mut decoded) = frame::decode_bmp(&rendered.bitmap) else {
+                return;
+            };
             decoded.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
             slot.insert(decoded);
         }
-        self.backgrounds.get(&map)
     }
 
-    /// Resident art for the current roster, recomputed when the roster changes.
-    fn resident_art(&mut self) -> &[Result<Animation, Placeholder>] {
+    /// Decodes bodies for the current roster, recomputed when it changes.
+    fn ensure_art(&mut self) {
         let map = self.world.map();
         let records: Vec<usize> = self
             .world
@@ -270,6 +296,11 @@ impl Session {
             let art = residents_art(self.image, map, self.world.residents(), events);
             self.art = Some((map, records, self.world.events().to_vec(), art));
         }
+    }
+
+    /// Bodies for the current roster, aligned with the world's residents.
+    fn resident_art(&mut self) -> &[Result<Body, Placeholder>] {
+        self.ensure_art();
         self.art
             .as_ref()
             .map_or(&[], |(_, _, _, art)| art.as_slice())
@@ -283,17 +314,23 @@ impl Session {
     /// order and only inflates the player's rank.
     fn compose(&mut self, cartridge: &rom::Rom, frame: &mut [u32]) -> (usize, usize) {
         frame.fill(0);
-        let position = self.world.position();
-        let player = self.atlas.frame(self.world.animation()).clone();
-        let residents: Vec<_> = self
-            .world
-            .residents()
-            .iter()
-            .map(|resident| resident.position)
-            .collect();
-        let art: Vec<_> = self.resident_art().to_vec();
-        let tick = self.tick;
-        let Some(background) = self.background(cartridge) else {
+        self.ensure_background(cartridge);
+        self.ensure_art();
+        let Session {
+            world,
+            backgrounds,
+            art,
+            atlas,
+            sprites,
+            dialogue,
+            ..
+        } = self;
+        let position = world.position();
+        let player = atlas.frame(world.animation());
+        let residents = world.residents();
+        let bodies: &[Result<Body, Placeholder>] =
+            art.as_ref().map_or(&[], |(_, _, _, art)| art.as_slice());
+        let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
         let camera = frame::camera(position, (background.width, background.height));
@@ -302,31 +339,54 @@ impl Session {
         let mut order: Vec<(u16, usize, usize)> = residents
             .iter()
             .enumerate()
-            .map(|(index, at)| (at.1, count - 1 - index, index))
+            .map(|(index, resident)| (resident.position.1, count - 1 - index, index))
             .collect();
         order.push((position.1, count, usize::MAX));
         order.sort_unstable();
         for (_, _, index) in order {
             if index == usize::MAX {
-                frame::draw_sprite(frame, background, camera, &player, position);
+                frame::draw_sprite(frame, background, camera, player, position);
                 continue;
             }
-            match &art[index] {
-                Ok(animation) => {
-                    let raster = animation.frame_at(tick);
-                    frame::draw_sprite(frame, background, camera, raster, residents[index]);
+            let resident = &residents[index];
+            let placeholder = |frame: &mut [u32]| {
+                let (x, y) = (
+                    i32::from(resident.position.0) - i32::try_from(camera.0).unwrap_or(0),
+                    i32::from(resident.position.1) - i32::try_from(camera.1).unwrap_or(0),
+                );
+                frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
+            };
+            match bodies.get(index) {
+                Some(Ok(body)) => {
+                    let key = (resident.record, resident.selector, resident.hflip);
+                    let animation = sprites.entry(key).or_insert_with(|| {
+                        // A sequence the packet lacks falls back to the setup
+                        // one rather than a block.
+                        body.animation(key.1, key.2)
+                            .or_else(|_| body.animation(body.initial(), key.2))
+                            .ok()
+                    });
+                    match animation {
+                        Some(animation) => {
+                            let raster = animation.frame_at(u64::from(resident.pose_age));
+                            frame::draw_sprite(
+                                frame,
+                                background,
+                                camera,
+                                raster,
+                                resident.position,
+                            );
+                        }
+                        None => placeholder(frame),
+                    }
                 }
-                Err(Placeholder::Invisible) => {}
-                Err(Placeholder::Refused(_) | Placeholder::PredecessorRefused) => {
-                    let (x, y) = (
-                        i32::from(residents[index].0) - i32::try_from(camera.0).unwrap_or(0),
-                        i32::from(residents[index].1) - i32::try_from(camera.1).unwrap_or(0),
-                    );
-                    frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
+                Some(Err(Placeholder::Invisible)) | None => {}
+                Some(Err(Placeholder::Refused(_) | Placeholder::PredecessorRefused)) => {
+                    placeholder(frame);
                 }
             }
         }
-        if let Some(open) = &self.dialogue {
+        if let Some(open) = dialogue {
             let page = &open.pages[open.index];
             frame::draw_page(
                 frame,
