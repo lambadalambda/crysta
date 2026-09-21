@@ -215,6 +215,8 @@ pub struct HouseActor {
     id: u32,
     map: u16,
     position: [u16; 2],
+    /// The header's initial selector, before any script selects a pose.
+    initial: u8,
     selector: u8,
     hflip: bool,
     tie_rank: u8,
@@ -332,6 +334,7 @@ impl HouseActor {
             id: cpu_address(source)?,
             map,
             position: [record.origin().0, record.origin().1],
+            initial: head[0],
             selector,
             hflip: pose.hflip,
             tie_rank: 0,
@@ -360,6 +363,37 @@ impl HouseActor {
     #[must_use]
     pub const fn selector(&self) -> u8 {
         self.selector
+    }
+    /// The header's initial selector, which a script starts from.
+    #[must_use]
+    pub const fn initial(&self) -> u8 {
+        self.initial
+    }
+    /// Decodes any sequence of the actor's packet, for a pose a running
+    /// script selects later: the walking sequences 3, 4 and 5, for instance.
+    ///
+    /// # Errors
+    /// Refuses a selector outside the packet's table, a direct-ROM resource,
+    /// and records outside the qualified shape.
+    pub fn sequence(&self, selector: u8, hflip: bool) -> Result<Vec<HouseFrame>, SpriteError> {
+        let packet = self
+            .resource
+            .packet
+            .as_ref()
+            .ok_or(SpriteError::Invalid("direct-ROM resource has no packet"))?;
+        decode_sequence(
+            &packet.bytes,
+            ListSpec {
+                selector,
+                count: 1,
+                duration: 0,
+                source_cpu: packet.cpu,
+                direct: false,
+                source_palette: self.resource.source_palette,
+                palette_base: self.resource.palette_base,
+                hflip,
+            },
+        )
     }
     /// Qualified actor horizontal mirror. Vertical mirroring is not requested.
     #[must_use]
@@ -725,6 +759,7 @@ impl<'a> Loader<'a> {
             id: cpu_address(source)?,
             map: p.map,
             position,
+            initial: p.initial,
             selector,
             hflip,
             tie_rank: p.rank,
@@ -823,6 +858,7 @@ impl<'a> Loader<'a> {
             source_palette,
         })
     }
+    #[allow(clippy::too_many_lines)] // One source-created object, read end to end.
     fn prop(&mut self) -> Result<HouseActor, SpriteError> {
         let start = self.ranges.len();
         let list = self.room_list(15)?;
@@ -911,6 +947,7 @@ impl<'a> Loader<'a> {
             id: header_cpu + 11,
             map: 15,
             position,
+            initial: selector,
             selector,
             hflip: false,
             tie_rank: 0,
