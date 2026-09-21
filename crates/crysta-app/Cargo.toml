@@ -1,0 +1,35 @@
+# Outside the workspace on purpose. `winit` and `gilrs` enable `cc`'s parallel
+# feature, and Cargo.lock records the feature union across all members, so
+# joining the workspace adds `jobserver` and `libc` to map-inspector's recorded
+# dependency closure and trips the capture gate. The producer is built with
+# `-p map-inspector` and would not enable them, but the lockfile cannot say so,
+# and weakening the gate to paper over that is the wrong trade.
+#
+#   cargo run --release --manifest-path crates/crysta-app/Cargo.toml -- <rom>
+[workspace]
+
+[package]
+name = "crysta-app"
+description = "Native macOS window, renderer and gamepad for the Crysta slice"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/lainsoykaf/terranigma"
+
+[dependencies]
+assets = { path = "../assets" }
+crysta-runtime = { path = "../crysta-runtime" }
+map-inspector = { path = "../map-inspector" }
+rom = { path = "../rom" }
+room-core = { path = "../room-core" }
+gilrs = "0.11"
+softbuffer = "0.4"
+winit = "0.30"
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = "warn"

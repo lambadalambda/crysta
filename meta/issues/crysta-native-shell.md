@@ -46,3 +46,56 @@ free-roam runtime.
 - The compositing to port is about 440 lines of the browser viewer, and it has
   no framework dependency — the art manifest hands over fully decoded RGBA
   frames with pre-composed mirrors and a pre-sorted draw list.
+
+## Progress: it runs
+
+`crates/crysta-app` opens a window, renders the slice at 256x224 scaled by the
+largest integer factor that fits, and drives `crysta_runtime::world::World`
+from a gamepad or the keyboard.
+
+- Backgrounds come from the qualified renderer, `render_static_background`,
+  rather than a second decode path; the app only decodes its 24-bit top-down
+  BMP into a framebuffer.
+- Input: D-pad or left stick past half deflection, arrows/WASD, and
+  Space/Enter or South/East to interact. Interaction talks to a resident when
+  one is faced and otherwise opens a doorway, so a resident standing in a
+  doorway is spoken to rather than walked past.
+- The interact button is edge-triggered, or holding it would re-talk every
+  frame.
+
+### A headless mode, so the renderer can be looked at
+
+`--screenshot <path> <frames> [direction]` runs the world for N frames and
+writes the composed view as a PPM without opening a window. That is how the
+renderer was checked: 400 frames of Down from the opening house walks the
+player out of map `$000B` and into `$000C`, and the frame shows the next room
+with the camera following.
+
+`frame.rs` is pure functions over pixels with 8 unit tests — camera clamping at
+every edge, integer-only scaling, clipping, and a synthetic BMP round trip — so
+none of it needs a window to test.
+
+### Outside the workspace, and the gate is why
+
+`winit` and `gilrs` enable `cc`'s parallel feature, and Cargo.lock records the
+feature union across *all* members, so joining the workspace adds `jobserver`
+and `libc` to map-inspector's recorded dependency closure and trips the capture
+gate. The producer is built with `-p map-inspector` and would not enable them,
+but the lockfile cannot express that, and weakening the gate a second time to
+paper over it is the wrong trade. Run it with:
+
+```sh
+cargo run --release --manifest-path crates/crysta-app/Cargo.toml -- <rom>
+```
+
+## Remaining
+
+- **The player and residents are coloured blocks, not sprites.** The art
+  manifest hands over decoded RGBA frames with pre-sorted draw lists; wiring it
+  in is the next step and is the bulk of what "looks like the game" means.
+- **Dialogue is not drawn.** Talking resolves the pages and the app reports
+  what it got, but the pages are not painted into the frame.
+- **The camera shows past the map's own region.** Several maps share one layer,
+  so the window can include part of a neighbouring room. Clipping needs the
+  per-map region.
+- No `.app` bundle yet; it runs as a binary.
