@@ -44,9 +44,32 @@ const RANDOM_STEP: u8 = 0x26;
 const BRANCH_ON_PLAYER_NEAR: u8 = 0x0F;
 /// Branches on a bit of `$0454`; `$80:90AC`.
 ///
-/// What `$0454` holds is not established. The runtime reads it as zero, so
-/// the branch is never taken.
+/// `$0454` is the held-button word: `COP 2B`, `COP 2D` and `COP 61` compare
+/// it against masks, and a trace shows `$0100` while Right is held and
+/// `$0400` while Down is. The runtime has no button state to offer an
+/// actor, so it reads the word as zero and never takes the branch.
 const BRANCH_ON_GLOBAL: u8 = 0x2E;
+/// Stops for a player who stands beside the actor and faces them;
+/// `$80:8D1E`. Operand: a two-byte target.
+///
+/// When the player is nine to sixteen pixels away on one axis and within
+/// eight on the other, and `$0956` says they face the actor, the actor turns
+/// to face the player, selects the standing sequence for that facing, sets
+/// the script pointer to the target and yields. Otherwise the loop continues.
+/// The handler skips the test while bit 14 of the slot word at +4 is set,
+/// which the runtime never sets, and while `$0999` is nonzero, which a
+/// traced conversation never made it.
+const STOP_FOR_PLAYER: u8 = 0x23;
+/// Holds the actor while the scene pauses them; `$80:9AC7`. One operand
+/// byte.
+///
+/// The handler tests bit 14 of the slot word at +4. When it is set the
+/// script pointer is rewound onto the service, the operand becomes the
+/// scheduler's countdown at +$0E, and the actor yields. The game sets that
+/// bit on every actor for a few frames around a map transition and never
+/// during a conversation; the runtime never sets it, so the service
+/// continues.
+const HOLD_WHILE_PAUSED: u8 = 0x59;
 
 /// Frames a one-tile step takes.
 pub const STEP_FRAMES: u16 = 8;
@@ -94,6 +117,8 @@ pub struct Surroundings<'a> {
     pub occupied: &'a [(u16, u16)],
     /// The player's pixel position.
     pub player: (u16, u16),
+    /// The way the player faces; `$0956`.
+    pub facing: Direction,
 }
 
 /// One resident's running script and where it has put them.
@@ -258,75 +283,79 @@ impl Actor {
                     return;
                 }
             }
-            let service = window[1];
-            let operands = self.pc + 2;
-            match service {
-                SELECT_POSE => {
-                    let Some(selector) = image.get(operands).copied() else {
-                        self.state = State::Frozen;
-                        return;
-                    };
-                    let hflip = self.hflip;
-                    self.set_pose(selector, hflip);
-                    self.pc = operands + 1;
-                }
-                CLEAR_HFLIP | SET_HFLIP => {
-                    let selector = self.selector;
-                    self.set_pose(selector, service == SET_HFLIP);
-                    self.pc = operands;
-                }
-                WAIT => {
-                    self.pc = operands;
-                    self.state = State::Waiting(1);
-                    return;
-                }
-                WAIT_STEP => {
-                    self.pc = operands;
-                    self.state = State::Waiting(WAIT_FRAMES);
-                    return;
-                }
-                RANDOM_STEP => {
-                    let Some(rect) = image.get(operands..operands + 4) else {
-                        self.state = State::Frozen;
-                        return;
-                    };
-                    self.pc = operands + 4;
-                    if self.random_step([rect[0], rect[1], rect[2], rect[3]], around) {
-                        return;
-                    }
-                }
-                BRANCH_ON_PLAYER_NEAR => {
-                    if !self.branch_near_player(operands, bank, around) {
-                        return;
-                    }
-                }
-                BRANCH_ON_GLOBAL => self.pc = operands + 4,
-                BRANCH_ON_FLAG => {
-                    if !self.branch_on_flag(operands, bank, around) {
-                        return;
-                    }
-                }
-                CHAINED_BRANCH | CHAINED_DESPAWN => {
-                    if !self.branch_on_chain(service, operands, bank, around) {
-                        return;
-                    }
-                }
-                // Anything else is stepped over by its derived length. That
-                // includes text and flag writes: the loop's ambient effects
-                // are not the runtime's to apply from here.
-                other => {
-                    let length = *self.lengths[usize::from(other)]
-                        .get_or_insert_with(|| actor_script::operand_length(image, other));
-                    let Some(length) = length else {
-                        self.state = State::Frozen;
-                        return;
-                    };
-                    self.pc = operands + length;
-                }
+            if !self.service(window[1], self.pc + 2, bank, around) {
+                return;
             }
         }
         // Spinning without yielding: a loop with no wait in it.
         self.state = State::Frozen;
+    }
+
+    /// Executes one service. Returns whether execution continues this
+    /// frame; a yield or a freeze ends it.
+    fn service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            SELECT_POSE => {
+                let Some(selector) = image.get(operands).copied() else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let hflip = self.hflip;
+                self.set_pose(selector, hflip);
+                self.pc = operands + 1;
+            }
+            CLEAR_HFLIP | SET_HFLIP => {
+                let selector = self.selector;
+                self.set_pose(selector, service == SET_HFLIP);
+                self.pc = operands;
+            }
+            WAIT => {
+                self.pc = operands;
+                self.state = State::Waiting(1);
+                return false;
+            }
+            WAIT_STEP => {
+                self.pc = operands;
+                self.state = State::Waiting(WAIT_FRAMES);
+                return false;
+            }
+            RANDOM_STEP => {
+                let Some(rect) = image.get(operands..operands + 4) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.pc = operands + 4;
+                return !self.random_step([rect[0], rect[1], rect[2], rect[3]], around);
+            }
+            BRANCH_ON_PLAYER_NEAR => return self.branch_near_player(operands, bank, around),
+            BRANCH_ON_GLOBAL => self.pc = operands + 4,
+            HOLD_WHILE_PAUSED => self.pc = operands + 1,
+            STOP_FOR_PLAYER => return self.stop_for_player(operands, bank, around),
+            BRANCH_ON_FLAG => return self.branch_on_flag(operands, bank, around),
+            CHAINED_BRANCH | CHAINED_DESPAWN => {
+                return self.branch_on_chain(service, operands, bank, around)
+            }
+            // Anything else is stepped over by its derived length. That
+            // includes text and flag writes: the loop's ambient effects
+            // are not the runtime's to apply from here.
+            other => {
+                let length = *self.lengths[usize::from(other)]
+                    .get_or_insert_with(|| actor_script::operand_length(image, other));
+                let Some(length) = length else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.pc = operands + length;
+            }
+        }
+        true
     }
 
     /// Resumes at a bank-relative target, or freezes on one below `$8000`,
@@ -338,6 +367,32 @@ impl Actor {
         }
         self.pc = bank | usize::from(target);
         true
+    }
+
+    /// `COP 23`: stops for a player who stands beside the actor and faces
+    /// them. Returns whether execution continues this frame.
+    fn stop_for_player(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
+        let Some(bytes) = around.image.get(operands..operands + 2) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let faced = approach(self.position, around.player)
+            .into_iter()
+            .flatten()
+            .any(|toward| toward == around.facing);
+        if !faced {
+            self.pc = operands + 2;
+            return true;
+        }
+        // `$8DC2`: the actor's facing is the player's, reversed.
+        let facing = opposite(around.facing);
+        self.facing = facing;
+        let (selector, hflip) = standing_pose(facing);
+        self.set_pose(selector, hflip);
+        let target = u16::from_le_bytes([bytes[0], bytes[1]]);
+        // A taken branch yields whether or not the target was sound.
+        self.jump(bank, target);
+        false
     }
 
     /// `COP 0F`: branches on the player standing at a map position. Returns
@@ -432,14 +487,8 @@ impl Actor {
     fn random_step(&mut self, rect: [u8; 4], around: &Surroundings<'_>) -> bool {
         let draw = self.next_random();
         let (column, row) = self.collision_cell();
-        let standing = |facing: Direction| match facing {
-            Direction::Down => (0, false),
-            Direction::Up => (1, false),
-            Direction::Right => (2, false),
-            Direction::Left => (2, true),
-        };
         if draw & 4 != 0 {
-            let (selector, hflip) = standing(self.facing);
+            let (selector, hflip) = standing_pose(self.facing);
             self.set_pose(selector, hflip);
             return false;
         }
@@ -487,7 +536,7 @@ impl Actor {
             };
             true
         } else {
-            let (selector, hflip) = standing(self.facing);
+            let (selector, hflip) = standing_pose(self.facing);
             self.set_pose(selector, hflip);
             false
         }
@@ -503,6 +552,72 @@ impl Actor {
         self.rng = x;
         (x >> 24) as u8
     }
+}
+
+/// The standing sequence for a facing: 0, 1 and 2, with 2 mirrored for
+/// left, as `$80:8DC8` selects it.
+const fn standing_pose(facing: Direction) -> (u8, bool) {
+    match facing {
+        Direction::Down => (0, false),
+        Direction::Up => (1, false),
+        Direction::Right => (2, false),
+        Direction::Left => (2, true),
+    }
+}
+
+/// The facing that looks back at `facing`; `$8DC2`'s `EOR #1` on the game's
+/// 0 down, 1 up, 2 left, 3 right.
+const fn opposite(facing: Direction) -> Direction {
+    match facing {
+        Direction::Down => Direction::Up,
+        Direction::Up => Direction::Down,
+        Direction::Left => Direction::Right,
+        Direction::Right => Direction::Left,
+    }
+}
+
+/// The facings a player at `player` may hold to be looking at an actor at
+/// `actor`, as `$80:8D2B`..`$8DB5` classifies their offset; both `None`
+/// when the player is not beside them.
+///
+/// Along one axis the actor must be nine to sixteen pixels away; across it
+/// within eight. The handler measures `actor.x - $0966` and
+/// `(actor.y - 8) - $0968`, and `$0968` is the player's y less eight, so
+/// both are plain differences. Within eight on both axes it tries the
+/// vertical facing it settled on and then the horizontal one it had noted.
+fn approach(actor: (u16, u16), player: (u16, u16)) -> [Option<Direction>; 2] {
+    let dx = i32::from(actor.0) - i32::from(player.0);
+    let dy = i32::from(actor.1) - i32::from(player.1);
+    let across = |offset: i32| (-8..=8).contains(&offset);
+    // `$8D46`..`$8D59`: beside on the horizontal axis.
+    if (9..=16).contains(&dx) {
+        return [across(dy).then_some(Direction::Right), None];
+    }
+    if (-16..=-9).contains(&dx) {
+        return [across(dy).then_some(Direction::Left), None];
+    }
+    if !across(dx) {
+        return [None, None];
+    }
+    // `$8D83`..`$8DA3`: aligned horizontally, so the vertical axis decides.
+    let horizontal = if dx >= 0 {
+        Direction::Right
+    } else {
+        Direction::Left
+    };
+    if (9..=16).contains(&dy) {
+        return [Some(Direction::Down), None];
+    }
+    if (-16..=-9).contains(&dy) {
+        return [Some(Direction::Up), None];
+    }
+    if (0..=8).contains(&dy) {
+        return [Some(Direction::Down), Some(horizontal)];
+    }
+    if (-8..=-1).contains(&dy) {
+        return [Some(Direction::Up), Some(horizontal)];
+    }
+    [None, None]
 }
 
 /// Cell offset one step in a direction.
@@ -543,6 +658,7 @@ mod tests {
             height: 8,
             occupied: &[],
             player: (0, 0),
+            facing: Direction::Down,
         };
         let mut actor = Actor::new((40, 48), Some(0x88_8000), 7, 1);
         for _ in 0..200 {
@@ -570,6 +686,7 @@ mod tests {
             height: 8,
             occupied: &[(3, 4)],
             player: (0, 0),
+            facing: Direction::Down,
         };
         // Origin (56, 64): collision cell (3, 3).
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 12345);
@@ -613,6 +730,7 @@ mod tests {
             height: 8,
             occupied: &[],
             player: (0, 0),
+            facing: Direction::Down,
         };
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 9, 5);
         for _ in 0..50 {
@@ -660,6 +778,7 @@ mod tests {
                 height: 8,
                 occupied: &[],
                 player,
+                facing: Direction::Down,
             };
             let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 1);
             actor.tick(&around);
@@ -690,6 +809,7 @@ mod tests {
             height: 4,
             occupied: &[],
             player: (0, 0),
+            facing: Direction::Down,
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
         actor.tick(&around);
@@ -722,6 +842,7 @@ mod tests {
             height: 4,
             occupied: &[],
             player: (0, 0),
+            facing: Direction::Down,
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
         actor.tick(&around);
@@ -743,5 +864,195 @@ mod tests {
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
         actor.tick(&around);
         assert_eq!(actor.state, State::Frozen);
+    }
+}
+
+#[cfg(test)]
+mod stop_for_player_tests {
+    use super::*;
+
+    fn image_with(script: &[u8]) -> Vec<u8> {
+        let mut image = vec![0u8; 0x09_0000];
+        image[0x08_8000..0x08_8000 + script.len()].copy_from_slice(script);
+        image
+    }
+
+    /// `COP 23 <$8000>` at the head, then pose 9, wait, and back to the head.
+    /// A taken branch lands on the `COP 23` again and never reaches pose 9.
+    fn loop_with_stop() -> Vec<u8> {
+        vec![
+            0x02, 0x23, 0x00, 0x80, 0x02, 0x80, 0x09, 0x02, 0x8E, 0x80, 0xF5,
+        ]
+    }
+
+    fn run(script: &[u8], player: (u16, u16), facing: Direction, frames: usize) -> Actor {
+        let image = image_with(script);
+        let cells = vec![0u16; 64];
+        let around = Surroundings {
+            image: &image,
+            events: &[0; 512],
+            cells: &cells,
+            width: 8,
+            height: 8,
+            occupied: &[],
+            player,
+            facing,
+        };
+        // Origin (56, 64): the actor's own reference for the near test.
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        for _ in 0..frames {
+            actor.tick(&around);
+        }
+        actor
+    }
+
+    #[test]
+    fn a_player_one_cell_away_and_facing_the_actor_stops_them_and_is_faced() {
+        // Right of the actor, facing left: the actor turns right.
+        let actor = run(&loop_with_stop(), (72, 64), Direction::Left, 20);
+        assert_eq!((actor.selector, actor.hflip), (2, false));
+        assert_eq!(actor.facing, Direction::Right);
+        assert_eq!(actor.state, State::Running, "one branch per frame, no spin");
+        // Left, facing right: mirrored.
+        let actor = run(&loop_with_stop(), (40, 64), Direction::Right, 20);
+        assert_eq!((actor.selector, actor.hflip), (2, true));
+        assert_eq!(actor.facing, Direction::Left);
+        // Above, facing down: the actor faces up.
+        let actor = run(&loop_with_stop(), (56, 48), Direction::Down, 20);
+        assert_eq!((actor.selector, actor.hflip), (1, false));
+        // Below, facing up: the actor faces down.
+        let actor = run(&loop_with_stop(), (56, 80), Direction::Up, 20);
+        assert_eq!((actor.selector, actor.hflip), (0, false));
+    }
+
+    #[test]
+    fn a_player_who_is_near_but_faces_away_does_not_stop_the_actor() {
+        let actor = run(&loop_with_stop(), (72, 64), Direction::Right, 20);
+        assert_eq!(actor.selector, 9);
+        let actor = run(&loop_with_stop(), (72, 64), Direction::Up, 20);
+        assert_eq!(actor.selector, 9);
+    }
+
+    #[test]
+    fn the_window_is_nine_to_sixteen_on_the_axis_and_eight_across_it() {
+        // `$8D46`..`$8D59`: dx of 9..=16 is beside; 17 is not, and -8 or 8
+        // is "aligned", which sends the test to the vertical axis instead.
+        assert_eq!(
+            run(&loop_with_stop(), (64, 64), Direction::Down, 5).selector,
+            1
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (48, 64), Direction::Down, 5).selector,
+            1
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (65, 64), Direction::Down, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (65, 64), Direction::Left, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (47, 64), Direction::Right, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (73, 64), Direction::Left, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (40, 64), Direction::Right, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (39, 64), Direction::Right, 5).selector,
+            9
+        );
+        // `$8D5B`..`$8D6B`: across the axis, eight either way still counts.
+        assert_eq!(
+            run(&loop_with_stop(), (72, 72), Direction::Left, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (72, 56), Direction::Left, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (72, 73), Direction::Left, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (72, 55), Direction::Left, 5).selector,
+            9
+        );
+        // Vertically: 9..=16 below or above, at most eight across.
+        assert_eq!(
+            run(&loop_with_stop(), (56, 73), Direction::Up, 5).selector,
+            0
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (56, 81), Direction::Up, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (64, 80), Direction::Up, 5).selector,
+            0
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (48, 48), Direction::Down, 5).selector,
+            1
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (56, 47), Direction::Down, 5).selector,
+            9
+        );
+    }
+
+    #[test]
+    fn the_overlap_case_tries_the_vertical_facing_then_the_horizontal_one() {
+        // `$8D79`: within eight on both axes the handler tests Down (or Up
+        // when the actor is above), then the horizontal side it noted.
+        assert_eq!(
+            run(&loop_with_stop(), (56, 64), Direction::Down, 5).selector,
+            1
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (60, 64), Direction::Left, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (60, 64), Direction::Right, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (56, 60), Direction::Up, 5).selector,
+            9
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (52, 66), Direction::Up, 5).selector,
+            0
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (52, 66), Direction::Right, 5).selector,
+            2
+        );
+        assert_eq!(
+            run(&loop_with_stop(), (52, 66), Direction::Left, 5).selector,
+            9
+        );
+    }
+
+    #[test]
+    fn hold_while_paused_is_a_one_byte_service_that_continues() {
+        // COP 59 08, COP 80 05, COP 8E, BRA back.
+        let actor = run(
+            &[0x02, 0x59, 0x08, 0x02, 0x80, 0x05, 0x02, 0x8E, 0x80, 0xF6],
+            (0, 0),
+            Direction::Down,
+            3,
+        );
+        assert_eq!(actor.selector, 5);
+        assert_eq!(actor.state, State::Waiting(1));
     }
 }

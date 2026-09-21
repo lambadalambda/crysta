@@ -250,6 +250,7 @@ impl<'a> World<'a> {
                 height: self.base.height,
                 occupied: &occupied,
                 player: (x, y),
+                facing: self.facing,
             };
             self.actors[index].tick(&around);
         }

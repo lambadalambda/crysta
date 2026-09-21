@@ -3,6 +3,7 @@
 
 use crysta_runtime::world::World;
 use rom::{Revision, Rom};
+use room_core::Direction;
 use std::collections::BTreeSet;
 use std::path::Path;
 
@@ -98,4 +99,62 @@ fn a_walking_resident_still_blocks_the_player_where_they_stand() {
         cells[usize::from(start.1) * width + usize::from(start.0)] >> 9,
         14
     );
+}
+
+#[test]
+fn a_walker_stops_and_faces_a_player_who_faces_them_and_walks_on_when_they_look_away() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let origin = World::enter(image, 0x000D, 200, 700)
+        .unwrap()
+        .residents()
+        .iter()
+        .find(|resident| resident.record == 0x03_8CB4)
+        .expect("the wanderer is present")
+        .position;
+    // One cell to the wanderer's right, looking left at them.
+    let mut world = World::enter(image, 0x000D, origin.0 + 16, origin.1).unwrap();
+    world.face(Direction::Left);
+    let index = world
+        .residents()
+        .iter()
+        .position(|resident| resident.record == 0x03_8CB4)
+        .unwrap();
+    let cell = world.residents()[index].collision_cell();
+    for _ in 0..600 {
+        world.step(None);
+        let wanderer = &world.residents()[index];
+        assert_eq!(wanderer.collision_cell(), cell, "walked off while faced");
+    }
+    let wanderer = &world.residents()[index];
+    assert_eq!(
+        (wanderer.selector, wanderer.hflip),
+        (2, false),
+        "faces right"
+    );
+    assert!(!wanderer.walking);
+    // From below, facing up: the wanderer faces down, so the vertical
+    // convention is checked too.
+    let mut below = World::enter(image, 0x000D, origin.0, origin.1 + 16).unwrap();
+    below.face(Direction::Up);
+    for _ in 0..100 {
+        below.step(None);
+    }
+    let wanderer = &below.residents()[index];
+    assert_eq!(
+        (wanderer.selector, wanderer.hflip),
+        (0, false),
+        "faces down"
+    );
+    assert_eq!(wanderer.collision_cell(), cell);
+    // Looking away releases them.
+    world.face(Direction::Up);
+    let mut cells = BTreeSet::new();
+    for _ in 0..4000 {
+        world.step(None);
+        cells.insert(world.residents()[index].collision_cell());
+    }
+    assert!(cells.len() >= 2, "stayed put after the player looked away");
 }
