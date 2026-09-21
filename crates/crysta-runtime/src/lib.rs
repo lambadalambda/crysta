@@ -16,11 +16,13 @@ use room_core::{
 };
 use std::fmt;
 
+pub mod world;
+
 /// Maps the static exit graph bounds the Crysta slice to.
 pub const MAPS: std::ops::RangeInclusive<u16> = 0x000A..=0x0021;
 
 /// A map built into a walkable room.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MapRoom {
     /// Collision and walking data for the map.
     pub room: Room,
