@@ -1,6 +1,7 @@
 //! ROM-backed checks that residents appear and can be talked to.
 
 use assets::maps::scripts::EventFlags;
+use assets::text::Placement;
 use crysta_runtime::residents::{residents, talk_to, Conversation};
 use crysta_runtime::MAPS;
 use rom::{Revision, Rom};
@@ -102,8 +103,8 @@ fn the_documented_resident_speaks_their_own_pages() {
 fn a_progressed_resident_says_something_different_from_a_fresh_one() {
     // The callback is a six-way dispatch over progression, so the flags choose
     // what is said. With every gate set the first branch fires and the
-    // resident gives a later line at `$88:95B3`, which is a choice prompt the
-    // text decoder does not render -- reported as unsupported, not as silence.
+    // resident gives a later line at `$88:95B3`, which opens its window with
+    // `$DA`, away from the player.
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -118,8 +119,11 @@ fn a_progressed_resident_says_something_different_from_a_fresh_one() {
         .find(|resident| resident.position == (120, 112))
         .unwrap();
     match talk_to(image, resident, EventFlags::Bitmap(&met)) {
-        Conversation::Unsupported { source } => assert_eq!(source, 0x95B3),
-        other => panic!("expected the progressed choice prompt, got {other:?}"),
+        Conversation::Speaks { pages, .. } => {
+            assert!(!pages.is_empty());
+            assert_eq!(pages[0].placement(), Placement::AwayFromPlayer);
+        }
+        other => panic!("expected the progressed line, got {other:?}"),
     }
 }
 

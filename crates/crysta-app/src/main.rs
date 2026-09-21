@@ -146,7 +146,7 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
         let says = match crysta_runtime::residents::talk_to(session.image, resident, events) {
             Conversation::Speaks { pages, .. } => format!("speaks {} page(s)", pages.len()),
             Conversation::Silent => "silent".to_string(),
-            Conversation::Unsupported { source } => format!("choice prompt at ${source:04x}"),
+            Conversation::Unsupported { source } => format!("undecodable text at ${source:04x}"),
             Conversation::Unaccounted { service } => format!("stops at COP ${service:02x}"),
         };
         println!(
@@ -248,9 +248,7 @@ impl Session {
             }
             Some(Conversation::Speaks { .. }) => {}
             Some(Conversation::Unsupported { source }) => {
-                eprintln!(
-                    "the resident's line is a choice prompt at ${source:04x}, which is not drawn"
-                );
+                eprintln!("the resident's line at ${source:04x} does not decode as text");
             }
             Some(Conversation::Unaccounted { service }) => {
                 eprintln!("the resident's script stops at COP ${service:02x}");
@@ -388,11 +386,15 @@ impl Session {
         }
         if let Some(open) = dialogue {
             let page = &open.pages[open.index];
+            let dimensions = (usize::from(page.width()), usize::from(page.height()));
+            let player_screen_y = usize::from(position.1).saturating_sub(camera.1);
+            let origin = frame::page_origin(page.placement(), dimensions, player_screen_y);
             frame::draw_page(
                 frame,
                 page.indexed(),
-                (usize::from(page.width()), usize::from(page.height())),
+                dimensions,
                 page.background_index(),
+                origin,
             );
         }
         camera

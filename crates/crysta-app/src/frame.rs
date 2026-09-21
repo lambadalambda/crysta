@@ -3,6 +3,8 @@
 //! Everything here is a pure function over decoded pixels, so the renderer can
 //! be tested without opening a window or owning a GPU.
 
+use assets::text::Placement;
+
 /// Native view width in pixels.
 pub const VIEW_WIDTH: usize = 256;
 /// Native view height in pixels.
@@ -83,10 +85,39 @@ const PAGE_PALETTE: [u32; 4] = [0x0000_0000, 0x00F0_F4F8, 0x0024_2F37, 0x0010_18
 const PAGE_BOX: u32 = 0x0010_1828;
 /// The box's border.
 const PAGE_BORDER: u32 = 0x00F0_F4F8;
-/// Margin between the view's bottom edge and the box.
+/// Margin between the view's edge and the box, and between the box and its page.
 const PAGE_MARGIN: usize = 8;
 
-/// Draws a dialogue page in a box along the bottom of the view.
+/// Where a page's box goes, from the page's native placement.
+///
+/// The standard window is centred along the bottom. `$DA` moves it to the
+/// top when the player's screen row is in the lower half, as `$85964D` does
+/// against the camera. A `$C2` window puts its content at its tile column
+/// and row, with the box drawn around it.
+#[must_use]
+pub fn page_origin(
+    placement: Placement,
+    (width, height): (usize, usize),
+    player_screen_y: usize,
+) -> (usize, usize) {
+    let box_width = (width + 2 * PAGE_MARGIN).min(VIEW_WIDTH);
+    let box_height = (height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT);
+    let centred = (VIEW_WIDTH - box_width) / 2;
+    let bottom = VIEW_HEIGHT.saturating_sub(box_height + PAGE_MARGIN);
+    let top = match placement {
+        Placement::AwayFromPlayer if player_screen_y >= VIEW_HEIGHT / 2 => PAGE_MARGIN,
+        Placement::Bottom | Placement::AwayFromPlayer => bottom,
+        Placement::Tile { column, row } => {
+            return (
+                (usize::from(column) * 8).saturating_sub(PAGE_MARGIN),
+                (usize::from(row) * 8).saturating_sub(PAGE_MARGIN),
+            )
+        }
+    };
+    (centred, top)
+}
+
+/// Draws a dialogue page in a box whose top-left corner is `origin`.
 ///
 /// `indexed` is the page's row-major two-bit pixels, `width * height` of
 /// them, and `background_index` is the index that reads as clear.
@@ -95,14 +126,13 @@ pub fn draw_page(
     indexed: &[u8],
     (width, height): (usize, usize),
     background_index: u8,
+    (left, top): (usize, usize),
 ) {
     if width == 0 || height == 0 || indexed.len() < width * height {
         return;
     }
     let box_width = (width + 2 * PAGE_MARGIN).min(VIEW_WIDTH);
     let box_height = (height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT);
-    let left = (VIEW_WIDTH - box_width) / 2;
-    let top = VIEW_HEIGHT.saturating_sub(box_height + PAGE_MARGIN);
     let (left_i, top_i) = (
         i32::try_from(left).unwrap_or(0),
         i32::try_from(top).unwrap_or(0),
@@ -261,6 +291,21 @@ pub fn present(frame: &[u32], target: &mut [u32], size: (usize, usize)) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_page_box_goes_where_the_native_window_opens() {
+        let dims = (224, 48);
+        // The standard window sits along the bottom, centred.
+        assert_eq!(page_origin(Placement::Bottom, dims, 30), (8, 224 - 64 - 8));
+        assert_eq!(page_origin(Placement::Bottom, dims, 200), (8, 224 - 64 - 8));
+        // $DA keeps out of the player's half of the screen.
+        assert_eq!(page_origin(Placement::AwayFromPlayer, dims, 111), (8, 224 - 64 - 8));
+        assert_eq!(page_origin(Placement::AwayFromPlayer, dims, 112), (8, 8));
+        // $C2 puts the content at its tile column and row.
+        let tile = Placement::Tile { column: 3, row: 3 };
+        assert_eq!(page_origin(tile, (200, 48), 0), (24 - 8, 24 - 8));
+        assert_eq!(page_origin(Placement::Tile { column: 0, row: 0 }, dims, 0), (0, 0));
+    }
 
     #[test]
     fn the_camera_centres_the_player_and_stops_at_the_edges() {
@@ -467,7 +512,8 @@ mod tests {
         let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
         // A 4x2 page: indices 0..3 across the top row, all background below.
         let indexed = [0u8, 1, 2, 3, 3, 3, 3, 3];
-        draw_page(&mut frame, &indexed, (4, 2), 3);
+        let origin = page_origin(Placement::Bottom, (4, 2), 0);
+        draw_page(&mut frame, &indexed, (4, 2), 3, origin);
         let box_width = 4 + 2 * PAGE_MARGIN;
         let box_height = 2 + 2 * PAGE_MARGIN;
         let left = (VIEW_WIDTH - box_width) / 2;
@@ -487,8 +533,8 @@ mod tests {
     #[test]
     fn a_malformed_page_draws_nothing() {
         let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
-        draw_page(&mut frame, &[1, 1], (4, 2), 3);
-        draw_page(&mut frame, &[], (0, 0), 3);
+        draw_page(&mut frame, &[1, 1], (4, 2), 3, (8, 8));
+        draw_page(&mut frame, &[], (0, 0), 3, (8, 8));
         assert!(frame.iter().all(|pixel| *pixel == 0));
     }
 }

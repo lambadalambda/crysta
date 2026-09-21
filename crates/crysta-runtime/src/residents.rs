@@ -72,9 +72,9 @@ pub enum Conversation {
     Silent,
     /// The script reached dialogue the text decoder cannot render.
     ///
-    /// Choice prompts are the case in the slice: the documented resident's
-    /// first-visit line at `$88:95B3` is one. Distinguished from silence
-    /// because the script *did* reach text.
+    /// One record in the slice, in map `$1D`, hands the text service an
+    /// address holding native code rather than text. Distinguished from
+    /// silence because the script *did* reach a text service.
     Unsupported {
         /// Bank-relative address of the text that would not decode.
         source: u16,
