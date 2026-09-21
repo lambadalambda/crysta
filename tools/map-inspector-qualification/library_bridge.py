@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 
 import bridge
+import projection
 import check
 from check import load, require, sha
 
@@ -61,7 +62,7 @@ PRODUCER_FIELDS = {
 
 
 def hashes(repo, files):
-    return {name: sha((repo / name).read_bytes()) for name in files}
+    return {name: projection.effective_sha(repo, name) for name in files}
 
 
 def frozen_predecessor():
@@ -105,7 +106,7 @@ def verify_library_descriptor(repo, predecessor_repo, fixed_repo, descriptor_pat
                 'replacement identity fields mismatch')
         require(identities['predecessor_sha256'] == old_sources[name],
                 'replacement predecessor mismatch')
-        require(identities['current_sha256'] == sha((repo / name).read_bytes()),
+        require(identities['current_sha256'] == projection.effective_sha(repo, name),
                 'replacement current source mismatch')
         require(identities['current_sha256'] != identities['predecessor_sha256'],
                 'replacement must authenticate a real delta')

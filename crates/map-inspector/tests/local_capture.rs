@@ -1,5 +1,5 @@
 //! Optional end-to-end capture qualification, using a fresh oracle process.
-use std::{path::Path, process::Command};
+use std::{collections::BTreeSet, fmt::Write as _, path::Path, process::Command};
 
 const PREDECESSOR: &str =
     include_str!("../../../tools/map-inspector-qualification/current-producer.json");
@@ -131,7 +131,6 @@ fn sha256(bytes: &[u8]) -> String {
 }
 
 fn check_inventory(hashes: &serde_json::Value, files: &[&str]) {
-    use std::collections::BTreeSet;
     assert_eq!(
         hashes
             .as_object()
@@ -426,6 +425,222 @@ fn check_repin_report(report: &str, repin: &serde_json::Value) {
     assert_ne!(producers[0]["target_dir"], producers[1]["target_dir"]);
 }
 
+/// Build-input files pinned by projection rather than whole-file hash.
+///
+/// `Cargo.lock` and the workspace `Cargo.toml` are producer sources because
+/// they decide what the producer compiles against. Both also record things the
+/// producer cannot reach: adding an unrelated workspace member rewrites
+/// `members` and appends a `[[package]]` block without changing a single input
+/// to the capture.
+///
+/// Rather than spend a repin on a provable no-op, each is pinned as a
+/// projection, and the chain is anchored on a frozen copy of the exact file the
+/// descriptor pinned:
+///
+/// ```text
+/// descriptor entry == sha256(pinned fixture)   descriptor <-> fixture
+/// projection(fixture) == projection(live)      fixture    <-> live
+/// ```
+///
+/// There is no free-floating constant to edit: the fixture is a real file whose
+/// whole-file hash the descriptor already names.
+const LOCK: &str = "Cargo.lock";
+const ROOT_MANIFEST: &str = "Cargo.toml";
+const PINNED_LOCK: &str =
+    include_str!("../../../tools/map-inspector-qualification/pinned/Cargo.lock");
+const PINNED_MANIFEST: &str =
+    include_str!("../../../tools/map-inspector-qualification/pinned/Cargo.toml");
+
+/// One `[[package]]` block.
+///
+/// Identity is `(name, version, source)`. Keying on `(name, version)` alone is
+/// not enough: cargo emits a dependency reference's source exactly when name
+/// and version are ambiguous, which is what a `[patch]` at a git fork that kept
+/// its version number produces. Dropping the source there would merge two
+/// distinct packages, and the second one's edges would never be walked.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct LockPackage {
+    name: String,
+    version: String,
+    source: String,
+    checksum: String,
+    dependencies: Vec<String>,
+}
+
+impl LockPackage {
+    fn identity(&self) -> (String, String, String) {
+        (self.name.clone(), self.version.clone(), self.source.clone())
+    }
+}
+
+/// Parses the `[[package]]` blocks of a `Cargo.lock`.
+fn lockfile_packages(lock: &str) -> Vec<LockPackage> {
+    let mut packages = Vec::new();
+    let mut current: Option<LockPackage> = None;
+    let mut in_dependencies = false;
+    let unquote = |line: &str| {
+        line.split_once('=')
+            .map(|(_, value)| value.trim().trim_matches('"').to_string())
+            .unwrap_or_default()
+    };
+    for line in lock.lines() {
+        let trimmed = line.trim();
+        if trimmed == "[[package]]" {
+            packages.extend(current.take());
+            current = Some(LockPackage {
+                name: String::new(),
+                version: String::new(),
+                source: String::new(),
+                checksum: String::new(),
+                dependencies: Vec::new(),
+            });
+            in_dependencies = false;
+            continue;
+        }
+        let Some(package) = current.as_mut() else {
+            continue;
+        };
+        if in_dependencies {
+            if trimmed == "]" {
+                in_dependencies = false;
+            } else {
+                package
+                    .dependencies
+                    .push(trimmed.trim_end_matches(',').trim_matches('"').to_string());
+            }
+            continue;
+        }
+        match trimmed {
+            _ if trimmed.starts_with("name =") => package.name = unquote(trimmed),
+            _ if trimmed.starts_with("version =") => package.version = unquote(trimmed),
+            _ if trimmed.starts_with("source =") => package.source = unquote(trimmed),
+            _ if trimmed.starts_with("checksum =") => package.checksum = unquote(trimmed),
+            "dependencies = [" => in_dependencies = true,
+            // A new top-level table ends the package blocks.
+            _ if trimmed.starts_with('[') => {
+                packages.extend(current.take());
+                break;
+            }
+            _ => {}
+        }
+    }
+    packages.extend(current);
+    packages
+}
+
+/// Splits a dependency reference into its name, optional version and optional
+/// source: `"name"`, `"name version"` or `"name version (source)"`.
+fn dependency_reference(reference: &str) -> (&str, Option<&str>, Option<&str>) {
+    let (head, source) = match reference.split_once(" (") {
+        Some((head, rest)) => (head, Some(rest.trim_end_matches(')'))),
+        None => (reference, None),
+    };
+    let mut fields = head.split_whitespace();
+    (fields.next().unwrap_or_default(), fields.next(), source)
+}
+
+/// Canonical text of `root`'s transitive dependency closure.
+fn lockfile_subtree(lock: &str, root: &str) -> String {
+    let packages = lockfile_packages(lock);
+    let mut wanted: BTreeSet<(String, String, String)> = BTreeSet::new();
+    let mut queue: Vec<String> = vec![root.to_string()];
+    while let Some(reference) = queue.pop() {
+        let (name, version, source) = dependency_reference(&reference);
+        for package in packages.iter().filter(|package| {
+            // A reference that omits a field is ambiguous only when several
+            // packages share what it does give; taking all of them can only
+            // widen the closure.
+            package.name == name
+                && version.is_none_or(|version| package.version == version)
+                && source.is_none_or(|source| package.source == source)
+        }) {
+            if wanted.insert(package.identity()) {
+                queue.extend(package.dependencies.iter().cloned());
+            }
+        }
+    }
+    let mut canonical = String::new();
+    for identity in &wanted {
+        let Some(package) = packages
+            .iter()
+            .find(|package| package.identity() == *identity)
+        else {
+            continue;
+        };
+        let mut dependencies = package.dependencies.clone();
+        dependencies.sort();
+        write!(
+            canonical,
+            "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1e}",
+            package.name,
+            package.version,
+            package.source,
+            package.checksum,
+            dependencies.join("\u{1d}")
+        )
+        .expect("writing to a String cannot fail");
+    }
+    canonical
+}
+
+/// The manifest with only `[workspace] members` elided.
+///
+/// The producer is built by a pinned command, `cargo build --locked -p
+/// map-inspector`. That selects one package, so feature resolution covers only
+/// map-inspector's own graph and the *set* of other workspace members cannot
+/// reach it. Everything else stays byte-for-byte: `resolver`, `default-members`,
+/// `exclude`, `[workspace.package]`, `[workspace.lints]`,
+/// `[workspace.dependencies]`, `[patch]` and any profile table.
+///
+/// This holds for the default resolver behaviour. `resolver.feature-unification
+/// = "workspace"` would unify features across all members regardless of `-p`
+/// and break the argument; no cargo configuration sets it, and none is pinned,
+/// so it is a stated assumption rather than a guarantee.
+///
+/// The elision is bounded by the `[workspace]` table and by real bracket depth,
+/// counted outside quoted strings. A line-prefix match with a trailing-bracket
+/// heuristic is not enough -- `members = [...] #` would run the elision on to
+/// the next bracketed line and swallow whatever sat between.
+fn manifest_without_members(manifest: &str) -> String {
+    let mut out = String::new();
+    let mut table = String::new();
+    let mut depth = 0usize;
+    for line in manifest.lines() {
+        let trimmed = line.trim();
+        if depth > 0 {
+            depth = bracket_depth(line, depth);
+            continue;
+        }
+        if trimmed.starts_with('[') && !trimmed.starts_with("[[") {
+            table = trimmed.trim_matches(|c| c == '[' || c == ']').to_string();
+        }
+        let key = trimmed.split_once('=').map(|(key, _)| key.trim());
+        if table == "workspace" && key == Some("members") {
+            out.push_str("members = <elided>\n");
+            depth = bracket_depth(line, 0);
+            continue;
+        }
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Bracket nesting after `line`, starting from `depth`, ignoring quoted text.
+fn bracket_depth(line: &str, depth: usize) -> usize {
+    let mut depth = depth;
+    let mut quoted = false;
+    for byte in line.bytes() {
+        match byte {
+            b'"' => quoted = !quoted,
+            b'[' if !quoted => depth += 1,
+            b']' if !quoted => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth
+}
+
 fn check_library_sources(root: &Path, library: &serde_json::Value) {
     let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
     let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
@@ -438,8 +653,25 @@ fn check_library_sources(root: &Path, library: &serde_json::Value) {
                 .as_str()
                 .or_else(|| library["replaced_source_hashes"][name]["current_sha256"].as_str())
                 .unwrap_or_else(|| expected.as_str().unwrap());
+            let contents = std::fs::read(root.join(name)).expect("read predecessor source");
+            if name == LOCK {
+                // The descriptor names the frozen fixture...
+                assert_eq!(
+                    sha256(PINNED_LOCK.as_bytes()),
+                    expected,
+                    "the lockfile's descriptor identity was substituted"
+                );
+                // ...and the live file must project onto it.
+                assert_eq!(
+                    lockfile_subtree(std::str::from_utf8(&contents).unwrap(), "map-inspector"),
+                    lockfile_subtree(PINNED_LOCK, "map-inspector"),
+                    "map-inspector's resolved dependencies changed; \
+                     explicitly revalidate before repinning"
+                );
+                continue;
+            }
             assert_eq!(
-                sha256(&std::fs::read(root.join(name)).expect("read predecessor source")),
+                sha256(&contents),
                 expected,
                 "library producer source changed: {name}; explicitly revalidate before repinning"
             );
@@ -451,8 +683,23 @@ fn check_library_sources(root: &Path, library: &serde_json::Value) {
         "adapter_source_hashes",
     ] {
         for (name, expected) in library[field].as_object().unwrap() {
+            let contents = std::fs::read(root.join(name)).expect("read library source");
+            if name == ROOT_MANIFEST {
+                assert_eq!(
+                    sha256(PINNED_MANIFEST.as_bytes()),
+                    expected.as_str().unwrap(),
+                    "the manifest's descriptor identity was substituted"
+                );
+                assert_eq!(
+                    manifest_without_members(std::str::from_utf8(&contents).unwrap()),
+                    manifest_without_members(PINNED_MANIFEST),
+                    "the workspace manifest changed outside its member list; \
+                     explicitly revalidate before repinning"
+                );
+                continue;
+            }
             assert_eq!(
-                sha256(&std::fs::read(root.join(name)).expect("read library source")),
+                sha256(&contents),
                 expected.as_str().unwrap(),
                 "library producer source changed: {name}; explicitly revalidate before repinning"
             );
@@ -711,4 +958,267 @@ fn loaded_map_matches_qualified_runtime_checkpoint() {
             }
         );
     }
+}
+
+// ---- Lockfile projection: the pin must stay strict where it matters. ----
+
+const SAMPLE_LOCK: &str = r#"
+[[package]]
+name = "map-inspector"
+version = "0.1.0"
+dependencies = [
+ "oracle",
+]
+
+[[package]]
+name = "oracle"
+version = "0.1.0"
+source = "registry+x"
+checksum = "abc"
+dependencies = [
+ "cc",
+]
+
+[[package]]
+name = "cc"
+version = "1.1.0"
+source = "registry+x"
+checksum = "def"
+
+[[package]]
+name = "unrelated"
+version = "9.9.9"
+source = "registry+x"
+checksum = "999"
+"#;
+
+#[test]
+fn the_lockfile_projection_reaches_the_whole_closure() {
+    let projected = lockfile_subtree(SAMPLE_LOCK, "map-inspector");
+    for name in ["map-inspector", "oracle", "cc"] {
+        assert!(projected.contains(name), "{name} must be in the closure");
+    }
+    assert!(
+        !projected.contains("unrelated"),
+        "a package the producer does not depend on must not be pinned"
+    );
+}
+
+#[test]
+fn the_lockfile_projection_ignores_packages_outside_the_closure() {
+    // The whole point: adding a workspace member the producer does not depend
+    // on must not trip the gate.
+    let added = format!(
+        "{SAMPLE_LOCK}\n[[package]]\nname = \"newcomer\"\nversion = \"0.1.0\"\ndependencies = [\n \"cc\",\n]\n"
+    );
+    assert_eq!(
+        lockfile_subtree(SAMPLE_LOCK, "map-inspector"),
+        lockfile_subtree(&added, "map-inspector")
+    );
+}
+
+#[test]
+fn the_lockfile_projection_catches_every_change_inside_the_closure() {
+    let baseline = lockfile_subtree(SAMPLE_LOCK, "map-inspector");
+    // A version bump, a source swap, a checksum change and a dropped edge are
+    // each inside the closure, and each must change the projection.
+    for (from, to) in [
+        ("version = \"1.1.0\"", "version = \"1.2.0\""),
+        (
+            "source = \"registry+x\"\nchecksum = \"def\"",
+            "source = \"git+y\"\nchecksum = \"def\"",
+        ),
+        ("checksum = \"def\"", "checksum = \"deadbeef\""),
+        ("dependencies = [\n \"cc\",\n]", "dependencies = [\n]"),
+    ] {
+        let mutated = SAMPLE_LOCK.replacen(from, to, 1);
+        assert_ne!(mutated, SAMPLE_LOCK, "mutation {from:?} must apply");
+        assert_ne!(
+            lockfile_subtree(&mutated, "map-inspector"),
+            baseline,
+            "mutation {from:?} must change the projection"
+        );
+    }
+}
+
+#[test]
+fn an_ambiguous_dependency_reference_widens_the_closure() {
+    // Two versions of one name, referenced without a version. Taking both is
+    // conservative; taking one could drop a package that reaches the producer.
+    let lock = r#"
+[[package]]
+name = "map-inspector"
+version = "0.1.0"
+dependencies = [
+ "twice",
+]
+
+[[package]]
+name = "twice"
+version = "1.0.0"
+source = "registry+x"
+checksum = "one"
+
+[[package]]
+name = "twice"
+version = "2.0.0"
+source = "registry+x"
+checksum = "two"
+"#;
+    let projected = lockfile_subtree(lock, "map-inspector");
+    assert!(projected.contains("one") && projected.contains("two"));
+}
+
+const SAMPLE_MANIFEST: &str = r#"[workspace]
+resolver = "2"
+members = ["crates/rom", "crates/oracle"]
+
+[workspace.package]
+version = "0.1.0"
+
+[workspace.lints.clippy]
+pedantic = "warn"
+"#;
+
+#[test]
+fn the_manifest_projection_ignores_only_the_member_list() {
+    let baseline = manifest_without_members(SAMPLE_MANIFEST);
+    // Adding a member is invisible: the producer is built with -p.
+    let added = SAMPLE_MANIFEST.replace(
+        r#"members = ["crates/rom", "crates/oracle"]"#,
+        r#"members = ["crates/rom", "crates/oracle", "crates/newcomer"]"#,
+    );
+    assert_ne!(added, SAMPLE_MANIFEST);
+    assert_eq!(manifest_without_members(&added), baseline);
+
+    // A multi-line member list is elided the same way.
+    let multiline = SAMPLE_MANIFEST.replace(
+        r#"members = ["crates/rom", "crates/oracle"]"#,
+        "members = [\n  \"crates/rom\",\n  \"crates/oracle\",\n]",
+    );
+    assert_eq!(manifest_without_members(&multiline), baseline);
+}
+
+#[test]
+fn the_manifest_projection_catches_everything_else() {
+    let baseline = manifest_without_members(SAMPLE_MANIFEST);
+    for (from, to) in [
+        ("resolver = \"2\"", "resolver = \"1\""),
+        ("version = \"0.1.0\"", "version = \"0.2.0\""),
+        ("pedantic = \"warn\"", "pedantic = \"allow\""),
+        ("[workspace.package]", "[profile.release]"),
+    ] {
+        let mutated = SAMPLE_MANIFEST.replacen(from, to, 1);
+        assert_ne!(mutated, SAMPLE_MANIFEST, "mutation {from:?} must apply");
+        assert_ne!(
+            manifest_without_members(&mutated),
+            baseline,
+            "mutation {from:?} must change the projection"
+        );
+    }
+    // An added profile table is caught too.
+    let profiled = format!("{SAMPLE_MANIFEST}\n[profile.release]\nlto = true\n");
+    assert_ne!(manifest_without_members(&profiled), baseline);
+}
+
+#[test]
+fn a_duplicate_name_and_version_at_another_source_is_not_merged() {
+    // Keying the closure on (name, version) alone merges a patched git fork
+    // that kept its version number with the registry package it replaces. The
+    // second one's edges then never get walked, so a whole subtree -- and its
+    // checksums -- drop out of the pin silently.
+    let lock = r#"
+[[package]]
+name = "map-inspector"
+version = "0.1.0"
+dependencies = [
+ "foo 1.0.0 (registry+x)",
+ "bar",
+]
+
+[[package]]
+name = "bar"
+version = "1.0.0"
+source = "registry+x"
+checksum = "bar-sum"
+dependencies = [
+ "foo 1.0.0 (git+fork)",
+]
+
+[[package]]
+name = "foo"
+version = "1.0.0"
+source = "registry+x"
+checksum = "registry-sum"
+
+[[package]]
+name = "foo"
+version = "1.0.0"
+source = "git+fork"
+checksum = "fork-sum"
+dependencies = [
+ "hidden",
+]
+
+[[package]]
+name = "hidden"
+version = "6.6.6"
+source = "registry+x"
+checksum = "hidden-sum"
+"#;
+    let projected = lockfile_subtree(lock, "map-inspector");
+    assert!(projected.contains("registry-sum"), "registry foo");
+    assert!(projected.contains("fork-sum"), "the forked foo");
+    assert!(
+        projected.contains("hidden-sum"),
+        "a package reachable only through the fork must be in the closure"
+    );
+    // And each of those checksums must actually be load-bearing.
+    for sum in ["registry-sum", "fork-sum", "hidden-sum"] {
+        let mutated = lock.replacen(sum, "tampered", 1);
+        assert_ne!(
+            lockfile_subtree(&mutated, "map-inspector"),
+            projected,
+            "tampering with {sum} must change the projection"
+        );
+    }
+}
+
+#[test]
+fn the_member_elision_cannot_run_past_its_own_line() {
+    // A trailing comment stops the members line ending in `]`. A heuristic that
+    // elides until the next `]`-terminated line would swallow everything
+    // between, hiding injected workspace keys inside the elided region.
+    let baseline = manifest_without_members(SAMPLE_MANIFEST);
+    let smuggled = SAMPLE_MANIFEST.replace(
+        r#"members = ["crates/rom", "crates/oracle"]"#,
+        "members = [\"crates/rom\", \"crates/oracle\"] #\ndependencies = { serde = \"1\" }\n[patch.crates-io]",
+    );
+    assert_ne!(smuggled, SAMPLE_MANIFEST);
+    assert_ne!(
+        manifest_without_members(&smuggled),
+        baseline,
+        "keys smuggled after the members line must remain visible"
+    );
+    assert!(
+        manifest_without_members(&smuggled).contains("patch.crates-io"),
+        "the injected table must survive the projection"
+    );
+}
+
+#[test]
+fn only_the_workspace_tables_members_key_is_elided() {
+    // A `members`-prefixed key in another table is a different key.
+    let elsewhere =
+        format!("{SAMPLE_MANIFEST}\n[workspace.metadata.x]\nmembers_are_cool = \"yes\"\n");
+    assert!(
+        manifest_without_members(&elsewhere).contains("members_are_cool"),
+        "a key outside [workspace] must not be elided"
+    );
+    // default-members is a distinct key and stays pinned.
+    let defaults = SAMPLE_MANIFEST.replace(
+        r#"members = ["crates/rom", "crates/oracle"]"#,
+        "members = [\"crates/rom\"]\ndefault-members = [\"crates/rom\"]",
+    );
+    assert!(manifest_without_members(&defaults).contains("default-members"));
 }

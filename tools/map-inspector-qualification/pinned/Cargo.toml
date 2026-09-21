@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/rom", "crates/oracle", "crates/disasm", "crates/memory-map", "crates/assets", "crates/map-inspector", "crates/room-core", "crates/web-spike", "crates/pandora-web"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/lainsoykaf/terranigma"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = "warn"

@@ -521,3 +521,93 @@ detected; records are retained under ignored `local/map-inspector-repin/`.
 `test_capture.py` covers the recorder's repin branch: schema-4 envelope shape,
 inherited (not restated) group inventories, the required fixed-source argument
 and descriptor-mode exclusivity.
+
+## Build-input pins: two files pinned by projection, not whole file
+
+The workspace root `Cargo.toml` and `Cargo.lock` are producer sources because
+they decide what the producer compiles against. But both also record things the
+producer cannot reach: adding an unrelated workspace member rewrites `members`
+and appends a `[[package]]` block without changing a single input to the
+capture.
+
+Rather than spend a repin on a provable no-op, those two are pinned by
+**projection**, anchored on a frozen copy of the exact file the descriptor
+named, under `pinned/`:
+
+```text
+descriptor entry == sha256(pinned fixture)   descriptor <-> fixture
+projection(fixture) == projection(live)      fixture    <-> live
+```
+
+There is no free-floating constant to edit. An earlier draft compared two
+constants to two constants and so dropped the descriptor's binding to the tree
+entirely; this chain restores it.
+
+| File | Pinned as | Elided |
+| --- | --- | --- |
+| `Cargo.lock` | transitive dependency closure of `map-inspector` | packages outside that closure |
+| `Cargo.toml` | the file with `[workspace] members` elided | only that one key |
+
+### Both gates, one definition of each projection
+
+`projection.py` and the Rust sourcegate implement the same two projections, and
+**both compare the live file to the same fixture**, so a divergence between the
+two implementations makes one of them red. Routing the Python bridge through
+`projection.effective_sha` keeps every existing equality check in
+`library_bridge.py` intact: it returns the fixture's whole-file hash only when
+the live file projects onto it, and the live file's own hash otherwise.
+
+Narrowing the Rust gate alone would have been a regression, not a narrowing —
+the Python bridge is what actually authenticates a capture, and it whole-file
+hashes both files.
+
+### Why each is no weaker
+
+`Cargo.lock`: the closure carries every name, version, source, checksum and
+edge inside it, keyed on `(name, version, source)`. The source belongs in the
+key — cargo emits a dependency reference's source exactly when name and version
+are ambiguous, which a patched git fork that kept its version number produces,
+and merging those would leave the fork's subtree unwalked. A reference that
+omits a field matches every package sharing what it does give, so ambiguity
+widens the closure rather than narrowing it. 31 of the workspace's 42 packages
+are in the closure, byte-identical to `cargo tree -p map-inspector`.
+
+`Cargo.toml`: the producer's build command is pinned as exactly
+`cargo build --locked -p map-inspector`. That selects one package, so feature
+resolution covers only that package's graph and the *set* of other workspace
+members cannot reach it. Everything else stays pinned byte-for-byte —
+`resolver`, `default-members`, `exclude`, `[workspace.package]`,
+`[workspace.lints]`, `[workspace.dependencies]`, `[patch]` and any profile
+table.
+
+The elision is bounded by the `[workspace]` table and by real bracket depth
+counted outside quoted strings. A line-prefix match with a trailing-bracket
+heuristic is not enough: `members = [...] #` does not end in a bracket, so the
+elision would run on to the next bracketed line and swallow whatever sat
+between — an injected `[workspace.dependencies]` and `[patch.crates-io]` were
+demonstrated hiding there, projecting to the expected hash exactly.
+
+**Stated assumption, not a guarantee:** the `Cargo.toml` argument holds for the
+default resolver behaviour. `resolver.feature-unification = "workspace"` would
+unify features across all members regardless of `-p`. No cargo configuration
+sets it and none is pinned.
+
+### Known losses
+
+The projections do not see the `Cargo.lock` `version = N` header, `[metadata]`
+or `[patch.unused]` tables, or lockfile whitespace and comments. All are
+build-neutral; `[patch.unused]` appearing is a signal that a `[patch]` stopped
+applying, and that signal is now invisible.
+
+### Evidence
+
+Both projections were established from the exact files the library stage
+pinned, *before* any change to them — `Cargo.lock` at `23e335de...d070`,
+`Cargo.toml` at `6d5ae00e...1937`, which are the fixtures' own hashes — and
+were then shown unchanged after the workspace gained a member. The two
+implementations agree: both produce lockfile projection `7d9b629d...9e5f`.
+
+`test_projection.py` (10 tests) and the Rust sourcegate (9 projection tests) fix
+the strictness in both directions, including the two holes an adversarial review
+found in the first draft: a git fork sharing a name and version, and the
+trailing-comment elision runaway.
