@@ -16,6 +16,126 @@ pub struct Background {
     pub width: usize,
     /// Height in pixels.
     pub height: usize,
+    /// Row-major, one per pixel: whether the tile there is opaque and high
+    /// priority, which draws over an ordinary sprite. Empty means none is.
+    pub high: Vec<bool>,
+}
+
+impl Background {
+    /// Whether the background at a world pixel covers an ordinary sprite.
+    #[must_use]
+    pub fn occludes(&self, x: usize, y: usize) -> bool {
+        x < self.width && self.high.get(y * self.width + x).copied().unwrap_or(false)
+    }
+}
+
+/// Blits a sprite raster at a world position, occluded by the background.
+///
+/// This is the first-background compositor the browser viewer qualified,
+/// narrowed to what the slice draws: every sprite is ordinary priority, so a
+/// pixel under an opaque high-priority tile is the tile's. Later sprites in
+/// the draw list overwrite earlier ones where both are opaque.
+pub fn draw_sprite(
+    frame: &mut [u32],
+    background: &Background,
+    camera: (usize, usize),
+    raster: &crysta_runtime::art::Raster,
+    at: (u16, u16),
+) {
+    for row in 0..raster.height {
+        for column in 0..raster.width {
+            let Some(pixel) = raster.pixels.get(row * raster.width + column) else {
+                return;
+            };
+            if pixel >> 24 == 0 {
+                continue;
+            }
+            let (Ok(column_i), Ok(row_i)) = (i64::try_from(column), i64::try_from(row)) else {
+                continue;
+            };
+            let world_x = i64::from(at.0) + i64::from(raster.offset.0) + column_i;
+            let world_y = i64::from(at.1) + i64::from(raster.offset.1) + row_i;
+            let (Ok(world_x), Ok(world_y)) = (usize::try_from(world_x), usize::try_from(world_y))
+            else {
+                continue;
+            };
+            if background.occludes(world_x, world_y) {
+                continue;
+            }
+            let (Some(x), Some(y)) = (world_x.checked_sub(camera.0), world_y.checked_sub(camera.1))
+            else {
+                continue;
+            };
+            if x < VIEW_WIDTH && y < VIEW_HEIGHT {
+                frame[y * VIEW_WIDTH + x] = pixel & 0x00FF_FFFF;
+            }
+        }
+    }
+}
+
+/// Colours for a dialogue page's four indices: black, text, shadow, and the
+/// page's own background index, which takes the box colour.
+///
+/// A presentation policy, as the browser viewer's is: the ROM's font pixels
+/// at high contrast, not the SNES window or its colours.
+const PAGE_PALETTE: [u32; 4] = [0x0000_0000, 0x00F0_F4F8, 0x0024_2F37, 0x0010_1828];
+/// The box behind a page.
+const PAGE_BOX: u32 = 0x0010_1828;
+/// The box's border.
+const PAGE_BORDER: u32 = 0x00F0_F4F8;
+/// Margin between the view's bottom edge and the box.
+const PAGE_MARGIN: usize = 8;
+
+/// Draws a dialogue page in a box along the bottom of the view.
+///
+/// `indexed` is the page's row-major two-bit pixels, `width * height` of
+/// them, and `background_index` is the index that reads as clear.
+pub fn draw_page(
+    frame: &mut [u32],
+    indexed: &[u8],
+    (width, height): (usize, usize),
+    background_index: u8,
+) {
+    if width == 0 || height == 0 || indexed.len() < width * height {
+        return;
+    }
+    let box_width = (width + 2 * PAGE_MARGIN).min(VIEW_WIDTH);
+    let box_height = (height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT);
+    let left = (VIEW_WIDTH - box_width) / 2;
+    let top = VIEW_HEIGHT.saturating_sub(box_height + PAGE_MARGIN);
+    let (left_i, top_i) = (
+        i32::try_from(left).unwrap_or(0),
+        i32::try_from(top).unwrap_or(0),
+    );
+    let (box_w, box_h) = (
+        i32::try_from(box_width).unwrap_or(0),
+        i32::try_from(box_height).unwrap_or(0),
+    );
+    fill(frame, (left_i, top_i), (box_w, box_h), PAGE_BORDER);
+    fill(
+        frame,
+        (left_i + 1, top_i + 1),
+        (box_w - 2, box_h - 2),
+        PAGE_BOX,
+    );
+    let mut palette = PAGE_PALETTE;
+    if let Some(slot) = palette.get_mut(usize::from(background_index)) {
+        *slot = PAGE_BOX;
+    }
+    for row in 0..height {
+        let y = top + PAGE_MARGIN + row;
+        if y >= VIEW_HEIGHT {
+            break;
+        }
+        for column in 0..width {
+            let x = left + PAGE_MARGIN + column;
+            if x >= VIEW_WIDTH {
+                break;
+            }
+            let index = usize::from(indexed[row * width + column]) & 3;
+            frame[y * VIEW_WIDTH + x] = palette[index];
+        }
+    }
 }
 
 /// Decodes a 24-bit top-down BMP, which is what the qualified renderer emits.
@@ -54,6 +174,7 @@ pub fn decode_bmp(bytes: &[u8]) -> Option<Background> {
         pixels,
         width,
         height,
+        high: Vec::new(),
     })
 }
 
@@ -244,6 +365,7 @@ mod tests {
             pixels: vec![0x0000_0001; 300 * 300],
             width: 300,
             height: 300,
+            high: Vec::new(),
         };
         let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
         // A camera near the edge leaves the far side untouched rather than
@@ -251,5 +373,122 @@ mod tests {
         draw_background(&mut frame, &background, (200, 200));
         assert_eq!(frame[0], 0x0000_0001);
         assert_eq!(frame[VIEW_HEIGHT * VIEW_WIDTH - 1], 0);
+    }
+
+    fn raster(width: usize, height: usize, offset: (i16, i16)) -> crysta_runtime::art::Raster {
+        crysta_runtime::art::Raster {
+            width,
+            height,
+            offset,
+            pixels: vec![0xFF12_3456; width * height],
+        }
+    }
+
+    #[test]
+    fn a_sprite_lands_at_its_origin_plus_offset_minus_the_camera() {
+        let background = Background {
+            pixels: vec![0; 512 * 512],
+            width: 512,
+            height: 512,
+            high: Vec::new(),
+        };
+        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        // Origin (100, 100), offset (-8, -16), camera (50, 40): the top-left
+        // pixel lands at view (42, 44).
+        draw_sprite(
+            &mut frame,
+            &background,
+            (50, 40),
+            &raster(16, 16, (-8, -16)),
+            (100, 100),
+        );
+        assert_eq!(frame[44 * VIEW_WIDTH + 42], 0x0012_3456);
+        assert_eq!(frame[43 * VIEW_WIDTH + 42], 0);
+        assert_eq!(frame[44 * VIEW_WIDTH + 41], 0);
+        assert_eq!(frame[(44 + 15) * VIEW_WIDTH + 42 + 15], 0x0012_3456);
+        assert_eq!(frame[(44 + 16) * VIEW_WIDTH + 42 + 16], 0);
+    }
+
+    #[test]
+    fn transparent_pixels_and_high_background_are_left_alone() {
+        let mut high = vec![false; 512 * 512];
+        // The world pixel (100, 100) is under a high-priority tile.
+        high[100 * 512 + 100] = true;
+        let background = Background {
+            pixels: vec![0; 512 * 512],
+            width: 512,
+            height: 512,
+            high,
+        };
+        let mut frame = vec![0x00AB_CDEF; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut sprite = raster(2, 1, (0, 0));
+        sprite.pixels[1] = 0; // transparent
+        draw_sprite(&mut frame, &background, (0, 0), &sprite, (100, 100));
+        // Occluded: the background shows through.
+        assert_eq!(frame[100 * VIEW_WIDTH + 100], 0x00AB_CDEF);
+        // Transparent: untouched too.
+        assert_eq!(frame[100 * VIEW_WIDTH + 101], 0x00AB_CDEF);
+        // But the same sprite one pixel over draws.
+        draw_sprite(&mut frame, &background, (0, 0), &sprite, (101, 100));
+        assert_eq!(frame[100 * VIEW_WIDTH + 101], 0x0012_3456);
+    }
+
+    #[test]
+    fn a_sprite_off_the_view_or_before_the_camera_is_clipped_not_wrapped() {
+        let background = Background {
+            pixels: vec![0; 64 * 64],
+            width: 64,
+            height: 64,
+            high: Vec::new(),
+        };
+        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        // Above and left of the world origin entirely.
+        draw_sprite(
+            &mut frame,
+            &background,
+            (0, 0),
+            &raster(8, 8, (-8, -8)),
+            (0, 0),
+        );
+        assert!(frame.iter().all(|pixel| *pixel == 0));
+        // Behind the camera.
+        draw_sprite(
+            &mut frame,
+            &background,
+            (32, 32),
+            &raster(8, 8, (0, 0)),
+            (10, 10),
+        );
+        assert!(frame.iter().all(|pixel| *pixel == 0));
+    }
+
+    #[test]
+    fn a_page_is_boxed_at_the_bottom_with_its_background_index_as_box_colour() {
+        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        // A 4x2 page: indices 0..3 across the top row, all background below.
+        let indexed = [0u8, 1, 2, 3, 3, 3, 3, 3];
+        draw_page(&mut frame, &indexed, (4, 2), 3);
+        let box_width = 4 + 2 * PAGE_MARGIN;
+        let box_height = 2 + 2 * PAGE_MARGIN;
+        let left = (VIEW_WIDTH - box_width) / 2;
+        let top = VIEW_HEIGHT - box_height - PAGE_MARGIN;
+        // Border corner, box interior, then the page's pixels.
+        assert_eq!(frame[top * VIEW_WIDTH + left], PAGE_BORDER);
+        assert_eq!(frame[(top + 1) * VIEW_WIDTH + left + 1], PAGE_BOX);
+        let row = (top + PAGE_MARGIN) * VIEW_WIDTH + left + PAGE_MARGIN;
+        assert_eq!(frame[row], PAGE_PALETTE[0]);
+        assert_eq!(frame[row + 1], PAGE_PALETTE[1]);
+        assert_eq!(frame[row + 2], PAGE_PALETTE[2]);
+        assert_eq!(frame[row + 3], PAGE_BOX, "the background index is the box");
+        // Above the box nothing was touched.
+        assert_eq!(frame[(top - 1) * VIEW_WIDTH + left], 0);
+    }
+
+    #[test]
+    fn a_malformed_page_draws_nothing() {
+        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        draw_page(&mut frame, &[1, 1], (4, 2), 3);
+        draw_page(&mut frame, &[], (0, 0), 3);
+        assert!(frame.iter().all(|pixel| *pixel == 0));
     }
 }

@@ -88,14 +88,41 @@ paper over it is the wrong trade. Run it with:
 cargo run --release --manifest-path crates/crysta-app/Cargo.toml -- <rom>
 ```
 
+## Progress: sprites and dialogue
+
+The player is drawn from the ROM's own frames: `crysta_runtime::art::ArkAtlas`
+rasterizes the three standing and eighteen walking compositions, with the
+horizontal ones mirrored through the ROM's alternate anchors, and the world
+advances a `room_core::AnimationState` from the walking state's active
+direction exactly as the qualified slice does. Residents are drawn from their
+spawn records through
+[the record-driven loader](crysta-resident-art.md).
+
+Compositing follows the browser viewer: background at the camera, then the
+draw list sorted by world Y with later spawn records first and the player
+last at equal Y, with every sprite pixel under an opaque high-priority
+background tile left to the tile. The priority mask comes from the same
+`render_static_background` call that supplies the bitmap.
+
+Dialogue pages are drawn as the two-bit images the ROM holds, boxed along
+the bottom of the view, and the interact button pages through them; the last
+page's acknowledgement closes the box. While a conversation is open the
+player stands still.
+
+A resident with no graphics descriptor draws nothing, as in the game. One
+whose descriptor was refused draws a coloured block, so that someone is
+visibly there and visibly not right.
+
+`--screenshot <path> <script>` runs a step script such as
+`down:400,wait:12,up:24,wait:12,left:20,wait:12,talk` and lists every
+resident with their art status and what talking to them yields.
+
 ## Remaining
 
-- **The player and residents are coloured blocks, not sprites.** The art
-  manifest hands over decoded RGBA frames with pre-sorted draw lists; wiring it
-  in is the next step and is the bulk of what "looks like the game" means.
-- **Dialogue is not drawn.** Talking resolves the pages and the app reports
-  what it got, but the pages are not painted into the frame.
-- **The camera shows past the map's own region.** Several maps share one layer,
-  so the window can include part of a neighbouring room. Clipping needs the
-  per-map region.
+- **Choice prompts are not drawn.** The text decoder refuses them, so the
+  residents whose new-game line is one -- including the first resident in
+  the opening room -- report the prompt on stderr and show nothing.
+- **The camera shows past the map's own region.** Several maps share one
+  layer, so the window can include part of a neighbouring room. Clipping
+  needs the per-map region.
 - No `.app` bundle yet; it runs as a binary.

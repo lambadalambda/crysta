@@ -2,10 +2,12 @@
 //!
 //! The simulation is [`crysta_runtime`]; this owns a window, a framebuffer and
 //! input, and nothing else. Backgrounds come from the qualified renderer rather
-//! than a second decode path.
+//! than a second decode path, and sprites from the runtime's art module.
 
 mod frame;
 
+use assets::text::{Acknowledgement, DialoguePage};
+use crysta_runtime::art::{residents_art, ArkAtlas, Placeholder, Raster};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::world::World;
 use frame::{VIEW_HEIGHT, VIEW_WIDTH};
@@ -22,6 +24,10 @@ use winit::window::{Window, WindowId};
 
 /// Map the player starts in, and where. The opening house's first room.
 const START: (u16, u16, u16) = (0x000B, 120, 128);
+
+/// What a resident whose art was refused is drawn as: a block, so that
+/// someone is visibly there and visibly not right.
+const PLACEHOLDER: u32 = 0x00C0_50C0;
 
 fn main() {
     let mut arguments = std::env::args().skip(1);
@@ -47,61 +53,58 @@ fn main() {
         eprintln!("the slice is qualified only for the Japanese reference");
         std::process::exit(1);
     }
-    // Headless: compose one frame after N steps and write it out, so the
+    // Headless: run a step script and write the composed frame out, so the
     // renderer can be inspected without a window.
+    // The image is leaked once, so the world can borrow it for the run.
+    let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
     if arguments.next().as_deref() == Some("--screenshot") {
         let path = arguments.next().unwrap_or_else(|| "frame.ppm".into());
-        let steps: usize = arguments
-            .next()
-            .and_then(|value| value.parse().ok())
-            .unwrap_or(0);
-        let direction = match arguments.next().as_deref() {
-            Some("up") => Some(Direction::Up),
-            Some("down") => Some(Direction::Down),
-            Some("left") => Some(Direction::Left),
-            Some("right") => Some(Direction::Right),
-            _ => None,
-        };
-        screenshot(&cartridge, &path, steps, direction);
+        let script = arguments.next().unwrap_or_default();
+        screenshot(&cartridge, image, &path, &script);
         return;
     }
     let event_loop = EventLoop::new().expect("an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::new(cartridge);
+    let mut app = App::new(cartridge, image);
     if let Err(error) = event_loop.run_app(&mut app) {
         eprintln!("{error}");
         std::process::exit(1);
     }
 }
 
-/// Runs the world for `steps` frames and writes the composed view as a PPM.
-fn screenshot(cartridge: &rom::Rom, path: &str, steps: usize, direction: Option<Direction>) {
-    let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
-    let mut session = Session {
-        world: World::enter(image, START.0, START.1, START.2).expect("the opening house"),
-        backgrounds: HashMap::new(),
-        said: None,
-    };
-    for _ in 0..steps {
-        session.world.step(direction);
+/// Runs a step script and writes the composed view as a PPM.
+///
+/// The script is comma-separated: `down:400` walks 400 frames down, `wait:5`
+/// stands for 5, and `talk` presses the interact button once.
+fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &str) {
+    let mut session = Session::new(image);
+    for step in script.split(',').filter(|step| !step.is_empty()) {
+        let (what, count) = step.split_once(':').unwrap_or((step, "1"));
+        let Ok(count) = count.parse::<usize>() else {
+            eprintln!("bad step count in {step:?}");
+            std::process::exit(2);
+        };
+        let direction = match what {
+            "up" => Some(Direction::Up),
+            "down" => Some(Direction::Down),
+            "left" => Some(Direction::Left),
+            "right" => Some(Direction::Right),
+            "wait" => None,
+            "talk" => {
+                session.advance(None, true);
+                continue;
+            }
+            other => {
+                eprintln!("unknown step {other:?}");
+                std::process::exit(2);
+            }
+        };
+        for _ in 0..count {
+            session.advance(direction, false);
+        }
     }
     let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
-    let position = session.world.position();
-    let residents: Vec<_> = session
-        .world
-        .residents()
-        .iter()
-        .map(|resident| resident.position)
-        .collect();
-    let camera = match session.background(cartridge) {
-        Some(background) => {
-            let camera = frame::camera(position, (background.width, background.height));
-            frame::draw_background(&mut frame, background, camera);
-            camera
-        }
-        None => (0, 0),
-    };
-    draw_actors(&mut frame, camera, position, &residents);
+    let camera = session.compose(cartridge, &mut frame);
     let mut out = format!("P6\n{VIEW_WIDTH} {VIEW_HEIGHT}\n255\n").into_bytes();
     for pixel in &frame {
         // Truncation is the point: the low byte of each channel.
@@ -109,39 +112,224 @@ fn screenshot(cartridge: &rom::Rom, path: &str, steps: usize, direction: Option<
         out.extend_from_slice(&[channel(16), channel(8), channel(0)]);
     }
     std::fs::write(path, out).expect("writing the frame");
+    let roster = session.world.residents().to_vec();
+    let art = session.resident_art().to_vec();
+    for (resident, art) in roster.iter().zip(&art) {
+        let status = match art {
+            Ok(_) => "drawn".to_string(),
+            Err(Placeholder::Invisible) => "invisible".to_string(),
+            Err(other) => format!("{other:?}"),
+        };
+        let events = assets::maps::scripts::EventFlags::Bitmap(session.world.events());
+        let says = match crysta_runtime::residents::talk_to(session.image, resident, events) {
+            Conversation::Speaks { pages, .. } => format!("speaks {} page(s)", pages.len()),
+            Conversation::Silent => "silent".to_string(),
+            Conversation::Unsupported { source } => format!("choice prompt at ${source:04x}"),
+            Conversation::Unaccounted { service } => format!("stops at COP ${service:02x}"),
+        };
+        println!(
+            "  resident {:#08x} at {:?}: {status}, {says}",
+            resident.record, resident.position
+        );
+    }
     println!(
-        "map {:#06x} at {position:?}, camera {camera:?}, {} residents -> {path}",
+        "map {:#06x} at {:?}, camera {camera:?}, {} residents, dialogue {} -> {path}",
         session.world.map(),
-        residents.len()
+        session.world.position(),
+        session.world.residents().len(),
+        session
+            .dialogue
+            .as_ref()
+            .map_or("closed".to_string(), |open| format!(
+                "page {} of {}",
+                open.index + 1,
+                open.pages.len()
+            )),
     );
 }
 
-/// Draws the player and the residents into a composed frame.
-fn draw_actors(
-    frame: &mut [u32],
-    camera: (usize, usize),
-    position: (u16, u16),
-    residents: &[(u16, u16)],
-) {
-    let to_view = |(x, y): (u16, u16)| {
-        let origin = (
-            i32::try_from(camera.0).unwrap_or(i32::MAX),
-            i32::try_from(camera.1).unwrap_or(i32::MAX),
-        );
-        (i32::from(x) - origin.0, i32::from(y) - origin.1)
-    };
-    for resident in residents {
-        let (x, y) = to_view(*resident);
-        frame::fill(frame, (x - 8, y - 16), (16, 16), 0x0000_C8FF);
+/// Resident art for one roster: the map, the records present, the flags in
+/// force, and their rasters. The flags are part of the key because a
+/// resident's pose comes from their walked script, which branches on them.
+type RosterArt = (u16, Vec<usize>, Vec<u8>, Vec<Result<Raster, Placeholder>>);
+
+/// A conversation being shown, one page at a time.
+struct Dialogue {
+    pages: Vec<DialoguePage>,
+    index: usize,
+}
+
+/// The running world plus what it needs to draw.
+struct Session {
+    world: World<'static>,
+    image: &'static [u8],
+    atlas: ArkAtlas,
+    backgrounds: HashMap<u16, frame::Background>,
+    /// Resident art for the roster it was computed for, keyed by map and by
+    /// which records were present, since the flags can change the roster.
+    art: Option<RosterArt>,
+    dialogue: Option<Dialogue>,
+}
+
+impl Session {
+    fn new(image: &'static [u8]) -> Self {
+        Self {
+            world: World::enter(image, START.0, START.1, START.2).expect("the opening house"),
+            image,
+            atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
+            backgrounds: HashMap::new(),
+            art: None,
+            dialogue: None,
+        }
     }
-    let (x, y) = to_view(position);
-    frame::fill(frame, (x - 8, y - 16), (16, 16), 0x00FF_FFFF);
-    frame::fill(frame, (x - 4, y - 12), (8, 8), 0x00C8_2020);
+
+    /// One frame of simulation: walking, or paging through dialogue.
+    ///
+    /// While a conversation is open the player stands still and the button
+    /// turns pages; the last page's acknowledgement closes it.
+    fn advance(&mut self, direction: Option<Direction>, interact: bool) {
+        if let Some(open) = &mut self.dialogue {
+            if interact {
+                let last = open.index + 1 >= open.pages.len();
+                let closes =
+                    last || open.pages[open.index].acknowledgement() == Acknowledgement::End;
+                if closes {
+                    self.dialogue = None;
+                } else {
+                    open.index += 1;
+                }
+            }
+            return;
+        }
+        self.world.step(direction);
+        if !interact {
+            return;
+        }
+        // Talking first: a resident standing in a doorway should be spoken
+        // to rather than walked past.
+        match self.world.talk() {
+            Some(Conversation::Speaks { pages, .. }) if !pages.is_empty() => {
+                // Stand, rather than hold whatever stride the step left.
+                self.world.face(self.world.facing());
+                self.dialogue = Some(Dialogue { pages, index: 0 });
+            }
+            Some(Conversation::Speaks { .. }) => {}
+            Some(Conversation::Unsupported { source }) => {
+                eprintln!(
+                    "the resident's line is a choice prompt at ${source:04x}, which is not drawn"
+                );
+            }
+            Some(Conversation::Unaccounted { service }) => {
+                eprintln!("the resident's script stops at COP ${service:02x}");
+            }
+            Some(Conversation::Silent) => eprintln!("..."),
+            None => {
+                self.world.interact();
+            }
+        }
+    }
+
+    /// Renders and caches the current map's background and its priority mask.
+    fn background(&mut self, cartridge: &rom::Rom) -> Option<&frame::Background> {
+        let map = self.world.map();
+        if let std::collections::hash_map::Entry::Vacant(slot) = self.backgrounds.entry(map) {
+            let rendered = map_inspector::render_static_background(cartridge, map).ok()?;
+            let mut decoded = frame::decode_bmp(&rendered.bitmap)?;
+            decoded.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
+            slot.insert(decoded);
+        }
+        self.backgrounds.get(&map)
+    }
+
+    /// Resident art for the current roster, recomputed when the roster changes.
+    fn resident_art(&mut self) -> &[Result<Raster, Placeholder>] {
+        let map = self.world.map();
+        let records: Vec<usize> = self
+            .world
+            .residents()
+            .iter()
+            .map(|resident| resident.record)
+            .collect();
+        let stale = !matches!(
+            &self.art,
+            Some((cached_map, cached, flags, _))
+                if *cached_map == map && *cached == records && flags == self.world.events()
+        );
+        if stale {
+            let events = assets::maps::scripts::EventFlags::Bitmap(self.world.events());
+            let art = residents_art(self.image, map, self.world.residents(), events);
+            self.art = Some((map, records, self.world.events().to_vec(), art));
+        }
+        self.art
+            .as_ref()
+            .map_or(&[], |(_, _, _, art)| art.as_slice())
+    }
+
+    /// Composes the view: background, depth-sorted sprites, then dialogue.
+    ///
+    /// Depth is world Y, ties broken by spawn order with later records first
+    /// and the player last, which is what every frozen tie rank encodes. The
+    /// count includes residents that draw nothing, which keeps the relative
+    /// order and only inflates the player's rank.
+    fn compose(&mut self, cartridge: &rom::Rom, frame: &mut [u32]) -> (usize, usize) {
+        frame.fill(0);
+        let position = self.world.position();
+        let player = self.atlas.frame(self.world.animation()).clone();
+        let residents: Vec<_> = self
+            .world
+            .residents()
+            .iter()
+            .map(|resident| resident.position)
+            .collect();
+        let art: Vec<_> = self.resident_art().to_vec();
+        let Some(background) = self.background(cartridge) else {
+            return (0, 0);
+        };
+        let camera = frame::camera(position, (background.width, background.height));
+        frame::draw_background(frame, background, camera);
+        let count = residents.len();
+        let mut order: Vec<(u16, usize, usize)> = residents
+            .iter()
+            .enumerate()
+            .map(|(index, at)| (at.1, count - 1 - index, index))
+            .collect();
+        order.push((position.1, count, usize::MAX));
+        order.sort_unstable();
+        for (_, _, index) in order {
+            if index == usize::MAX {
+                frame::draw_sprite(frame, background, camera, &player, position);
+                continue;
+            }
+            match &art[index] {
+                Ok(raster) => {
+                    frame::draw_sprite(frame, background, camera, raster, residents[index]);
+                }
+                Err(Placeholder::Invisible) => {}
+                Err(Placeholder::Refused(_) | Placeholder::PredecessorRefused) => {
+                    let (x, y) = (
+                        i32::from(residents[index].0) - i32::try_from(camera.0).unwrap_or(0),
+                        i32::from(residents[index].1) - i32::try_from(camera.1).unwrap_or(0),
+                    );
+                    frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
+                }
+            }
+        }
+        if let Some(open) = &self.dialogue {
+            let page = &open.pages[open.index];
+            frame::draw_page(
+                frame,
+                page.indexed(),
+                (usize::from(page.width()), usize::from(page.height())),
+                page.background_index(),
+            );
+        }
+        camera
+    }
 }
 
 struct App {
     cartridge: rom::Rom,
-    /// The ROM image, leaked **once** so the world can borrow it for the run.
+    /// The ROM image, leaked once in `main`.
     image: &'static [u8],
     window: Option<Rc<Window>>,
     surface: Option<softbuffer::Surface<Rc<Window>, Rc<Window>>>,
@@ -152,18 +340,11 @@ struct App {
     frame: Vec<u32>,
     /// Edge-triggered, so holding the button does not re-talk every frame.
     interact_down: bool,
-}
-
-/// The running world plus what it needs to draw.
-struct Session {
-    world: World<'static>,
-    backgrounds: HashMap<u16, frame::Background>,
-    said: Option<String>,
+    interact_was_down: bool,
 }
 
 impl App {
-    fn new(cartridge: rom::Rom) -> Self {
-        let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
+    fn new(cartridge: rom::Rom, image: &'static [u8]) -> Self {
         Self {
             cartridge,
             image,
@@ -175,28 +356,13 @@ impl App {
             keys: Vec::new(),
             frame: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
             interact_down: false,
+            interact_was_down: false,
         }
     }
 
     fn session(&mut self) -> &mut Session {
         let image = self.image;
-        self.state.get_or_insert_with(|| Session {
-            world: World::enter(image, START.0, START.1, START.2).expect("the opening house"),
-            backgrounds: HashMap::new(),
-            said: None,
-        })
-    }
-}
-
-impl Session {
-    /// Renders and caches the current map's background.
-    fn background(&mut self, cartridge: &rom::Rom) -> Option<&frame::Background> {
-        let map = self.world.map();
-        if let std::collections::hash_map::Entry::Vacant(slot) = self.backgrounds.entry(map) {
-            let rendered = map_inspector::render_static_background(cartridge, map).ok()?;
-            slot.insert(frame::decode_bmp(&rendered.bitmap)?);
-        }
-        self.backgrounds.get(&map)
+        self.state.get_or_insert_with(|| Session::new(image))
     }
 }
 
@@ -217,7 +383,9 @@ impl ApplicationHandler for App {
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
             WindowEvent::CloseRequested => event_loop.exit(),
-            WindowEvent::KeyboardInput { event, .. } => {
+            // OS auto-repeat would page through a whole conversation on a
+            // held button and shuffle held directions; a repeat is not a press.
+            WindowEvent::KeyboardInput { event, .. } if !event.repeat => {
                 let pressed = event.state == ElementState::Pressed;
                 let direction = match event.physical_key {
                     PhysicalKey::Code(KeyCode::ArrowUp | KeyCode::KeyW) => Some(Direction::Up),
@@ -295,36 +463,18 @@ impl App {
             }
         }
         self.held = direction;
-        if interact {
-            self.interact_down = true;
-        }
+        // The pad is level-polled; the keyboard sets the flag on its edges.
+        // Either way one press is one interaction.
+        let down = interact || self.interact_down;
+        let pressed = down && !self.interact_was_down;
+        self.interact_was_down = down;
+        self.interact_down = pressed;
     }
 
     fn advance(&mut self) {
         let direction = self.held;
         let interact = std::mem::take(&mut self.interact_down);
-        let session = self.session();
-        session.world.step(direction);
-        if interact {
-            // Talking first: a resident standing in a doorway should be spoken
-            // to rather than walked past.
-            session.said = match session.world.talk() {
-                Some(Conversation::Speaks { pages, .. }) => {
-                    Some(format!("{} page(s)", pages.len()))
-                }
-                Some(Conversation::Unsupported { source }) => {
-                    Some(format!("choice prompt at ${source:04x}"))
-                }
-                Some(Conversation::Unaccounted { service }) => {
-                    Some(format!("script stops at COP ${service:02x}"))
-                }
-                Some(Conversation::Silent) => Some("...".to_string()),
-                None => {
-                    session.world.interact();
-                    None
-                }
-            };
-        }
+        self.session().advance(direction, interact);
     }
 
     fn draw(&mut self) {
@@ -342,25 +492,8 @@ impl App {
         // here rather than assumed.
         self.session();
         let frame = &mut self.frame;
-        frame.fill(0);
         let session = self.state.as_mut().expect("just created");
-        let position = session.world.position();
-        let residents: Vec<_> = session
-            .world
-            .residents()
-            .iter()
-            .map(|resident| resident.position)
-            .collect();
-        let camera = match session.background(&cartridge) {
-            Some(background) => {
-                let camera = frame::camera(position, (background.width, background.height));
-                frame::draw_background(frame, background, camera);
-                camera
-            }
-            None => (0, 0),
-        };
-        draw_actors(frame, camera, position, &residents);
-
+        session.compose(&cartridge, frame);
         if let Some(surface) = &mut self.surface {
             surface.resize(width, height).expect("resize");
             let mut buffer = surface.buffer_mut().expect("a buffer");
