@@ -125,6 +125,6 @@ resident with their art status and what talking to them yields.
 - **The camera shows past the map's own region.** Several maps share one
   layer, so the window can include part of a neighbouring room. Clipping
   needs the per-map region.
-- **Residents do not move.** Their pose lists cycle, but walking about is
-  actor-VM behaviour the script walker does not execute.
+- **Walkers keep walking while spoken to**, and do not greet the player on
+  approach: `COP 59` and `COP 2E` are not modelled.
 - No `.app` bundle yet; it runs as a binary.
