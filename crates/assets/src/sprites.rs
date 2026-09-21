@@ -4,7 +4,10 @@ pub use house::pandora::{
     PandoraActorPhase, PandoraArt, PandoraCarryMotion, PandoraCarryPose, PandoraGraphicsKey,
     PandoraMotion, PandoraPhase, PandoraPoseList, PandoraSceneLimit, PandoraSprites,
 };
-pub use house::{HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseScenes};
+pub use house::{
+    HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseScenes, RecordRefusal,
+    ResidentPose,
+};
 mod house_npc;
 pub use house_npc::HouseNpc;
 

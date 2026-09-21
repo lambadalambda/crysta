@@ -4,8 +4,133 @@ use super::{bank_range, take, word, SpriteError, SpriteFrame};
 use crate::{
     compression,
     graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp},
+    maps::{
+        actor_script::{self, ScriptError},
+        actors::SpawnRecord,
+        scripts::EventFlags,
+    },
 };
 use std::{collections::HashMap, ops::Range, sync::Arc};
+
+/// Clears the actor's horizontal mirror.
+const CLEAR_HFLIP: u8 = 0xB6;
+/// Sets the actor's horizontal mirror.
+const SET_HFLIP: u8 = 0xB7;
+/// Selects an animation sequence; one operand byte.
+const SELECT_POSE: u8 = 0x80;
+/// Resolves the pose through `$80:ED75` and yields until it is done.
+///
+/// Its counted sibling `COP 8F` is not a boundary: the map-`$0011` resident
+/// pauses on one before their ordinary loop sets the mirror the frozen
+/// roster shows.
+const WAIT: u8 = 0x8E;
+
+/// The pose an actor's script has selected by the time it first waits.
+///
+/// The ordinary interaction loop `docs/house-npc.md` records is: clear or set
+/// H-flip (`COP B6`/`B7`), select animation (`COP 80 n`), then resolve and
+/// wait (`COP 8E`). What is in force at that wait is the resident's steady
+/// state, so the walk stops there. For a resident whose script walks them
+/// about first, that is later than the frozen roster's setup-frame policy and
+/// can differ from it in mirror.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ResidentPose {
+    /// Sequence selected by `COP 80`, or `None` to keep the header's initial one.
+    pub selector: Option<u8>,
+    /// Horizontal mirror in force.
+    pub hflip: bool,
+}
+
+impl ResidentPose {
+    /// Derives the setup pose by walking the record's entry script.
+    ///
+    /// The walk follows the flags first. When it ends before any wait -- the
+    /// map-`$0011` resident runs an intro on a new game that ends in native
+    /// code the walker does not execute -- a walk with every flag set stands
+    /// in. One-time sequences are gated on a clear flag they set when they
+    /// finish, so that is the state the resident settles into once they have
+    /// run. The branch-free walk would not do: it falls into the `COP 06`
+    /// call those scripts keep on their not-taken arm, which is unaccounted.
+    ///
+    /// A record without a script, or one that reaches no wait either way,
+    /// keeps the header's initial selector and no mirror.
+    ///
+    /// # Errors
+    /// Propagates a script address that is not ROM-backed or is truncated.
+    pub fn from_script(
+        image: &[u8],
+        record: &SpawnRecord,
+        events: EventFlags<'_>,
+    ) -> Result<Self, ScriptError> {
+        let Some(script) = record.script() else {
+            return Ok(Self::default());
+        };
+        let flagged = actor_script::walk_with_events(image, script, events)?;
+        if let Some(pose) = Self::at_first_wait(image, &flagged) {
+            return Ok(pose);
+        }
+        let every = [0xFFu8; 512];
+        let settled = actor_script::walk_with_events(image, script, EventFlags::Bitmap(&every))?;
+        Ok(Self::at_first_wait(image, &settled).unwrap_or_default())
+    }
+
+    /// The pose in force at the first wait, or `None` if the walk has none.
+    fn at_first_wait(image: &[u8], walked: &actor_script::ScriptEffects) -> Option<Self> {
+        let mut pose = Self::default();
+        for command in &walked.commands {
+            match command.service {
+                CLEAR_HFLIP => pose.hflip = false,
+                SET_HFLIP => pose.hflip = true,
+                SELECT_POSE => pose.selector = image.get(command.offset + 2).copied(),
+                WAIT => return Some(pose),
+                _ => {}
+            }
+        }
+        None
+    }
+}
+
+/// Why a spawn record yields no actor.
+#[derive(Debug)]
+pub enum RecordRefusal {
+    /// The record installs no graphics resource: a `$00` or `$FD` record is a
+    /// script with a position, and the game draws nothing for it either.
+    NoDescriptor,
+    /// The record reuses its predecessor's resource or graphics, and that
+    /// predecessor was refused.
+    PredecessorRefused,
+    /// The record's descriptor, header or frame is outside the qualified set.
+    Invalid(SpriteError),
+}
+
+impl std::fmt::Display for RecordRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoDescriptor => write!(f, "spawn record carries no resource descriptor"),
+            Self::PredecessorRefused => write!(f, "the record this one reuses was refused"),
+            Self::Invalid(error) => write!(f, "{error}"),
+        }
+    }
+}
+
+/// Whether a `$01` record leans on the record before it.
+fn reuses_predecessor(image: &[u8], spawn: &[u8]) -> bool {
+    let descriptor = &spawn[7..10];
+    if descriptor == [0, 0, 0] {
+        return true;
+    }
+    let Ok(at) = pointer(descriptor) else {
+        return false;
+    };
+    // Descriptor: packet (3), mode (2), three more for mode `$0000`, palette
+    // (4), then graphics, which is `$FFFF` for reuse.
+    let extra = if image.get(at + 3..at + 5) == Some(&[0, 0]) {
+        3
+    } else {
+        0
+    };
+    image.get(at + 9 + extra..at + 11 + extra) == Some(&[0xFF, 0xFF])
+}
 
 #[path = "pandora.rs"]
 pub(super) mod pandora;
@@ -98,6 +223,121 @@ pub struct HouseActor {
     ranges: Vec<Range<usize>>,
 }
 impl HouseActor {
+    /// Decodes the setup art a map's spawn records install, in list order.
+    ///
+    /// `HouseScenes` names its residents by profile; this follows each `$01`
+    /// record's resource descriptor and takes the first record of the
+    /// sequence `pose` selects, with the same shape checks. The result is
+    /// aligned with `records`.
+    ///
+    /// The list is decoded as a whole because a record may lean on the one
+    /// before it: a descriptor of `$000000` reuses its resource, and graphics
+    /// of `$FFFF` reuse its graphics. The native loader always has that
+    /// predecessor; this one may have refused it, and then the reuse is
+    /// refused too rather than handed the last body that happened to decode.
+    /// Whether a `$00` or `$FD` record moves the native predecessor is not
+    /// established; here they do not.
+    pub fn from_records(
+        image: &[u8],
+        map: u16,
+        records: &[SpawnRecord],
+        mut pose: impl FnMut(&SpawnRecord) -> ResidentPose,
+    ) -> Vec<Result<Self, RecordRefusal>> {
+        // Index in `out` of the last descriptor-bearing record, which is the
+        // predecessor a reuse reaches for, decoded or not.
+        let mut previous: Option<usize> = None;
+        let mut out: Vec<Result<Self, RecordRefusal>> = Vec::with_capacity(records.len());
+        for record in records {
+            if record.opcode() != 1 || record.bytes().len() != 10 {
+                out.push(Err(RecordRefusal::NoDescriptor));
+                continue;
+            }
+            let prior = previous.map(|index| out[index].as_ref());
+            let result = match prior {
+                Some(Err(_)) if reuses_predecessor(image, record.bytes()) => {
+                    Err(RecordRefusal::PredecessorRefused)
+                }
+                _ => {
+                    Self::from_record(image, map, record, pose(record), prior.and_then(Result::ok))
+                        .map_err(RecordRefusal::Invalid)
+                }
+            };
+            previous = Some(out.len());
+            out.push(result);
+        }
+        out
+    }
+
+    /// One record, with the predecessor its reuse may reach for.
+    ///
+    /// # Errors
+    /// Refuses a record without a descriptor, a descriptor shape outside the
+    /// qualified set, a selector outside the packet's table, and a reuse with
+    /// no predecessor.
+    fn from_record(
+        image: &[u8],
+        map: u16,
+        record: &SpawnRecord,
+        pose: ResidentPose,
+        previous: Option<&Self>,
+    ) -> Result<Self, SpriteError> {
+        let spawn = record.bytes();
+        if record.opcode() != 1 || spawn.len() != 10 {
+            return Err(SpriteError::Invalid(
+                "spawn record carries no resource descriptor",
+            ));
+        }
+        // Neither the record's flag byte nor the header's tail names art.
+        // Byte 3 is `$00` on 58 of the slice's 61 descriptor-bearing records
+        // and `$01`/`$02` on the rest; the header is `[selector, n, flags, 0,
+        // n]` with flags `$41`/`$50`/`$51`/`$D1` seen. The descriptor alone
+        // names the packet, palette and graphics, and the frozen nine
+        // reproduce from it, so these bytes are read for the selector and
+        // otherwise left to the actor VM they seed.
+        let mut loader = Loader::new(image);
+        let source = record.offset();
+        loader.read(source, 10)?;
+        let header = pointer(&spawn[4..7])?;
+        let head = loader.read(header, 5)?;
+        let selector = pose.selector.unwrap_or(head[0]);
+        let resource = if spawn[7..10] == [0, 0, 0] {
+            let prior =
+                previous.ok_or(SpriteError::Invalid("missing descriptor reuse predecessor"))?;
+            loader.ranges.extend(prior.ranges.clone());
+            prior.resource.clone()
+        } else {
+            loader.resource(pointer(&spawn[7..10])?, previous)?
+        };
+        let packet = resource
+            .packet
+            .as_ref()
+            .ok_or(SpriteError::Invalid("cannot reuse a direct-ROM resource"))?;
+        let frame = decode_setup(
+            &packet.bytes,
+            ListSpec {
+                selector,
+                count: 1,
+                duration: 0,
+                source_cpu: packet.cpu,
+                direct: false,
+                source_palette: resource.source_palette,
+                palette_base: resource.palette_base,
+                hflip: pose.hflip,
+            },
+        )?;
+        Ok(Self {
+            id: cpu_address(source)?,
+            map,
+            position: [record.origin().0, record.origin().1],
+            selector,
+            hflip: pose.hflip,
+            tie_rank: 0,
+            frames: vec![frame],
+            resource,
+            ranges: loader.ranges,
+        })
+    }
+
     /// Stable source spawn record, or source child-creation instruction for F's object.
     #[must_use]
     pub const fn source_id(&self) -> u32 {
@@ -694,6 +934,16 @@ struct ListSpec {
     palette_base: u8,
     hflip: bool,
 }
+/// Offset of the sequence a selector names in a compressed packet's table.
+fn packed_sequence(bytes: &[u8], selector: u8) -> Result<usize, SpriteError> {
+    if usize::from(selector) * 2 + 2 > frame_table_end(bytes)? - 2 {
+        return Err(SpriteError::Invalid("house selector outside packed table"));
+    }
+    Ok(usize::from(word(
+        take(bytes, usize::from(selector) * 2, 2)?,
+        0,
+    )))
+}
 fn frame_table_end(bytes: &[u8]) -> Result<usize, SpriteError> {
     let end = usize::from(word(take(bytes, 0, 2)?, 0));
     if end < 4 || end % 2 != 0 {
@@ -707,66 +957,93 @@ fn decode_list(bytes: &[u8], spec: ListSpec) -> Result<Vec<HouseFrame>, SpriteEr
         selector,
         count,
         duration,
+        direct,
+        ..
+    } = spec;
+    let sequence = if direct {
+        usize::from(word(take(bytes, usize::from(selector) * 2, 2)?, 0))
+    } else {
+        packed_sequence(bytes, selector)?
+    };
+    let records = take(bytes, sequence, count * 4 + 2)?;
+    if records[count * 4..] != [0xff, 0xff] {
+        return Err(SpriteError::Invalid("changed house frame list extent"));
+    }
+    records[..count * 4]
+        .chunks_exact(4)
+        .map(|r| {
+            if r[0] != duration {
+                return Err(SpriteError::Invalid("unsupported house frame record"));
+            }
+            decode_record(bytes, r, spec)
+        })
+        .collect()
+}
+
+/// The first record of the sequence `spec.selector` names, with no claim
+/// about the list's length or timing. This is the frozen setup policy for a
+/// record found by walking rather than by profile.
+fn decode_setup(bytes: &[u8], spec: ListSpec) -> Result<HouseFrame, SpriteError> {
+    let sequence = packed_sequence(bytes, spec.selector)?;
+    let record = take(bytes, sequence, 4)?;
+    if record[..2] == [0xff, 0xff] {
+        return Err(SpriteError::Invalid("empty house frame list"));
+    }
+    decode_record(bytes, record, spec)
+}
+
+/// One four-byte list record: duration, facing, composition anchor.
+fn decode_record(bytes: &[u8], r: &[u8], spec: ListSpec) -> Result<HouseFrame, SpriteError> {
+    let ListSpec {
         source_cpu,
         direct,
         source_palette,
         palette_base,
         hflip,
+        ..
     } = spec;
-    if !direct && usize::from(selector) * 2 + 2 > frame_table_end(bytes)? - 2 {
-        return Err(SpriteError::Invalid("house selector outside packed table"));
+    if ![0, 1, 3].contains(&r[1]) {
+        return Err(SpriteError::Invalid("unsupported house frame record"));
     }
-    let sequence = usize::from(word(take(bytes, usize::from(selector) * 2, 2)?, 0));
-    let records = take(bytes, sequence, count * 4 + 2)?;
-    if records[count * 4..] != [0xff, 0xff] {
-        return Err(SpriteError::Invalid("changed house frame list extent"));
-    }
-    let mut frames = Vec::new();
-    for r in records[..count * 4].chunks_exact(4) {
-        if r[0] != duration || ![0, 1, 3].contains(&r[1]) {
-            return Err(SpriteError::Invalid("unsupported house frame record"));
+    let anchor = usize::from(word(r, 2));
+    let n = usize::from(take(bytes, anchor, 17)?[16]);
+    let raw = take(bytes, anchor, 17 + n * 7)?;
+    let original = SpriteFrame::decode(raw)?;
+    let mut adjusted = raw.to_vec();
+    for (i, c) in original.components().iter().enumerate() {
+        let tile = c.word() & 511;
+        if (c.word() >> 9) & 7 != u16::from(source_palette)
+            || (c.word() >> 12) & 3 != 2
+            || tile >= 256
+            || (c.size() == 16 && (tile & 15 == 15 || tile + 17 >= 256))
+        {
+            return Err(SpriteError::Invalid(
+                "unsupported house palette/priority/tile boundary",
+            ));
         }
-        let anchor = usize::from(word(r, 2));
-        let n = usize::from(take(bytes, anchor, 17)?[16]);
-        let raw = take(bytes, anchor, 17 + n * 7)?;
-        let original = SpriteFrame::decode(raw)?;
-        let mut adjusted = raw.to_vec();
-        for (i, c) in original.components().iter().enumerate() {
-            let tile = c.word() & 511;
-            if (c.word() >> 9) & 7 != u16::from(source_palette)
-                || (c.word() >> 12) & 3 != 2
-                || tile >= 256
-                || (c.size() == 16 && (tile & 15 == 15 || tile + 17 >= 256))
-            {
-                return Err(SpriteError::Invalid(
-                    "unsupported house palette/priority/tile boundary",
-                ));
-            }
-            let relocated = c
-                .word()
-                .wrapping_sub(u16::from(source_palette) << 9)
-                .wrapping_add(u16::from((palette_base - 128) / 16) << 9);
-            adjusted[22 + i * 7..24 + i * 7].copy_from_slice(&relocated.to_le_bytes());
-        }
-        let offset = u16::try_from(anchor + 4)
-            .map_err(|_| SpriteError::Invalid("oversized house composition offset"))?;
-        let key = if direct {
-            HousePoseKey::Direct(source_cpu + u32::from(offset))
-        } else {
-            HousePoseKey::Compressed {
-                packet: source_cpu,
-                offset,
-            }
-        };
-        frames.push(HouseFrame {
-            key,
-            duration: r[0],
-            facing: if r[1] == 3 && hflip { 2 } else { r[1] },
-            source: original,
-            composition: SpriteFrame::decode(&adjusted)?,
-        });
+        let relocated = c
+            .word()
+            .wrapping_sub(u16::from(source_palette) << 9)
+            .wrapping_add(u16::from((palette_base - 128) / 16) << 9);
+        adjusted[22 + i * 7..24 + i * 7].copy_from_slice(&relocated.to_le_bytes());
     }
-    Ok(frames)
+    let offset = u16::try_from(anchor + 4)
+        .map_err(|_| SpriteError::Invalid("oversized house composition offset"))?;
+    let key = if direct {
+        HousePoseKey::Direct(source_cpu + u32::from(offset))
+    } else {
+        HousePoseKey::Compressed {
+            packet: source_cpu,
+            offset,
+        }
+    };
+    Ok(HouseFrame {
+        key,
+        duration: r[0],
+        facing: if r[1] == 3 && hflip { 2 } else { r[1] },
+        source: original,
+        composition: SpriteFrame::decode(&adjusted)?,
+    })
 }
 fn pointer(p: &[u8]) -> Result<usize, SpriteError> {
     let bank = p[2];
