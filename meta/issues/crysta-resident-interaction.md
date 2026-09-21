@@ -120,8 +120,9 @@ records sit on the cells doorway approaches need.
 
 ## Remaining
 
-- Choice prompts do not decode, so 14 residents reach text that cannot be
-  shown.
+- The `Unsupported` residents were not choice prompts but window controls;
+  [the refused text controls](crysta-refused-text-controls.md) admits them.
+  One remains, whose text address holds native code.
 - 17 scripts stop at an unaccounted `COP` service; `$06`, a call through a
   long pointer that sits on the not-taken arm of most house scripts, is one.
 - 89 records register no interaction callback at all. Whether those are scenery

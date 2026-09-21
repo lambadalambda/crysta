@@ -119,9 +119,10 @@ resident with their art status and what talking to them yields.
 
 ## Remaining
 
-- **Choice prompts are not drawn.** The text decoder refuses them, so the
-  residents whose new-game line is one -- including the first resident in
-  the opening room -- report the prompt on stderr and show nothing.
+- **One resident's line does not decode.** The map-`$1D` record's script
+  hands the text service an address holding native code; see
+  [the refused text controls](crysta-refused-text-controls.md). The eight
+  others that showed nothing were window controls, now admitted and drawn.
 - **The camera shows past the map's own region.** Several maps share one
   layer, so the window can include part of a neighbouring room. Clipping
   needs the per-map region.
