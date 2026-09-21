@@ -138,6 +138,7 @@ qualification remain open.
 - [Walk between Crysta maps through the real exit geometry](issues/crysta-map-transitions.md)
 - [Place Crysta residents and let the player talk to them](issues/crysta-resident-interaction.md)
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
+- [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
