@@ -799,7 +799,8 @@ impl<'a> Loader<'a> {
     ) -> Result<Resource, SpriteError> {
         let prefix = take(self.image, at, 5)?;
         let extra = match prefix[3..5] {
-            [0x20, 0] => 0,
+            // $0022 (Crysta birds, $83:ED37) has no movement pointer, like $0020.
+            [0x20 | 0x22, 0] => 0,
             [0, 0] => 3,
             _ => return Err(SpriteError::Invalid("unsupported house movement resource")),
         };

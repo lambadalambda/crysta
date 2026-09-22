@@ -37,7 +37,6 @@
 - [ ] [Place Crysta residents and let the player talk to them](issues/crysta-resident-interaction.md)
 - [ ] [Record native play-session diagnostics](issues/native-play-session-diagnostics.md)
 - [ ] [Fix native Crysta outdoor stalls](issues/fix-native-crysta-outdoor-stalls.md)
-- [ ] [Resolve remaining Crysta exterior resident placeholders](issues/fix-crysta-exterior-placeholders.md)
 - [ ] [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [ ] [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [ ] [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)

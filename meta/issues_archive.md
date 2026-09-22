@@ -88,3 +88,4 @@
 - [x] [Qualify horizontal type8 collision with native witnesses](issues/qualify-horizontal-type8-collision.md)
 - [x] [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [x] [Play Crysta music in the native app](issues/native-crysta-music.md)
+- [x] [Resolve remaining Crysta exterior resident placeholders](issues/fix-crysta-exterior-placeholders.md)

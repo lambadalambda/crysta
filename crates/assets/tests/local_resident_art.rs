@@ -7,7 +7,9 @@
 
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
-use assets::sprites::{HouseActor, HousePoseKey, HouseScenes, RecordRefusal, ResidentPose};
+use assets::sprites::{
+    HouseActor, HousePoseKey, HouseScenes, PandoraSprites, RecordRefusal, ResidentPose,
+};
 use rom::{Revision, Rom};
 use std::path::Path;
 
@@ -118,15 +120,71 @@ fn record_derived_art_matches_every_frozen_resident() {
 }
 
 #[test]
-fn a_reuse_after_a_refused_record_is_refused_not_given_the_wrong_body() {
-    // Map $000A: the record at $83:8A19 has a descriptor mode the loader does
-    // not qualify, and the three records after it reuse its resource. The
-    // native loader would hand them $8A19's body; this one cannot, and must
-    // not reach past it to the last body it did decode.
+fn exterior_bird_root_and_three_reuses_match_qualified_pandora_art() {
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
+    let decoded = decode_map(image, 0x000A, &new_game());
+    let list = SpawnList::from_rom(image, 0x000A).unwrap();
+    // Descriptor $83:ED37 already has a native witness at map $000A,
+    // selector 1: pandora-scene-qualification/reference.json, town-gap-up-rest.
+    let pandora = PandoraSprites::from_rom(image).unwrap();
+    let bird = pandora.get(0x83_ED37).unwrap();
+    assert_eq!(&image[0x03_ED3A..0x03_ED3C], &[0x22, 0]);
+    for offset in [0x03_8A19, 0x03_8A23, 0x03_8A2D, 0x03_8A37] {
+        let index = list
+            .records()
+            .iter()
+            .position(|r| r.offset() == offset)
+            .unwrap();
+        let actor = decoded[index].as_ref().unwrap_or_else(|error| {
+            panic!("exterior bird {offset:#08x}, descriptor $83:ED37: {error}")
+        });
+        assert_eq!(actor.palette_base(), bird.palette_base());
+        assert_eq!(actor.palette(), bird.palette());
+        assert_eq!(actor.graphics().len(), bird.graphics().len());
+        assert!(actor
+            .graphics()
+            .iter()
+            .zip(bird.graphics())
+            .all(|(a, b)| a.pixels() == b.pixels()));
+        for selector in 0..=8 {
+            let expected = bird.list(selector).unwrap();
+            for hflip in [false, true] {
+                let frames = actor.sequence(selector, hflip).unwrap();
+                assert_eq!(frames.len(), expected.frames().len());
+                for (index, (actual, native)) in frames.iter().zip(expected.frames()).enumerate() {
+                    assert_eq!(actual.key(), native.key());
+                    assert_eq!(actual.duration(), native.duration());
+                    assert_eq!(
+                        Some(actual.facing()),
+                        expected.effective_facing(index, hflip)
+                    );
+                    assert_eq!(
+                        actual.source_composition().source_bytes(),
+                        native.source_composition().source_bytes()
+                    );
+                    assert_eq!(
+                        actual.composition().source_bytes(),
+                        native.composition().source_bytes()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_reuse_after_a_refused_record_is_refused_not_given_the_wrong_body() {
+    // Mutate the now-qualified bird descriptor to unsupported mode $0021.
+    // Its three reuses must not reach past it to the last decoded body.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut mutated = cartridge.image().to_vec();
+    mutated[0x03_ED3A] = 0x21;
+    let image = mutated.as_slice();
     let decoded = decode_map(image, 0x000A, &new_game());
     let list = SpawnList::from_rom(image, 0x000A).unwrap();
     let at = |offset: usize| {

@@ -306,6 +306,35 @@ fn full_roster_includes_source_created_prop_with_direct_pose_key() {
     assert!(HouseScenes::from_rom(&r).is_err());
 }
 #[test]
+fn mode_0022_has_no_extra_movement_pointer_and_keeps_resource_guards() {
+    let mut r = fixture();
+    r[0x3_ed5a + 3] = 0x22;
+    let scenes = HouseScenes::residents_from_rom(&r).unwrap();
+    let actor = scenes.actor(0x83_8c0a).unwrap();
+    let reused = scenes.actor(0x83_8c14).unwrap();
+    assert_eq!(actor.palette_base(), 208);
+    assert_eq!(actor.palette()[1].rgb8(), [255, 0, 0]);
+    assert_eq!(actor.palette(), reused.palette());
+    assert!(std::ptr::eq(actor.graphics(), reused.graphics()));
+    assert!(actor.source_ranges().contains(&(0x3_ed5a..0x3_ed67)));
+    for (at, value) in [
+        (0x3_ed5a + 3, 0x21), // Unsupported neighboring modes stay refused.
+        (0x3_ed5a + 3, 0x23),
+        (0x3_ed5a + 4, 1),
+        (0x3_ed5a + 7, 1), // Palette transfer shape.
+        (0x3_ed5a + 8, 7), // Palette destination.
+        (0x3_ed5a + 9, 1), // Graphics transfer shape.
+    ] {
+        let mut invalid = r.clone();
+        invalid[at] = value;
+        assert!(
+            HouseScenes::residents_from_rom(&invalid).is_err(),
+            "{at:x}/{value:x}"
+        );
+    }
+}
+
+#[test]
 fn rejects_missing_reuse_and_unsupported_resource_shapes() {
     for (at, value) in [
         (0x3_8c14 + 7, 1),

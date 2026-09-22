@@ -133,14 +133,42 @@ fn the_documented_resident_has_art_and_the_slice_mostly_does() {
 }
 
 #[test]
-fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
-    // Map $000A: the record at $83:8A19 has a descriptor mode the loader does
-    // not qualify, and the three records after it reuse its resource. They
-    // must not be handed the body of the record before it.
+fn exterior_bird_root_and_three_reuses_draw_without_placeholders() {
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
+    let flags = new_game();
+    let present = residents(image, 0x000A, EventFlags::Bitmap(&flags)).unwrap();
+    let art = residents_art(image, 0x000A, &present, EventFlags::Bitmap(&flags));
+    for offset in [0x03_8A19, 0x03_8A23, 0x03_8A2D, 0x03_8A37] {
+        let index = present.iter().position(|r| r.record == offset).unwrap();
+        let body = art[index].as_ref().unwrap_or_else(|error| {
+            panic!("exterior bird {offset:#08x}, descriptor $83:ED37: {error:?}")
+        });
+        for selector in 0..=8 {
+            for hflip in [false, true] {
+                let animation = body.animation(selector, hflip).unwrap();
+                assert!(!animation.frames.is_empty());
+                assert!(
+                    animation.frames.iter().all(Raster::is_visible),
+                    "bird {offset:#08x}, selector {selector}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
+    // Mutate the now-qualified bird descriptor to unsupported mode $0021.
+    // Its three reuses must not be handed the body of the record before it.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut mutated = cartridge.image().to_vec();
+    mutated[0x03_ED3A] = 0x21;
+    let image = mutated.as_slice();
     let flags = new_game();
     // Every record, whether the flags would install it or not: the reuse
     // chain is a property of the list, not of who is present.
