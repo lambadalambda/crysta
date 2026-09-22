@@ -89,13 +89,24 @@ beyond its current 19 of 24 reachable maps.
 - Added explicit candidate room/world construction preserved across occupancy
   and transitions, checked movement/interaction, and actual events at destination
   construction. Legacy resident-decoding fallback is documented, not broadened.
-- Candidate discovery now reaches **24/24** and replays every accepted action
-  without core refusal/load error. **21/23** non-opening destinations have checked
-  returns from their real outbound endpoints. Production remains conservative
-  **19/24**; no global enablement or native progression equivalence is claimed.
-- Two return gaps (`$19→$17`, `$1E→$0A`) align into the reverse doorway before
-  arrival completes. The host omits selector-driven arrival ownership/coordinate
-  conversion and native exit-scan suppression. Capture those actual native edges
-  before changing arrival behavior; see the detailed collision document.
+- At this checkpoint, candidate discovery reached **24/24**, with **21/23**
+  checked returns; the two missing returns were deferred for native arrival
+  capture rather than patched with offsets. See the completed return-arrival
+  qualification below.
+
+### Measured return-arrival follow-up
+
+- Both missing returns now have native boot-origin captures, hostile Left+A
+  controls and exact-record-bound initialized-to-free host profiles. Candidate
+  routes replay **24/24 outbound and 23/23 returns** from actual reached states,
+  with no accepted refusal/load error or intermediate position reset.
+- Production collision remains conservative **19/24**. Arrival ownership does
+  not globally enable collision or claim native story progression. Checked
+  resident-resolution failures propagate; the former empty-roster fallback
+  was removed separately.
+- [Return arrival qualification](qualify-crysta-return-arrivals.md) records
+  measured pacing, source binding and handoff limits. Direct ROM verification
+  corrected the old gate annotation: `$097C & $10` set inhibits scan, clear
+  permits it. Host ownership is distinct from emulation of that native bit.
 - Acceptance remains open: remaining native material/branch/mode qualification,
-  full envelope, two arrival/round-trip cases, then justified production enablement.
+  full envelope, then justified production enablement.

@@ -589,8 +589,8 @@ cannot prove a missing route impossible.
 - Conservative default: **19/24**, unchanged.
 - Explicit clear-bit candidate: **24/24 outbound**, with zero discovery core
   refusals or build errors and no rejected action on accepted routes.
-- Checked returns from the actual outbound endpoint: **21/23 non-opening maps**.
-  Return searches for `$19` and `$1E` remain incomplete.
+- Checked returns from the actual outbound endpoint: **23/23 non-opening maps**.
+  Both previously bouncing returns now consume source-bound arrival profiles.
 
 This is host free-roam geometry under its candidate contract, **not native
 new-game progression or globally qualified collision**. In particular, the
@@ -610,21 +610,64 @@ The owned JP ROM must be present at the documented local path; these tests are
 optional without it. Artifacts are host route recipes, not native input-only
 captures; `interact` explicitly includes a host-facing operation.
 
-#### Two return gaps need arrival-controller evidence
+#### Two measured return-arrival profiles
 
-Bounded inspection explains the observed bounce without inventing an 8px snap:
+The original bounce diagnosis was not a collision defect:
 
-| Return edge | Raw arrival | What the candidate does |
+| Return edge | Old raw arrival | Old candidate behavior |
 | --- | --- | --- |
-| `$19 → $17`, record `$818F42`, selector14 | `(448,352)` | Static corner nudges Down to `(456,352)`, entering reverse trigger `(28,21)` before moving south |
-| `$1E → $0A`, record `$818F9B`, selector5 | `(784,752)` | Resident occupancy at `(48,47)` nudges Down to `(792,752)`, entering reverse trigger `(49,46)` |
+| `$19 → $17`, record `$818F42`, selector14 | `(448,352)` | Static corner nudged Down to `(456,352)`, entering reverse trigger `(28,21)` before moving south |
+| `$1E → $0A`, record `$818F9B`, selector5 | `(784,752)` | Resident occupancy at `(48,47)` nudged Down to `(792,752)`, entering reverse trigger `(49,46)` |
 
-Without exit processing, ordinary movement proceeds south after those nudges.
-The current host installs raw destinations and rearms when the fine exit test
-misses; it omits the selector-driven load/arrival sequence. Existing source-backed
-selector code describes loader coordinate conversion, forced arrival movement
-and the native `$097C & $10` exit-scan gate. These **two specific edges still need
-native confirmation** of queued coordinates, loaded and settled anchors, arrival
-controller ownership, reverse-exit suppression and town occupancy. The relevant
-existing implementations are `map-inspector/src/pandora_progression.rs` and
-`pandora_navigation.rs`. Neither a guessed timer nor coordinate offset was added.
+New input-only boot captures, plus separate Left+A arrival replays, qualify
+these **two exact mode0 records**, not every use of selectors5/14:
+
+| Edge | Adjusted queue | Initialized player | Settled XY | Recovery / free cursors |
+| --- | --- | --- | --- | --- |
+| `$1E → $0A` | `(784,736)` | `(792,752)` | `(792,769)` at34 | 35 / 36 |
+| `$19 → $17` | `(434,329)` | `(442,345)` | `(456,368)` at75 | 77 / 78 |
+
+Cursor0 is the already-installed initialized sample. The pure
+`room_core::arrival` profile holds exact measured change points without
+interpolation: **37/79 inclusive samples**, not36/78 samples. Initialized,
+forced, recovery and free phases remain distinct even at unchanged XY. Both
+checked exit paths validate the full source record and install initialized
+placement plus ownership. During ownership the host advances the profile and
+residents, but does not run ordinary player collision, turning, talking, doorway
+interaction, or exit scan/rearming. The free sample consumes its own advance;
+ordinary walking starts on the next call with fresh **host** walking history.
+`World::enter` remains an explicit raw placement operation. Mutated target
+records fail with `WorldError::Arrival`; unrelated edges retain legacy raw host
+transfers and are not newly selector-qualified.
+
+Town occupancy was present, not removed to get a passing return: native actor
+slot `$1180` stands at `(776,768)` on frames12928–12950 and the later walk,
+with continuation `$888853`. Its cell `(48,47)` has the dynamic blocking bit
+set; reverse-door cell `(49,46)` remains type14. The player nonetheless follows
+the owned `(792,752) → (792,769)` arrival, then walks south normally. These
+selected observations are from the hash-pinned capture; the extraction verifier
+recomputes player/control profiles, not this separately inspected occupancy
+statement. No collision alias or occupancy removal was needed.
+
+**Limits:** synchronous host destination loading is not native departure or
+map-loader timing. These are bounded completed-frame XY/ownership profiles for
+the witnessed route/state, not a general scheduler or proof that pacing is
+invariant across arbitrary story/actor states. Diagonal stair artwork, native
+held-input history through release, and every ancillary input consumer remain
+unqualified. Left+A captures match selected motion/ownership and resume ordinary
+walking after release; incidental scratch-word differences are retained as
+metadata, not hidden. Hostile inputs held through the host handoff are a policy
+test, not a claim that native pad bookkeeping is identical.
+
+Direct ROM verification also corrected a stale scan-gate annotation:
+`$8D:87A0 LDA $097C; BIT #$10; BEQ $87AA` permits scanning when bit4 is **clear**;
+set jumps to the return tail. `$879F` is an operand byte, not that branch.
+Frame-end `$8000` arrival ownership is a different bit and does not prove this
+scan gate suppressed every native invocation. The host suppresses exit handling
+as part of its qualified arrival ownership; it does not emulate that native gate.
+
+Recipes, capture/source hashes, phase boundaries, hostile controls and verifier:
+[return-arrival evidence](../tools/arrival-qualification/README.md). Raw ROM,
+layers, actor words and traces remain ignored. Candidate returns now replay
+**23/23** without position resets or accepted refusals; conservative production
+collision remains **19/24 outbound**.

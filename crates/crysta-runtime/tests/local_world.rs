@@ -248,6 +248,9 @@ fn retain_route(name: &str, mut world: World<'_>, actions: &[(Action, Step)]) {
         json!({
             "map": world.map(), "position": world.position(),
             "facing": format!("{:?}", world.facing()),
+            "arrival": world.arrival().map(|arrival| json!({
+                "elapsed": arrival.elapsed(), "phase": format!("{:?}", arrival.phase()),
+            })),
         })
     };
     let start = state(&world);
@@ -281,6 +284,7 @@ fn assert_same_arrival(actual: &World<'_>, expected: &World<'_>) {
     assert_eq!(actual.map(), expected.map());
     assert_eq!(actual.position(), expected.position());
     assert_eq!(actual.facing(), expected.facing());
+    assert_eq!(actual.arrival(), expected.arrival());
     assert_eq!(actual.events(), expected.events());
     assert_eq!(actual.residents(), expected.residents());
     assert_eq!(actual.room(), expected.room());
@@ -762,8 +766,8 @@ fn candidate_routes_replay_from_the_opening_house_and_return_from_reached_states
         .collect();
     assert_eq!(
         missing_returns,
-        vec![0x19, 0x1E],
-        "record the remaining return-search gaps, not an unreachability claim"
+        Vec::<u16>::new(),
+        "every non-opening map must have a checked return route"
     );
 }
 

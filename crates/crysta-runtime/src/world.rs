@@ -2,14 +2,16 @@
 //!
 //! Movement is [`room_core`]'s, unchanged. This adds the two things free roam
 //! needs on top: the current map's room, and the exit geometry that carries the
-//! player into the next one.
+//! player into the next one. Two exact return records additionally own the
+//! player through measured initialized-to-free arrival profiles.
 
 use crate::actors::{Actor, Surroundings};
 use crate::residents::{residents, talk_to, Conversation, Resident};
 use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
 use assets::maps::actors::ResolveError;
-use assets::maps::exits::{ExitError, ExitList};
+use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::scripts::EventFlags;
+use room_core::arrival::{Arrival, ReturnRoute};
 use room_core::{
     AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
 };
@@ -26,6 +28,8 @@ pub struct World<'a> {
     base: MapRoom,
     exits: ExitList,
     walking: WalkingState,
+    /// Source-bound initialized-to-free arrival; never ordinary walking.
+    arrival: Option<Arrival>,
     /// Residents the spawn lists install for the current flags, where their
     /// running scripts have put them.
     residents: Vec<Resident>,
@@ -51,6 +55,13 @@ pub struct World<'a> {
 /// A world that could not be entered or stepped.
 #[derive(Debug)]
 pub enum WorldError {
+    /// A targeted return edge no longer matches its exact qualified record.
+    Arrival {
+        /// Source map.
+        map: u16,
+        /// Normalized offset of the rejected exit record.
+        record: usize,
+    },
     /// The map could not be built into a room.
     Room(RoomError),
     /// The map's resident spawn stream could not be resolved.
@@ -78,6 +89,10 @@ impl From<RoomError> for WorldError {
 impl fmt::Display for WorldError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Arrival { map, record } => write!(
+                f,
+                "unqualified return arrival from map {map:#06x}, record {record:#08x}"
+            ),
             Self::Room(source) => write!(f, "{source}"),
             Self::Residents { map, source } => write!(f, "map {map:#06x} residents: {source}"),
             Self::Exits { map, source } => write!(f, "map {map:#06x} exits: {source}"),
@@ -88,6 +103,7 @@ impl fmt::Display for WorldError {
 impl std::error::Error for WorldError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Arrival { .. } => None,
             Self::Room(source) => Some(source),
             Self::Residents { source, .. } => Some(source),
             Self::Exits { source, .. } => Some(source),
@@ -148,7 +164,9 @@ impl<'a> World<'a> {
     /// [`Room::with_passive_directional_type8_special_bit_clear`] contract:
     /// ordinary special-player resolver, fixed (-8,-16) offsets and 16×16 bounds,
     /// inactive action hooks (`$0980 & $0050 == 0`), and `$097C & $0004 == 0`
-    /// throughout this world's movement. Stop using it if the contract changes.
+    /// during ordinary walking. Source-bound arrivals suspend ordinary collision
+    /// until their measured free boundary. Stop using ordinary movement if its
+    /// contract changes.
     /// Host doorway interaction is not native interaction qualification.
     ///
     /// # Errors
@@ -208,6 +226,7 @@ impl<'a> World<'a> {
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
+            arrival: None,
         })
     }
 
@@ -220,7 +239,16 @@ impl<'a> World<'a> {
     /// Player position in pixels.
     #[must_use]
     pub fn position(&self) -> (u16, u16) {
-        (self.walking.x(), self.walking.y())
+        self.arrival
+            .map_or((self.walking.x(), self.walking.y()), Arrival::position)
+    }
+
+    /// Measured return arrival currently owning the player, if any.
+    ///
+    /// The final free sample consumes an arrival advance, not a walking step.
+    #[must_use]
+    pub const fn arrival(&self) -> Option<Arrival> {
+        self.arrival
     }
 
     /// The current map's room.
@@ -246,6 +274,9 @@ impl<'a> World<'a> {
     /// Holding a direction against a wall turns the player in the real game,
     /// which is how a doorway gets faced from the cell in front of it.
     pub fn face(&mut self, direction: Direction) {
+        if self.arrival.is_some() {
+            return;
+        }
         self.facing = direction;
         self.animation = AnimationState::standing(direction);
     }
@@ -272,10 +303,30 @@ impl<'a> World<'a> {
     /// may already have advanced. Use this API for discovery and replay.
     ///
     /// # Errors
-    /// Propagates destination resident-resolution, room, exit-list and actor
-    /// occupancy rebuild failures.
+    /// Propagates unqualified target-arrival records, destination resident-resolution,
+    /// room, exit-list and actor occupancy rebuild failures.
     pub fn step_checked(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
         let before = self.position();
+        if let Some(mut arrival) = self.arrival {
+            arrival.advance();
+            let (x, y) = arrival.position();
+            if arrival.owns_player() {
+                self.arrival = Some(arrival);
+            } else {
+                self.arrival = None;
+                // Fresh host input history, not emulation of native pad bookkeeping.
+                self.walking = WalkingState::new(x, y);
+                self.face(Direction::Down);
+            }
+            // Actors still run, but forced player movement never uses their
+            // ordinary collision grid or scans/rearms reverse exits.
+            self.run_actors()?;
+            return Ok(if self.position() == before {
+                Step::Stayed
+            } else {
+                Step::Walked
+            });
+        }
         if let Some(direction) = direction {
             self.facing = direction;
         }
@@ -363,6 +414,9 @@ impl<'a> World<'a> {
     ///
     /// Applies the flags the conversation writes, so progression moves.
     pub fn talk(&mut self) -> Option<Conversation> {
+        if self.arrival.is_some() {
+            return None;
+        }
         let (x, y) = self.position();
         let (dx, dy) = facing_delta(self.facing);
         let faced = (
@@ -415,9 +469,12 @@ impl<'a> World<'a> {
     /// This host doorway operation is not native interaction qualification.
     ///
     /// # Errors
-    /// Propagates destination resident-resolution, room, exit-list and occupancy
-    /// build failures.
+    /// Propagates unqualified target-arrival records, destination resident-resolution,
+    /// room, exit-list and occupancy build failures.
     pub fn interact_checked(&mut self) -> Result<Step, WorldError> {
+        if self.arrival.is_some() {
+            return Ok(Step::Stayed);
+        }
         let (x, y) = self.position();
         let (Some(origin_x), Some(origin_y)) = (x.checked_sub(8), y.checked_sub(16)) else {
             return Ok(Step::Stayed);
@@ -441,14 +498,10 @@ impl<'a> World<'a> {
         }) else {
             return Ok(Step::Stayed);
         };
-        let Ok(destination) = record.direct_destination() else {
+        let Some(entered) = self.enter_exit(record)? else {
             return Ok(Step::Stayed);
         };
-        if !MAPS.contains(&destination) {
-            return Ok(Step::Stayed);
-        }
-        let (arrival_x, arrival_y) = record.destination_position();
-        let entered = self.enter_destination(destination, arrival_x, arrival_y)?;
+        let destination = entered.map;
         let from = self.map;
         *self = entered;
         Ok(Step::Entered {
@@ -484,16 +537,10 @@ impl<'a> World<'a> {
         let Some(record) = self.exits.select(origin.0, origin.1) else {
             return Ok(None);
         };
-        let Ok(destination) = record.direct_destination() else {
+        let Some(mut entered) = self.enter_exit(record)? else {
             return Ok(None);
         };
-        // An exit out of the slice is refused as movement. The player does not
-        // pass, rather than arriving in a map that was never loaded.
-        if !MAPS.contains(&destination) {
-            return Ok(None);
-        }
-        let (arrival_x, arrival_y) = record.destination_position();
-        let mut entered = self.enter_destination(destination, arrival_x, arrival_y)?;
+        let destination = entered.map;
         let from = self.map;
         // Arriving stands the player facing the way they came in, as the
         // qualified slice does on its own transitions.
@@ -503,6 +550,23 @@ impl<'a> World<'a> {
             from,
             to: destination,
         }))
+    }
+
+    // Both checked exit paths share source admission, initialized placement and
+    // ownership. Explicit World::enter remains a raw placement operation.
+    fn enter_exit(&self, record: &ExitRecord) -> Result<Option<Self>, WorldError> {
+        // Validate pinned source identities before interpreting mutable operands.
+        let arrival = qualified_arrival(self.map, record)?;
+        let Ok(destination) = record.direct_destination() else {
+            return Ok(None);
+        };
+        if !MAPS.contains(&destination) {
+            return Ok(None);
+        }
+        let (x, y) = arrival.map_or(record.destination_position(), Arrival::position);
+        let mut entered = self.enter_destination(destination, x, y)?;
+        entered.arrival = arrival;
+        Ok(Some(entered))
     }
 
     fn enter_destination(&self, map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
@@ -515,6 +579,32 @@ impl<'a> World<'a> {
             self.base.room.passive_directional_type8_special_bit_clear(),
         )
     }
+}
+
+/// Only these two record/state witnesses have measured arrival profiles.
+/// Other edges retain the legacy raw host transfer, not selector qualification.
+fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, WorldError> {
+    let source = record.source_range().start;
+    let (offset, bytes, route) = match map {
+        0x1E if source == 0x18F9B || record.raw_destination() == 0x0A => (
+            0x18F9B,
+            [39, 12, 1, 4, 10, 0, 0, 5, 16, 3, 240, 2],
+            ReturnRoute::Town,
+        ),
+        0x19 if source == 0x18F42 || record.raw_destination() == 0x17 => (
+            0x18F42,
+            [58, 20, 1, 1, 23, 0, 0, 14, 192, 1, 96, 1],
+            ReturnRoute::Stairs,
+        ),
+        _ => return Ok(None),
+    };
+    if record.source_range().start != offset || record.bytes() != &bytes {
+        return Err(WorldError::Arrival {
+            map,
+            record: record.source_range().start,
+        });
+    }
+    Ok(Some(Arrival::new(route)))
 }
 
 /// The residents that are bodies.
@@ -641,6 +731,63 @@ mod tests {
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: true,
+            arrival: None,
+        }
+    }
+
+    #[test]
+    fn return_admission_pins_every_operand_and_source_before_destination_decoding() {
+        for (map, offset, bytes, route) in [
+            (
+                0x1E,
+                0x18F9B,
+                [39, 12, 1, 4, 10, 0, 0, 5, 16, 3, 240, 2],
+                ReturnRoute::Town,
+            ),
+            (
+                0x19,
+                0x18F42,
+                [58, 20, 1, 1, 23, 0, 0, 14, 192, 1, 96, 1],
+                ReturnRoute::Stairs,
+            ),
+        ] {
+            for changed in 0..14 {
+                let at = offset + if changed == 13 { 16 } else { 0 };
+                let mut image = vec![0; 0x19000];
+                let pointer = 0x18000 + usize::from(map) * 2;
+                image[pointer..pointer + 2]
+                    .copy_from_slice(&u16::try_from(at - 0x10000).unwrap().to_le_bytes());
+                image[at..at + 12].copy_from_slice(&bytes);
+                image[at + 12] = 0xFF;
+                if changed < 12 {
+                    image[at + changed] ^= if changed == 5 { 0x80 } else { 2 };
+                }
+                let exits = ExitList::from_rom(&image, map).unwrap();
+                let record = &exits.records()[0];
+                if changed == 12 {
+                    assert_eq!(
+                        qualified_arrival(map, record).unwrap(),
+                        Some(Arrival::new(route))
+                    );
+                    assert_eq!(qualified_arrival(0xB, record).unwrap(), None);
+                    continue;
+                }
+                let origin = (u16::from(record.x()) * 16, u16::from(record.y()) * 16);
+                let mut world = synthetic_world();
+                world.map = map;
+                world.walking = WalkingState::new(origin.0 + 8, origin.1 + 16);
+                world.exits = exits;
+                for error in [
+                    world.interact_checked().unwrap_err(),
+                    world.transition_at(origin).unwrap_err(),
+                ] {
+                    assert!(
+                        matches!(error, WorldError::Arrival { map: source, record } if source == map && record == at)
+                    );
+                }
+                assert_eq!(world.map(), map);
+                assert!(world.arrival().is_none());
+            }
         }
     }
 

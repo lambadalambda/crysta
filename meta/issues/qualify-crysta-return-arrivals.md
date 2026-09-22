@@ -2,9 +2,10 @@
 
 ## Summary
 
-The explicit directional candidate reaches all 24 Crysta maps, but two return
-routes bounce into the reverse doorway after an alignment nudge. The host uses
-raw destination coordinates and omits the native selector-driven arrival phase.
+Initially the explicit directional candidate reached all 24 Crysta maps, but
+returned from only21 of23 non-opening maps. Raw destination placement omitted
+the native arrival phase. Both missing returns now use measured source-bound
+profiles, and all23 checked round trips pass.
 
 ## Dependencies
 
@@ -45,3 +46,29 @@ raw destination coordinates and omits the native selector-driven arrival phase.
   continues scanning when `$097C & $10` is **clear**, not set. Frame-end `$8000`
   arrival ownership must not be presented as proof that this gate suppresses
   every native scan.
+
+## Completion
+
+- Pure, lossless change-point profiles replay every initialized-to-free sample;
+  both checked transition paths validate exact source identity and all operands.
+  Explicit placement stays raw. Owned arrival bypasses ordinary walking/exits
+  and host interaction, then releases fresh host walking history only after the
+  measured free sample. Other records remain explicitly legacy/unqualified.
+- Native town occupancy is retained: the nearby resident at `(776,768)` and
+  dynamic block at `(48,47)` coexist with the measured arrival; no solid cell or
+  resident was removed. See collision documentation for bounded evidence limits.
+- Checked discovery/replay now passes **24/24 outbound, 23/23 returns**, with
+  no intermediate position reset or accepted refusal/load error. Conservative
+  production outbound coverage remains **19/24**.
+- TDD: missing profile/API tests failed before implementation; review's changed
+  destination bypass was reproduced red, then fixed by source-first validation.
+  Portable tests cover all operand bytes (including conditional destination),
+  source relocation, every sample/phase and saturation; ROM-backed tests cover
+  both entry paths, hostile inputs, held endpoint/recovery, and ordinary resumption.
+- Verification: full release workspace tests; nine native collision windows
+  (**5,541 frames**) and legacy regressions; both baseline/hostile capture hashes
+  and profiles; observer and extractor unit tests; strict clippy/rustdoc,
+  formatting, tracker and repository safety checks. Independent source,
+  architecture/correctness reviews and executable runtime verification passed.
+- Broader collision/state qualification remains in the parent issue; this does
+  not enable production directional collision or emulate native global scheduling.
