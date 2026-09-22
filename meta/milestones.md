@@ -103,6 +103,7 @@ qualification remain open.
 - [Decode map, metadata, and collision formats](issues/decode-map-collision-formats.md)
 - [Trace and qualify the movement collision predicate](issues/qualify-collision-predicate.md)
 - [Trace the player's movement admission routine](issues/trace-movement-admission-routine.md)
+- [Qualify the directional resolver for Crysta's remaining collision types](issues/qualify-crysta-directional-collision.md)
 - [Decode the door-entry trigger for one-cell exits](issues/decode-door-entry-trigger.md)
 - [Decode the actor script VM](issues/decode-actor-script-vm.md)
 - [Decode graphics, palettes, sprites, and animation](issues/decode-graphics-animation.md)

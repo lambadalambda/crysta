@@ -40,3 +40,4 @@
 - [ ] [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [ ] [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [ ] [Trace the player's movement admission routine](issues/trace-movement-admission-routine.md)
+- [ ] [Qualify the directional resolver for Crysta's remaining collision types](issues/qualify-crysta-directional-collision.md)

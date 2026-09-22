@@ -147,3 +147,13 @@ candidates are not it: `$80:C469` and `$80:C47F` read `$7E:A000` and branch on
 `$88`, `$90`, `$A0` and `$C0`, which against the runtime word's high byte of
 `2 * attribute` are attributes 68, 72, 80 and 96 — the dynamic-bit range, not
 base passability.
+
+## Update: controller probe traced; directional resolver remains
+
+The earlier “routine still untraced” and “all six settled by a table” statements
+are superseded by [the admission investigation](trace-movement-admission-routine.md).
+`COP CA` gates an accelerated-action branch, not ordinary walking; its decoded
+table is not a global passability partition. Fresh ordinary-control traces now
+reach type6/7 slope paths in `$80:D107`'s directional resolver. The original
+house/map-$41 equivalence requirements remain binding, so this issue stays open.
+See [the directional collision follow-up](qualify-crysta-directional-collision.md).

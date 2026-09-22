@@ -1,0 +1,56 @@
+# Qualify the directional resolver for Crysta's remaining collision types
+
+## Summary
+
+The table traced by the movement-admission investigation is not a binary
+walking predicate: `COP CA` gates a Right accelerated-action branch. The
+ordinary motion resolver at `$80:D107` uses directional/pair dispatch, old-edge
+slopes and additional state. Qualify that behavior before extending free roam
+beyond its current 19 of 24 reachable maps.
+
+## Dependencies
+
+- [Trace the player's movement admission routine](trace-movement-admission-routine.md)
+
+## Requirements
+
+- Continue from the new input-only type6/7 witnesses produced by
+  `tools/collision-qualification/slope_route.py`, not the old oscillating `goto`
+  experiment. Extend coverage to all four directions, old/new edges, both
+  sample positions, neighbour classes, aligned/unaligned positions and 1/2px
+  steps. Trace any previously unaccounted direction before implementing it.
+- Decode the slope diversions before the dynamic-bit override, preserving
+  their ordering. Right's type6 witness reaches `$80:DF74 → DFA2`; Left's
+  type7 witness reaches `$80:DBF8 → DC26`. Both change Y while holding a
+  horizontal direction; simple Open/Solid aliases are insufficient.
+- Account for type8's Up handler `$80:D506`, including its `$097C & 4` input.
+  Do not infer a global class from its Down/Open handler equality.
+- Admit types5/21 only where source-equivalent geometry and passive action-hook
+  conditions are established. Type5 matches P16, type21 matches S12 across
+  sixteen tables; that alone does not qualify gameplay side effects.
+- Preserve type29's Right S-first exception: it blocks without the nudge Open
+  would produce. Existing narrowly qualified Up stair aliases stay valid.
+- Keep the current runtime conservative until reference samples and mutation
+  controls qualify each extension. Do not rewrite unknown words to Open or
+  remove the sample checks to obtain connectivity.
+
+## Acceptance Criteria
+
+- A pure directional resolver matches contiguous reference trajectories for
+  every newly admitted case, with controls for wrong type, pair order, direction,
+  mask, neighbour stride, branch sense and dynamic-bit precedence.
+- Existing house trajectories and the map-$41 envelope agree, or each mismatch
+  has an identified additional input and remains outside admission.
+- Runtime traversal tests reach all 24 maps through real movement and exits,
+  preserve collision boundaries and round trips, and do not silently discard
+  unknown-material errors along the claimed route.
+- Raw ROM/layers/traces stay ignored; committed evidence is tooling, input logs,
+  selected source metadata and hashes. Remaining unsupported modes are explicit.
+
+## Notes
+
+- Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
+- Parent: [Trace the player's movement admission routine](trace-movement-admission-routine.md)
+- Evidence and reproduction: [collision](../../docs/collision.md).
+- This is the implementation/qualification follow-up, not completed by the
+  probe-table decoder or the two slope discovery frames.
