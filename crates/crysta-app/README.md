@@ -61,6 +61,14 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
   session_tests -- --ignored --nocapture
 ```
 
+## Simulation speed
+
+Windowed simulation uses the Japanese reference's nominal **60.098814 ticks/s**,
+independent of display refresh or event-loop wakeups. Catch-up is capped at four
+steps after a host stall; larger backlogs are discarded and logged. Headless
+scripts remain exact logical steps. Audio pacing is independent.
+See [timing measurements and NPC fidelity limits](../../docs/native-crysta-timing.md).
+
 ## Background presentation
 
 Exterior tree transparency uses the ROM-derived scene backdrop, not the asset
@@ -73,7 +81,7 @@ entry, and stops with a fatal world error. Redrawing does not advance its clock;
 only affected map cells are refreshed. Logs include `background_tick` to help
 diagnose phase-dependent rendering bugs.
 
-This preserves the existing host simulation cadence; it does not claim native
+This follows the fixed host simulation cadence; it does not claim native
 video-frame phase synchronization. [Source and native-state comparison](../../tools/crysta-animation-qualification/README.md).
 
 ```sh

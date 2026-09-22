@@ -5,8 +5,10 @@
 //! than a second decode path, and sprites from the runtime's art module.
 
 mod background;
+mod clock;
 mod diagnostics;
 mod frame;
+mod input;
 mod music;
 mod music_controls;
 mod music_data;
@@ -92,7 +94,7 @@ fn main() {
         None
     };
     let event_loop = EventLoop::new().expect("an event loop");
-    event_loop.set_control_flow(ControlFlow::Poll);
+    event_loop.set_control_flow(ControlFlow::Wait);
     let log = start_diagnostics(&cartridge, music.is_some());
     let mut app = App::new(cartridge, image, music, log);
     if let Err(error) = event_loop.run_app(&mut app) {
@@ -111,6 +113,8 @@ fn start_diagnostics(cartridge: &rom::Rom, music: bool) -> Option<diagnostics::S
         "rom_sha256": cartridge.digests().sha256, "music_available": music,
         "initial": {"map": START.0, "x": START.1, "y": START.2},
         "movement_policy": "interactive-refusal-reset-v1",
+        "timing_policy": "ntsc-mean-fixed-step-v1",
+        "tick_period_ns": clock::FRAME_PERIOD.as_nanos(), "max_catch_up":clock::MAX_CATCH_UP,
         "limits": "portable-host diagnostics, not native qualification; rotated history may be incomplete"
     });
     match diagnostics::SessionLog::start(std::path::Path::new("local/crysta-app/logs"), metadata) {
@@ -582,8 +586,10 @@ struct App {
     keys: Vec<Direction>,
     frame: Vec<u32>,
     /// Edge-triggered, so holding the button does not re-talk every frame.
-    interact_down: bool,
-    interact_was_down: bool,
+    interaction: input::Interaction,
+    started: std::time::Instant,
+    clock: clock::Clock,
+    suspended: bool,
     music: Option<music_output::Music>,
     music_controls: music_controls::Controls,
     log: Option<diagnostics::SessionLog>,
@@ -606,8 +612,10 @@ impl App {
             held: None,
             keys: Vec::new(),
             frame: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
-            interact_down: false,
-            interact_was_down: false,
+            interaction: input::Interaction::default(),
+            started: std::time::Instant::now(),
+            clock: clock::Clock::new(std::time::Duration::ZERO),
+            suspended: false,
             music,
             music_controls: music_controls::Controls::default(),
             log,
@@ -665,6 +673,8 @@ impl App {
 
 impl ApplicationHandler for App {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
+        self.clock.reset(self.started.elapsed());
+        self.suspended = false;
         let attributes = Window::default_attributes()
             .with_title("Crysta")
             .with_inner_size(winit::dpi::LogicalSize::new(
@@ -680,6 +690,10 @@ impl ApplicationHandler for App {
     }
 
     fn suspended(&mut self, _: &ActiveEventLoop) {
+        self.suspended = true;
+        self.interaction = input::Interaction::default();
+        self.keys.clear();
+        self.held = None;
         self.music_controls.set_focused(false);
         self.update_music();
     }
@@ -728,7 +742,7 @@ impl ApplicationHandler for App {
                         None
                     }
                     PhysicalKey::Code(KeyCode::Space | KeyCode::Enter) => {
-                        self.interact_down = pressed;
+                        self.interaction.keyboard(pressed);
                         None
                     }
                     _ => None,
@@ -750,15 +764,45 @@ impl ApplicationHandler for App {
     }
 
     fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
-        self.poll_pad();
-        self.advance();
-        if self.session().fault.is_some() {
+        if self.suspended
+            || self
+                .state
+                .as_ref()
+                .is_some_and(|session| session.fault.is_some())
+        {
             event_loop.set_control_flow(ControlFlow::Wait);
             return;
         }
-        if let Some(window) = &self.window {
-            window.request_redraw();
+        self.poll_pad();
+        let batch = self.clock.poll(self.started.elapsed());
+        for _ in 0..batch.steps {
+            self.advance();
+            if self.session().fault.is_some() {
+                break;
+            }
         }
+        if batch.dropped_backlog {
+            let tick = self.session().tick;
+            self.record_diagnostic(
+                &serde_json::json!({"kind":"host", "event":"timing_backlog_dropped",
+                "tick":tick}),
+                true,
+            );
+        }
+        if self
+            .state
+            .as_ref()
+            .is_some_and(|session| session.fault.is_some())
+        {
+            event_loop.set_control_flow(ControlFlow::Wait);
+            return;
+        }
+        if batch.steps != 0 {
+            if let Some(window) = &self.window {
+                window.request_redraw();
+            }
+        }
+        event_loop.set_control_flow(ControlFlow::WaitUntil(self.started + self.clock.deadline()));
     }
 }
 
@@ -800,17 +844,14 @@ impl App {
             }
         }
         self.held = direction;
-        // The pad is level-polled; the keyboard sets the flag on its edges.
-        // Either way one press is one interaction.
-        let down = interact || self.interact_down;
-        let pressed = down && !self.interact_was_down;
-        self.interact_was_down = down;
-        self.interact_down = pressed;
+        // Level-polled pad edges and keyboard events remain latched until a
+        // simulation tick, even if several redraw/input wakeups happen first.
+        self.interaction.gamepad(interact);
     }
 
     fn advance(&mut self) {
         let direction = self.held;
-        let interact = std::mem::take(&mut self.interact_down);
+        let interact = self.interaction.take();
         let session = self.session();
         if session.fault.is_some() {
             return;
@@ -819,7 +860,8 @@ impl App {
         session.advance(direction, interact);
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
         if self.log.is_some() {
-            let event = self.session().trace_frame(before, direction, interact);
+            let mut event = self.session().trace_frame(before, direction, interact);
+            event["host_elapsed_ns"] = serde_json::json!(self.started.elapsed().as_nanos());
             self.record_diagnostic(&event, urgent);
         }
         if self.session().fault.is_some() {
@@ -1080,7 +1122,7 @@ mod session_tests {
         assert!(frame["error"].as_str().unwrap().contains("exits"));
         // Now drive a real checked destination failure through the host.
         session.fault = None;
-        app.interact_down = true;
+        app.interaction.keyboard(true);
         app.advance();
         assert!(app.session().fault.is_some());
         let tick = app.session().tick;
