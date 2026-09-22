@@ -139,6 +139,58 @@ fn goto(s: &mut Session, target: (u16, u16), label: &str) -> &'static str {
     "exhausted"
 }
 
+/// Capture the player's live inputs to $80:D107 before its STA $02 executes.
+/// No state is patched: both bounded traces advance the same input-only session.
+fn motion_frame(s: &mut Session, label: &str, held: &[&str]) -> Value {
+    use oracle::CpuTraceStop::{FrameLimit, TargetReached};
+    let frame = s.frame_state().frames;
+    let start = s.wram_image();
+    let entry = s.trace_until_pc(0x80_D107, 100_000, 1).unwrap();
+    assert_eq!(entry.stop, TargetReached, "player motion entry not reached");
+    assert_eq!(
+        s.frame_state().frames,
+        frame,
+        "motion entry crossed a frame"
+    );
+    let before = s.wram_image();
+    assert_eq!(
+        s.cpu_registers().x,
+        0x1000,
+        "first resolver call is not Ark"
+    );
+    assert_eq!(word(&before, 0xDEA), 0x1000);
+    assert_eq!(
+        position(&start),
+        position(&before),
+        "controller moved Ark before collision"
+    );
+    let layer = assets::maps::LoadedMap::from_wram(&before).unwrap();
+    let rest = s.trace_until_pc(0xFF_FFFF, 100_000, 1).unwrap();
+    assert_eq!(rest.stop, FrameLimit, "incomplete motion frame");
+    assert_eq!(s.frame_state().frames, frame + 1);
+    let after = s.wram_image();
+    assert_eq!(
+        word(&before, 0x47E),
+        word(&after, 0x47E),
+        "motion changed maps"
+    );
+    json!({
+        "kind": "motion", "label": label, "frame": frame + 1, "held": held,
+        "map": word(&before, 0x47E),
+        "before": position(&before), "after": position(&after),
+        "attempt": [word(&before, 0x11018) as i16, word(&before, 0x1101A) as i16],
+        "control": [word(&before, 0x980), word(&after, 0x980)],
+        "flags": word(&before, 0x1004), "special": word(&before, 0x97C),
+        "bounds": [word(&before, 0x11028), word(&before, 0x1102A),
+                   word(&before, 0x1102C), word(&before, 0x1102E)],
+        "width": layer.width(), "height": layer.height(),
+        "cells": layer.cells().iter().map(|cell| cell.raw()).collect::<Vec<_>>(),
+        "path": rest.entries.iter().filter_map(|entry|
+            (0x80_D100..0x80_E87C).contains(&entry.address).then_some(entry.address)
+        ).collect::<Vec<_>>(),
+    })
+}
+
 fn main() {
     let a: Vec<_> = std::env::args().collect();
     assert_eq!(a.len(), 3, "trace ROM local/OUT < ROUTE.jsonl");
@@ -233,6 +285,10 @@ fn main() {
         let frames = c["frames"].as_u64().unwrap();
         assert!(frames > 0 && frames <= 2000);
         for _ in 0..frames {
+            if c["motion"] == true {
+                emit(&motion_frame(&mut s, label, &held));
+                continue;
+            }
             s.run_frame();
             emit(&sample(
                 &s.wram_image(),
