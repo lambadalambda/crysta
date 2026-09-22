@@ -568,9 +568,14 @@ refusals remain `Step::Refused` and must also reject an accepted route. A failed
 checked action can have advanced host state, so exploration discards that branch.
 Interaction constructs the destination with the current event bitmap before
 residents/occupancy are resolved. Host doorway interaction is not a claim about
-native action-controller qualification or Pandora story progression. The existing
-resident-resolution fallback to an empty roster is explicitly retained; these
-APIs do not claim fully fail-closed decoding of every world subsystem.
+native action-controller qualification or Pandora story progression.
+Resident-resolution failures now reject every world constructor and checked
+transition as `WorldError::Residents`, preserving the map and original decoder
+error (also available through the standard error chain). Failed destinations are
+not installed with missing occupancy; successfully decoded empty lists remain
+valid. Legacy convenience wrappers still return `Stayed` on entry failure, so
+callers needing diagnostics must use the checked APIs. This hardening concerns
+spawn resolution, not sprite/pose decoding or every other world subsystem.
 
 ### Checked 24-map candidate traversal
 

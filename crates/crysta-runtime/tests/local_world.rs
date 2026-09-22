@@ -801,3 +801,55 @@ fn checked_interaction_reports_destination_exit_decode_failure() {
     );
     assert_same_arrival(&world, &before);
 }
+
+#[test]
+fn resident_failure_is_not_a_successfully_empty_roster() {
+    use assets::maps::actors::{ActorError, ResolveError};
+    use assets::maps::scripts::EventFlags;
+    use crysta_runtime::residents::residents;
+
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let map = 0xB;
+    let pointer = 0x38000 + usize::from(map) * 2;
+    let mut image = cartridge.image().to_vec();
+    image[pointer..pointer + 2].fill(0);
+    let events = crysta_runtime::world::new_game_flags();
+    let expected = ResolveError::Decode(ActorError::Absent { index: map });
+    assert_eq!(
+        residents(&image, map, EventFlags::Bitmap(&events)),
+        Err(expected.clone())
+    );
+    for result in [
+        World::enter(&image, map, 120, 112),
+        World::enter_with_events(&image, map, 120, 112, events.clone()),
+        World::enter_candidate(&image, map, 120, 112, events.clone()),
+    ] {
+        let error = result
+            .err()
+            .expect("refused roster must not create an empty world");
+        assert_eq!(
+            error.to_string(),
+            format!("map {map:#06x} residents: {expected}")
+        );
+    }
+
+    // A valid terminator is genuinely empty, not a failed decode.
+    let mut image = cartridge.image().to_vec();
+    let entry = 0x30000 | usize::from(u16::from_le_bytes([image[pointer], image[pointer + 1]]));
+    image[entry + 2..entry + 4].copy_from_slice(&[0xFF, 0]);
+    assert_eq!(
+        residents(&image, map, EventFlags::Bitmap(&events)),
+        Ok(vec![])
+    );
+    for result in [
+        World::enter(&image, map, 120, 112),
+        World::enter_with_events(&image, map, 120, 112, events.clone()),
+        World::enter_candidate(&image, map, 120, 112, events),
+    ] {
+        let world = result.unwrap();
+        assert!(world.residents().is_empty());
+        assert_eq!(world.map(), map);
+    }
+}

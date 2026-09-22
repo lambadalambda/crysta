@@ -7,6 +7,7 @@
 use crate::actors::{Actor, Surroundings};
 use crate::residents::{residents, talk_to, Conversation, Resident};
 use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
+use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList};
 use assets::maps::scripts::EventFlags;
 use room_core::{
@@ -52,6 +53,13 @@ pub struct World<'a> {
 pub enum WorldError {
     /// The map could not be built into a room.
     Room(RoomError),
+    /// The map's resident spawn stream could not be resolved.
+    Residents {
+        /// Map whose roster failed to load.
+        map: u16,
+        /// Original spawn decoding or resolution failure.
+        source: ResolveError,
+    },
     /// The map's exit list did not decode.
     Exits {
         /// Map identifier.
@@ -71,12 +79,21 @@ impl fmt::Display for WorldError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::Room(source) => write!(f, "{source}"),
+            Self::Residents { map, source } => write!(f, "map {map:#06x} residents: {source}"),
             Self::Exits { map, source } => write!(f, "map {map:#06x} exits: {source}"),
         }
     }
 }
 
-impl std::error::Error for WorldError {}
+impl std::error::Error for WorldError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Room(source) => Some(source),
+            Self::Residents { source, .. } => Some(source),
+            Self::Exits { source, .. } => Some(source),
+        }
+    }
+}
 
 /// What one step did.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -100,9 +117,9 @@ impl<'a> World<'a> {
     /// Places the player in a map at a pixel position.
     ///
     /// # Errors
-    /// Refuses a map that cannot be built into a room or whose exits do not
-    /// decode. Resident decoding still falls back to an empty roster on failure;
-    /// entry is not fully fail-closed for roster loading.
+    /// Refuses a map whose resident spawn stream cannot be resolved, whose room
+    /// cannot be built, or whose exits do not decode. A failed roster is never
+    /// replaced by an empty one.
     pub fn enter(image: &'a [u8], map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
         Self::enter_with_events(image, map, x, y, new_game_flags())
     }
@@ -154,7 +171,8 @@ impl<'a> World<'a> {
         events: Vec<u8>,
         candidate: bool,
     ) -> Result<Self, WorldError> {
-        let present = residents(image, map, EventFlags::Bitmap(&events)).unwrap_or_default();
+        let present = residents(image, map, EventFlags::Bitmap(&events))
+            .map_err(|source| WorldError::Residents { map, source })?;
         let actors = present
             .iter()
             .enumerate()
@@ -254,9 +272,8 @@ impl<'a> World<'a> {
     /// may already have advanced. Use this API for discovery and replay.
     ///
     /// # Errors
-    /// Propagates destination room, exit-list and actor occupancy rebuild failures.
-    /// Resident decoding retains [`Self::enter`]'s empty-roster fallback; this
-    /// does not make roster loading fully fail-closed.
+    /// Propagates destination resident-resolution, room, exit-list and actor
+    /// occupancy rebuild failures.
     pub fn step_checked(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
         let before = self.position();
         if let Some(direction) = direction {
@@ -398,9 +415,8 @@ impl<'a> World<'a> {
     /// This host doorway operation is not native interaction qualification.
     ///
     /// # Errors
-    /// Propagates destination room, exit-list and occupancy build failures.
-    /// Resident decoding retains [`Self::enter`]'s empty-roster fallback; this
-    /// does not make roster loading fully fail-closed.
+    /// Propagates destination resident-resolution, room, exit-list and occupancy
+    /// build failures.
     pub fn interact_checked(&mut self) -> Result<Step, WorldError> {
         let (x, y) = self.position();
         let (Some(origin_x), Some(origin_y)) = (x.checked_sub(8), y.checked_sub(16)) else {
@@ -599,7 +615,7 @@ mod tests {
         }
     }
 
-    fn synthetic_world() -> World<'static> {
+    fn synthetic_world<'a>() -> World<'a> {
         let base = MapRoom {
             room: Room::new(8, 8, vec![0; 64]).unwrap(),
             map: 0xB,
@@ -628,6 +644,50 @@ mod tests {
         }
     }
 
+    fn synthetic_spawn_image(map: u16, stream: &[u8]) -> Vec<u8> {
+        // Synthetic stream and table only; no game data or complete ROM.
+        let mut image = vec![0; 0x39002 + stream.len()];
+        let pointer = 0x38000 + usize::from(map) * 2;
+        image[pointer..pointer + 2].copy_from_slice(&0x9000u16.to_le_bytes());
+        image[0x39002..].copy_from_slice(stream);
+        image
+    }
+
+    #[test]
+    fn entry_reports_resident_resolution_failure_in_every_mode() {
+        let map = 0xC;
+        for image in [
+            vec![],                                 // Truncated table.
+            vec![0; 0x3801A],                       // Absent list.
+            synthetic_spawn_image(map, &[0xF0, 0]), // Unknown opcode.
+            synthetic_spawn_image(map, &[0xFA, 0, 0x20, 0, 0, 0, 0, 0xFF, 0]),
+        ] {
+            let events = new_game_flags();
+            let expected = residents(&image, map, EventFlags::Bitmap(&events)).unwrap_err();
+            for result in [
+                World::enter(&image, map, 56, 64),
+                World::enter_with_events(&image, map, 56, 64, events.clone()),
+                World::enter_candidate(&image, map, 56, 64, events.clone()),
+            ] {
+                let error = result.err().expect("failed roster must reject entry");
+                assert_eq!(
+                    error.to_string(),
+                    format!("map {map:#06x} residents: {expected}")
+                );
+                assert!(
+                    matches!(&error, WorldError::Residents { map: actual_map, source }
+                    if *actual_map == map && *source == expected)
+                );
+                assert_eq!(
+                    std::error::Error::source(&error)
+                        .unwrap()
+                        .downcast_ref::<ResolveError>(),
+                    Some(&expected)
+                );
+            }
+        }
+    }
+
     #[test]
     fn occupancy_keeps_candidate_collision_without_changing_default() {
         for candidate in [false, true] {
@@ -648,12 +708,59 @@ mod tests {
 
     #[test]
     fn checked_actions_report_destination_build_failure() {
+        let image = synthetic_spawn_image(0xC, &[0xFF, 0]);
         let mut world = synthetic_world();
+        world.image = &image;
         assert!(matches!(world.interact_checked(), Err(WorldError::Room(_))));
         assert_eq!(world.map(), 0xB);
         assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
         assert_eq!(world.map(), 0xB);
         assert_eq!(world.interact(), Step::Stayed);
+    }
+
+    #[test]
+    fn checked_transitions_report_resident_failure_without_installing_destination() {
+        let image = synthetic_spawn_image(0xC, &[0xF0, 0]);
+        let expected = residents(&image, 0xC, EventFlags::Bitmap(&new_game_flags())).unwrap_err();
+        for candidate in [false, true] {
+            let mut origin = synthetic_world();
+            origin.image = &image;
+            if candidate {
+                origin.base.room = origin
+                    .base
+                    .room
+                    .with_passive_directional_type8_special_bit_clear();
+                origin.room = origin.base.clone();
+            }
+            for interact in [false, true] {
+                let mut world = origin.clone();
+                let result = if interact {
+                    world.interact_checked()
+                } else {
+                    world.step_checked(None)
+                };
+                assert!(
+                    matches!(result, Err(WorldError::Residents { map: 0xC, source })
+                    if source == expected)
+                );
+                assert_eq!(world.map(), origin.map());
+                assert_eq!(
+                    world.walking.encode_snapshot(),
+                    origin.walking.encode_snapshot()
+                );
+                assert_eq!(world.events(), origin.events());
+                assert_eq!(world.residents(), origin.residents());
+                assert_eq!(world.room().cells(), origin.room().cells());
+                assert_eq!(
+                    world.room().passive_directional_type8_special_bit_clear(),
+                    candidate
+                );
+            }
+            // The legacy wrappers still refuse entry rather than install an empty map.
+            assert_eq!(origin.interact(), Step::Stayed);
+            assert_eq!(origin.step(None), Step::Stayed);
+            assert_eq!(origin.map(), 0xB);
+        }
     }
 
     #[test]
