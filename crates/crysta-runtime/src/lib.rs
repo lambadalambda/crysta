@@ -261,6 +261,27 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
     })
 }
 
+/// Builds an opt-in passive directional candidate with `$097C & 4 == 0`.
+///
+/// This is for route discovery, not production enablement. [`room`] remains
+/// conservative; the raw cells and qualified material policy are unchanged.
+/// The caller asserts the full
+/// [`Room::with_passive_directional_type8_special_bit_clear`] contract: the
+/// ordinary special-player resolver, fixed (-8,-16) offsets and 16×16 bounds,
+/// inactive action hooks (`$0980 & $0050 == 0`), and `$097C & $0004 == 0`.
+/// Stop using this candidate if that contract changes. This is collision
+/// geometry only, not native interaction qualification.
+///
+/// # Errors
+/// As [`room`].
+pub fn room_candidate(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
+    let mut built = room(image, map)?;
+    built.room = built
+        .room
+        .with_passive_directional_type8_special_bit_clear();
+    Ok(built)
+}
+
 /// Classifications `room-core` already qualified, scoped to their own cells.
 ///
 /// Its default table leaves attributes 5, 25 and 29 undecided, but it carries

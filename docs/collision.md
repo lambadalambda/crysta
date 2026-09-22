@@ -554,3 +554,20 @@ and the full map-$41 envelope remain gates. Runtime routes must retain and check
 every step, transitions and round trips rather than treating rejected materials
 as walls or reporting a cell-keyed search as proof of impossibility.
 **19/24 remains the conservative production result.**
+
+### Checked host candidate API
+
+`crysta_runtime::room_candidate` and `World::enter_candidate` explicitly select
+the clear-bit directional contract; `room`, `World::enter`, and production callers
+retain conservative behavior. Candidate policy survives actor occupancy rebuilds
+and both transition paths. Callers inherit the full ordinary-player, fixed-bounds,
+passive-action-hook and special-bit-clear contract—not just the last bit test.
+
+`step_checked` and `interact_checked` expose load/exit/occupancy errors; core
+refusals remain `Step::Refused` and must also reject an accepted route. A failed
+checked action can have advanced host state, so exploration discards that branch.
+Interaction constructs the destination with the current event bitmap before
+residents/occupancy are resolved. Host doorway interaction is not a claim about
+native action-controller qualification or Pandora story progression. The existing
+resident-resolution fallback to an empty roster is explicitly retained; these
+APIs do not claim fully fail-closed decoding of every world subsystem.

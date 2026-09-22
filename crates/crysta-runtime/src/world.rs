@@ -6,7 +6,7 @@
 
 use crate::actors::{Actor, Surroundings};
 use crate::residents::{residents, talk_to, Conversation, Resident};
-use crate::{room, MapRoom, RoomError, MAPS};
+use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
 use assets::maps::exits::{ExitError, ExitList};
 use assets::maps::scripts::EventFlags;
 use room_core::{
@@ -101,7 +101,8 @@ impl<'a> World<'a> {
     ///
     /// # Errors
     /// Refuses a map that cannot be built into a room or whose exits do not
-    /// decode.
+    /// decode. Resident decoding still falls back to an empty roster on failure;
+    /// entry is not fully fail-closed for roster loading.
     pub fn enter(image: &'a [u8], map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
         Self::enter_with_events(image, map, x, y, new_game_flags())
     }
@@ -120,6 +121,39 @@ impl<'a> World<'a> {
         y: u16,
         events: Vec<u8>,
     ) -> Result<Self, WorldError> {
+        Self::enter_with_policy(image, map, x, y, events, false)
+    }
+
+    /// Enters with the opt-in passive directional candidate (`$097C & 4 == 0`).
+    ///
+    /// The explicit flags are installed before residents and occupancy are built.
+    /// Ordinary constructors remain conservative. The caller asserts the full
+    /// [`Room::with_passive_directional_type8_special_bit_clear`] contract:
+    /// ordinary special-player resolver, fixed (-8,-16) offsets and 16×16 bounds,
+    /// inactive action hooks (`$0980 & $0050 == 0`), and `$097C & $0004 == 0`
+    /// throughout this world's movement. Stop using it if the contract changes.
+    /// Host doorway interaction is not native interaction qualification.
+    ///
+    /// # Errors
+    /// As [`Self::enter`].
+    pub fn enter_candidate(
+        image: &'a [u8],
+        map: u16,
+        x: u16,
+        y: u16,
+        events: Vec<u8>,
+    ) -> Result<Self, WorldError> {
+        Self::enter_with_policy(image, map, x, y, events, true)
+    }
+
+    fn enter_with_policy(
+        image: &'a [u8],
+        map: u16,
+        x: u16,
+        y: u16,
+        events: Vec<u8>,
+        candidate: bool,
+    ) -> Result<Self, WorldError> {
         let present = residents(image, map, EventFlags::Bitmap(&events)).unwrap_or_default();
         let actors = present
             .iter()
@@ -131,7 +165,11 @@ impl<'a> World<'a> {
                 Actor::new(resident.position, resident.script, resident.initial, seed)
             })
             .collect();
-        let base = room(image, map)?;
+        let base = if candidate {
+            room_candidate(image, map)?
+        } else {
+            room(image, map)?
+        };
         let blocked = body_cells(&present);
         let built = occupy(base.clone(), &bodies(&present))?;
         // Every map in the slice has a list that decodes; a malformed one is a
@@ -206,23 +244,37 @@ impl<'a> World<'a> {
 
     /// Walks one frame, then applies any exit the player is standing on.
     pub fn step(&mut self, direction: Option<Direction>) -> Step {
+        self.step_checked(direction).unwrap_or(Step::Stayed)
+    }
+
+    /// Walks one frame without hiding transition or occupancy build failures.
+    ///
+    /// A core refusal remains [`Step::Refused`], not a successful route action.
+    /// On a build error the caller must discard the world: walking or actors
+    /// may already have advanced. Use this API for discovery and replay.
+    ///
+    /// # Errors
+    /// Propagates destination room, exit-list and actor occupancy rebuild failures.
+    /// Resident decoding retains [`Self::enter`]'s empty-roster fallback; this
+    /// does not make roster loading fully fail-closed.
+    pub fn step_checked(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
         let before = self.position();
         if let Some(direction) = direction {
             self.facing = direction;
         }
         if let Err(refused) = self.walking.step(&self.room.room, FrameInput { direction }) {
-            return Step::Refused(refused);
+            return Ok(Step::Refused(refused));
         }
         self.animation.advance(self.walking.active_direction());
-        if let Some(step) = self.take_exit() {
-            return step;
+        if let Some(step) = self.take_exit()? {
+            return Ok(step);
         }
-        self.run_actors();
-        if self.position() == before {
+        self.run_actors()?;
+        Ok(if self.position() == before {
             Step::Stayed
         } else {
             Step::Walked
-        }
+        })
     }
 
     /// Runs every resident's script for one frame and moves bodies.
@@ -231,7 +283,7 @@ impl<'a> World<'a> {
     /// destination as occupied, so nobody steps onto anybody. When a body's
     /// cell changes, the room is rebuilt from the base with the new cells
     /// blocked, so the player is stopped by residents wherever they are.
-    fn run_actors(&mut self) {
+    fn run_actors(&mut self) -> Result<(), WorldError> {
         let (x, y) = self.position();
         let player = (x.saturating_sub(8) / 16, y.saturating_sub(16) / 16);
         for index in 0..self.actors.len() {
@@ -272,11 +324,10 @@ impl<'a> World<'a> {
         }
         let cells = body_cells(&self.residents);
         if cells != self.blocked {
-            if let Ok(rebuilt) = occupy(self.base.clone(), &bodies(&self.residents)) {
-                self.room = rebuilt;
-                self.blocked = cells;
-            }
+            self.room = occupy(self.base.clone(), &bodies(&self.residents))?;
+            self.blocked = cells;
         }
+        Ok(())
     }
 
     /// Residents present in the current map.
@@ -339,9 +390,21 @@ impl<'a> World<'a> {
     /// tile containment of the origin, and of the tile being faced, and ignores
     /// the fine position that walking through would need.
     pub fn interact(&mut self) -> Step {
+        self.interact_checked().unwrap_or(Step::Stayed)
+    }
+
+    /// Opens a doorway without hiding destination entry failures.
+    ///
+    /// This host doorway operation is not native interaction qualification.
+    ///
+    /// # Errors
+    /// Propagates destination room, exit-list and occupancy build failures.
+    /// Resident decoding retains [`Self::enter`]'s empty-roster fallback; this
+    /// does not make roster loading fully fail-closed.
+    pub fn interact_checked(&mut self) -> Result<Step, WorldError> {
         let (x, y) = self.position();
         let (Some(origin_x), Some(origin_y)) = (x.checked_sub(8), y.checked_sub(16)) else {
-            return Step::Stayed;
+            return Ok(Step::Stayed);
         };
         let (tile_x, tile_y) = (origin_x / 16, origin_y / 16);
         let (dx, dy) = facing_delta(self.facing);
@@ -360,83 +423,81 @@ impl<'a> World<'a> {
             };
             covers((tile_x, tile_y)) || covers(faced)
         }) else {
-            return Step::Stayed;
+            return Ok(Step::Stayed);
         };
         let Ok(destination) = record.direct_destination() else {
-            return Step::Stayed;
+            return Ok(Step::Stayed);
         };
         if !MAPS.contains(&destination) {
-            return Step::Stayed;
+            return Ok(Step::Stayed);
         }
         let (arrival_x, arrival_y) = record.destination_position();
-        match Self::enter(self.image, destination, arrival_x, arrival_y) {
-            Ok(mut entered) => {
-                let from = self.map;
-                entered.events.clone_from(&self.events);
-                *self = entered;
-                Step::Entered {
-                    from,
-                    to: destination,
-                }
-            }
-            Err(_) => Step::Stayed,
-        }
+        let entered = self.enter_destination(destination, arrival_x, arrival_y)?;
+        let from = self.map;
+        *self = entered;
+        Ok(Step::Entered {
+            from,
+            to: destination,
+        })
     }
 
     /// Applies the exit under the player, if one is armed and leads into the
     /// slice.
-    fn take_exit(&mut self) -> Option<Step> {
+    fn take_exit(&mut self) -> Result<Option<Step>, WorldError> {
         let (x, y) = self.position();
         // `ExitList::select` takes the bounding origin, not the player
         // position: the measured collision reference is (x - 8, y - 16).
-        let origin = (x.checked_sub(8)?, y.checked_sub(16)?);
+        let (Some(x), Some(y)) = (x.checked_sub(8), y.checked_sub(16)) else {
+            return Ok(None);
+        };
+        let origin = (x, y);
         if self.exits.select(origin.0, origin.1).is_none() {
             // Clear of every exit, so the next one may fire.
             self.armed = true;
-            return None;
+            return Ok(None);
         }
         if !self.armed {
-            return None;
+            return Ok(None);
         }
         self.transition_at(origin)
     }
 
     /// Follows the exit whose rectangle contains `origin`, if it stays in the
     /// slice.
-    fn transition_at(&mut self, origin: (u16, u16)) -> Option<Step> {
-        let record = self.exits.select(origin.0, origin.1)?;
-        let destination = record.direct_destination().ok()?;
+    fn transition_at(&mut self, origin: (u16, u16)) -> Result<Option<Step>, WorldError> {
+        let Some(record) = self.exits.select(origin.0, origin.1) else {
+            return Ok(None);
+        };
+        let Ok(destination) = record.direct_destination() else {
+            return Ok(None);
+        };
         // An exit out of the slice is refused as movement. The player does not
         // pass, rather than arriving in a map that was never loaded.
         if !MAPS.contains(&destination) {
-            return None;
+            return Ok(None);
         }
         let (arrival_x, arrival_y) = record.destination_position();
-        let entered = Self::enter_with_events(
-            self.image,
-            destination,
-            arrival_x,
-            arrival_y,
-            self.events.clone(),
-        )
-        .ok()?;
+        let mut entered = self.enter_destination(destination, arrival_x, arrival_y)?;
         let from = self.map;
-        self.map = entered.map;
-        self.room = entered.room;
-        self.base = entered.base;
-        self.exits = entered.exits;
-        self.walking = entered.walking;
-        self.residents = entered.residents;
-        self.actors = entered.actors;
-        self.blocked = entered.blocked;
         // Arriving stands the player facing the way they came in, as the
         // qualified slice does on its own transitions.
-        self.animation = AnimationState::standing(self.facing);
-        self.armed = false;
-        Some(Step::Entered {
+        entered.face(self.facing);
+        *self = entered;
+        Ok(Some(Step::Entered {
             from,
             to: destination,
-        })
+        }))
+    }
+
+    fn enter_destination(&self, map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
+        Self::enter_with_policy(
+            self.image,
+            map,
+            x,
+            y,
+            self.events.clone(),
+            self.base.room.passive_directional_type8_special_bit_clear(),
+        )
     }
 }
 
@@ -505,12 +566,118 @@ pub fn occupy(built: MapRoom, present: &[Resident]) -> Result<MapRoom, WorldErro
         cells[usize::from(row) * usize::from(built.width) + usize::from(column)] = 14 << 9;
     }
     let map = built.map;
-    let rebuilt = Room::new(built.width, built.height, cells)
+    let mut rebuilt = Room::new(built.width, built.height, cells)
         .map_err(|source| RoomError::Refused { map, source })?
         .with_material_policy(crate::qualified_policy(map, built.width, built.height))
         .map_err(|source| RoomError::Policy { map, source })?;
+    if built.room.passive_directional_type8_special_bit_clear() {
+        rebuilt = rebuilt.with_passive_directional_type8_special_bit_clear();
+    } else if built.room.passive_directional_collision() {
+        rebuilt = rebuilt.with_passive_directional_collision();
+    }
     Ok(MapRoom {
         room: rebuilt,
         ..built
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn resident() -> Resident {
+        Resident {
+            position: (24, 32),
+            record: 0,
+            script: None,
+            body: true,
+            initial: 0,
+            selector: 0,
+            hflip: false,
+            pose_age: 0,
+            walking: false,
+        }
+    }
+
+    fn synthetic_world() -> World<'static> {
+        let base = MapRoom {
+            room: Room::new(8, 8, vec![0; 64]).unwrap(),
+            map: 0xB,
+            width: 8,
+            height: 8,
+        };
+        // Synthetic exit encoding only; no ROM fixture is used by shared tests.
+        let mut bytes = vec![0; 0x188B9];
+        bytes[0x18016..0x18018].copy_from_slice(&0x88ACu16.to_le_bytes());
+        bytes[0x188AC..0x188B8].copy_from_slice(&[3, 3, 1, 1, 0xC, 0, 0, 0, 56, 0, 64, 0]);
+        bytes[0x188B8] = 0xFF;
+        World {
+            image: &[],
+            map: 0xB,
+            room: base.clone(),
+            base,
+            exits: ExitList::from_rom(&bytes, 0xB).unwrap(),
+            walking: WalkingState::new(56, 64),
+            residents: vec![],
+            actors: vec![],
+            blocked: vec![],
+            events: new_game_flags(),
+            facing: Direction::Down,
+            animation: AnimationState::standing(Direction::Down),
+            armed: true,
+        }
+    }
+
+    #[test]
+    fn occupancy_keeps_candidate_collision_without_changing_default() {
+        for candidate in [false, true] {
+            let mut built = synthetic_world().base;
+            if candidate {
+                built.room = built
+                    .room
+                    .with_passive_directional_type8_special_bit_clear();
+            }
+            let occupied = occupy(built, &[resident()]).unwrap();
+            assert_eq!(
+                occupied.room.passive_directional_type8_special_bit_clear(),
+                candidate
+            );
+            assert_eq!(occupied.room.cells()[9], 14 << 9);
+        }
+    }
+
+    #[test]
+    fn checked_actions_report_destination_build_failure() {
+        let mut world = synthetic_world();
+        assert!(matches!(world.interact_checked(), Err(WorldError::Room(_))));
+        assert_eq!(world.map(), 0xB);
+        assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
+        assert_eq!(world.map(), 0xB);
+        assert_eq!(world.interact(), Step::Stayed);
+    }
+
+    #[test]
+    fn checked_step_reports_occupancy_rebuild_failure() {
+        let mut world = synthetic_world();
+        world.armed = false;
+        // Invalid base metadata forces the rebuild to fail, not the walking step.
+        world.base.width = 0;
+        world.residents = vec![resident()];
+        world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+        assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
+    }
+
+    #[test]
+    fn checked_step_keeps_core_refusals_distinct() {
+        let mut world = synthetic_world();
+        world.armed = false;
+        world.room.room = Room::new(8, 8, vec![1 << 9; 64]).unwrap();
+        for _ in 0..2 {
+            world.step_checked(Some(Direction::Right)).unwrap();
+        }
+        assert_eq!(
+            world.step_checked(Some(Direction::Right)).unwrap(),
+            Step::Refused(Unqualified::UnsupportedType(1))
+        );
+    }
 }
