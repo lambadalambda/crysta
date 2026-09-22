@@ -1,0 +1,1086 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "scope": "frozen_return_to_map101_first_interior_entry",
+  "route": [
+    {
+      "from_map": 33,
+      "table": 8490958,
+      "end": 8490971,
+      "exit": {
+        "source": 8490958,
+        "rectangle": [
+          8,
+          6,
+          1,
+          1
+        ],
+        "map": 32,
+        "mode": 0,
+        "selector": 13,
+        "raw_position": [
+          352,
+          864
+        ]
+      }
+    },
+    {
+      "from_map": 32,
+      "table": 8490933,
+      "end": 8490958,
+      "exit": {
+        "source": 8490933,
+        "rectangle": [
+          25,
+          53,
+          1,
+          1
+        ],
+        "map": 14,
+        "mode": 0,
+        "selector": 13,
+        "raw_position": [
+          96,
+          864
+        ]
+      }
+    },
+    {
+      "from_map": 14,
+      "table": 8490531,
+      "end": 8490556,
+      "exit": {
+        "source": 8490531,
+        "rectangle": [
+          9,
+          53,
+          1,
+          1
+        ],
+        "map": 12,
+        "mode": 0,
+        "selector": 13,
+        "raw_position": [
+          176,
+          352
+        ]
+      }
+    },
+    {
+      "from_map": 12,
+      "table": 8490445,
+      "end": 8490494,
+      "exit": {
+        "source": 8490445,
+        "rectangle": [
+          7,
+          28,
+          1,
+          4
+        ],
+        "map": 13,
+        "mode": 0,
+        "selector": 5,
+        "raw_position": [
+          112,
+          608
+        ]
+      }
+    },
+    {
+      "from_map": 13,
+      "table": 8490494,
+      "end": 8490531,
+      "exit": {
+        "source": 8490494,
+        "rectangle": [
+          7,
+          44,
+          1,
+          4
+        ],
+        "map": 10,
+        "mode": 0,
+        "selector": 5,
+        "raw_position": [
+          496,
+          752
+        ]
+      }
+    },
+    {
+      "from_map": 10,
+      "table": 8490323,
+      "end": 8490432,
+      "exit": {
+        "source": 8490419,
+        "rectangle": [
+          0,
+          62,
+          80,
+          2
+        ],
+        "map": 3,
+        "mode": 0,
+        "selector": 85,
+        "raw_position": [
+          528,
+          528
+        ]
+      }
+    },
+    {
+      "from_map": 3,
+      "table": 8490177,
+      "end": 8490286,
+      "exit": {
+        "source": 8490189,
+        "rectangle": [
+          13,
+          49,
+          1,
+          2
+        ],
+        "map": 256,
+        "mode": 0,
+        "selector": 102,
+        "raw_position": [
+          248,
+          992
+        ]
+      }
+    },
+    {
+      "from_map": 256,
+      "table": 8504034,
+      "end": 8504083,
+      "exit": {
+        "source": 8504046,
+        "rectangle": [
+          15,
+          54,
+          2,
+          2
+        ],
+        "map": 257,
+        "mode": 0,
+        "selector": 98,
+        "raw_position": [
+          120,
+          608
+        ]
+      }
+    }
+  ],
+  "scenes": [
+    {
+      "map": 10,
+      "bank82_word": 0,
+      "bank83_word": 35239,
+      "selected": 8620455
+    },
+    {
+      "map": 11,
+      "bank82_word": 0,
+      "bank83_word": 35708,
+      "selected": 8620924
+    },
+    {
+      "map": 13,
+      "bank82_word": 0,
+      "bank83_word": 36001,
+      "selected": 8621217
+    },
+    {
+      "map": 3,
+      "bank82_word": 0,
+      "bank83_word": 35065,
+      "selected": 8620281
+    },
+    {
+      "map": 256,
+      "bank82_word": 35009,
+      "bank83_word": 0,
+      "selected": 8554689
+    },
+    {
+      "map": 257,
+      "bank82_word": 35069,
+      "bank83_word": 0,
+      "selected": 8554749
+    }
+  ],
+  "records": {
+    "actors": [
+      {
+        "source": 8621246,
+        "header": 8948715,
+        "position": [
+          120,
+          720
+        ]
+      },
+      {
+        "source": 8620290,
+        "header": 8707808,
+        "position": [
+          520,
+          560
+        ]
+      },
+      {
+        "source": 8554691,
+        "header": 8692009,
+        "position": [
+          248,
+          944
+        ]
+      },
+      {
+        "source": 8554698,
+        "header": 9473008,
+        "position": [
+          248,
+          880
+        ]
+      },
+      {
+        "source": 8554751,
+        "header": 8692009,
+        "position": [
+          120,
+          560
+        ]
+      }
+    ],
+    "intro_header_reference": 8554730,
+    "guardian_initial_offset": {
+      "source": 9473013,
+      "xy": [
+        8,
+        8
+      ]
+    }
+  },
+  "elder": {
+    "admission": {
+      "source": 8948720,
+      "events": [
+        35,
+        33
+      ],
+      "operation": "xor",
+      "require_true": true
+    },
+    "callback": {
+      "source": 8948732,
+      "target": 8948759
+    },
+    "effects": [
+      {
+        "source": 8948726,
+        "event": 20,
+        "set": true
+      },
+      {
+        "source": 8948759,
+        "event": 33,
+        "set": true
+      },
+      {
+        "source": 8948787,
+        "event": 662,
+        "set": true
+      }
+    ],
+    "choice": {
+      "source": 8948769,
+      "catalog": 1,
+      "table": 8948775,
+      "cancel_then_options": [
+        8948801,
+        8948781,
+        8948801
+      ]
+    },
+    "requests": [
+      {
+        "source": 8948763,
+        "request": 8948817
+      },
+      {
+        "source": 8948781,
+        "request": 8949023
+      },
+      {
+        "source": 8948801,
+        "request": 8949204
+      }
+    ],
+    "waits": [
+      {
+        "source": 8948767,
+        "selector": 31
+      },
+      {
+        "source": 8948785,
+        "selector": 31
+      },
+      {
+        "source": 8948805,
+        "selector": 31
+      }
+    ],
+    "clear_callbacks": [
+      {
+        "source": 8948791,
+        "target": 0
+      },
+      {
+        "source": 8948807,
+        "target": 0
+      }
+    ],
+    "departures": [
+      {
+        "source": 8948795,
+        "target": 8948747
+      },
+      {
+        "source": 8948811,
+        "target": 8948747
+      }
+    ],
+    "event21_means": "encounter_not_acceptance",
+    "retry": {
+      "qualification": "source_only_not_native_route",
+      "map": 11,
+      "callback": 8949470,
+      "branches": [
+        {
+          "source": 8949470,
+          "event": 265,
+          "when_set": true,
+          "target": 8949694
+        },
+        {
+          "source": 8949476,
+          "event": 59,
+          "when_set": true,
+          "target": 8949482
+        },
+        {
+          "source": 8949482,
+          "event": 662,
+          "when_set": true,
+          "target": 8949613
+        },
+        {
+          "source": 8949488,
+          "event": 33,
+          "when_set": true,
+          "target": 8949577
+        }
+      ],
+      "choice": {
+        "source": 8949583,
+        "catalog": 1,
+        "table": 8949589,
+        "cancel_then_options": [
+          8949606,
+          8949595,
+          8949606
+        ]
+      },
+      "effect": {
+        "source": 8949601,
+        "event": 662,
+        "set": true
+      },
+      "requests": [
+        {
+          "source": 8949577,
+          "request": 8950337
+        },
+        {
+          "source": 8949595,
+          "request": 8950384
+        },
+        {
+          "source": 8949606,
+          "request": 8950428
+        }
+      ],
+      "waits": [
+        {
+          "source": 8949581,
+          "selector": 31
+        },
+        {
+          "source": 8949599,
+          "selector": 31
+        },
+        {
+          "source": 8949610,
+          "selector": 31
+        }
+      ]
+    }
+  },
+  "town": {
+    "gate": {
+      "source": 8946927,
+      "events": [
+        662,
+        60
+      ],
+      "operation": "xor",
+      "when_true": true,
+      "target": 8946959
+    },
+    "effects": [
+      {
+        "source": 8946959,
+        "event": 20,
+        "set": true
+      },
+      {
+        "source": 8947000,
+        "event": 60,
+        "set": true
+      }
+    ],
+    "controls": [
+      {
+        "source": 8946963,
+        "selector": 42,
+        "mask": 65360
+      },
+      {
+        "source": 8946996,
+        "selector": 41,
+        "mask": 65360
+      }
+    ],
+    "delays": [
+      {
+        "source": 8946967,
+        "ticks": 120
+      },
+      {
+        "source": 8946982,
+        "ticks": 100
+      },
+      {
+        "source": 8946992,
+        "ticks": 32
+      }
+    ],
+    "requests": [
+      {
+        "source": 8946971,
+        "request": 8947039
+      },
+      {
+        "source": 8946986,
+        "request": 8947067
+      }
+    ],
+    "waits": [
+      {
+        "source": 8946975,
+        "selector": 31
+      },
+      {
+        "source": 8946990,
+        "selector": 32
+      }
+    ],
+    "presentation": {
+      "source": 8946977,
+      "target": 8947009
+    },
+    "continuation": {
+      "source": 8947004,
+      "target": 8946935
+    },
+    "proves_296_geographic_prerequisite": false
+  },
+  "world": {
+    "spawn": {
+      "source": 8707826,
+      "target": 8708138,
+      "parameters": [
+        0,
+        132
+      ]
+    },
+    "effect": {
+      "source": 8707838,
+      "event": 240,
+      "set": false
+    },
+    "waits": [
+      {
+        "source": 8707842,
+        "event": 242,
+        "until_set": false
+      },
+      {
+        "source": 8709235,
+        "event": 242,
+        "until_set": true
+      }
+    ],
+    "branches": [
+      {
+        "source": 8708138,
+        "event": 242,
+        "when_set": true,
+        "target": 8709391
+      },
+      {
+        "source": 8709189,
+        "event": 242,
+        "when_set": false,
+        "target": 8709235
+      }
+    ],
+    "player_header": 8707808,
+    "world_actor_header": 8709155,
+    "movement_model": "not_modeled_distinct_world_mode"
+  },
+  "guardian": {
+    "branches": [
+      {
+        "source": 9473019,
+        "event": 406,
+        "when_set": true,
+        "target": 9474079
+      },
+      {
+        "source": 9473040,
+        "event": 277,
+        "when_set": true,
+        "target": 9473151
+      }
+    ],
+    "proximity": [
+      {
+        "source": 9473027,
+        "radius": 64,
+        "target": 9473175
+      },
+      {
+        "source": 9473034,
+        "radius": 64,
+        "target": 9473040
+      }
+    ],
+    "presentation": {
+      "source": 9473046,
+      "target": 9501451
+    },
+    "spawn": {
+      "source": 9473051,
+      "target": 9473183,
+      "parameters": [
+        0,
+        145
+      ]
+    },
+    "wait_helper": {
+      "source": 9473058,
+      "event": 1,
+      "until_set": true
+    },
+    "requests": [
+      {
+        "source": 9473062,
+        "request": 9473348
+      },
+      {
+        "source": 9473072,
+        "request": 9473397
+      },
+      {
+        "source": 9473082,
+        "request": 9473444
+      },
+      {
+        "source": 9473099,
+        "request": 9473490
+      },
+      {
+        "source": 9473109,
+        "request": 9473553
+      },
+      {
+        "source": 9473117,
+        "request": 9473580
+      },
+      {
+        "source": 9473127,
+        "request": 9473656
+      }
+    ],
+    "waits": [
+      {
+        "source": 9473066,
+        "selector": 31
+      },
+      {
+        "source": 9473076,
+        "selector": 31
+      },
+      {
+        "source": 9473086,
+        "selector": 31
+      },
+      {
+        "source": 9473103,
+        "selector": 31
+      },
+      {
+        "source": 9473113,
+        "selector": 31
+      },
+      {
+        "source": 9473121,
+        "selector": 31
+      },
+      {
+        "source": 9473131,
+        "selector": 31
+      }
+    ],
+    "choice": {
+      "source": 9473088,
+      "catalog": 1,
+      "table": 9473093,
+      "cancel_then_options": [
+        9473117,
+        9473099,
+        9473117
+      ]
+    },
+    "effects": [
+      {
+        "source": 9473068,
+        "event": 2,
+        "set": true
+      },
+      {
+        "source": 9473078,
+        "event": 2,
+        "set": false
+      },
+      {
+        "source": 9473105,
+        "event": 2,
+        "set": true
+      },
+      {
+        "source": 9473123,
+        "event": 2,
+        "set": true
+      },
+      {
+        "source": 9473133,
+        "event": 3,
+        "set": true
+      },
+      {
+        "source": 9473141,
+        "event": 277,
+        "set": true
+      }
+    ],
+    "option1_join": {
+      "source": 9473115,
+      "target": 9473133
+    },
+    "cancel_option2_fallthrough": 9473133,
+    "delay": {
+      "source": 9473137,
+      "ticks": 60
+    },
+    "handoff": {
+      "source": 9473145,
+      "mode": 1,
+      "target": 8685505
+    },
+    "both_choices_grant_115": true,
+    "helper": {
+      "entry": 9473183,
+      "effect": {
+        "source": 9473227,
+        "event": 1,
+        "set": true
+      },
+      "wait": {
+        "source": 9473236,
+        "event": 2,
+        "until_set": true
+      },
+      "branches": [
+        {
+          "source": 9473250,
+          "event": 3,
+          "when_set": true,
+          "target": 9473274
+        },
+        {
+          "source": 9473256,
+          "event": 2,
+          "when_set": false,
+          "target": 9473231
+        }
+      ],
+      "input": {
+        "source": 9473262,
+        "address": 3492,
+        "mask": 48
+      },
+      "action": {
+        "source": 9473270,
+        "selector": 228
+      },
+      "teardown": 9473274,
+      "delay": {
+        "source": 9473287,
+        "ticks": 60
+      },
+      "end": {
+        "source": 9473291,
+        "selector": 167
+      }
+    },
+    "intro": {
+      "header": 9473827,
+      "membership": {
+        "source": 9473832,
+        "event": 256,
+        "require_set": false
+      },
+      "effect": {
+        "source": 9473836,
+        "event": 256,
+        "set": true
+      },
+      "request": {
+        "source": 9473856,
+        "request": 9473869
+      },
+      "wait": {
+        "source": 9473860,
+        "selector": 31
+      },
+      "controls": [
+        {
+          "source": 9473840,
+          "selector": 42,
+          "mask": 65520
+        },
+        {
+          "source": 9473862,
+          "selector": 41,
+          "mask": 65520
+        }
+      ],
+      "end": {
+        "source": 9473866,
+        "selector": 167
+      }
+    }
+  },
+  "proximity_handler": {
+    "entry": 8434804,
+    "player_reference_words": [
+      2406,
+      2408
+    ],
+    "condition": "abs_dx_and_abs_dy_lte_radius",
+    "requires_button": false
+  },
+  "equipment": {
+    "category_split": [
+      128,
+      160
+    ],
+    "item81_insertion_proves_equipped": false,
+    "combat_state": "hp_xp_not_qualified",
+    "weapon": {
+      "address": 8259146,
+      "width": 2,
+      "none": 0,
+      "selection_source": 8761124,
+      "selected_item_address": 3536,
+      "clear_source": 8761353,
+      "equip_source": 8761368,
+      "stat_read_source": 8778978,
+      "player_zero_test": 8685874
+    },
+    "armor": {
+      "address": 8259148,
+      "width": 2,
+      "none": 0,
+      "selection_source": 8761174,
+      "selected_item_address": 3536,
+      "clear_source": 8761383,
+      "equip_source": 8761398,
+      "stat_read_source": 8779012
+    }
+  },
+  "ranges": [
+    {
+      "start": 8948715,
+      "end": 8948817,
+      "sha256": "d0f78a4921dc29bfc2a018984c24456442be2aa78ac602a73a154e071e5a87b8"
+    },
+    {
+      "start": 8949470,
+      "end": 8949613,
+      "sha256": "55e1ea9dafb1cc67eb1ad6ab5f0b60a6a828ba70a9d44e1728eb62dd2a48f1db"
+    },
+    {
+      "start": 8946927,
+      "end": 8947039,
+      "sha256": "1d13251077fa168d4130433029d37afbf798fbc284947592eb096dd6f5ed99c0"
+    },
+    {
+      "start": 8423061,
+      "end": 8423200,
+      "sha256": "020f6cce2b6e34f328b3d3b91dec5b6b5c93c81b2ea34d1fbf45298425b593a2"
+    },
+    {
+      "start": 8427066,
+      "end": 8427211,
+      "sha256": "fd99c4b1b16e12e1ea451bab1121eb96d96d880c124d276c453c3c4fdb5d7212"
+    },
+    {
+      "start": 8707808,
+      "end": 8707858,
+      "sha256": "0e76884a77b5a2cffab32101ab25f2020ab1fb29f758939961fc06dd5390e903"
+    },
+    {
+      "start": 8708138,
+      "end": 8708204,
+      "sha256": "63e7e297e680e385d5740c80ce1ec94bba5d26be6c6f723db9b3a43ec73104be"
+    },
+    {
+      "start": 8709155,
+      "end": 8709248,
+      "sha256": "426e9eecd8a1601e075707ebd7855cccf1c19848e8f2d932104a7163b500202a"
+    },
+    {
+      "start": 9473008,
+      "end": 9473348,
+      "sha256": "9866a55d061dbd621d232aca737a3cbaddf92ba551343706a385044eee912167"
+    },
+    {
+      "start": 9473827,
+      "end": 9473869,
+      "sha256": "be53de04aebe1f3f931d7482f097e4f281d39178b8c8e5752fcab073eecf3e07"
+    },
+    {
+      "start": 9501451,
+      "end": 9501494,
+      "sha256": "c6d0b8429193e3529240310f30f61340e34fd48ad7e810d2449886da5d20d238"
+    },
+    {
+      "start": 8434804,
+      "end": 8434865,
+      "sha256": "c3e8cf72080dfea5da545b0946245d98bd776e9645caf2cb9cf8c73c914d6458"
+    },
+    {
+      "start": 8760988,
+      "end": 8760993,
+      "sha256": "b45b7925da5c903fe7af73f501d4943095b1b44f63b26f7f289271a74ff9f963"
+    },
+    {
+      "start": 8761119,
+      "end": 8761132,
+      "sha256": "77e12725f5b5abe2ad015296c5094e1d29cdc098137cfe4878af256a49d73848"
+    },
+    {
+      "start": 8761174,
+      "end": 8761182,
+      "sha256": "eecfc1f3984abaef6cc7450b0a5994c76008ec5b589a7dfccdc5d520e66393e6"
+    },
+    {
+      "start": 8761350,
+      "end": 8761408,
+      "sha256": "11f47914c1f4519a99ac7308544ada36da609b5112ab160471dfc3ff9c474b32"
+    },
+    {
+      "start": 8778941,
+      "end": 8779062,
+      "sha256": "56cdb19fdd62ef2cff488b03eb63db66cc588e47ea399804d1cd190d5ef6897a"
+    },
+    {
+      "start": 8685874,
+      "end": 8685887,
+      "sha256": "f32792bb551521b1aaad81dd6ee0ac8100270a720e8958685f7b9339acc29c15"
+    },
+    {
+      "start": 8621246,
+      "end": 8621256,
+      "sha256": "049bf56286a96eac94c1169c107d631cf00510960b7904b765ec6173c595e822"
+    },
+    {
+      "start": 8620281,
+      "end": 8620329,
+      "sha256": "11bb96f883e0ebfffb0bda89550e05c7d907b67e3fe395695b2c3d145620a367"
+    },
+    {
+      "start": 8554689,
+      "end": 8554749,
+      "sha256": "ac57530dc18ce2d2d98f7dcd7852193f3453fb503976116cc441081ff01d4a09"
+    },
+    {
+      "start": 8554749,
+      "end": 8554764,
+      "sha256": "464f0bfb287528ce9f0b1bd121053802e646ab6ec966880735a0983014f7dd81"
+    },
+    {
+      "start": 8490958,
+      "end": 8490971,
+      "sha256": "fdc4c1aa3ce5c2aca1c0cd548f72ee8b5e3f345c10f8c1036d6a25b440f5afc9"
+    },
+    {
+      "start": 8490933,
+      "end": 8490958,
+      "sha256": "d79797d7684ee4b607d555e4af50c37581ea4c0ae975d7005058e87980c9570c"
+    },
+    {
+      "start": 8490531,
+      "end": 8490556,
+      "sha256": "e18b984bd2e181203ab5ee2ea67d847b3a135b92aafb36087678392d8e7ecdc4"
+    },
+    {
+      "start": 8490445,
+      "end": 8490494,
+      "sha256": "0fc117ba77530a1bfc74255aac36a5ddad7d356af9d19f7f59f8165ef6ca5b1d"
+    },
+    {
+      "start": 8490494,
+      "end": 8490531,
+      "sha256": "9f84469e76a856e4bc01d8be25b726d06ecffcf47590fff1a1fc9c2a863fbfb1"
+    },
+    {
+      "start": 8490323,
+      "end": 8490432,
+      "sha256": "b2ea1b9183770b4f131ce594f3cd8b989a57935bbe79720e0020e48847a7dd1a"
+    },
+    {
+      "start": 8490177,
+      "end": 8490286,
+      "sha256": "387100e781e5dd4256b75649508442b29ec5c1418d650a4dd6230f0e2d2b69bb"
+    },
+    {
+      "start": 8504034,
+      "end": 8504083,
+      "sha256": "5a17108f45e8a663b565713108dc0971193198601d0645d13489023f68d2ded3"
+    },
+    {
+      "start": 8486978,
+      "end": 8486980,
+      "sha256": "557b9e1b756ddd4088ccbfa1e23277d21f713b5d8b0532a262d638ee380ca857"
+    },
+    {
+      "start": 8486976,
+      "end": 8486978,
+      "sha256": "04d05b3fae5f095070997bca85190f70ccb4fe376b75d915f4852692b449ec3e"
+    },
+    {
+      "start": 8486940,
+      "end": 8486942,
+      "sha256": "2ab6653b1a3042ffacfd61a0e2698fbc74a7e89bf185892226b3e4519c8e666d"
+    },
+    {
+      "start": 8486936,
+      "end": 8486938,
+      "sha256": "3779f9c53567f1b852d00053ef563c4ad9133ce8f20c67a63a7376099dce8d7f"
+    },
+    {
+      "start": 8486938,
+      "end": 8486940,
+      "sha256": "2c0ea71c6a364169e009a849fdaef0a35554ea4b401fd2664f2283970031f26f"
+    },
+    {
+      "start": 8486932,
+      "end": 8486934,
+      "sha256": "97419a8d8c126521eb2d5a91d0adfc41a6b627405130d088b74da822c3199e83"
+    },
+    {
+      "start": 8486918,
+      "end": 8486920,
+      "sha256": "039a5b08e8625c90b9782a7f56b485dddb4f7aa6a727cbfa11d5b8055bab65da"
+    },
+    {
+      "start": 8487424,
+      "end": 8487426,
+      "sha256": "3c325ec76c067218b3d3bb9736dd9754e71d5a1d7a8ef0f94468e8b77652aa39"
+    },
+    {
+      "start": 8552468,
+      "end": 8552470,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618004,
+      "end": 8618006,
+      "sha256": "0570f6b9c3d5bb38306cbfef1a042b5fab0e4397c7cd1ea707f9a2b4c24e129f"
+    },
+    {
+      "start": 8552470,
+      "end": 8552472,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618006,
+      "end": 8618008,
+      "sha256": "c328f53e527cb04c2d40958a2977fc1ee082a50987d3db12da7385ed7e827964"
+    },
+    {
+      "start": 8552474,
+      "end": 8552476,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618010,
+      "end": 8618012,
+      "sha256": "ec7d4c4e2e94175da732acca1e0f77dd80c6e0eb79e4412d83f47fccd97a088c"
+    },
+    {
+      "start": 8552454,
+      "end": 8552456,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8617990,
+      "end": 8617992,
+      "sha256": "045ed2dfb88c982871796e9cf4e4389182754791bc8c2887d1aa5f4e629ac4d4"
+    },
+    {
+      "start": 8552960,
+      "end": 8552962,
+      "sha256": "553589efea9650c549cbd81693a3710ec9a420ec296da43879f5bab3d8fa4bc3"
+    },
+    {
+      "start": 8618496,
+      "end": 8618498,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8552962,
+      "end": 8552964,
+      "sha256": "dab8f4cdd2317e93d81bc723165a093a5736a18409a1fd1ae99d08577fb384fa"
+    },
+    {
+      "start": 8618498,
+      "end": 8618500,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    }
+  ]
+}
