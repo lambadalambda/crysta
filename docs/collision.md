@@ -1,10 +1,10 @@
 # Movement collision: measured attribute semantics
 
-Status: **bounded movement measurements plus a traced controller probe and
-native slope witnesses; not a complete passability specification.** The table
-at `$80:E85C` is decoded, but `COP CA` does not decide ordinary walking.
-The motion resolver's direction/pair and slope behavior is the remaining gate
-for 24-map free roam. See [the open issue](../meta/issues/qualify-collision-predicate.md).
+Status: **an opt-in directional resolver candidate now matches bounded native
+slope trajectories in all four directions; not a complete passability
+specification.** The table at `$80:E85C` is decoded, but `COP CA` does not decide
+ordinary walking. Production remains at 19/24 maps until the remaining
+qualification gates pass. See [the directional issue](../meta/issues/qualify-crysta-directional-collision.md).
 
 ## The attribute field, and the bit that is not attribute
 
@@ -401,3 +401,114 @@ map-B sustained contact whose sampled cells have zero entries. These are not
 silently excused: entry-layer drift, controller/actor effects and sampling
 geometry remain unverified inputs. Missing layers in the old `town.jsonl` and
 missing actor evidence in early captures now fail instead of looking green.
+
+## Opt-in directional candidate and live-frame replays
+
+`Room::with_passive_directional_collision()` adds a pure, CPU/ROM-free
+translation of the special-player branches for 6/7, source-equivalent passive
+5/21 geometry, and 29's directional exception. **Neither the default core nor
+production `crysta-runtime` enables it.** Callers assert fixed `(-8,-16)`
+offsets, 16×16 bounds and inactive action hooks (`$0980 & $0050 == 0`). Type8
+still fails closed; no global alias bypasses its extra state input.
+
+The implementation preserves old-edge slope diversion before the bit15
+substitution, raw (not overridden) slope-neighbor probes, exact positive-edge
+remainders and alignment, and the source's asymmetric neighbor checks. It
+retains bounds, sample halos, atomic errors and existing scoped material rules.
+Synthetic controls cover all ordered O/S/P pairs and passive 5/21 substitutions
+at every subpixel position, all directions and 1/2px attempts (83,968 comparisons),
+as well as slopes, masks, pair order, neighbor stride, thresholds, flags and
+snapshots. These are source/implementation controls, not substitute native data.
+
+### What the new captures prove
+
+The trace probe accepts `"motion": true` on a bounded frame command. From one
+empty-SRAM, input-only session it stops immediately before the first `$80:D107`,
+requires player X/slot `$1000`, unchanged pre-collision XY and the same frame,
+and reads the **live layer and attempted velocities**. It then finishes exactly
+one frame. Incomplete traces or map changes abort the capture. No warps, memory
+patches, state restoration or per-frame player resets are involved.
+
+`crysta-runtime/tests/local_collision.rs` pins six complete JSONL hashes and
+replays **1,972 consecutive motion frames** across six independent sessions.
+Each starts after twelve contiguous, settled neutral frames. Every motion frame
+checks map, special state, player flags, passive controls, fixed bounds, attempted
+velocity and final XY, with an independent snapshot-restored walking history.
+No motion frame is excluded. The initial TDD failure was Right frame11976,
+`UnsupportedType(6)`; the candidate makes the entire windows pass.
+
+| Capture | Frames | Player slope-adjustment handlers observed (bank `$80`) |
+| --- | ---: | --- |
+| `motion-Right` | 40 | `DFA2` (Right6) |
+| `motion-Left` | 40 | `DC26` (Left7) |
+| `motion-Right-vertical` | 236 | `D8A6` (Down6), `DFA2` |
+| `motion-Left-vertical` | 236 | `D82E` (Down7), `DC26` |
+| `motion-tree-east` | 714 | `D447` (Up6), `DBD0` (Left6), `DC26` |
+| `motion-tree-bottom` | 706 | `D4C4` (Up7), `DBD0`, `DF4C` (Right7) |
+
+The suite requires all eight handlers. Recorded PCs span the remainder of the
+frame, so coverage uses **only the prefix from `$D109` through the first `$D197`**;
+later NPC calls cannot supply missing player coverage. `$D107` was already
+captured at the entry breakpoint and is not repeated by the resumed trace.
+Missing start/end markers fail, with ROM-free mutation controls.
+
+This establishes frame-wide movement equality **conditioned on each native live
+layer**, not an independently simulated world or isolated resolver-output equality.
+The `after` XY is frame-end, not a second breakpoint at resolver return. Snapshot
+checks exercise portable walking continuation with that externally supplied room,
+not native snapshots or world-state authentication. Observing each slope handler
+also does not exhaust every native neighbor/pair/alignment branch.
+
+The existing authenticated house suites additionally advance an independent
+candidate history: **1,985 trajectory transitions plus 238 passive-material
+transitions**, including three P/S nudges, all agree without additional exclusions.
+These inherit the earlier fixtures' admission/source assumptions; they do not
+newly measure every candidate precondition. Total committed native/regression
+comparisons: **4,195**.
+
+A separate diagnostic of retained map-$41 discovery data matched its first
+**880 cardinal/neutral frames (41789–42668)**, initialized once at `(120,192)`;
+the snapshot replay also agreed. This stops before the A command, uses the
+initial checkpoint grid, lacks native velocities/per-frame layer observations,
+and is not a pinned full-envelope test. Type15 was not reclassified. The wider
+map-$41 envelope remains a qualification gate, not a completed acceptance claim.
+
+### Reproduce the six pinned motion captures
+
+Capture implementation/input recipes: tooling commit `6300ec3`, using the
+workspace oracle and owned normalized JP ROM (SHA-256
+`f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`).
+Complete output pins live in the replay test; raw outputs remain ignored.
+
+```sh
+sh tools/collision-qualification/build.sh
+ROM='local/Tenchi Souzou (Japan).sfc'
+D=local/collision-qualification
+for direction in Right Left; do
+  python3 tools/collision-qualification/slope_route.py "$direction" --motion \
+    > "$D/motion-$direction-route.jsonl"
+  python3 tools/collision-qualification/slope_route.py "$direction" --motion --vertical \
+    > "$D/motion-$direction-vertical-route.jsonl"
+done
+python3 tools/collision-qualification/slope_route.py TreeEast > "$D/motion-tree-east-route.jsonl"
+python3 tools/collision-qualification/slope_route.py TreeBottom > "$D/motion-tree-bottom-route.jsonl"
+for name in motion-Right motion-Left motion-Right-vertical motion-Left-vertical motion-tree-east motion-tree-bottom; do
+  "$D/probe/target/release/trace" "$ROM" "$D/$name" \
+    < "$D/$name-route.jsonl" > "$D/$name.jsonl"
+done
+CRYSTA_COLLISION_FIXTURES="$PWD/$D" cargo test -p crysta-runtime --test local_collision
+ROOM_CORE_FIXTURES="$PWD/local/movement" \
+  cargo test -p room-core --test local_trajectories
+ROOM_CORE_MATERIAL_FIXTURES="$PWD/local/house-materials" \
+  cargo test -p room-core --test local_materials
+```
+
+### Remaining production gate
+
+The candidate is deliberately opt-in. Native branch/mutation qualification is
+still incomplete, broad passive 5/21/29 admission needs native route evidence,
+type8 needs its state input, and the map-$41 envelope needs a reproducible gate.
+Only then should the free-roam builder/occupancy rebuild opt in. The existing
+reachability search still merges by cell and drops errors; it is not evidence
+for a new 24-map claim. Actual successful routes must retain and check every
+step, transitions and round trips. **19/24 remains the production result.**

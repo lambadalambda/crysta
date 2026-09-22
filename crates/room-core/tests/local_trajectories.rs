@@ -180,6 +180,7 @@ fn direction(value: &str) -> Option<Direction> {
     }
 }
 
+#[allow(clippy::too_many_lines)] // Keep both authenticated replays and their checks together.
 fn replay(directory: &Path, fixture: &Fixture) -> usize {
     let directory = directory.join(fixture.name);
     let csv = String::from_utf8(read_authenticated(
@@ -209,6 +210,7 @@ fn replay(directory: &Path, fixture: &Fixture) -> usize {
         .map(|p| u16::from_le_bytes([p[0], p[1]]))
         .collect();
     let room = Room::new(32, 64, cells).unwrap();
+    let directional_room = room.clone().with_passive_directional_collision();
     let rows: Vec<Vec<&str>> = csv
         .lines()
         .skip(1)
@@ -222,6 +224,11 @@ fn replay(directory: &Path, fixture: &Fixture) -> usize {
     let number = |r: &Vec<&str>, i: usize| r[i].parse::<u16>().unwrap();
     let mut state = WalkingState::new(number(&rows[0], 3), number(&rows[0], 4));
     let mut restored = WalkingState::decode_snapshot(&room, &state.encode_snapshot()).unwrap();
+    // Separate uninterrupted candidate replay: never seed it from an expected
+    // native position or from the baseline state after initialization.
+    let mut directional = WalkingState::new(number(&rows[0], 3), number(&rows[0], 4));
+    let mut directional_restored =
+        WalkingState::decode_snapshot(&directional_room, &directional.encode_snapshot()).unwrap();
     for (index, r) in rows.iter().enumerate().skip(1) {
         assert_eq!(
             usize::from(number(r, 0)),
@@ -267,6 +274,26 @@ fn replay(directory: &Path, fixture: &Fixture) -> usize {
         assert_eq!(restored.encode_snapshot(), state.encode_snapshot());
         restored = WalkingState::decode_snapshot(&room, &restored.encode_snapshot()).unwrap();
         assert_eq!(restored, state);
+        let directional_out = directional
+            .step(&directional_room, input)
+            .unwrap_or_else(|e| panic!("{} directional frame {}: {e}", fixture.name, r[0]));
+        // `out` has already been checked against this authenticated native row.
+        assert_eq!(
+            directional_out, out,
+            "{} directional frame {}",
+            fixture.name, r[0]
+        );
+        assert_eq!(directional.encode_snapshot(), state.encode_snapshot());
+        assert_eq!(
+            directional_restored.step(&directional_room, input).unwrap(),
+            directional_out
+        );
+        directional_restored = WalkingState::decode_snapshot(
+            &directional_room,
+            &directional_restored.encode_snapshot(),
+        )
+        .unwrap();
+        assert_eq!(directional_restored, directional);
     }
     if fixture.name == "doorway-approach" {
         assert_eq!(state.position(), (392, 209));
@@ -302,5 +329,5 @@ fn authenticated_reference_positions_streams_and_snapshots() {
     );
     let total: usize = FIXTURES.iter().map(|fixture| replay(&root, fixture)).sum();
     assert_eq!(total, 1985);
-    eprintln!("Matched all {total} reference position/stream steps and restored-snapshot replays");
+    eprintln!("Matched all {total} reference position/stream steps and restored-snapshot replays for both default and directional rooms");
 }

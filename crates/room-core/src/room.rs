@@ -1,6 +1,8 @@
 use crate::{Direction, Unqualified};
 use alloc::vec::Vec;
 
+mod directional;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Material {
     Open,
@@ -128,6 +130,7 @@ pub struct Room {
     height: u16,
     cells: Vec<u16>,
     passive_flags: bool,
+    passive_directional: bool,
     sample_halo: Option<[u16; 4]>,
     material_policy: Vec<MaterialRule>,
 }
@@ -153,6 +156,7 @@ impl Room {
             height,
             cells,
             passive_flags: false,
+            passive_directional: false,
             sample_halo: None,
             material_policy: Vec::new(),
         })
@@ -165,7 +169,8 @@ impl Room {
     /// for interactions, attacks, pushing, or other unqualified controller modes.
     /// The separate [`crate::pots`] component qualifies bounded held movement
     /// (`$0980=$0020`) reusing this geometry, not arbitrary carrying/action hooks.
-    /// Stored old-edge slopes 6/7 remain unsupported even when flagged. Raw cells
+    /// Stored old-edge slopes 6/7 remain unsupported even when flagged unless
+    /// [`Self::with_passive_directional_collision`] is explicitly enabled. Raw cells
     /// are preserved; new flagged samples override their stored type with solid.
     /// [`Self::new`] keeps rejecting flagged cells when this contract is unavailable.
     ///
@@ -175,6 +180,30 @@ impl Room {
         let mut room = Self::new(width, height, cells)?;
         room.passive_flags = true;
         Ok(room)
+    }
+
+    /// Opt into source-derived passive directional geometry for types 5/6/7/21/29.
+    ///
+    /// The caller asserts the ordinary special-player resolver, fixed (-8,-16)
+    /// offsets and 16×16 bounds, and inactive action hooks (`$0980 & $0050 == 0`).
+    /// This also enables the passive bit15 contract of [`Self::new_passive`].
+    /// Old-edge slope dispatch and raw slope-neighbor probes precede/ignore that
+    /// override, respectively. This is geometry only, not gameplay side effects
+    /// or qualification of a room/route. Type8 remains unsupported: its Up branch
+    /// needs the additional `$097C & 4` input. Other unknown types still fail closed.
+    /// The immutable policy is retained on clone/patch; hosts must bind it to room
+    /// identity on snapshot restore. Existing constructors keep their old behavior.
+    #[must_use]
+    pub fn with_passive_directional_collision(mut self) -> Self {
+        self.passive_flags = true;
+        self.passive_directional = true;
+        self
+    }
+
+    /// Whether the caller opted into passive directional geometry.
+    #[must_use]
+    pub const fn passive_directional_collision(&self) -> bool {
+        self.passive_directional
     }
 
     /// Restrict actual collision samples to half-open cell bounds
@@ -366,6 +395,9 @@ impl Room {
         let Some(direction) = direction.filter(|_| dx != 0 || dy != 0) else {
             return Ok((x, y, false));
         };
+        if self.passive_directional {
+            return self.resolve_directional(x, y, direction, dx, dy);
+        }
         self.samples(x, y, direction, true)?;
         let next_x = x
             .checked_add_signed(dx)

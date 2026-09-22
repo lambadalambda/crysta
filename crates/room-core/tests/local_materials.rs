@@ -105,6 +105,7 @@ fn passive_material_routes_have_no_excluded_frames() {
                 .collect(),
         )
         .unwrap();
+        let directional_room = room.clone().with_passive_directional_collision();
         let rows: Vec<Vec<&str>> = csv
             .lines()
             .skip(1)
@@ -120,6 +121,10 @@ fn passive_material_routes_have_no_excluded_frames() {
         assert_eq!(&rows[0][..5], &["1601", "", "f", "472", "176"]);
         let mut state = WalkingState::new(472, 176);
         let mut restored = state;
+        // Advance independently through exactly the same admitted rows; do not
+        // reset candidate history or position from the baseline/native outputs.
+        let mut directional = WalkingState::new(472, 176);
+        let mut directional_restored = directional;
         for (index, row) in rows.iter().enumerate().take(end - 1601 + 1).skip(1) {
             let frame = row[0].parse::<usize>().unwrap();
             assert_eq!(frame, 1601 + index);
@@ -156,6 +161,22 @@ fn passive_material_routes_have_no_excluded_frames() {
             assert_eq!(restored.step(&room, input).unwrap(), out);
             assert_eq!(restored.encode_snapshot(), state.encode_snapshot());
             restored = WalkingState::decode_snapshot(&room, &restored.encode_snapshot()).unwrap();
+            let directional_out = directional
+                .step(&directional_room, input)
+                .unwrap_or_else(|error| panic!("{name} directional frame {frame}: {error}"));
+            // Includes native-checked XY/attempts and the baseline's P/S nudges.
+            assert_eq!(directional_out, out, "{name} directional frame {frame}");
+            assert_eq!(directional.encode_snapshot(), state.encode_snapshot());
+            assert_eq!(
+                directional_restored.step(&directional_room, input).unwrap(),
+                directional_out
+            );
+            directional_restored = WalkingState::decode_snapshot(
+                &directional_room,
+                &directional_restored.encode_snapshot(),
+            )
+            .unwrap();
+            assert_eq!(directional_restored, directional);
             if name == "wall-Up" {
                 assert_eq!((out.x, out.y), (472, 176));
             }
@@ -167,5 +188,5 @@ fn passive_material_routes_have_no_excluded_frames() {
         }
     }
     assert_eq!((matched, partial_nudges), (238, 3));
-    eprintln!("Matched {matched} material transitions, including {partial_nudges} P/S nudges; zero exclusions");
+    eprintln!("Matched {matched} material transitions, including {partial_nudges} P/S nudges, for both default and directional rooms; zero exclusions");
 }

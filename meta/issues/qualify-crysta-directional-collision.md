@@ -54,3 +54,21 @@ beyond its current 19 of 24 reachable maps.
 - Evidence and reproduction: [collision](../../docs/collision.md).
 - This is the implementation/qualification follow-up, not completed by the
   probe-table decoder or the two slope discovery frames.
+
+### Implementation checkpoint
+
+- Added an explicit opt-in, pure directional candidate for 6/7 and passive
+  5/21/29 geometry; defaults and production room builders remain unchanged.
+- Six fresh input-only captures replay 1,972 contiguous frames, native attempted
+  velocities and final XY, using per-frame live layers and uninterrupted walking
+  histories. Player-only PC coverage requires both slopes' adjustment handlers
+  in all four directions. Existing house candidate replays add 2,223 matching
+  transitions. Synthetic controls include every ordered O/S/P pair.
+- A diagnostic of the first 880 ordinary map-$41 discovery frames also agrees,
+  but is not a pinned/full-envelope gate and lacks per-frame layers/velocities.
+- Independent implementation and evidence reviews completed; reversed/equal
+  material-pair test coverage was expanded and NPC PCs excluded from slope
+  coverage. Frame-end XY and native-provided layers limit the equality claim.
+- Still open: exhaustive native branch controls, broad 5/21/29 qualification,
+  type8 state handling, full map-$41 envelope, production opt-in and retained
+  error-checked 24-map movement/round-trip routes. Production remains **19/24**.

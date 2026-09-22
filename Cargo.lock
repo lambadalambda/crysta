@@ -75,6 +75,7 @@ dependencies = [
  "assets",
  "rom",
  "room-core",
+ "serde_json",
 ]
 
 [[package]]
