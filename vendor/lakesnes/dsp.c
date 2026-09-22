@@ -429,10 +429,11 @@ static void dsp_decodeBrr(Dsp* dsp, int ch) {
       s = curByte >> 4;
     }
     if(s > 7) s -= 16;
+    // Multiplication preserves BRR scaling without left-shifting negative values.
     if(shift <= 0xc) {
-      s = (s << shift) >> 1;
+      s = (s * (1 << shift)) >> 1;
     } else {
-      s = (s >> 3) << 12;
+      s = (s >> 3) * 4096;
     }
     switch(filter) {
       case 1: s += old + (-old >> 4); break;

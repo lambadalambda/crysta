@@ -25,6 +25,10 @@ room-core = { path = "../room-core" }
 gilrs = "0.11"
 softbuffer = "0.4"
 winit = "0.30"
+# MIT OR Apache-2.0; PCM playback only, no file codecs.
+rodio = { version = "=0.20.1", default-features = false }
+# Project MIT wrapper around the existing MIT LakeSnes audio core only.
+spc-player = { path = "spc-player" }
 
 [lints.rust]
 unsafe_code = "forbid"

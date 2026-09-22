@@ -1,0 +1,13 @@
+[package]
+name = "spc-player"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+description = "Audio-only LakeSnes SPC/DSP streaming boundary"
+
+[build-dependencies]
+cc = "1"
+
+[lints.rust]
+missing_docs = "warn"
+unsafe_op_in_unsafe_fn = "deny"
