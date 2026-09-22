@@ -43,3 +43,5 @@
 - [ ] [Qualify native horizontal first8 dispatch](issues/qualify-horizontal-first8.md)
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
+- [ ] [Correct native Crysta tree compositing](issues/fix-crysta-tree-compositing.md)
+- [ ] [Animate the river in native Crysta](issues/animate-native-crysta-river.md)
