@@ -5,7 +5,10 @@
 
 **Endpoint: `pandora-tour-control`, inside map `$41`, after the first-time box
 interior tour.** This is not a claimed return to the field or a frozen Crysta.
-Strict qualification now uses **`headless-sync-video-v1`**. Both independently
+Strict qualification now uses **`headless-sync-video-v1`**. The separate
+[spear/frozen-return extension](../tools/tower-approach-qualification/README.md)
+now goes beyond this document's unchanged endpoint; it does not retroactively
+broaden the original tour-only claim. Both independently
 produced parent fixed roots and both video-task roots pass the migrated exact
 checker normally and under `-O`, with unchanged source/gameplay semantics. See
 [observer migration and remaining wrapper gates](../tools/pandora-qualification/OBSERVER-MIGRATION.md).

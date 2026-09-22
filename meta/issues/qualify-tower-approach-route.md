@@ -68,6 +68,30 @@ it is not portable implementation.
 
 ## Qualification in progress
 
+### Corrected blocker: spear and frozen return reproduced
+
+The earlier **terminal-hall/unreachable-arches conclusion below is refuted**.
+A turning corridor, missed by the old sweeps, reaches `(72,80)`; A enters map42.
+The hall controller being idle does not disable the door interactions. Native
+input follows the current directional-model navigation hint exactly, without any
+native position initialization from that model.
+
+The [new bounded qualification](../../tools/tower-approach-qualification/README.md)
+preserves the accepted prefix and extends the same boot session through spear
+refusal/retry, consent `$241`, separate collection `$242`, actual inventory
+`$7F8048/49 = 81 01`, map21 return and completed `$FE/$23` effects. Two-axis
+control and neutral stability end at **53586, map21 `(120,448)`**. Independent
+fresh replay matches all3,508 artifacts and every log byte. This qualifies
+acquisition, **not equipping**, town/overworld traversal or the first tower.
+
+Source/checker work uses red→green mutation controls and retains every failed
+approach/misnamed discovery checkpoint. No portable behavior or production
+collision admission is widened. Onward stair return, Elder encounter and tower
+approach remain this open issue's next segment; the bounded portable follow-up
+scope is listed in the new qualification README.
+
+### Earlier investigation (terminal-hall inference superseded)
+
 - The accepted baseline reproduces on this machine: `replay.sh` produced a fresh
   root of 2,682 artifacts and the strict checker passed normally and under `-O`.
   Source, checker and epoch suites pass 6/13/11 in both modes. No pins touched.

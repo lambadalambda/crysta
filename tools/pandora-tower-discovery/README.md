@@ -7,6 +7,14 @@ evidence here. The accepted route and its strict checker remain
 [`tools/pandora-qualification/`](../pandora-qualification/), and the directory is
 named `-discovery` rather than `-qualification` to keep that distinction visible.
 
+**Correction to the historical findings below:** the hall is not terminal and
+its arches are reachable through a turning corridor. A later input-only journey
+reaches the weapon room, acquires the spear, and completes the map21 frozen
+return. See the [independently replayed qualification](../tower-approach-qualification/README.md).
+The old lack-of-polling result is real; the inference that no interaction could
+continue progression was not. Do not repeat the old sweeps as an exhaustive
+reachability argument.
+
 ## Why it exists
 
 The accepted route ends at `pandora-tour-control` in map `$41`, and every

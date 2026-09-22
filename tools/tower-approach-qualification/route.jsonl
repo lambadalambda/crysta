@@ -1,0 +1,501 @@
+{"label":"right","buttons":["Right"],"frames":62}
+{"label":"release","buttons":[],"frames":38}
+{"label":"down","buttons":["Down"],"frames":67}
+{"label":"room10","buttons":[],"frames":83}
+{"label":"south10","buttons":["Down"],"frames":42}
+{"label":"west10","buttons":["Left"],"frames":78}
+{"label":"roomC","buttons":[],"frames":90}
+{"label":"crossC","buttons":["Left"],"frames":12}
+{"label":"settledC","buttons":[],"frames":100}
+{"label":"westC","buttons":["Left"],"frames":55}
+{"label":"northC","buttons":["Up"],"frames":70}
+{"label":"settledB","buttons":[],"frames":100}
+{"label":"north-door-A","buttons":["Up","A"],"frames":1}
+{"label":"north-door-wait","buttons":[],"frames":100}
+{"label":"north-door-push","buttons":["Up"],"frames":50}
+{"label":"north-door-settled","buttons":[],"frames":100}
+{"label": "entry-no-ack", "buttons": ["Up"], "frames": 180}
+{"label": "entry-A", "buttons": ["A"], "frames": 1}
+{"label": "entry-after-A", "buttons": [], "frames": 120}
+{"label": "first-no-ack", "buttons": ["Right"], "frames": 240}
+{"label": "first-A1", "buttons": ["A"], "frames": 1}
+{"label": "first-page2", "buttons": [], "frames": 180}
+{"label": "choice-no-confirm", "buttons": [], "frames": 180}
+{"label": "choice-A", "buttons": ["A"], "frames": 1}
+{"label": "first-followup", "buttons": [], "frames": 180}
+{"label": "followup-no-ack", "buttons": ["Down"], "frames": 120}
+{"label": "followup-B", "buttons": ["B"], "frames": 1}
+{"label": "first-complete", "buttons": [], "frames": 120}
+{"label": "repeat-wrong-facing", "buttons": ["Down", "A"], "frames": 1}
+{"label": "repeat-wrong-wait", "buttons": [], "frames": 90}
+{"label": "repeat-A", "buttons": ["Up", "A"], "frames": 1}
+{"label": "repeat-start", "buttons": [], "frames": 180}
+{"label": "followup-X", "buttons": ["X"], "frames": 1}
+{"label": "followup-closed", "buttons": [], "frames": 120}
+{"label": "wrong-facing-A", "buttons": ["Down", "A"], "frames": 1}
+{"label": "wrong-facing-settled", "buttons": [], "frames": 100}
+{"label": "face-resident", "buttons": ["Up"], "frames": 1}
+{"label": "facing-settled", "buttons": [], "frames": 5}
+{"label": "repeat-admit", "buttons": ["A"], "frames": 1}
+{"label": "repeat-page", "buttons": [], "frames": 180}
+{"label": "repeat-choice-down", "buttons": ["Down"], "frames": 1}
+{"label": "repeat-choice-second", "buttons": [], "frames": 60}
+{"label": "repeat-choice-cancel", "buttons": ["B"], "frames": 1}
+{"label": "repeat-cancel-page", "buttons": [], "frames": 180}
+{"label": "repeat-followup-L", "buttons": ["L"], "frames": 1}
+{"label": "repeat-after-L", "buttons": [], "frames": 120}
+{"label": "repeat-followup-A", "buttons": ["A"], "frames": 1}
+{"label": "repeat-after-A", "buttons": [], "frames": 120}
+{"label": "turn-away", "buttons": ["Down"], "frames": 1}
+{"label": "away-settled", "buttons": [], "frames": 10}
+{"label": "away-A", "buttons": ["A"], "frames": 1}
+{"label": "away-negative", "buttons": [], "frames": 90}
+{"label": "near-face-Up", "buttons": ["Up"], "frames": 1}
+{"label": "near-face-wait", "buttons": [], "frames": 10}
+{"label": "repeat2-admit", "buttons": ["A"], "frames": 1}
+{"label": "repeat2-choice", "buttons": [], "frames": 180}
+{"label": "repeat2-choose-L", "buttons": ["L"], "frames": 1}
+{"label": "repeat2-followup", "buttons": [], "frames": 180}
+{"label": "repeat2-page1-A", "buttons": ["A"], "frames": 1}
+{"label": "repeat2-page2", "buttons": [], "frames": 180}
+{"label": "repeat2-page2-A", "buttons": ["A"], "frames": 1}
+{"label": "repeat2-closed", "buttons": [], "frames": 120}
+{"label": "leave-B", "buttons": ["Down"], "frames": 60}
+{"label": "leave-B-settled", "buttons": [], "frames": 100}
+{"label": "align-D", "buttons": ["Left"], "frames": 10}
+{"label": "south-C", "buttons": ["Down"], "frames": 82}
+{"label": "open-D", "buttons": [], "frames": 100}
+{"label": "approach-exterior", "buttons": ["Down"], "frames": 45}
+{"label": "exterior-settled", "buttons": [], "frames": 140}
+{"label": "exit-trigger", "buttons": ["Down"], "frames": 22}
+{"label": "exit-loading", "buttons": [], "frames": 25}
+{"label": "exit-spawn", "buttons": [], "frames": 15}
+{"label": "landed-A", "buttons": [], "frames": 140}
+{"label": "exterior-walk-down", "buttons": ["Down"], "frames": 32}
+{"label": "exterior-walk-down-settled", "buttons": [], "frames": 60}
+{"label": "exterior-walk-right", "buttons": ["Right"], "frames": 24}
+{"label": "exterior-walk-settled", "buttons": [], "frames": 90}
+{"label": "town-west", "buttons": ["Left"], "frames": 120}
+{"label": "town-west-rest", "buttons": [], "frames": 60}
+{"label": "town-north", "buttons": ["Up"], "frames": 300}
+{"label": "town-north-rest", "buttons": [], "frames": 60}
+{"label": "town-gap", "buttons": ["Right"], "frames": 132}
+{"label": "town-gap-rest", "buttons": [], "frames": 60}
+{"label": "town-gap-up", "buttons": ["Up"], "frames": 65}
+{"label": "town-gap-up-rest", "buttons": [], "frames": 60}
+{"label": "town-door-align", "buttons": ["Left"], "frames": 56}
+{"label": "town-door-align-rest", "buttons": [], "frames": 60}
+{"label": "town-door-up", "buttons": ["Up"], "frames": 25}
+{"label": "town-door-ready", "buttons": [], "frames": 100}
+{"label": "town-door-A", "buttons": ["A"], "frames": 1}
+{"label": "town-door-open", "buttons": [], "frames": 100}
+{"label": "enter-13", "buttons": ["Up"], "frames": 40}
+{"label": "landed-13", "buttons": [], "frames": 180}
+{"label": "13-north", "buttons": ["Up"], "frames": 43}
+{"label": "13-north-rest", "buttons": [], "frames": 60}
+{"label": "13-west", "buttons": ["Left"], "frames": 22}
+{"label": "13-west-rest", "buttons": [], "frames": 60}
+{"label": "13-target-up", "buttons": ["Up"], "frames": 20}
+{"label": "13-target-ready", "buttons": [], "frames": 60}
+{"label": "13-admit", "buttons": ["A"], "frames": 1}
+{"label": "13-first-page", "buttons": [], "frames": 180}
+{"label": "13-first-page-A", "buttons": ["A"], "frames": 1}
+{"label": "13-choice", "buttons": [], "frames": 180}
+{"label": "13-confirm", "buttons": ["A"], "frames": 1}
+{"label": "13-followup-1", "buttons": [], "frames": 180}
+{"label": "13-followup-A1", "buttons": ["A"], "frames": 1}
+{"label": "13-followup-2", "buttons": [], "frames": 180}
+{"label": "13-followup-A2", "buttons": ["A"], "frames": 1}
+{"label": "13-followup-3", "buttons": [], "frames": 180}
+{"label": "13-followup-A3", "buttons": ["A"], "frames": 1}
+{"label": "13-followup-4", "buttons": [], "frames": 180}
+{"label": "13-followup-A4", "buttons": ["A"], "frames": 1}
+{"label": "13-grant28", "buttons": [], "frames": 160}
+{"label": "leave13-down", "buttons": ["Down"], "frames": 22}
+{"label": "leave13-down-rest", "buttons": [], "frames": 40}
+{"label": "leave13-align", "buttons": ["Right"], "frames": 22}
+{"label": "leave13-align-rest", "buttons": [], "frames": 40}
+{"label": "leave13-out", "buttons": ["Down"], "frames": 55}
+{"label": "returned-A-from13", "buttons": [], "frames": 160}
+{"label": "return-town-down", "buttons": ["Down"], "frames": 10}
+{"label": "return-town-down-rest", "buttons": [], "frames": 40}
+{"label": "return-town-gap", "buttons": ["Right"], "frames": 55}
+{"label": "return-town-gap-rest", "buttons": [], "frames": 40}
+{"label": "return-town-south", "buttons": ["Down"], "frames": 55}
+{"label": "return-town-south-rest", "buttons": [], "frames": 40}
+{"label": "return-town-west", "buttons": ["Left"], "frames": 132}
+{"label": "return-town-west-rest", "buttons": [], "frames": 40}
+{"label": "return-town-home", "buttons": ["Down"], "frames": 280}
+{"label": "return-town-home-rest", "buttons": [], "frames": 80}
+{"label": "return-home-east", "buttons": ["Right"], "frames": 101}
+{"label": "return-home-east-rest", "buttons": [], "frames": 40}
+{"label": "return-home-north", "buttons": ["Up"], "frames": 38}
+{"label": "return-home-front", "buttons": [], "frames": 60}
+{"label": "return-home-open", "buttons": ["A"], "frames": 1}
+{"label": "return-home-open-rest", "buttons": [], "frames": 100}
+{"label": "return-home-enter", "buttons": ["Up"], "frames": 40}
+{"label": "return-home-D28", "buttons": [], "frames": 160}
+{"label": "return-home-C28", "buttons": ["Up"], "frames": 100}
+{"label": "return-home-C28-rest", "buttons": [], "frames": 160}
+{"label": "C28-entry-A1", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-page2", "buttons": [], "frames": 180}
+{"label": "C28-entry-A2", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-request2", "buttons": [], "frames": 180}
+{"label": "C28-entry-A3", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-request3", "buttons": [], "frames": 180}
+{"label": "C28-entry-A4", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-choice", "buttons": [], "frames": 180}
+{"label": "C28-entry-A5", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-page6", "buttons": [], "frames": 180}
+{"label": "C28-entry-A6", "buttons": ["A"], "frames": 1}
+{"label": "C28-entry-real-choice", "buttons": [], "frames": 180}
+{"label": "C-direct-confirm", "buttons": ["A"], "frames": 1}
+{"label": "C-direct-page1", "buttons": [], "frames": 180}
+{"label": "C-direct-A1", "buttons": ["A"], "frames": 1}
+{"label": "C-direct-page2", "buttons": [], "frames": 180}
+{"label": "C-direct-A2", "buttons": ["A"], "frames": 1}
+{"label": "C-direct-ready", "buttons": [], "frames": 180}
+{"label": "pot-corridor-right", "buttons": ["Right"], "frames": 11}
+{"label": "pot-corridor-right-rest", "buttons": [], "frames": 60}
+{"label": "pot-corridor-north", "buttons": ["Up"], "frames": 67}
+{"label": "pot-corridor-north-rest", "buttons": [], "frames": 80}
+{"label": "pot-first-left", "buttons": ["Left"], "frames": 24}
+{"label": "pot-first-ready", "buttons": [], "frames": 60}
+{"label": "pot-first-A", "buttons": ["A"], "frames": 1}
+{"label": "pot-first-held", "buttons": [], "frames": 120}
+{"label": "carry-first-down", "buttons": ["Down"], "frames": 22}
+{"label": "carry-first-down-rest", "buttons": [], "frames": 60}
+{"label": "carry-first-right", "buttons": ["Right"], "frames": 55}
+{"label": "carry-first-right-rest", "buttons": [], "frames": 60}
+{"label": "carry-first-up", "buttons": ["Up"], "frames": 1}
+{"label": "carry-first-ready", "buttons": [], "frames": 40}
+{"label": "throw-first", "buttons": ["A"], "frames": 1}
+{"label": "door-hit1", "buttons": [], "frames": 180}
+{"label": "door-hit1-A", "buttons": ["A"], "frames": 1}
+{"label": "door-hit1-closed", "buttons": [], "frames": 160}
+{"label": "pot-second-west", "buttons": ["Left"], "frames": 55}
+{"label": "pot-second-west-rest", "buttons": [], "frames": 60}
+{"label": "pot-second-up", "buttons": ["Up"], "frames": 14}
+{"label": "pot-second-up-rest", "buttons": [], "frames": 60}
+{"label": "pot-second-left", "buttons": ["Left"], "frames": 16}
+{"label": "pot-second-ready", "buttons": [], "frames": 60}
+{"label": "pot-second-A", "buttons": ["A"], "frames": 1}
+{"label": "pot-second-held", "buttons": [], "frames": 120}
+{"label": "left-pot-up", "buttons": ["Up"], "frames": 20}
+{"label": "left-pot-up-rest", "buttons": [], "frames": 60}
+{"label": "left-pot-face", "buttons": ["Right"], "frames": 1}
+{"label": "left-pot-face-rest", "buttons": [], "frames": 30}
+{"label": "left-pot-A", "buttons": ["A"], "frames": 1}
+{"label": "left-pot-held", "buttons": [], "frames": 120}
+{"label": "left-carry-down", "buttons": ["Down"], "frames": 45}
+{"label": "left-carry-down-rest", "buttons": [], "frames": 60}
+{"label": "left-carry-south", "buttons": ["Down"], "frames": 22}
+{"label": "left-carry-south-rest", "buttons": [], "frames": 60}
+{"label": "left-carry-east", "buttons": ["Right"], "frames": 66}
+{"label": "left-carry-east-rest", "buttons": [], "frames": 60}
+{"label": "left-carry-north", "buttons": ["Up"], "frames": 40}
+{"label": "left-carry-north-rest", "buttons": [], "frames": 60}
+{"label": "left-carry-door", "buttons": ["Right"], "frames": 33}
+{"label": "left-carry-door-rest", "buttons": [], "frames": 60}
+{"label": "left-carry-target", "buttons": ["Up"], "frames": 20}
+{"label": "left-carry-target-rest", "buttons": [], "frames": 80}
+{"label": "door-throw-hit1", "buttons": ["A"], "frames": 1}
+{"label": "door-real-hit1", "buttons": [], "frames": 180}
+{"label": "door-real-hit1-A", "buttons": ["A"], "frames": 1}
+{"label": "door-real-hit1-closed", "buttons": [], "frames": 180}
+{"label": "middle-route-down", "buttons": ["Down"], "frames": 16}
+{"label": "middle-route-down-rest", "buttons": [], "frames": 60}
+{"label": "middle-route-west", "buttons": ["Left"], "frames": 33}
+{"label": "middle-route-west-rest", "buttons": [], "frames": 60}
+{"label": "middle-route-up", "buttons": ["Up"], "frames": 28}
+{"label": "middle-route-up-rest", "buttons": [], "frames": 60}
+{"label": "middle-route-left", "buttons": ["Left"], "frames": 33}
+{"label": "middle-route-ready", "buttons": [], "frames": 60}
+{"label": "middle-grab", "buttons": ["A"], "frames": 1}
+{"label": "middle-held", "buttons": [], "frames": 120}
+{"label": "middle-carry-right", "buttons": ["Right"], "frames": 33}
+{"label": "middle-carry-right-rest", "buttons": [], "frames": 60}
+{"label": "middle-carry-down", "buttons": ["Down"], "frames": 28}
+{"label": "middle-carry-down-rest", "buttons": [], "frames": 60}
+{"label": "middle-carry-door", "buttons": ["Right"], "frames": 33}
+{"label": "middle-carry-door-rest", "buttons": [], "frames": 60}
+{"label": "middle-carry-up", "buttons": ["Up"], "frames": 20}
+{"label": "middle-carry-ready", "buttons": [], "frames": 80}
+{"label": "door-throw-hit2", "buttons": ["A"], "frames": 1}
+{"label": "door-hit2", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-000", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-000-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-001", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-002", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-002-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-003", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-003-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-004", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-005", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-005-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-006", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-006-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-007", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-007-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-008", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-008-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-009", "buttons": [], "frames": 240}
+{"label": "cellar-sequence-009-A", "buttons": ["A"], "frames": 1}
+{"label": "cellar-sequence-010", "buttons": [], "frames": 240}
+{"label": "door-passable", "buttons": [], "frames": 120}
+{"label": "stairs-E", "buttons": ["Up"], "frames": 30}
+{"label": "landed-E", "buttons": [], "frames": 400}
+{"label": "E-left", "buttons": ["Left"], "frames": 33}
+{"label": "E-left-rest", "buttons": [], "frames": 80}
+{"label": "stairs-20", "buttons": ["Up"], "frames": 35}
+{"label": "landed-20", "buttons": [], "frames": 300}
+{"label": "20-left", "buttons": ["Left"], "frames": 33}
+{"label": "20-left-rest", "buttons": [], "frames": 80}
+{"label": "stairs-21", "buttons": ["Up"], "frames": 35}
+{"label": "landed-21", "buttons": [], "frames": 300}
+{"label": "21-entry-A", "buttons": ["A"], "frames": 1}
+{"label": "21-entry-closed", "buttons": [], "frames": 160}
+{"label": "21-toward-box", "buttons": ["Down"], "frames": 150}
+{"label": "21-near-box", "buttons": [], "frames": 180}
+{"label": "21-box-contact", "buttons": ["Down"], "frames": 25}
+{"label": "21-box-contact-rest", "buttons": [], "frames": 180}
+{"label": "21-contact-no-ack", "buttons": ["Down"], "frames": 120}
+{"label": "21-warning-A1", "buttons": ["A"], "frames": 1}
+{"label": "21-warning-page2", "buttons": [], "frames": 180}
+{"label": "21-warning-A2", "buttons": ["A"], "frames": 1}
+{"label": "21-warning-return", "buttons": [], "frames": 180}
+{"label": "21-warning-A3", "buttons": ["A"], "frames": 1}
+{"label": "21-warning-complete", "buttons": [], "frames": 180}
+{"label": "21-warning-complete-neutral", "buttons": [], "frames": 180}
+{"label": "21-open-contact", "buttons": ["Down"], "frames": 15}
+{"label": "21-opening", "buttons": [], "frames": 300}
+{"label": "21-opening-wait", "buttons": [], "frames": 300}
+{"label": "tutorial-000", "buttons": [], "frames": 240}
+{"label": "tutorial-000-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-001", "buttons": [], "frames": 240}
+{"label": "tutorial-001-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-002", "buttons": [], "frames": 240}
+{"label": "tutorial-002-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-003", "buttons": [], "frames": 240}
+{"label": "tutorial-003-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-004", "buttons": [], "frames": 240}
+{"label": "tutorial-004-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-005", "buttons": [], "frames": 240}
+{"label": "tutorial-005-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-006", "buttons": [], "frames": 240}
+{"label": "tutorial-006-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-007", "buttons": [], "frames": 240}
+{"label": "tutorial-007-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-008", "buttons": [], "frames": 240}
+{"label": "tutorial-008-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-009", "buttons": [], "frames": 240}
+{"label": "tutorial-009-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-010", "buttons": [], "frames": 240}
+{"label": "tutorial-010-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-011", "buttons": [], "frames": 240}
+{"label": "tutorial-011-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-012", "buttons": [], "frames": 240}
+{"label": "tutorial-012-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-013", "buttons": [], "frames": 240}
+{"label": "tutorial-013-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-014", "buttons": [], "frames": 240}
+{"label": "tutorial-015", "buttons": [], "frames": 240}
+{"label": "tutorial-015-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-016", "buttons": [], "frames": 240}
+{"label": "tutorial-016-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-017", "buttons": [], "frames": 240}
+{"label": "tutorial-017-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-018", "buttons": [], "frames": 240}
+{"label": "tutorial-018-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-019", "buttons": [], "frames": 240}
+{"label": "tutorial-019-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-020", "buttons": [], "frames": 240}
+{"label": "tutorial-020-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-021", "buttons": [], "frames": 240}
+{"label": "tutorial-021-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-022", "buttons": [], "frames": 240}
+{"label": "tutorial-022-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-023", "buttons": [], "frames": 240}
+{"label": "tutorial-023-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-024", "buttons": [], "frames": 240}
+{"label": "tutorial-024-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-025", "buttons": [], "frames": 240}
+{"label": "tutorial-025-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-026", "buttons": [], "frames": 240}
+{"label": "tutorial-026-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-027", "buttons": [], "frames": 240}
+{"label": "tutorial-027-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-028", "buttons": [], "frames": 240}
+{"label": "tutorial-028-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-029", "buttons": [], "frames": 240}
+{"label": "tutorial-029-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-030", "buttons": [], "frames": 240}
+{"label": "tutorial-030-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-031", "buttons": [], "frames": 240}
+{"label": "tutorial-031-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-032", "buttons": [], "frames": 240}
+{"label": "tutorial-032-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-033", "buttons": [], "frames": 240}
+{"label": "tutorial-033-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-034", "buttons": [], "frames": 240}
+{"label": "tutorial-034-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-035", "buttons": [], "frames": 240}
+{"label": "tutorial-035-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-036", "buttons": [], "frames": 240}
+{"label": "tutorial-036-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-037", "buttons": [], "frames": 240}
+{"label": "tutorial-037-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-038", "buttons": [], "frames": 240}
+{"label": "tutorial-038-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-039", "buttons": [], "frames": 240}
+{"label": "tutorial-039-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-040", "buttons": [], "frames": 240}
+{"label": "tutorial-040-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-041", "buttons": [], "frames": 240}
+{"label": "tutorial-041-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-042", "buttons": [], "frames": 240}
+{"label": "tutorial-042-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-043", "buttons": [], "frames": 240}
+{"label": "tutorial-043-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-044", "buttons": [], "frames": 240}
+{"label": "tutorial-044-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-045", "buttons": [], "frames": 240}
+{"label": "tutorial-045-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-046", "buttons": [], "frames": 240}
+{"label": "tutorial-046-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-047", "buttons": [], "frames": 240}
+{"label": "tutorial-047-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-048", "buttons": [], "frames": 240}
+{"label": "tutorial-048-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-049", "buttons": [], "frames": 240}
+{"label": "tutorial-049-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-050", "buttons": [], "frames": 240}
+{"label": "tutorial-050-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-051", "buttons": [], "frames": 240}
+{"label": "tutorial-051-A", "buttons": ["A"], "frames": 1}
+{"label": "tutorial-052", "buttons": [], "frames": 240}
+{"label": "pandora-tour-control", "buttons": [], "frames": 120}
+{"label": "pandora-left", "buttons": ["Left"], "frames": 12}
+{"label": "pandora-left-rest", "buttons": [], "frames": 120}
+{"label": "pandora-up", "buttons": ["Up"], "frames": 12}
+{"label": "pandora-up-rest", "buttons": [], "frames": 120}
+{"label": "pandora-neutral-stable", "buttons": [], "frames": 180}
+{"label":"departure-L","buttons":["L"],"frames":12}
+{"label":"departure-L-rest","buttons":[],"frames":120}
+{"label":"weapon-lane-left","buttons":["Left"],"frames":8}
+{"label":"weapon-lane-left-rest","buttons":[],"frames":12}
+{"label":"weapon-lane-up1","buttons":["Up"],"frames":32}
+{"label":"weapon-lane-up1-rest","buttons":[],"frames":12}
+{"label":"weapon-lane-up2","buttons":["Up"],"frames":32}
+{"label":"weapon-lane-up2-rest","buttons":[],"frames":12}
+{"label":"weapon-lane-left2","buttons":["Left"],"frames":8}
+{"label":"weapon-lane-left2-rest","buttons":[],"frames":12}
+{"label":"weapon-lane-up3","buttons":["Up"],"frames":32}
+{"label":"weapon-lane-up3-rest","buttons":[],"frames":120}
+{"label":"weapon-door-A","buttons":["A"],"frames":6}
+{"label":"weapon-door-wait","buttons":[],"frames":180}
+{"label":"spear-left","buttons":["Left"],"frames":44}
+{"label":"spear-left-rest","buttons":[],"frames":12}
+{"label":"spear-up","buttons":["Up"],"frames":60}
+{"label":"spear-up-rest","buttons":[],"frames":12}
+{"label":"spear-A","buttons":["A"],"frames":6}
+{"label":"spear-request","buttons":[],"frames":180}
+{"label":"spear-around-left","buttons":["Left"],"frames":32}
+{"label":"spear-around-left-rest","buttons":[],"frames":12}
+{"label":"spear-around-up","buttons":["Up"],"frames":32}
+{"label":"spear-around-up-rest","buttons":[],"frames":12}
+{"label":"spear-around-right","buttons":["Right"],"frames":20}
+{"label":"spear-around-right-rest","buttons":[],"frames":12}
+{"label":"spear-near-up","buttons":["Up"],"frames":20}
+{"label":"spear-near-up-rest","buttons":[],"frames":12}
+{"label":"spear-talk","buttons":["A"],"frames":6}
+{"label":"spear-talk-wait","buttons":[],"frames":180}
+{"label":"spear-page-1-A","buttons":["A"],"frames":1}
+{"label":"spear-page-1","buttons":[],"frames":180}
+{"label":"spear-page-2-A","buttons":["A"],"frames":1}
+{"label":"spear-page-2","buttons":[],"frames":180}
+{"label":"spear-page-3-A","buttons":["A"],"frames":1}
+{"label":"spear-page-3","buttons":[],"frames":180}
+{"label":"spear-page-4-A","buttons":["A"],"frames":1}
+{"label":"spear-page-4","buttons":[],"frames":180}
+{"label":"spear-page-5-A","buttons":["A"],"frames":1}
+{"label":"spear-page-5","buttons":[],"frames":180}
+{"label":"spear-cancel","buttons":["B"],"frames":1}
+{"label":"spear-refusal","buttons":[],"frames":180}
+{"label":"spear-refusal-1-A","buttons":["A"],"frames":1}
+{"label":"spear-refusal-1","buttons":[],"frames":180}
+{"label":"spear-retry-A","buttons":["A"],"frames":6}
+{"label":"spear-retry","buttons":[],"frames":180}
+{"label":"spear-retry-page-A","buttons":["A"],"frames":1}
+{"label":"spear-retry-choice","buttons":[],"frames":180}
+{"label":"spear-repeat-1-A","buttons":["A"],"frames":1}
+{"label":"spear-repeat-1","buttons":[],"frames":180}
+{"label":"spear-repeat-2-A","buttons":["A"],"frames":1}
+{"label":"spear-repeat-2","buttons":[],"frames":180}
+{"label":"spear-accept-A","buttons":["A"],"frames":1}
+{"label":"spear-accept-request","buttons":[],"frames":180}
+{"label":"spear-accept-1-A","buttons":["A"],"frames":1}
+{"label":"spear-accept-1","buttons":[],"frames":180}
+{"label":"spear-accepted-neutral","buttons":[],"frames":180}
+{"label":"spear-collect-A","buttons":["A"],"frames":6}
+{"label":"spear-collect-request","buttons":[],"frames":180}
+{"label":"spear-grant-1","buttons":[],"frames":180}
+{"label":"spear-grant-2","buttons":[],"frames":180}
+{"label":"spear-grant-3","buttons":[],"frames":180}
+{"label":"spear-grant-4","buttons":[],"frames":180}
+{"label":"spear-grant-5","buttons":[],"frames":180}
+{"label":"spear-grant-6","buttons":[],"frames":180}
+{"label":"spear-grant-7","buttons":[],"frames":180}
+{"label":"spear-grant-8","buttons":[],"frames":180}
+{"label":"spear-grant-9","buttons":[],"frames":180}
+{"label":"spear-reapproach","buttons":["Up"],"frames":12}
+{"label":"spear-reapproach-rest","buttons":[],"frames":12}
+{"label":"spear-take-A","buttons":["A"],"frames":6}
+{"label":"spear-take-request","buttons":[],"frames":180}
+{"label":"spear-take-1","buttons":[],"frames":180}
+{"label":"spear-presentation-wait","buttons":[],"frames":600}
+{"label":"return-sequence-1-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-1","buttons":[],"frames":240}
+{"label":"return-sequence-2-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-2","buttons":[],"frames":240}
+{"label":"return-sequence-3","buttons":[],"frames":240}
+{"label":"return-sequence-4-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-4","buttons":[],"frames":240}
+{"label":"return-sequence-5-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-5","buttons":[],"frames":240}
+{"label":"return-sequence-6-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-6","buttons":[],"frames":240}
+{"label":"return-sequence-7-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-7","buttons":[],"frames":240}
+{"label":"return-sequence-8-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-8","buttons":[],"frames":240}
+{"label":"return-sequence-9-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-9","buttons":[],"frames":240}
+{"label":"return-sequence-10-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-10","buttons":[],"frames":240}
+{"label":"return-sequence-11","buttons":[],"frames":240}
+{"label":"return-sequence-12-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-12","buttons":[],"frames":240}
+{"label":"return-sequence-13-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-13","buttons":[],"frames":240}
+{"label":"return-sequence-14-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-14","buttons":[],"frames":240}
+{"label":"return-sequence-15-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-15","buttons":[],"frames":240}
+{"label":"return-sequence-16-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-16","buttons":[],"frames":240}
+{"label":"return-sequence-17-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-17","buttons":[],"frames":240}
+{"label":"return-sequence-18-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-18","buttons":[],"frames":240}
+{"label":"return-sequence-19-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-19","buttons":[],"frames":240}
+{"label":"return-sequence-20-A","buttons":["A"],"frames":1}
+{"label":"return-sequence-20","buttons":[],"frames":240}
+{"label":"frozen-return-control","buttons":[],"frames":120}
+{"label":"frozen-return-left","buttons":["Left"],"frames":12}
+{"label":"frozen-return-left-rest","buttons":[],"frames":12}
+{"label":"frozen-return-up","buttons":["Up"],"frames":12}
+{"label":"frozen-return-up-rest","buttons":[],"frames":120}
+{"label":"frozen-return-stable","buttons":[],"frames":120}
+{"finish":true}
