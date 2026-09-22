@@ -21,18 +21,96 @@ STALL_FRAMES = 20
 WALKING_CONTROL = 160
 
 
-def load(run, map_id=None):
-    frames = []
+def require(ok, message):
+    if not ok:
+        raise ValueError(message)
+
+
+def uint(value, maximum=0xFFFF):
+    return type(value) is int and 0 <= value <= maximum
+
+
+def word_list(value, size):
+    return isinstance(value, list) and len(value) == size and all(uint(v) for v in value)
+
+
+def actor_positions(frame):
+    """Accept both live producers and historical coordinate-pair captures."""
+    actors = frame.get('actors', [])
+    require(isinstance(actors, list), 'actors must be a list')
+    positions, slots = [], set()
+    for actor in actors:
+        if isinstance(actor, dict):
+            require(set(actor) in ({'slot', 'position', 'script'}, {'slot', 'words'}),
+                    'invalid actor schema')
+            slot = actor['slot']
+            require(uint(slot) and 0x1040 <= slot < 0x2000 and slot % 0x40 == 0
+                    and slot not in slots, 'invalid or duplicate actor slot')
+            slots.add(slot)
+            if 'words' in actor:
+                require(word_list(actor['words'], 16), 'actor words must be sixteen u16s')
+                require(actor['words'][5] != 0, 'actor is not live')
+                position = actor['words'][:2]
+            else:
+                require(uint(actor['script'], 0xFFFFFF) and actor['script'] & 0xFFFF != 0,
+                        'invalid live actor script')
+                position = actor['position']
+        else:
+            position = actor
+        require(word_list(position, 2), 'actor position must be a u16 pair')
+        positions.append(position)
+    return positions
+
+
+def validate_frame(row, strict=False):
+    require(isinstance(row, dict) and row.get('kind') == 'frame', 'invalid frame record')
+    require(isinstance(row.get('label'), str) and bool(row['label']), 'invalid frame label')
+    require(word_list(row.get('position'), 2), 'position must be a u16 pair')
+    held = row.get('held')
+    buttons = set(DIRECTIONS) | {'A', 'B', 'X', 'Y', 'L', 'R', 'Start', 'Select'}
+    require(isinstance(held, list) and all(isinstance(h, str) and h in buttons for h in held)
+            and len(set(held)) == len(held), 'invalid held buttons')
+    for field in ('map', 'control', 'frame'):
+        require(not strict or field in row, f'missing {field} evidence')
+        if field in row:
+            require(uint(row[field], 0xFFFFFFFF if field == 'frame' else 0xFFFF),
+                    f'invalid {field}')
+    require(not strict or 'actors' in row, 'missing actors evidence')
+    actor_positions(row)
+
+
+def validate_layer(layer):
+    require(isinstance(layer, dict) and uint(layer.get('map')), 'invalid layer map')
+    for field in ('width', 'height'):
+        require(uint(layer.get(field)) and layer[field] > 0, f'invalid layer {field}')
+    require(word_list(layer.get('cells'), layer['width'] * layer['height']),
+            'layer cells must match dimensions and contain u16 words')
+    # The old producer dumped before the attribute pass. Zero-only layers cannot
+    # establish a partition; reject as unverified, not as proof all cells admit.
+    require(any(w >> 9 for w in layer['cells']), 'unverified zero-attribute layer (possibly stale)')
+
+
+def load(run, map_id=None, strict=False):
+    frames, previous = [], None
     with open(run) as handle:
-        for line in handle:
-            row = json.loads(line)
-            if row.get('kind') != 'frame' or row.get('label') == 'boot':
-                continue
-            if row.get('control') not in (None, WALKING_CONTROL):
-                continue
-            if map_id is not None and row.get('map') not in (None, map_id):
-                continue
-            frames.append(row)
+        for number, line in enumerate(handle, 1):
+            try:
+                row = json.loads(line)
+                require(isinstance(row, dict) and isinstance(row.get('kind'), str),
+                        'invalid record kind')
+                if row['kind'] != 'frame':
+                    continue
+                validate_frame(row, strict)
+                if strict and previous is not None:
+                    require(row['frame'] > previous, 'frame numbers must increase')
+                previous = row.get('frame')
+                if row['label'] == 'boot' or row.get('control') not in (None, WALKING_CONTROL):
+                    continue
+                if map_id is not None and row.get('map') not in (None, map_id):
+                    continue
+                frames.append(row)
+            except ValueError as error:
+                raise ValueError(f'{run}:{number}: {error}') from error
     return frames
 
 
@@ -54,7 +132,13 @@ def runs(frames):
     for row in frames:
         held = [h for h in row['held'] if h in DIRECTIONS]
         key = held[0] if len(held) == 1 else None
-        if cur and cur[0] == key and cur[1][-1]['label'] == row['label']:
+        previous = cur[1][-1] if cur else None
+        continuous = previous is not None and all(previous.get(f) == row.get(f)
+                                                  for f in ('label', 'map', 'control'))
+        if previous is not None and ('frame' in previous or 'frame' in row):
+            continuous = continuous and 'frame' in previous and 'frame' in row \
+                and row['frame'] == previous['frame'] + 1
+        if cur and cur[0] == key and continuous:
             cur[1].append(row)
         else:
             if cur and cur[0]:
@@ -83,7 +167,7 @@ def blocked_by_actor(frame, x, y, ux, uy):
     Ark's own shadow, which tracks the player and would otherwise disqualify
     every contact ever measured.
     """
-    for ax, ay in frame.get('actors', []):
+    for ax, ay in actor_positions(frame):
         if (ax, ay) == (x, y):
             continue
         ahead = (ax - x) * ux + (ay - y) * uy
@@ -138,6 +222,11 @@ DY_WINDOW = range(-24, 8)
 
 def solve(frames, layer, dx_window=DX_WINDOW, dy_window=DY_WINDOW):
     """Offsets consistent with every sample, within the sprite-extent window."""
+    validate_layer(layer)
+    require(bool(frames), 'no frame evidence')
+    for row in frames:
+        validate_frame(row)
+    check_one_map(frames, layer)
     points = {tuple(r['position']) for r in frames}
     contacts = stalls(frames)
     results = []
@@ -173,6 +262,7 @@ def main():
         sys.exit('usage: derive.py LAYER.json RUN.jsonl [RUN.jsonl ...]')
     with open(sys.argv[1]) as handle:
         layer = json.load(handle)
+    validate_layer(layer)
     frames = []
     for run in sys.argv[2:]:
         frames.extend(load(run, layer.get('map')))
@@ -184,7 +274,7 @@ def main():
           f'{distinct} distinct sustained contacts ({contacts} total)')
     if not results:
         print('NO CONSISTENT OFFSET: the samples contradict a single-point model')
-        return
+        return 1
     xs = {r['dx'] for r in results}
     ys = {r['dy'] for r in results}
     print(f'{len(results)} consistent offsets: dx in {min(xs)}..{max(xs)}, dy in {min(ys)}..{max(ys)}')
@@ -208,4 +298,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        sys.exit(main())
+    except (OSError, ValueError) as error:
+        sys.exit(f'invalid evidence: {error}')

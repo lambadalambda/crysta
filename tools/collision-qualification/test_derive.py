@@ -31,7 +31,7 @@ def frames(samples, control=160, map_id=0xF):
     for label, held, positions in samples:
         for x, y in positions:
             out.append({'kind': 'frame', 'label': label, 'held': held,
-                        'position': [x, y], 'frame': 0,
+                        'position': [x, y], 'frame': len(out),
                         'control': control, 'map': map_id})
     return out
 
@@ -169,6 +169,57 @@ class DeriveGates(unittest.TestCase):
         for row in elsewhere:
             row['actors'] = [[400, 400]]
         self.assertEqual(derive.stalls(elsewhere), [(32, 32, 1, 0)])
+
+    def test_actor_producer_shapes_and_historical_pairs(self):
+        for actor in ([48, 32],
+                      {'slot': 0x1040, 'position': [48, 32], 'script': 0x888ede},
+                      {'slot': 0x1040, 'words': [48, 32, 0, 0, 0, 0x8ede] + [0] * 10}):
+            rows = frames([('a', ['Right'], [(32, 32)] * derive.STALL_FRAMES)])
+            for row in rows:
+                row['actors'] = [actor]
+            self.assertEqual(derive.stalls(rows), [])
+
+    def test_malformed_actors_are_not_silently_clear(self):
+        for actors in (None, {}, [None], [[1]], [[True, 2]], [[-1, 2]],
+                       [{'position': [48, 32]}],
+                       [{'slot': 0x1041, 'position': [48, 32], 'script': 1}],
+                       [{'slot': 0x1040, 'words': [48, 32]}],
+                       [{'slot': 0x1040, 'words': [0] * 15 + ['bad']}],
+                       [{'slot': 0x1040, 'position': [48, 32], 'script': False}]):
+            with self.subTest(actors=actors), self.assertRaises(ValueError):
+                derive.blocked_by_actor({'actors': actors}, 32, 32, 1, 0)
+
+    def test_stalls_do_not_bridge_frames_maps_or_filtered_controls(self):
+        for field, value in [('frame', 100), ('map', 0x41), ('control', 0)]:
+            rows = frames([('a', ['Right'], [(32, 32)] * derive.STALL_FRAMES)])
+            rows[10][field] = value
+            self.assertEqual(derive.stalls(rows), [], field)
+        rows = frames([('a', ['Right'], [(32, 32)] * 21)])
+        rows[10]['control'] = 0
+        with tempfile.TemporaryDirectory() as d:
+            run = Path(d) / 'run.jsonl'
+            run.write_text('\n'.join(json.dumps(r) for r in rows))
+            self.assertEqual(derive.stalls(derive.load(run)), [])
+
+    def test_load_rejects_bad_frames_even_when_scripted(self):
+        for patch in ({'position': [1]}, {'held': 'Right'}, {'frame': True},
+                      {'actors': [{}]}, {'map': -1}, {'control': '160'}):
+            rows = frames([('a', ['Right'], [(32, 32)])], control=0)
+            rows[0].update(patch)
+            with tempfile.TemporaryDirectory() as d:
+                run = Path(d) / 'run.jsonl'
+                run.write_text(json.dumps(rows[0]))
+                with self.subTest(patch=patch), self.assertRaises(ValueError):
+                    derive.load(run)
+
+    def test_solver_rejects_empty_or_invalid_evidence(self):
+        lay = layer(8, 8, {(5, y) for y in range(8)})
+        rows = frames([('a', ['Right'], [(32, 32)] * derive.STALL_FRAMES)])
+        for bad_layer, bad_rows in ((lay, []), ({**lay, 'cells': []}, rows),
+                                    ({**lay, 'cells': [0] * 64}, rows),
+                                    (lay, [{**rows[0], 'actors': [{}]}])):
+            with self.subTest(layer=bad_layer, rows=bad_rows), self.assertRaises(ValueError):
+                derive.solve(bad_rows, bad_layer)
 
     def test_absent_actor_field_is_treated_as_no_actors(self):
         held = [(32, 32)] * derive.STALL_FRAMES
