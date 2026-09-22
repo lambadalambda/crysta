@@ -1,0 +1,733 @@
+{
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "scope": "map41_left_door_map42_spear_map21_frozen_return",
+  "scenes": {
+    "maps": [
+      {
+        "map": 65,
+        "scene": 8623399
+      },
+      {
+        "map": 66,
+        "scene": 8623465
+      },
+      {
+        "map": 33,
+        "scene": 8622696
+      }
+    ],
+    "records": [
+      {
+        "source": 8623418,
+        "header": 9034909,
+        "entry": 9034914
+      },
+      {
+        "source": 8623484,
+        "header": 9034233,
+        "entry": 9034238
+      },
+      {
+        "source": 8623494,
+        "header": 9034258,
+        "entry": 9034263
+      },
+      {
+        "source": 8622705,
+        "header": 8958714,
+        "entry": 8958719
+      },
+      {
+        "source": 8622715,
+        "header": 8957624,
+        "entry": 8957629
+      }
+    ]
+  },
+  "departure": {
+    "transitions": [
+      {
+        "source": 9034933,
+        "map": 66,
+        "mode": 0,
+        "selector": 2,
+        "raw_position": [
+          128,
+          448
+        ]
+      },
+      {
+        "source": 9034313,
+        "map": 33,
+        "mode": 4,
+        "selector": 1,
+        "raw_position": [
+          128,
+          352
+        ]
+      }
+    ],
+    "spark": {
+      "source": 9034238,
+      "offset": -8,
+      "membership": {
+        "source": 9034247,
+        "event": 578,
+        "require_set": false
+      }
+    },
+    "interaction": {
+      "source": 9034263,
+      "selector": 59
+    },
+    "callback": {
+      "source": 9034265,
+      "target": 9034326
+    },
+    "clear_callback": {
+      "source": 9034400,
+      "target": 0
+    },
+    "branches": [
+      {
+        "source": 9034326,
+        "event": 577,
+        "when_set": true,
+        "target": 9034390
+      },
+      {
+        "source": 9034332,
+        "event": 576,
+        "when_set": true,
+        "target": 9034354
+      }
+    ],
+    "choices": [
+      {
+        "source": 9034348,
+        "catalog": 1,
+        "table": 9034366,
+        "cancel_then_options": [
+          9034372,
+          9034379,
+          9034372
+        ]
+      },
+      {
+        "source": 9034360,
+        "catalog": 1,
+        "table": 9034366,
+        "cancel_then_options": [
+          9034372,
+          9034379,
+          9034372
+        ]
+      }
+    ],
+    "effects": [
+      {
+        "source": 9034338,
+        "event": 576,
+        "set": true
+      },
+      {
+        "source": 9034385,
+        "event": 577,
+        "set": true
+      },
+      {
+        "source": 9034396,
+        "event": 578,
+        "set": true
+      },
+      {
+        "source": 9034295,
+        "event": 1,
+        "set": true
+      }
+    ],
+    "requests": [
+      {
+        "source": 9034342,
+        "request": 9034420
+      },
+      {
+        "source": 9034354,
+        "request": 9034675
+      },
+      {
+        "source": 9034372,
+        "request": 9034683
+      },
+      {
+        "source": 9034379,
+        "request": 9034730
+      },
+      {
+        "source": 9034408,
+        "request": 9034766
+      },
+      {
+        "source": 9034282,
+        "request": 8966501
+      },
+      {
+        "source": 9034303,
+        "request": 9034793
+      }
+    ],
+    "dialogue_waits": [
+      {
+        "source": 9034346,
+        "selector": 31
+      },
+      {
+        "source": 9034358,
+        "selector": 31
+      },
+      {
+        "source": 9034376,
+        "selector": 31
+      },
+      {
+        "source": 9034383,
+        "selector": 31
+      },
+      {
+        "source": 9034412,
+        "selector": 31
+      },
+      {
+        "source": 9034287,
+        "selector": 31
+      },
+      {
+        "source": 9034307,
+        "selector": 31
+      }
+    ],
+    "masks": [
+      {
+        "source": 9034390,
+        "address": 1162,
+        "mask": 256,
+        "set": true
+      },
+      {
+        "source": 9034289,
+        "address": 1162,
+        "mask": 256,
+        "set": false
+      }
+    ],
+    "controls": [
+      {
+        "source": 9034404,
+        "selector": 42,
+        "mask": 65360
+      }
+    ],
+    "collection_jump": {
+      "source": 9034414,
+      "target": 9034272
+    },
+    "award": {
+      "source": 9034272,
+      "item": 129,
+      "presentation": 420,
+      "worker": 52
+    },
+    "delays": [
+      {
+        "source": 9034278,
+        "ticks": 480
+      },
+      {
+        "source": 9034299,
+        "ticks": 60
+      },
+      {
+        "source": 9034309,
+        "ticks": 60
+      }
+    ]
+  },
+  "frozen_return": {
+    "membership": [
+      {
+        "source": 8957629,
+        "event": 35,
+        "require_set": false
+      },
+      {
+        "source": 8957633,
+        "event": 34,
+        "require_set": true
+      },
+      {
+        "source": 8958719,
+        "event": 257,
+        "require_set": false
+      }
+    ],
+    "branches": [
+      {
+        "source": 8957641,
+        "event": 580,
+        "when_set": true,
+        "target": 8957673
+      },
+      {
+        "source": 8957681,
+        "event": 2,
+        "when_set": true,
+        "target": 8957694
+      },
+      {
+        "source": 8957704,
+        "event": 10,
+        "when_set": true,
+        "target": 8957717
+      },
+      {
+        "source": 8958723,
+        "event": 35,
+        "when_set": false,
+        "target": 8958744
+      }
+    ],
+    "effects": [
+      {
+        "source": 8957677,
+        "event": 3,
+        "set": true
+      },
+      {
+        "source": 8957759,
+        "event": 254,
+        "set": true
+      },
+      {
+        "source": 8957763,
+        "event": 35,
+        "set": true
+      },
+      {
+        "source": 8958839,
+        "event": 2,
+        "set": true
+      },
+      {
+        "source": 8958883,
+        "event": 10,
+        "set": true
+      }
+    ],
+    "flag_waits": [
+      {
+        "source": 8958753,
+        "event": 3,
+        "until_set": true
+      },
+      {
+        "source": 8958887,
+        "event": 35,
+        "until_set": true
+      }
+    ],
+    "movement_waits": [
+      {
+        "source": 8958766,
+        "selector": 58,
+        "animation_control": 3,
+        "motion_stream_index": 104,
+        "target_tile_y": 20
+      },
+      {
+        "source": 8958796,
+        "selector": 58,
+        "animation_control": 3,
+        "motion_stream_index": 104,
+        "target_tile_y": 23
+      }
+    ],
+    "requests": [
+      {
+        "source": 8957753,
+        "request": 8958670
+      },
+      {
+        "source": 8958782,
+        "request": 8958944
+      },
+      {
+        "source": 8958790,
+        "request": 8959008
+      },
+      {
+        "source": 8958817,
+        "request": 8959045
+      },
+      {
+        "source": 8958828,
+        "request": 8959104
+      },
+      {
+        "source": 8958866,
+        "request": 8958366
+      },
+      {
+        "source": 8958877,
+        "request": 8958396
+      }
+    ],
+    "dialogue_waits": [
+      {
+        "source": 8957757,
+        "selector": 32
+      },
+      {
+        "source": 8958786,
+        "selector": 31
+      },
+      {
+        "source": 8958794,
+        "selector": 31
+      },
+      {
+        "source": 8958821,
+        "selector": 32
+      },
+      {
+        "source": 8958832,
+        "selector": 31
+      },
+      {
+        "source": 8958870,
+        "selector": 31
+      },
+      {
+        "source": 8958881,
+        "selector": 32
+      }
+    ],
+    "calls": [
+      {
+        "source": 8957699,
+        "target": 8959239
+      },
+      {
+        "source": 8958834,
+        "target": 8958896
+      }
+    ],
+    "presentation_calls": [
+      {
+        "source": 8957744,
+        "target": 8957810
+      },
+      {
+        "source": 8958812,
+        "target": 8957776
+      },
+      {
+        "source": 8958872,
+        "target": 8957794
+      }
+    ],
+    "delays": [
+      {
+        "source": 8957673,
+        "ticks": 32
+      },
+      {
+        "source": 8957749,
+        "ticks": 60
+      }
+    ],
+    "controls": [
+      {
+        "source": 8957637,
+        "selector": 42,
+        "mask": 65360
+      },
+      {
+        "source": 8957767,
+        "selector": 41,
+        "mask": 65360
+      }
+    ],
+    "end": [
+      {
+        "source": 8957771,
+        "selector": 60
+      },
+      {
+        "source": 8957773,
+        "selector": 167
+      }
+    ]
+  },
+  "inventory": {
+    "item_latch": 2503,
+    "call": {
+      "source": 8428047,
+      "target": 9279059
+    },
+    "resolver_call": {
+      "source": 9279071,
+      "target": 9279282
+    },
+    "region": {
+      "item": 129,
+      "accumulator_bits": 8,
+      "start": 72,
+      "end_exclusive": 96,
+      "stride": 2,
+      "base": 8355840
+    },
+    "selection": "existing_id_else_first_empty",
+    "quantity_cap": 9,
+    "writes": [
+      {
+        "source": 9279119,
+        "base": 8355840,
+        "value": "item"
+      },
+      {
+        "source": 9279128,
+        "base": 8355841,
+        "value": "quantity+1"
+      }
+    ],
+    "first_empty_weapon_slot": {
+      "address": 8355912,
+      "item": 129,
+      "quantity_address": 8355913,
+      "quantity": 1
+    },
+    "failure": "carry_set_if_full_or_at_cap",
+    "cop60_checks_failure_carry": false,
+    "requires_runtime_inventory_proof": true,
+    "presentation_tail": 8425686
+  },
+  "handlers": {
+    "cop20": {
+      "entry": 8424602,
+      "call_source": 8424616,
+      "helper": 8753422,
+      "retry_on_carry_set": true,
+      "retry_source": 8424623,
+      "completion_source": 8424636,
+      "clears": 3522
+    },
+    "cop1c": {
+      "entry": 8424488,
+      "shared_tail": 8424454,
+      "operand_order": "bank_then_word",
+      "bank_latch": 3522,
+      "word_latch": 3520
+    },
+    "cop05": {
+      "entry": 8422958,
+      "flag_test": 8436646,
+      "positive_waits_until_set": true
+    },
+    "cop3a": {
+      "entry": 8426140,
+      "reached_target_tail": 8426116,
+      "coordinate_helper": 8436783,
+      "motion_helper": 8436699
+    }
+  },
+  "presentation": {
+    "spawned_workers": [
+      {
+        "source": 8958900,
+        "target": 8959347,
+        "parameters": [
+          16,
+          16
+        ]
+      },
+      {
+        "source": 8958907,
+        "target": 8959373,
+        "parameters": [
+          16,
+          16
+        ]
+      },
+      {
+        "source": 8958914,
+        "target": 8959399,
+        "parameters": [
+          16,
+          16
+        ]
+      },
+      {
+        "source": 8958921,
+        "target": 8959425,
+        "parameters": [
+          16,
+          16
+        ]
+      },
+      {
+        "source": 8958928,
+        "target": 8959451,
+        "parameters": [
+          16,
+          16
+        ]
+      },
+      {
+        "source": 8958935,
+        "target": 8959477,
+        "parameters": [
+          16,
+          16
+        ]
+      }
+    ],
+    "role": "presentation_only_not_handshake_flag_writers",
+    "shared_helper": 8959503,
+    "fade_call": {
+      "source": 8957699,
+      "target": 8959239
+    }
+  },
+  "ranges": [
+    {
+      "start": 9034233,
+      "end": 9034420,
+      "sha256": "bb2acf76baccd1179dd6936355defeff7f5595d6750e0a69cdce8eebb8c2b4a8"
+    },
+    {
+      "start": 9034909,
+      "end": 9034946,
+      "sha256": "ae725424df39df7446db7f27914df7ca2d3bdd3f3294f4350e6233dc4325f406"
+    },
+    {
+      "start": 8957624,
+      "end": 8957862,
+      "sha256": "8e582ea742b0fef9524bdbbbcba9faf00a3874f5f76dfcb1ded0d3e82f7e02a3"
+    },
+    {
+      "start": 8958714,
+      "end": 8958944,
+      "sha256": "3dbe52b96dbbcb4d249ba3112a22686adca9e3c6031b67f0239638fe52bda3a4"
+    },
+    {
+      "start": 8959239,
+      "end": 8959306,
+      "sha256": "d9c396bcb58059657f66bd7bc424d8025164e6fee7834e0cf95afeffdd5fb44a"
+    },
+    {
+      "start": 8959347,
+      "end": 8959518,
+      "sha256": "9e4cceaf676f393ff67e42e460fd33fc4f347f5067eac92da31625bccd84d7e5"
+    },
+    {
+      "start": 8428036,
+      "end": 8428126,
+      "sha256": "9fd0fd128a154ae0daa329673460fd5ce79fb985164c4e7ab106586ef26629dc"
+    },
+    {
+      "start": 8425686,
+      "end": 8425734,
+      "sha256": "ebe4aa009857a6165ba81d5cdc1ac3f788164c214d0307353c8d0d32b7ff5032"
+    },
+    {
+      "start": 9279059,
+      "end": 9279136,
+      "sha256": "a2072e676a78fcf6f965709914b0f97d6b72e3e5b49b4f47167242ee84a6400b"
+    },
+    {
+      "start": 9279282,
+      "end": 9279376,
+      "sha256": "25a84ff406562643d5fa2b47213677fd5221b48e6407fb20f6ffbeda3a57ad31"
+    },
+    {
+      "start": 8424454,
+      "end": 8424522,
+      "sha256": "48912b60956a6d6cdd74fbe7a02412c9d78bb44155d11b1e384b9e6261236d06"
+    },
+    {
+      "start": 8424602,
+      "end": 8424648,
+      "sha256": "9106144acb56ae8bcd6d9ce2df0a33d2e5a1d659a15326241f53b07a1880e2b8"
+    },
+    {
+      "start": 8422958,
+      "end": 8422988,
+      "sha256": "42cb3fd80cde842a1e699165f818810dbbe1461872f165bf4ef761d607273034"
+    },
+    {
+      "start": 8426116,
+      "end": 8426242,
+      "sha256": "fc019b160c735c22b2669ddd300f64e8ad52d5546543aa1240f368e06cc8193a"
+    },
+    {
+      "start": 8436646,
+      "end": 8436679,
+      "sha256": "fa816dfb173c4f39d6bc53212425b1275f03927a078daac7b4ed5b0f1dc70c1d"
+    },
+    {
+      "start": 8436691,
+      "end": 8436803,
+      "sha256": "af0ed40902ea0b77e304e795c350f04c8e22b0a416549899aa53ad1920a18f47"
+    },
+    {
+      "start": 8753422,
+      "end": 8753711,
+      "sha256": "580ffee04d7b16f79f4c3ff2d90bf386cb57dd40a1091dd35988d03f853384d1"
+    },
+    {
+      "start": 8623418,
+      "end": 8623428,
+      "sha256": "a886109889a703f4a634a8b8a0a455f41b8c179ceb56adfbd670e9fb60b287c2"
+    },
+    {
+      "start": 8623484,
+      "end": 8623504,
+      "sha256": "3d1e9591a1b31be61950431f233d086e85a5cb75edc19597b273425696c944c3"
+    },
+    {
+      "start": 8622705,
+      "end": 8622725,
+      "sha256": "456bb37999a7e2a9a7ec720e16cb6c6379a549fa79beb9c9dae5e588fa9d6ff8"
+    },
+    {
+      "start": 8552578,
+      "end": 8552580,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618114,
+      "end": 8618116,
+      "sha256": "caaf67fddd48ed113cefdc37648b1798c829af6e9dbfa5a1e71c1000ce3c84d0"
+    },
+    {
+      "start": 8552580,
+      "end": 8552582,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618116,
+      "end": 8618118,
+      "sha256": "e891cd7aa338c97880149e2bc8b1ab69b3a5745b17e8f21e1333f46b45c24737"
+    },
+    {
+      "start": 8552514,
+      "end": 8552516,
+      "sha256": "96a296d224f285c67bee93c30f8a309157f0daa35dc5b87e410b78630a09cfc7"
+    },
+    {
+      "start": 8618050,
+      "end": 8618052,
+      "sha256": "46b6033b402c2a4c36e437985ef75f243e922383c739cd4e98f8e05a4dcf49b6"
+    }
+  ]
+}
