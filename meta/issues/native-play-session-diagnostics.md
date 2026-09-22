@@ -29,3 +29,14 @@ be reproduced and diagnosed. Record bounded local input/state/outcome traces.
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Requested alongside [outdoor stall investigation](fix-native-crysta-outdoor-stalls.md).
 - These are portable-host diagnostics, not a renewed native reference qualification.
+
+## Implementation
+
+- Added an asset-independent JSONL writer with four owned session slots, two
+  8 MiB segments each, repeated schema/session metadata and bounded flushing.
+  Unknown files and symlinks are preserved; one active writer per root is required.
+- Eight ROM-free logger tests cover ordering, flushes, rotation/retention,
+  oversized entries, unavailable storage and preservation of unknown paths.
+  Independent correctness/architecture review approved the module; the
+  immediate-flush test now uses an explicit long interval to avoid timer flakiness.
+- Host integration and user-facing instructions follow separately.
