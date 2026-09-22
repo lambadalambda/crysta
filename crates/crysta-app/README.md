@@ -61,6 +61,14 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
   session_tests -- --ignored --nocapture
 ```
 
+## Background presentation
+
+Exterior tree transparency uses the ROM-derived scene backdrop, not the asset
+inspector's gray checkerboard. This does not yet reproduce the exterior's
+additive floating-leaf effects, secondary scrolling or full color math. Static
+inspection exports deliberately keep their checkerboard. River animation is
+tracked separately in [the native river issue](../../meta/issues/animate-native-crysta-river.md).
+
 ## Music scope and architecture
 
 This first music slice plays **fresh Crysta selection3**, continuously across

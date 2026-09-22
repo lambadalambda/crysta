@@ -4,6 +4,7 @@
 //! input and music playback. Backgrounds come from the qualified renderer rather
 //! than a second decode path, and sprites from the runtime's art module.
 
+mod background;
 mod diagnostics;
 mod frame;
 mod music;
@@ -420,13 +421,9 @@ impl Session {
     fn ensure_background(&mut self, cartridge: &rom::Rom) {
         let map = self.world.map();
         if let std::collections::hash_map::Entry::Vacant(slot) = self.backgrounds.entry(map) {
-            let Ok(rendered) = map_inspector::render_static_background(cartridge, map) else {
+            let Ok(decoded) = background::load(cartridge, map) else {
                 return;
             };
-            let Some(mut decoded) = frame::decode_bmp(&rendered.bitmap) else {
-                return;
-            };
-            decoded.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
             slot.insert(decoded);
         }
     }
@@ -850,6 +847,34 @@ impl App {
 #[cfg(test)]
 mod session_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn exterior_transparency_uses_source_backdrop_not_inspector_checkerboard() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let image = Box::leak(rom.image().to_vec().into_boxed_slice());
+        let mut session = Session::new(image);
+        session.world = World::enter(image, 0xA, 504, 769).unwrap();
+        session.ensure_background(&rom);
+        let background = &session.backgrounds[&0xA];
+        let source = assets::maps::visual::StaticBackground::from_rom(image, 0xA).unwrap();
+        assert_eq!(source.palette()[32].raw(), 0x15ed);
+        let [r, g, b] = source.palette()[32].rgb8();
+        let backdrop = u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b);
+        let mut transparent = 0;
+        // Tree rectangle in the qualified landed-A capture, away from leaf effects.
+        for y in 701..762 {
+            for x in 384..414 {
+                if source.pixel(x, y).unwrap() == assets::graphics::IndexedPixel::Transparent {
+                    transparent += 1;
+                    assert_eq!(background.pixels[y * background.width + x], backdrop);
+                    assert!(!background.occludes(x, y));
+                }
+            }
+        }
+        assert_eq!(transparent, 47);
+    }
 
     #[test]
     #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]

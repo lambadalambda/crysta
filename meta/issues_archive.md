@@ -91,3 +91,4 @@
 - [x] [Resolve remaining Crysta exterior resident placeholders](issues/fix-crysta-exterior-placeholders.md)
 - [x] [Fix native Crysta outdoor stalls](issues/fix-native-crysta-outdoor-stalls.md)
 - [x] [Record native play-session diagnostics](issues/native-play-session-diagnostics.md)
+- [x] [Correct native Crysta tree compositing](issues/fix-crysta-tree-compositing.md)

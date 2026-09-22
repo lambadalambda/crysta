@@ -145,7 +145,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Promote the Crysta room builder into a library](issues/crysta-room-library.md)
 - [Walk between Crysta maps through the real exit geometry](issues/crysta-map-transitions.md)
 - [Place Crysta residents and let the player talk to them](issues/crysta-resident-interaction.md)
-- [Correct native Crysta tree compositing](issues/fix-crysta-tree-compositing.md)
 - [Animate the river in native Crysta](issues/animate-native-crysta-river.md)
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
