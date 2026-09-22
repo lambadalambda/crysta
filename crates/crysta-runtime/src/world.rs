@@ -198,7 +198,7 @@ impl<'a> World<'a> {
                 let seed = u32::from(map)
                     .wrapping_mul(0x9E37_79B9)
                     .wrapping_add(u32::try_from(index).unwrap_or(0).wrapping_mul(0x85EB_CA6B));
-                Actor::new(resident.position, resident.script, resident.initial, seed)
+                Actor::for_resident(image, map, resident, seed)
             })
             .collect();
         let base = if candidate {

@@ -30,7 +30,7 @@ pub struct Resident {
     pub selector: u8,
     /// Horizontal mirror in force.
     pub hflip: bool,
-    /// Frames since the selector or mirror last changed.
+    /// Frames since the pose changed or a qualified action restarted it.
     pub pose_age: u32,
     /// Whether a step is under way.
     pub walking: bool,

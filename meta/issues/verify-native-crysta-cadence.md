@@ -39,8 +39,8 @@ too fast and asks what movement/animation speed should actually be.
   monotonic elapsed time and timing policy are now logged. Audio and deterministic
   headless stepping are unchanged. Clock/input tests pass red→green; existing
   Session regressions and strict native Clippy pass. Independent review approved.
-- [Timing contract and remaining NPC questions](../../docs/native-crysta-timing.md).
-- Issue remains open while source/native NPC per-tick timing is investigated;
+- [Timing contract and source/native evidence](../../docs/native-crysta-timing.md).
+- Host pacing was corrected separately from the per-tick NPC work below;
   no arbitrary global NPC slowdown has been applied.
 
 ## Resident raster countdown
@@ -54,7 +54,35 @@ too fast and asks what movement/animation speed should actually be.
   list still looks held), and255 lasts256 without overflow.
 - Two pure regressions failed before correction and pass afterward; seven
   owned-ROM art tests and strict runtime Clippy pass. Translation/wait timing
-  remains a separate, active investigation.
+  was investigated separately below.
 - Independent raster-cadence review confirmed the generic16-bit actor countdown
   and approved with no blockers. Root formatting, strict workspace Clippy and
   release workspace tests pass after the correction.
+
+## Ordinary NPC translation — completed
+
+- Source-bound the map-D wanderer to class0/common movement resources. Decoded
+  all6668 common-resource bytes exactly match native WRAM. A fresh input-only
+  replay supplies401 per-frame observations: three complete steps use signed
+  1/0 deltas for32 ticks (16 pixels); idle/refusal uses16 ticks. That is about
+  30.05 pixels/second moving,0.532 seconds per tile,0.266 seconds per idle.
+- Corrected only this admitted record/action path, validating descriptor/header,
+  class tables, loader bindings, velocity and display records. Repeated actions
+  restart raster/velocity phase and consume their own COP8F, with no gap or
+  appended wait. Unverified skipped services revoke admission. Other classes,
+  private resources, arbitrary VM waits and native RNG remain outside scope.
+- Regression failed on the old nine-tick idle observation, then passed for2000
+  consecutive runtime ticks. Pure tests cover all four directions, first/final
+  frames, same-direction restarts,16-tick idle/refusal and fixed reservations;
+  admission tests reject changed source/private/class profiles and skipped
+  service exceptions. Existing wander/bounds/occupancy/stop-facing tests pass.
+- Root formatting, strict workspace/native Clippy, full release workspace tests,
+  49 ROM-free native tests and five owned-ROM Session tests pass. Independent
+  correctness/architecture reviews approved both runtime and retained tooling.
+- Reusable source decoder/native probe/verifier are retained under
+  `tools/crysta-cadence-qualification`, using production codec and shared
+  bootstrap. Three synthetic verifier tests pass; retained and fresh native
+  replays verify, with byte-identical settledD WRAM and sample JSONL. Raw evidence
+  stays ignored. No physical audio test repeated (no device in this environment).
+- Acceptance criteria met; archived. This closes the measured cadence issue,
+  not the complete actor VM or source qualification of all movement profiles.

@@ -158,3 +158,43 @@ fn a_walker_stops_and_faces_a_player_who_faces_them_and_walks_on_when_they_look_
     }
     assert!(cells.len() >= 2, "stayed put after the player looked away");
 }
+
+#[test]
+fn qualified_wanderer_actions_match_native_cadence_without_gap_ticks() {
+    let Some(cartridge) = owned_rom() else { return };
+    let mut world = World::enter(cartridge.image(), 0x000D, 200, 700).unwrap();
+    let index = world
+        .residents()
+        .iter()
+        .position(|r| r.record == 0x03_8CB4)
+        .unwrap();
+    let mut previous = world.residents()[index].clone();
+    let mut action_ticks = 0;
+    let mut actions = 0;
+    let mut walking_actions = 0;
+    for _ in 0..2000 {
+        world.step_checked(None).unwrap();
+        let now = &world.residents()[index];
+        if now.pose_age == 0 {
+            if action_ticks != 0 {
+                assert_eq!(action_ticks, if previous.walking { 32 } else { 16 });
+                actions += 1;
+                walking_actions += usize::from(previous.walking);
+            }
+            action_ticks = 0;
+        }
+        assert_eq!(
+            now.pose_age, action_ticks,
+            "each action restarts its raster"
+        );
+        let dx = i32::from(now.position.0) - i32::from(previous.position.0);
+        let dy = i32::from(now.position.1) - i32::from(previous.position.1);
+        assert_eq!(
+            dx.abs() + dy.abs(),
+            i32::from(now.walking && action_ticks % 2 == 0)
+        );
+        action_ticks += 1;
+        previous = now.clone();
+    }
+    assert!(actions > 30 && walking_actions > 5);
+}

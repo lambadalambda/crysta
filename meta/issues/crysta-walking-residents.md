@@ -54,10 +54,11 @@ it once.
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Parent: [Native macOS window, renderer and gamepad for the Crysta slice](crysta-native-shell.md)
-- Step speed and the exact frame-by-frame animation during a step are not
-  established: `$8F32` sets a one-record countdown and a velocity entry from
-  a table the runtime has not decoded. The runtime walks a tile in eight
-  frames and cycles the walking sequence while moving.
+- [Cadence qualification](../../docs/native-crysta-timing.md) now establishes
+  the map-D ordinary class-0 action:32 ticks per tile with signed1/0 deltas,
+  16 ticks idle/refused. `$8F32` selects a velocity stream and one **list
+  repetition**, not a one-record countdown. Other movement profiles remain
+  approximate.
 
 ## Progress: the loop runs
 
@@ -97,8 +98,8 @@ wanderer's greeting on approach is not shown.
 
 ### Not reproduced
 
-- Step speed: eight frames a tile, against a velocity table `$80:8F32`
-  reads that is not decoded.
+- Other movement profiles still use an approximate eight-frame tile step;
+  only the source-bound map-D ordinary action has qualified velocity/list timing.
 - The RNG: the runtime's own xorshift, seeded per map and record.
 - `COP 59` turned out to be the scene pause, not a talk pause, and what
   stops a walker for the player is `COP 23`; both are executed now. See
