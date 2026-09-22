@@ -1,10 +1,14 @@
 //! Walk the Crysta slice in a native window, on a gamepad.
 //!
 //! The simulation is [`crysta_runtime`]; this owns a window, a framebuffer and
-//! input, and nothing else. Backgrounds come from the qualified renderer rather
+//! input and music playback. Backgrounds come from the qualified renderer rather
 //! than a second decode path, and sprites from the runtime's art module.
 
 mod frame;
+mod music;
+mod music_controls;
+mod music_data;
+mod music_output;
 
 use assets::text::{Acknowledgement, DialoguePage};
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
@@ -58,19 +62,53 @@ fn main() {
     // renderer can be inspected without a window.
     // The image is leaked once, so the world can borrow it for the run.
     let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
-    if arguments.next().as_deref() == Some("--screenshot") {
+    let mode = arguments.next();
+    if mode.as_deref() == Some("--screenshot") {
         let path = arguments.next().unwrap_or_else(|| "frame.ppm".into());
         let script = arguments.next().unwrap_or_default();
         screenshot(&cartridge, image, &path, &script);
         return;
     }
+    if mode.as_deref().is_some_and(|mode| mode != "--no-music") {
+        eprintln!("unknown option; use --no-music or --screenshot <path> <script>");
+        std::process::exit(2);
+    }
+    let music = if mode.is_none() {
+        match start_music(&cartridge) {
+            Ok(music) => {
+                eprintln!(
+                    "Crysta music: M pauses/resumes, -/+ changes volume; unfocusing pauses music."
+                );
+                Some(music)
+            }
+            Err(error) => {
+                eprintln!("music unavailable (continuing silently): {error}");
+                None
+            }
+        }
+    } else {
+        None
+    };
     let event_loop = EventLoop::new().expect("an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::new(cartridge, image);
+    let mut app = App::new(cartridge, image, music);
     if let Err(error) = event_loop.run_app(&mut app) {
         eprintln!("{error}");
         std::process::exit(1);
     }
+}
+
+fn start_music(cartridge: &rom::Rom) -> Result<music_output::Music, String> {
+    let data = music_data::extract_crysta_music(cartridge).map_err(|error| error.to_string())?;
+    music_output::Music::start(move || {
+        let mut player = music::initialize(&data).map_err(|error| error.to_string())?;
+        Ok(move |samples: &mut [i16]| {
+            player
+                .render(samples)
+                .map(|_| ())
+                .map_err(|error| error.to_string())
+        })
+    })
 }
 
 /// Runs a step script and writes the composed view as a PPM.
@@ -415,10 +453,12 @@ struct App {
     /// Edge-triggered, so holding the button does not re-talk every frame.
     interact_down: bool,
     interact_was_down: bool,
+    music: Option<music_output::Music>,
+    music_controls: music_controls::Controls,
 }
 
 impl App {
-    fn new(cartridge: rom::Rom, image: &'static [u8]) -> Self {
+    fn new(cartridge: rom::Rom, image: &'static [u8], music: Option<music_output::Music>) -> Self {
         Self {
             cartridge,
             image,
@@ -431,6 +471,27 @@ impl App {
             frame: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
             interact_down: false,
             interact_was_down: false,
+            music,
+            music_controls: music_controls::Controls::default(),
+        }
+    }
+
+    fn update_music(&mut self) {
+        if let Some(music) = &self.music {
+            if let Err(error) = music.update(self.music_controls) {
+                eprintln!("music unavailable: {error}");
+                self.music = None;
+            }
+        }
+        if let Some(window) = &self.window {
+            let status = if self.music.is_none() {
+                "unavailable".to_string()
+            } else if !self.music_controls.playing() {
+                "paused".to_string()
+            } else {
+                format!("{:.0}%", self.music_controls.volume() * 100.0)
+            };
+            window.set_title(&format!("Crysta — music {status} | M: pause, -/+: volume"));
         }
     }
 
@@ -452,6 +513,13 @@ impl ApplicationHandler for App {
         let context = softbuffer::Context::new(window.clone()).expect("a drawing context");
         self.surface = Some(softbuffer::Surface::new(&context, window.clone()).expect("a surface"));
         self.window = Some(window);
+        self.music_controls.set_focused(true);
+        self.update_music();
+    }
+
+    fn suspended(&mut self, _: &ActiveEventLoop) {
+        self.music_controls.set_focused(false);
+        self.update_music();
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
@@ -467,6 +535,21 @@ impl ApplicationHandler for App {
                     PhysicalKey::Code(KeyCode::ArrowLeft | KeyCode::KeyA) => Some(Direction::Left),
                     PhysicalKey::Code(KeyCode::ArrowRight | KeyCode::KeyD) => {
                         Some(Direction::Right)
+                    }
+                    PhysicalKey::Code(KeyCode::KeyM) if pressed => {
+                        self.music_controls.toggle();
+                        self.update_music();
+                        None
+                    }
+                    PhysicalKey::Code(KeyCode::Minus | KeyCode::NumpadSubtract) if pressed => {
+                        self.music_controls.adjust_volume(-10);
+                        self.update_music();
+                        None
+                    }
+                    PhysicalKey::Code(KeyCode::Equal | KeyCode::NumpadAdd) if pressed => {
+                        self.music_controls.adjust_volume(10);
+                        self.update_music();
+                        None
                     }
                     PhysicalKey::Code(KeyCode::Escape) if pressed => {
                         event_loop.exit();
@@ -484,6 +567,10 @@ impl ApplicationHandler for App {
                         self.keys.push(direction);
                     }
                 }
+            }
+            WindowEvent::Focused(focused) => {
+                self.music_controls.set_focused(focused);
+                self.update_music();
             }
             WindowEvent::RedrawRequested => self.draw(),
             _ => {}

@@ -28,3 +28,8 @@ Document audio bootstrap, command transport, sequence/sample inputs, and timing 
 
 - Milestone: [M3 — Content and script pipeline](../milestones.md#m3-content-and-script-pipeline)
 - This issue covers reverse engineering; backend library selection and playback integration remain separate.
+- [Bounded native Crysta work](native-crysta-music.md) now documents source-only
+  driver/selection3/sample extraction and physical IPL/resident uploads, including
+  the receiver's ACK-before-read settling requirement. See the
+  [source recipe](../../tools/native-music-qualification/README.md). This is not
+  a complete command trace, sound-effect transition or whole-protocol qualification.

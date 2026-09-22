@@ -27,3 +27,7 @@ Play original music and sound effects with correct command and timing behavior w
 
 - Milestone: [M5 — Classic presentation and Chapter 1](../milestones.md#m5-classic-presentation-and-chapter-1)
 - A high-level music reimplementation is optional future work, not required for classic fidelity.
+- [Native Crysta music](native-crysta-music.md) adds a bounded MIT LakeSnes
+  audio-only backend and rodio device integration, with source-derived selection3.
+  Software/PCM tests pass; hardware playback is still awaiting desktop verification.
+  Map/event track changes, effects, browser audio and classic timing remain open.
