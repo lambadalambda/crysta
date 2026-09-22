@@ -1,0 +1,15 @@
+[workspace]
+
+[package]
+name = "native-music-qualification"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[dependencies]
+assets = { path = "../../crates/assets" }
+rom = { path = "../../crates/rom" }
+
+[lib]
+path = "lib.rs"
