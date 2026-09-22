@@ -563,6 +563,42 @@ slope-mediated type8, arbitrary player modes or the full map-$41 envelope.
 Production remains conservative; accepted candidate routes still pass24/24
 outbound and23/23 returns.
 
+### Source survey for remaining horizontal pairs
+
+`tools/collision-qualification/pair_survey.rs` inventories **AllClear static BG1
+loading projections**, not native gameplay or actor/event-patched collision.
+Unlike the25-map visual allowlist, it attempts all1,104 loading IDs and reports
+one explicit status per map. Selected BG1 and512-byte attribute resources must
+have exact operands and be unique; duplicate/missing recipes and decode failures
+remain visible. Source extents/hashes are retained, not raw layers.
+
+The initial authenticated JP survey yields496 resolved,404 skipped and204
+resolution errors. Among resolved maps,112 contain unflagged vertical pairs
+ending in8. There are **zero direct Partial/8 pairs** for first-table indices
+5/9/16/27/31, and802 Solid/8 pairs in61 maps. These classes refer only to the
+horizontal first-table targets, not admission of every listed raw material.
+The24-map Crysta baseline has only44 such pairs, all in town, with first types
+0/22/8: no static direct Partial/8 or Solid/8 candidate there. Dynamic occupancy,
+script patches, unresolved maps and other event states are not ruled out.
+
+Early Solid/8 navigation candidates include map `$24` (second cells `(12,51)`
+and `(12,54)`), `$4E` `(9,5)`, `$50` `(13,6)` and `$51`. A decoded pair is **not**
+a boot-origin route, an ordinary-player witness, or native qualification. The
+remaining-pair issue stays open until real execution supplies those witnesses.
+No synthetic ROM patch is used to manufacture an otherwise missing contact.
+
+```sh
+sh tools/collision-qualification/build.sh
+local/collision-qualification/probe/target/release/pair_survey \
+  'local/Tenchi Souzou (Japan).sfc' > local/collision-qualification/pairs.jsonl
+cargo test --manifest-path local/collision-qualification/probe/Cargo.toml --bin pair_survey
+```
+
+Initial complete survey SHA-256:
+`aa935272e00a76d60ec9e228c9a297f1b71b2927733e975b82e0edab7f8945bc`.
+This identifies the source inventory only; **absence in it is not a proof of
+native unreachability**.
+
 ### Reproduce the ten pinned motion captures
 
 Original six-capture tooling: commit `6300ec3`; additional window recipes are
