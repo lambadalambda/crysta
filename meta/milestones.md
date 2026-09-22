@@ -141,7 +141,6 @@ qualification remain open.
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
-- [Walkers stop and face the player who faces them](issues/crysta-walker-stops-for-player.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
