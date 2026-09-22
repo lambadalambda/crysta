@@ -41,4 +41,3 @@
 - [ ] [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [ ] [Trace the player's movement admission routine](issues/trace-movement-admission-routine.md)
 - [ ] [Qualify the directional resolver for Crysta's remaining collision types](issues/qualify-crysta-directional-collision.md)
-- [ ] [Qualify horizontal type8 collision with native witnesses](issues/qualify-horizontal-type8-collision.md)

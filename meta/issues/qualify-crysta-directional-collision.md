@@ -110,3 +110,19 @@ beyond its current 19 of 24 reachable maps.
   permits it. Host ownership is distinct from emulation of that native bit.
 - Acceptance remains open: remaining native material/branch/mode qualification,
   full envelope, then justified production enablement.
+
+### Horizontal Open/type8 native follow-up
+
+- [Horizontal type8 qualification](qualify-horizontal-type8-collision.md) adds a
+  byte-reproduced100-frame boot-origin window,14342–14441, with Left/Right
+  Open/8 contacts and1/2px attempts. All frames replay without exclusions or
+  walking-state resets; no runtime geometry change was needed.
+- Native dispatch evidence now derives tentative sample coordinates, excludes
+  raw old-edge slope diversions, verifies unflagged0/8 cells and ordered
+  player-only lookup/dispatch pairs. Portable mutations protect those checks.
+- Ten pinned windows now total **5,641 frames**, plus the existing2,223 legacy
+  transitions. Candidate24/24 outbound and23/23 return gates still pass;
+  conservative production remains19/24.
+- Horizontal **first8, Partial/8, Solid/8 and slope-mediated type8** remain
+  native-unqualified, as do the other previously listed branches and modes.
+  This bounded Open/8 evidence does not complete the parent issue.

@@ -85,3 +85,4 @@
 - [x] [Fix actor-script rustdoc links to private constants](issues/fix-actor-script-rustdoc-links.md)
 - [x] [Reject world loading when resident resolution fails](issues/reject-resident-resolution-failures.md)
 - [x] [Qualify Crysta return arrivals and prevent reverse-door bounces](issues/qualify-crysta-return-arrivals.md)
+- [x] [Qualify horizontal type8 collision with native witnesses](issues/qualify-horizontal-type8-collision.md)

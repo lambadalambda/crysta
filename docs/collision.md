@@ -485,23 +485,25 @@ raw8 exception precedes the flagged second-sample override. Sixteen dispatch
 entries, the raw exception, flags and defaults have synthetic regression controls.
 The set-bit `$D511..D53F` branch remains outside admission.
 
-Three additional complete, pinned input-only windows pass every frame:
+Four additional complete, pinned input-only windows pass every frame:
 
 | Capture | Map | Frames | Bounded evidence |
 | --- | --- | ---: | --- |
 | `motion-type8-gap-bounded` | `$0A` | 2,482 | Up first8, Up Open/8, Down first8; special0 throughout |
 | `motion-door5-contact` | `$0C` | 207 | Passive contacts with the still-closed type5 door after the first real pot hit |
 | `motion-map41` | `$41` | 880 | First ordinary cardinal/neutral discovery window, freshly recaptured |
+| `motion-type8-horizontal` | `$0A` | 100 | Left and Right Open/8 dispatch with1/2px attempts; special0 throughout |
 
-The nine native windows total **5,541 frames**, with no frame exclusions or
+The ten native windows total **5,641 frames**, with no frame exclusions or
 walking-state resets. The suite also requires actual type8 cells and player-only
 PC witnesses: frame12915 reaches `$D506 → D50E`; frame13948 samples Open/8 and
 reaches `$D3F1`; frame14328 samples aligned8 and reaches `$D79D → D7A0`.
 TDD first failed at12915 with `UnsupportedType(8)`, then the whole window passed.
 
-**Native coverage is not complete:** Left/Right type8 dispatch, the Down ordered
-pairs, Up Partial/Solid pairs, flagged8 and `$D8A0` remain synthetic-only. Walking
-horizontally somewhere in the capture does not count as type8 dispatch coverage.
+**Native coverage is not complete:** horizontal first8 and Partial/8 or Solid/8,
+the Down ordered pairs, Up Partial/Solid pairs, flagged8 and `$D8A0` remain
+synthetic-only. The new horizontal window qualifies **Open/8 only**. Walking
+horizontally somewhere in a capture does not count as type8 dispatch coverage.
 
 Continuing Down after the bounded window reveals a real mode boundary:
 frame14469→14470 moves `(408,185) → (408,188)`, player flags change
@@ -512,10 +514,59 @@ This descent is **outside ordinary movement admission**, not a collision replay
 to silently omit or a reason to enable the candidate globally. `$097C & 4 == 0`
 alone is not sufficient: the rest of the ordinary-player contract still matters.
 
-### Reproduce the nine pinned motion captures
+### Native horizontal Open/type8 witnesses
+
+`Type8Horizontal` preserves the input-only cap approach through
+`type8-gap-4-settle`, recording ordinary frame samples on that prefix. Twelve
+settled neutral samples precede the contiguous **14342–14441** motion window:
+Right30, neutral12, Down4, neutral12, Left30, neutral12. It starts `(360,180)`
+and finishes `(360,184)`. The short Down leg repositions within ordinary mode;
+it is not the later special descent. Two independent empty-SRAM boot captures
+are byte-identical, with SHA-256
+`4dd8c8e052c9e3c2940fce83a1f349e2ec5ff04ae9316cd73971e7b9aa3408bd`.
+
+All100 frames match native attempted velocities and frame-end XY, with one
+continuous walking state and snapshot replay, fixed bounds, passive hooks,
+ordinary flags and special0. No runtime geometry change was necessary.
+
+Shared Open handler PCs alone do not prove type8. The new witness validator
+computes **tentative** sample positions from pre-resolver XY and attempted dx:
+Left lookup `x+dx−8`, Right lookup **`x+dx+7`**, vertical origin `y−16`.
+A nonzero vertical remainder is required; the second sample is **one row below**
+the first. It verifies unflagged raw0 then raw8 and excludes old-edge raw slope
+diversions (Left first6/second7; Right first7/second6), including flagged slopes.
+The PCs must be ordered adjacent lookup/dispatch pairs **within the player's
+`$D109..first $D197` segment**, never later NPC work.
+
+| Frame | Direction / attempt | Before | New first / second cell | Perpendicular remainder |
+| --- | --- | --- | --- | ---: |
+| 14344 | Right +1 | `(360,180)` | `(23,10)` / `(23,11)` | 4 |
+| 14354 | Right +1 | `(375,180)` | `(23,10)` / `(23,11)` | 4 |
+| 14355 | Right +2 | `(376,180)` | `(24,10)` / `(24,11)` | 4 |
+| 14402 | Left −1 | `(403,184)` | `(24,10)` / `(24,11)` | 8 |
+| 14409 | Left −2 | `(393,184)` | `(23,10)` / `(23,11)` | 8 |
+
+The Right14354 boundary distinguishes lookup `+7` from correction edge `+8`;
+Right14344 and Left14409 distinguish new from old sample columns. Source dispatch
+pairs, all in bank `$80`:
+
+- Left: first `$DB45 → DB48`; second `$DB4F → DB66`, from table `$DCA0`
+  type8 entry `$DCB0`. Lookup calls `$DB42 → E838` and `$DB4C → E777`.
+- Right: first `$DEBB → DEBE`; second `$DEC5 → DEDC`, from table `$E01C`
+  type8 entry `$E02C`. Lookup calls `$DEB8 → E838` and `$DEC2 → E777`.
+
+ROM-free negative controls reject removed, flagged or merely nearby8; aligned
+second-sample claims; wrong input/attempt/sample coordinates; either old slope;
+wrong or reordered dispatch pairs; and matching PCs appearing only after the
+player returns. This does **not** qualify horizontal first8, Partial/8, Solid/8,
+slope-mediated type8, arbitrary player modes or the full map-$41 envelope.
+Production remains conservative; accepted candidate routes still pass24/24
+outbound and23/23 returns.
+
+### Reproduce the ten pinned motion captures
 
 Original six-capture tooling: commit `6300ec3`; additional window recipes are
-`Type8Gap` and `window_route.py` in the current source. All use the
+`Type8Gap`, `Type8Horizontal` and `window_route.py` in the current source. All use the
 workspace oracle and owned normalized JP ROM (SHA-256
 `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`).
 Complete output pins live in the replay test; raw outputs remain ignored.
@@ -533,9 +584,10 @@ done
 python3 tools/collision-qualification/slope_route.py TreeEast > "$D/motion-tree-east-route.jsonl"
 python3 tools/collision-qualification/slope_route.py TreeBottom > "$D/motion-tree-bottom-route.jsonl"
 python3 tools/collision-qualification/slope_route.py Type8Gap > "$D/motion-type8-gap-bounded-route.jsonl"
+python3 tools/collision-qualification/slope_route.py Type8Horizontal > "$D/motion-type8-horizontal-route.jsonl"
 python3 tools/collision-qualification/window_route.py Door5 > "$D/motion-door5-contact-route.jsonl"
 python3 tools/collision-qualification/window_route.py Map41 > "$D/motion-map41-route.jsonl"
-for name in motion-Right motion-Left motion-Right-vertical motion-Left-vertical motion-tree-east motion-tree-bottom motion-type8-gap-bounded motion-door5-contact motion-map41; do
+for name in motion-Right motion-Left motion-Right-vertical motion-Left-vertical motion-tree-east motion-tree-bottom motion-type8-gap-bounded motion-door5-contact motion-map41 motion-type8-horizontal; do
   "$D/probe/target/release/trace" "$ROM" "$D/$name" \
     < "$D/$name-route.jsonl" > "$D/$name.jsonl"
 done

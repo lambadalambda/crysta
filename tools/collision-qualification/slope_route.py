@@ -108,9 +108,27 @@ def type8_gap_route():
     return commands + [{'finish': True}]
 
 
+def type8_horizontal_route():
+    """Keep the cap approach, then sample Open/8 from both horizontal sides."""
+    commands = []
+    for command in type8_gap_route():
+        commands.append({k: v for k, v in command.items() if k != 'motion'})
+        if command.get('label') == 'type8-gap-4-settle':
+            break
+    else:
+        raise ValueError('type8 route has no settled cap checkpoint')
+    # Four Down frames reposition within ordinary mode, not the later descent.
+    for index, (buttons, frames) in enumerate([
+            (['Right'], 30), ([], 12), (['Down'], 4),
+            ([], 12), (['Left'], 30), ([], 12)]):
+        commands.append({'label': f'horizontal8-{index}', 'buttons': buttons,
+                         'frames': frames, 'motion': True})
+    return commands + [{'finish': True}]
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('direction', choices=('Right', 'Left', 'TreeEast', 'TreeBottom', 'Type8', 'Type8Gap'))
+    parser.add_argument('direction', choices=('Right', 'Left', 'TreeEast', 'TreeBottom', 'Type8', 'Type8Gap', 'Type8Horizontal'))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--trace', action='store_true')
     mode.add_argument('--motion', action='store_true')
@@ -120,7 +138,8 @@ if __name__ == '__main__':
         parser.error('--vertical requires --motion')
     named = {'TreeEast': lambda: tree_route('east'),
              'TreeBottom': lambda: tree_route('bottom'),
-             'Type8': type8_route, 'Type8Gap': type8_gap_route}
+             'Type8': type8_route, 'Type8Gap': type8_gap_route,
+             'Type8Horizontal': type8_horizontal_route}
     if args.direction in named:
         if args.trace or args.motion or args.vertical:
             parser.error('named routes always record motion; no extra flags')

@@ -6,6 +6,26 @@ from slope_route import route
 
 
 class MotionRoutes(unittest.TestCase):
+    def test_horizontal8_window_preserves_approach_and_stops_before_descent(self):
+        from slope_route import type8_gap_route, type8_horizontal_route
+        commands = type8_horizontal_route()
+        boundary = next(i for i, c in enumerate(type8_gap_route())
+                        if c.get('label') == 'type8-gap-4-settle')
+        prefix = [{k: v for k, v in c.items() if k != 'motion'}
+                  for c in type8_gap_route()[:boundary + 1]]
+        self.assertEqual(commands[:boundary + 1], prefix)
+        self.assertEqual(prefix[-1]['buttons'], [])
+        self.assertEqual(prefix[-1]['frames'], 12)
+        window = commands[boundary + 1:-1]
+        self.assertTrue(all(c.get('motion') for c in window))
+        self.assertEqual(sum(c['frames'] for c in window), 100)
+        self.assertEqual([(c['buttons'], c['frames']) for c in window],
+                         [(['Right'], 30), ([], 12), (['Down'], 4),
+                          ([], 12), (['Left'], 30), ([], 12)])
+        self.assertEqual(commands[-1], {'finish': True})
+        self.assertTrue(all(set(c) <= {'label', 'buttons', 'frames', 'motion', 'finish'}
+                            for c in commands))
+
     def test_motion_window_has_settled_prefix_and_no_gaps(self):
         for direction in ('Right', 'Left'):
             for vertical in (False, True):

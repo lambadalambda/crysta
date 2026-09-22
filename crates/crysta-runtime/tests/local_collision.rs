@@ -49,6 +49,11 @@ const CASES: &[(&str, &str, usize)] = &[
         207,
     ),
     (
+        "motion-type8-horizontal",
+        "4dd8c8e052c9e3c2940fce83a1f349e2ec5ff04ae9316cd73971e7b9aa3408bd",
+        100,
+    ),
+    (
         "motion-map41",
         "63952a21cdd18e7a9e1c9855f7ada777f7901564fc8ab8fe55487936f2ce6c61",
         880,
@@ -138,6 +143,94 @@ fn type8_witnesses(rows: &[Value]) {
     }
 }
 
+/// Bounded ordinary Open/8 horizontal dispatch, not first8 or slope redispatch.
+fn horizontal_open8_witness(row: &Value, direction: Direction, expected: (u16, u16)) {
+    let (edge_offset, old_first_slope, old_second_slope, pairs) = match direction {
+        Direction::Left => (
+            -8,
+            6,
+            7,
+            [
+                [0x80_DB42, 0x80_E838],
+                [0x80_DB45, 0x80_DB48],
+                [0x80_DB4C, 0x80_E777],
+                [0x80_DB4F, 0x80_DB66],
+            ],
+        ),
+        Direction::Right => (
+            7,
+            7,
+            6,
+            [
+                [0x80_DEB8, 0x80_E838],
+                [0x80_DEBB, 0x80_DEBE],
+                [0x80_DEC2, 0x80_E777],
+                [0x80_DEC5, 0x80_DEDC],
+            ],
+        ),
+        _ => panic!("horizontal witness requires Left or Right"),
+    };
+    assert_eq!(row["held"], serde_json::json!([format!("{direction:?}")]));
+    let dx = row["attempt"][0].as_i64().unwrap();
+    assert_eq!(row["attempt"][1], 0);
+    assert!(matches!(dx, -2 | -1 | 1 | 2));
+    assert_eq!(dx > 0, direction == Direction::Right);
+    let (x, y) = pair(&row["before"]);
+    let v = y.checked_sub(16).unwrap();
+    assert_ne!(v & 15, 0, "aligned movement never samples the second row");
+    let old_u = u16::try_from(i64::from(x) + edge_offset).unwrap();
+    let new_u = u16::try_from(i64::from(x) + dx + edge_offset).unwrap();
+    let (column, top) = (new_u / 16, v / 16);
+    assert_eq!(
+        (column, top),
+        expected,
+        "tentative sample, not old/final/correction edge"
+    );
+    let width = number(row, "width");
+    let raw = |column: u16, row_index: u16| {
+        assert!(column < width && row_index < number(row, "height"));
+        row["cells"][usize::from(row_index) * usize::from(width) + usize::from(column)]
+            .as_u64()
+            .unwrap()
+    };
+    // Native tests RAW old types before bit15 override; a slope bypass would
+    // make the unadjusted new pair only hypothetical, even if it contains8.
+    assert_ne!((raw(old_u / 16, top) >> 9) & 31, old_first_slope);
+    assert_ne!((raw(old_u / 16, top + 1) >> 9) & 31, old_second_slope);
+    for (row_index, kind) in [(top, 0), (top + 1, 8)] {
+        let cell = raw(column, row_index);
+        assert_eq!(cell & 0x8000, 0, "flagged stored8 dispatches as class3");
+        assert_eq!((cell >> 9) & 31, kind);
+    }
+    // Require lookup calls and ordered direct dispatch→target pairs. Matching
+    // shared Open PCs somewhere in the complete frame cannot establish type8.
+    let path = player_path(row);
+    let mut remaining = path.as_slice();
+    for pair in pairs {
+        let at = remaining
+            .windows(2)
+            .position(|pcs| pcs == pair)
+            .expect("missing ordered player sample/dispatch pair");
+        remaining = &remaining[at + 2..];
+    }
+}
+
+fn horizontal_type8_witnesses(rows: &[Value]) {
+    for (frame, direction, before, dx, sample) in [
+        (14344, Direction::Right, (360, 180), 1, (23, 10)),
+        (14354, Direction::Right, (375, 180), 1, (23, 10)), // +7 vs +8 boundary.
+        (14355, Direction::Right, (376, 180), 2, (24, 10)),
+        (14402, Direction::Left, (403, 184), -1, (24, 10)),
+        (14409, Direction::Left, (393, 184), -2, (23, 10)), // Old/new columns differ.
+    ] {
+        let row = rows.iter().find(|row| row["frame"] == frame).unwrap();
+        assert_eq!(number(row, "map"), 0xA);
+        assert_eq!(pair(&row["before"]), before);
+        assert_eq!(row["attempt"], serde_json::json!([dx, 0]));
+        horizontal_open8_witness(row, direction, sample);
+    }
+}
+
 fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
     let actual = rom::digests(bytes)
         .sha256
@@ -216,6 +309,8 @@ fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
     }
     if name == "motion-type8-gap-bounded" {
         type8_witnesses(motion);
+    } else if name == "motion-type8-horizontal" {
+        horizontal_type8_witnesses(motion);
     }
     eprintln!("{name}: {count} native motion frames, zero exclusions");
     coverage
@@ -246,6 +341,101 @@ fn native_directional_motion_matches_every_frame_and_attempt() {
             coverage.contains(&handler),
             "missing player slope handler {handler:06x}"
         );
+    }
+}
+
+#[test]
+fn horizontal8_witnesses_require_the_dispatched_cells_and_player_path() {
+    use serde_json::json;
+    for (direction, x, dx, column, dispatches) in [
+        (
+            Direction::Right,
+            360,
+            1,
+            23,
+            [
+                0x80_DEB8, 0x80_E838, 0x80_DEBB, 0x80_DEBE, 0x80_DEC2, 0x80_E777, 0x80_DEC5,
+                0x80_DEDC,
+            ],
+        ),
+        (
+            Direction::Left,
+            393,
+            -2,
+            23,
+            [
+                0x80_DB42, 0x80_E838, 0x80_DB45, 0x80_DB48, 0x80_DB4C, 0x80_E777, 0x80_DB4F,
+                0x80_DB66,
+            ],
+        ),
+    ] {
+        let mut cells = vec![0u16; 32 * 16];
+        cells[11 * 32 + column] = 8 << 9;
+        let mut path = vec![0x80_D109];
+        path.extend(dispatches);
+        path.push(0x80_D197);
+        let row = json!({"before": [x, 180], "after": [0, 0], "attempt": [dx, 0],
+                         "held": [format!("{direction:?}")], "width": 32, "height": 16,
+                         "cells": cells, "path": path});
+        horizontal_open8_witness(&row, direction, (23, 10));
+        for mutation in 0..13 {
+            let mut wrong = row.clone();
+            match mutation {
+                0 => wrong["cells"][11 * 32 + column] = json!(0), // Same Open PCs, no8.
+                1 => wrong["cells"][11 * 32 + column] = json!(0x9000), // Flag overrides8.
+                2 => {
+                    // Nearby8 does not count.
+                    wrong["cells"][11 * 32 + column] = json!(0);
+                    wrong["cells"][12 * 32 + column] = json!(8 << 9);
+                }
+                3 => wrong["before"][1] = json!(176), // Aligned: no second sample.
+                4 => wrong["attempt"][0] = json!(-dx),
+                5 => wrong["attempt"][1] = json!(1),
+                6 => wrong["held"] = json!([]),
+                7 | 11 => {
+                    // Old-edge raw slopes divert before new pair dispatch.
+                    let old_column = if direction == Direction::Right {
+                        22
+                    } else {
+                        24
+                    };
+                    let first = mutation == 11;
+                    let old_row = if first { 10 } else { 11 };
+                    let slope = match (direction, first) {
+                        (Direction::Right, false) | (Direction::Left, true) => 6,
+                        _ => 7,
+                    };
+                    wrong["cells"][old_row * 32 + old_column] = json!(0x8000 | (slope << 9));
+                }
+                8 => wrong["path"][7] = json!(0x80_DCF0), // A table word is not a PC.
+                9 => {
+                    // All matching PCs belong to an NPC after the player returns.
+                    let mut npc = vec![0x80_D109, 0x80_D197];
+                    npc.extend(dispatches);
+                    wrong["path"] = json!(npc);
+                }
+                10 => wrong["before"][0] = json!(x + 16),
+                12 => wrong["path"].as_array_mut().unwrap()[1..9].rotate_left(4),
+                _ => unreachable!(),
+            }
+            assert!(
+                std::panic::catch_unwind(|| horizontal_open8_witness(&wrong, direction, (23, 10)))
+                    .is_err(),
+                "{direction:?} accepted mutation{mutation}"
+            );
+        }
+        if direction == Direction::Right {
+            // Tentative right lookup is x+dx+7, not the correction edge x+dx+8.
+            let mut boundary = row.clone();
+            boundary["before"][0] = json!(375);
+            horizontal_open8_witness(&boundary, direction, (23, 10));
+            assert!(std::panic::catch_unwind(|| horizontal_open8_witness(
+                &boundary,
+                direction,
+                (24, 10)
+            ))
+            .is_err());
+        }
     }
 }
 
