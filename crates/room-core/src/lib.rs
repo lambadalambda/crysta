@@ -11,6 +11,7 @@
 extern crate alloc;
 
 mod animation;
+pub mod arrival;
 pub mod conversation;
 pub mod events;
 mod house;
