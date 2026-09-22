@@ -53,7 +53,7 @@ it is not portable implementation.
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Parent: [Complete the Crysta and Pandora vertical slice](opening-vertical-slice.md)
-- Current endpoint per
+- Original endpoint per
   [the source/reference contract](../../docs/pandora-progression.md):
   `pandora-tour-control`, map `$41`, completed frame 41344, `(136,208)`; the
   final two-axis controls finish at completed 41788, `(120,192)`. Later field
@@ -66,11 +66,43 @@ it is not portable implementation.
   prerequisite for the slice rather than a parallel track. Determining that is
   part of this issue's value, so resolve it early and report it.
 
-## Qualification in progress
+## Completed qualification
+
+The [full source/reference contract](../../tools/tower-approach-qualification/TOWER.md)
+now reaches **`first-tower-transition-control`, completed65332, map `$101`,
+`(128,623)`**. Horizontal and vertical inputs then prove control; neutral stability
+ends at **65608, `(112,607)`**. This is the interior entrance, not just map100.
+
+- One empty-SRAM input-only boot preserves the complete Pandora and frozen-return
+  prefixes:615 commands,616 checkpoints,58,808 explicit route frames. An independent
+  fresh replay matches **all4,313 files** and every byte of the76,532,961-byte log.
+  No warp, memory patch, restoration, save loading or filtered observations.
+- The source-backed route separates spear consent, collection and inventory;
+  frozen return FE/23; Elder initiation21 versus completed response296; town3C;
+  distinct world-map movement; tower introduction100 and guardian completion115;
+  and the actual source exit100→101. Alternate Elder/guardian answers are
+  source-only where not exercised natively.
+- Acquisition and frozen return are part of this route. Equipped weapon/armor
+  words remain zero throughout the tower extension while inventory retains81/1.
+  **Neither equipment selection nor combat is required for the entrance endpoint.**
+  This does not qualify equipment UI, HP/XP, enemy behavior or later tower progress.
+- All58 qualification tests pass normally and under `-O`; the tower semantic
+  no-op mutant yields168 failures. Artifact-gate, inventory-slice and equipment-width
+  pipeline controls fail as intended. Both final checker modes pass on the original
+  and independent captures. Independent source, correctness/DRY and executable
+  reviews found no blockers, including direct equipment read/write verification.
+- Release workspace tests, three local collision tests and16 local world tests
+  pass. Candidate geometry stays24/24 outbound,23/23 returns; production stays19/24.
+  Missing first8/Partial8/Solid8/slope8 witnesses remain separate open issues.
+- [Bounded asset/runtime/render follow-up](../../tools/tower-approach-qualification/TOWER.md#bounded-portable-follow-up)
+  is recorded before integration. This closes the native evidence issue, **not**
+  the portable vertical slice. Raw artifacts remain ignored under `local/`.
+
+### First segment
 
 ### Corrected blocker: spear and frozen return reproduced
 
-The earlier **terminal-hall/unreachable-arches conclusion below is refuted**.
+The earlier **terminal-hall/unreachable-arches conclusion is refuted**.
 A turning corridor, missed by the old sweeps, reaches `(72,80)`; A enters map42.
 The hall controller being idle does not disable the door interactions. Native
 input follows the current directional-model navigation hint exactly, without any
@@ -87,10 +119,14 @@ acquisition, **not equipping**, town/overworld traversal or the first tower.
 Source/checker work uses red→green mutation controls and retains every failed
 approach/misnamed discovery checkpoint. No portable behavior or production
 collision admission is widened. Onward stair return, Elder encounter and tower
-approach remain this open issue's next segment; the bounded portable follow-up
-scope is listed in the new qualification README.
+entrance are now qualified by the second segment above; the first segment's
+recipe and pins remain unchanged.
 
 ### Earlier investigation (terminal-hall inference superseded)
+
+The following is historical investigation, not the accepted departure contract.
+Negative sweeps were not exhaustive connectivity proofs; the turning corridor
+above refutes the terminal-room interpretation.
 
 - The accepted baseline reproduces on this machine: `replay.sh` produced a fresh
   root of 2,682 artifacts and the strict checker passed normally and under `-O`.
@@ -104,7 +140,7 @@ scope is listed in the new qualification README.
   `discovery-route.jsonl`. **The continuation did not fire.** Final flags are
   exactly the documented endpoint set, with no `$23`, no `$FE` and no map change.
   The reachable area, its two pockets, the blocking floor object and the
-  unreachable arches are tabulated in the harness README.
+  arches thought unreachable at the time are tabulated in the harness README.
 - Behavioral finding worth carrying into any future sweep: `Start` opens an
   invisible state that swallows all input until `Start` is pressed again, while
   leaving map, position, flags and script unchanged. It silently invalidated the
@@ -144,27 +180,25 @@ scope is listed in the new qualification README.
 - `COP $91` ends in `PLA / PLA / RTL`, yielding to the actor dispatcher without
   advancing the actor's script pointer, so field `$0A` stays at `$D2E5` forever.
   The guide loops by design; it is idle-animating, not waiting on the player.
-- Net: the endpoint is **quiescent, not gated**. Nothing in map `$41` is waiting
-  on a condition a player could satisfy, which rules out the whole class of
-  "find the trigger in this room" approaches.
+- Corrected net: the tour controller is **quiescent, not gated**. This does not
+  disable room-door interactions or rule out departure; that earlier inference
+  was false.
 - The `$2E`-vs-`$2F` branch hypothesis is **refuted**. The archived discovery
   reference's own retained points end its `$2F` refusal journey in map `$41` at
   `(120,192)` — the same room and position as the accepted `$2E` endpoint — with
   `$243`/`$244` set, no `$23` and no `$FE`, and the same forced
   `41 → 44 → 42 → 43 → 41` tour path. It carries `$2F`, `$3F` and `$42` instead
-  of `$2E`, and still lands in the same terminal hall. Note that the discovery
+  of `$2E`, and still lands in the same hall. Note that the discovery
   observer epoch is unrenewed, so this is the best available semantic evidence,
   not a renewed claim.
-- Open question, reframed: how is the player meant to leave map `$41`? It has no
-  reachable exit, no script waiting on them, and both branches park there. The
-  candidates are a missed interaction, a departure the route's input interrupted,
-  or a continuation that belongs to a later phase and is never meant to run here.
+- Former open question: how does the player leave map `$41`? Resolved by the
+  turning corridor and arch interaction, not an interrupted tour controller.
 - Confirmed directly: replaying the discovery route under the trace probe
   reproduces its semantic endpoint (frame 48,259, map `$41`, `(120,192)`, flags
   `$20,$22,$26,$27,$28,$2F,$3F,$42,$FB,$243,$244,$292`) and breakpoints
   identically to the accepted branch. `$88AF3F` is not reached; `$89D2E5` runs
   every frame from `$80C745` with the same registers. No pixel claim is renewed.
-- All three departure hypotheses tested; none survives. **Nothing polls:** over
+- Three tour-controller hypotheses tested; none survives. **Nothing polls:** over
   two frames at the endpoint, bank `$88` executes zero instructions, so the
   controller bank holding `$88AF3F` is dormant rather than un-triggered; bank
   `$89` runs nine addresses once per frame each, all actor ticks. **Nothing is
@@ -185,9 +219,6 @@ scope is listed in the new qualification README.
   row's extreme, so it could not have found an interior column. Column-wise
   probing is the missing complement; it confirmed the same envelope here, but the
   gap was real.
-- Next: the box interior is terminal in this session, so the remaining
-  possibilities sit earlier in the route or outside it. Candidates: whether the
-  accepted route reaches `$41` in a state the game does not otherwise produce
-  (compare against a non-route arrival), and whether `$88AF3F`'s bank is entered
-  from a map change that the hall cannot reach, making the continuation belong to
-  a later phase rather than this one.
+- Superseded next-step inference: the interior was thought terminal. No earlier
+  route repair was needed; normal input through the missed turning corridor
+  reaches the spear and the later continuation.

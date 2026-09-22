@@ -86,3 +86,4 @@
 - [x] [Reject world loading when resident resolution fails](issues/reject-resident-resolution-failures.md)
 - [x] [Qualify Crysta return arrivals and prevent reverse-door bounces](issues/qualify-crysta-return-arrivals.md)
 - [x] [Qualify horizontal type8 collision with native witnesses](issues/qualify-horizontal-type8-collision.md)
+- [x] [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)

@@ -2,9 +2,14 @@
 
 [Owned issue](../../meta/issues/qualify-tower-approach-route.md). The first accepted
 segment extends the existing Pandora tour to **`frozen-return-stable`, frame53586,
-map `$21`, `(120,448)`**. It does **not** yet qualify the frozen town, overworld,
+map `$21`, `(120,448)`**. This first segment alone does **not** qualify the frozen town, overworld,
 tower approach/interior, equipment selection or combat. No portable/runtime
 behavior is changed by this tooling.
+
+The independently verified [second segment](TOWER.md) now reaches **first-tower
+interior map `$101`**, with two-axis control and neutral stability through
+frame65608, `(112,607)`. The native route issue is complete; portable integration
+remains open. The first-segment recipe and pins below are unchanged.
 
 ## Corrected progression blocker
 
@@ -110,5 +115,6 @@ item81 acquisition separately from equipped state; implement bounded award
 presentation, map21 return handoffs and cooperating request/flag phases; render
 the acquired object and return/freeze presentation from source assets. Do not
 instantiate these from captured WRAM. Equipment UI, frozen town/field traversal
-and any tower/combat behavior remain later scopes. The parent route issue stays
-open until its first-tower endpoint and prerequisites are independently verified.
+and any tower/combat behavior remain separate portable scopes. The completed
+[native second segment](TOWER.md#bounded-portable-follow-up) records their bounded
+follow-up requirements; no combat is required for its entrance-only endpoint.

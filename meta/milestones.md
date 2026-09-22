@@ -128,6 +128,10 @@ qualification remain open.
 - ROM validation, representative extraction, and a core replay pass an early WebAssembly feasibility check.
 - Classic-mode state remains within documented equivalence expectations for its covered paths.
 
+Native evidence now reaches the [first-tower interior entrance](issues/qualify-tower-approach-route.md)
+with stable two-axis control. Portable integration remains open; this native
+route needs acquisition/frozen return but no equipment selection or combat.
+
 ### Issues
 
 - [Define the deterministic portable core model](issues/deterministic-core-model.md)
@@ -135,7 +139,6 @@ qualification remain open.
 - [Port map loading, transitions, and collision](issues/port-map-loading-collision.md)
 - [Port the actor system and combat primitives](issues/port-actors-combat.md)
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
-- [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
 - [Play the Crysta slice free-roam in a native app](issues/free-roam-crysta-app.md)

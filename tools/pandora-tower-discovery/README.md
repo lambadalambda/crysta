@@ -116,9 +116,10 @@ pockets along the bottom row; it is what stopped rightward movement at `x=88` an
 leftward movement at `x=120`. The pockets do connect one row higher, around
 `y≈188`.
 
-Nothing above `y≈112` is walkable. The three arches at `x≈64/128/192` each have
-furniture directly below them, so the tour rooms `$42/$43/$44` are not reachable
-on foot; this is consistent with the tour being forced scripted presentation.
+The old sweeps found no path above `y≈112` and inferred that the arches at
+`x≈64/128/192` were unreachable. **That inference is superseded:** the later
+turning-corridor route reaches the left arch on foot and A enters map42. The tour
+itself is forced presentation, but these rooms are also reachable afterward.
 
 Interactions tried with no effect on flags, map or script: `A` facing the floor
 object from both sides, `A` facing the desk cluster, `A` facing the left
@@ -223,12 +224,11 @@ dispatcher without advancing the actor's script pointer — field `$0A` stays at
 `$D2E5` indefinitely. Looping on that COP forever is what the script is written
 to do.
 
-That makes the endpoint quiescent rather than gated: the controller has ended,
-and no script is waiting on a condition a player could satisfy. Whatever starts
-the continuation is not running in map `$41` at all. The strongest remaining
-hypothesis is that the accepted route's `$2E` branch cannot reach it, and that
-testing the alternative `$2F` refusal/retry branch — which the archived
-discovery reference explored — matters more than anything further in this room.
+The tour controller's endpoint is quiescent rather than gated. The historical
+hypothesis was that the accepted `$2E` branch could not reach the continuation,
+and that testing `$2F` mattered more than further room navigation. **That
+hypothesis is refuted:** the accepted branch leaves through the turning corridor
+and arch interaction. An idle tour controller does not disable room doors.
 
 ### Both story branches converge on the same quiescent hall
 
@@ -248,7 +248,7 @@ one:
 Its `tutorial_map_path` is `[65, 68, 66, 67, 65]` — the same forced
 `41 → 44 → 42 → 43 → 41` tour. So the refusal branch does more on the way (it
 retains missing-prerequisite, cancellation, refusal and second-hit controls, and
-carries `$3F`/`$42`) and still lands in the same terminal hall state.
+carries `$3F`/`$42`) and still lands in the same quiescent hall state.
 
 Caveat on provenance: this reads the archived
 `epochs/threaded-video-v0/discovery-reference.json`, whose observer epoch is
@@ -264,10 +264,9 @@ not reached, while `$89D2E5` is reached every frame from `$80C745` with the same
 registers (`a=$D2E4`, `x=$1040`, `y=$1280`). Same guide loop, same absent
 continuation. (Semantic reproduction only; no pixel claim is renewed.)
 
-That removes the branch hypothesis. Whatever starts the continuation is not
-selected by the `$2E`/`$2F` choice, which leaves the question of how the player
-is meant to leave map `$41` at all, given it has no reachable exit and no script
-waiting on them.
+That removed the branch hypothesis but did not prove there was no reachable
+exit. The remaining exit question is now resolved by the turning corridor and
+arch interaction; no waiting tour script is needed.
 
 ### Three departure hypotheses, all tested
 
@@ -305,12 +304,13 @@ to `y=80`, and an open row `y=80` reaching the arch centres at `x=64/128/192`.
 possible at each row, which the serpentine sweep never did, since it only tested
 vertical movement at each row's extreme — gives rightward limits of `x=72` at
 `y=144` and `y=156`, `x=120` at `y=176`, and the full `x=232` at `y=192`. The
-`x=96` cells that the code calls open cannot be entered from any row. The
-docs' warning that this code is "not verified passability" holds, and map `$41`
-is a concrete counter-example.
+`x=96` cells that the code calls open were not entered by those approaches. The
+docs' warning that this code is "not verified passability" holds; these probes
+are not an exhaustive connectivity analysis.
 
-The measured envelope stands as the sweep recorded it, and the arches remain
-unreachable on foot.
+The recorded sweep positions stand, but **the inferred envelope/unreachable
+arches do not**: the later `(104,155)→(104,109)→(94,109)→(72,80)` route goes
+around the obstruction rather than testing a single straight column.
 
 ### The ROM map's COP table bound is too small
 
@@ -328,9 +328,9 @@ scan artefact, not the real extent. Tracked as
 
 ## What this does not establish
 
-What `$80ED75` actually tests, and therefore how to satisfy it. That is the open
-question, and it is now a bounded one: a single predicate, called with a known
-actor slot, rather than an unbounded search of a room.
+The historical `$80ED75` "gate" question is resolved above: it is an animation
+stepper, not a missing progression predicate. These discovery traces alone did
+not establish departure; the later spear/frozen-return qualification does.
 
 The sweep result is a negative, not a proof. A later pass covered the right
 pocket at 13-16px rows (`208,192,179,166,153,144,131,118`) and the left pocket at

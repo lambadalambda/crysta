@@ -29,3 +29,12 @@ Integrate the portable systems into a playable opening that progresses from a ne
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice)
 - Visual and audio completeness are not required until M5, but semantic commands must be inspectable.
+
+- [Native route evidence is complete](qualify-tower-approach-route.md): one fresh
+  input-only boot reaches first-tower interior map101, with two-axis control and
+  stability at frame65608 `(112,607)`. This is not portable implementation.
+  [The bounded integration scope](../../tools/tower-approach-qualification/TOWER.md#bounded-portable-follow-up)
+  covers source assets, frozen-state actors/requests, world-map motion and tower
+  presentation/arrival. Item81 is acquired but unequipped; combat is not a hard
+  prerequisite for this entrance-only slice. Actor/presentation work remains
+  required, and broader combat stays in its separate dependency.
