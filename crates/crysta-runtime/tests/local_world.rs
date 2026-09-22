@@ -1,10 +1,14 @@
 //! ROM-backed checks that the player moves between maps through real exits.
 
 use assets::maps::exits::ExitList;
-use crysta_runtime::{room, world::World, MAPS};
+use crysta_runtime::{
+    room,
+    world::{Step, World, WorldError},
+    MAPS,
+};
 use rom::{Revision, Rom};
 use room_core::Direction;
-use std::collections::{BTreeSet, HashSet, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, HashSet, VecDeque};
 use std::path::Path;
 
 fn owned_rom() -> Option<Rom> {
@@ -68,60 +72,228 @@ fn every_slice_map_can_be_entered_at_a_declared_arrival() {
     assert!(entered > 20, "only {entered} arrivals were exercised");
 }
 
-/// Walks the slice from one start, returning every map reached.
-///
-/// A breadth-first search over `(map, cell)`, where every edge is realised by
-/// actually stepping the world. Searching pixel positions instead would never
-/// get anywhere: a step moves about a pixel and a half, so a doorway sixty
-/// frames away sits far below any reachable BFS depth.
-fn reachable_maps(image: &[u8], start: u16, x: u16, y: u16) -> BTreeSet<u16> {
-    const DIRECTIONS: [Direction; 4] = [
-        Direction::Up,
-        Direction::Down,
-        Direction::Left,
-        Direction::Right,
-    ];
-    let cell = |world: &World| {
-        let (x, y) = world.position();
-        (world.map(), x / 16, y / 16)
-    };
-    let origin = World::enter(image, start, x, y).expect("the start must build");
-    let mut reached = BTreeSet::from([start]);
-    let mut seen = HashSet::from([cell(&origin)]);
-    let mut queue = VecDeque::from([origin]);
-    while let Some(world) = queue.pop_front() {
-        if seen.len() > 20_000 {
-            break;
-        }
-        let mut found: Vec<World> = Vec::new();
-        for direction in DIRECTIONS {
-            // Walk until the cell changes or the step stalls.
-            let mut next = world.clone();
-            let from = cell(&world);
-            for _ in 0..32 {
-                next.step(Some(direction));
-                if cell(&next) != from {
-                    found.push(next);
-                    break;
-                }
-            }
-            // Face the neighbour and try to open it as a doorway. Most town
-            // entrances sit on cells the player cannot walk onto.
-            let mut opened = world.clone();
-            opened.face(direction);
-            opened.interact();
-            if opened.map() != world.map() {
-                found.push(opened);
-            }
-        }
-        for next in found {
-            if seen.insert(cell(&next)) {
-                reached.insert(next.map());
-                queue.push_back(next);
+#[derive(Debug, Clone, Copy)]
+enum Action {
+    Walk(Direction),
+    Open(Direction),
+}
+
+impl Action {
+    fn apply(self, world: &mut World<'_>) -> Result<Step, WorldError> {
+        match self {
+            Self::Walk(direction) => world.step_checked(Some(direction)),
+            Self::Open(direction) => {
+                world.face(direction);
+                world.interact_checked()
             }
         }
     }
-    reached
+}
+
+fn accepted(result: Result<Step, WorldError>) -> Result<Step, String> {
+    match result {
+        Ok(Step::Refused(reason)) => Err(format!("{reason:?}")),
+        Ok(step) => Ok(step),
+        Err(error) => Err(format!("build: {error}")),
+    }
+}
+
+#[test]
+fn route_actions_reject_refusals_and_build_errors() {
+    assert!(
+        accepted(Ok(Step::Refused(room_core::Unqualified::UnsupportedType(
+            8
+        ))))
+        .is_err()
+    );
+    assert!(accepted(Err(
+        crysta_runtime::RoomError::OutsideSlice { map: 0 }.into()
+    ))
+    .is_err());
+    assert_eq!(accepted(Ok(Step::Stayed)), Ok(Step::Stayed));
+}
+
+struct Link {
+    parent: Option<usize>,
+    actions: Vec<(Action, Step)>,
+}
+
+struct Discovery<'a> {
+    links: Vec<Link>,
+    // First successful route and actual reached state for each map.
+    arrivals: BTreeMap<u16, (usize, World<'a>)>,
+    refused: BTreeMap<(u16, String), usize>,
+    seen: HashSet<(u16, u16, u16)>,
+    truncated: bool,
+}
+
+fn cell(world: &World<'_>) -> (u16, u16, u16) {
+    let (x, y) = world.position();
+    (world.map(), x / 16, y / 16)
+}
+
+impl Discovery<'_> {
+    fn route(&self, mut index: usize) -> Vec<(Action, Step)> {
+        let mut edges = Vec::new();
+        while let Some(parent) = self.links[index].parent {
+            edges.push(self.links[index].actions.as_slice());
+            index = parent;
+        }
+        edges.into_iter().rev().flatten().copied().collect()
+    }
+}
+
+/// Cell BFS is discovery, not proof of unreachability: timing, subcell position,
+/// facing, actor state and walking history are deliberately absent from the key.
+/// Every accepted edge retains its exact frame actions, with no refused prefix.
+fn discover(origin: World<'_>, goal: Option<u16>) -> Discovery<'_> {
+    discover_with_stride(origin, goal, 16)
+}
+
+fn discover_with_stride(origin: World<'_>, goal: Option<u16>, stride: u16) -> Discovery<'_> {
+    let key = |world: &World<'_>| {
+        let (x, y) = world.position();
+        (world.map(), x / stride, y / stride)
+    };
+    let mut visited = HashSet::from([key(&origin)]);
+    let budget = 20_000 * usize::from(16 / stride).pow(2);
+    let mut discovery = Discovery {
+        links: vec![Link {
+            parent: None,
+            actions: vec![],
+        }],
+        arrivals: BTreeMap::from([(origin.map(), (0, origin.clone()))]),
+        refused: BTreeMap::new(),
+        seen: HashSet::from([cell(&origin)]),
+        truncated: false,
+    };
+    let mut queue = VecDeque::from([(0, origin)]);
+    while let Some((parent, world)) = queue.pop_front() {
+        if visited.len() > budget {
+            discovery.truncated = true;
+            break;
+        }
+        for direction in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            for action in [Action::Walk(direction), Action::Open(direction)] {
+                let mut next = world.clone();
+                let mut actions = Vec::new();
+                let frames = if matches!(action, Action::Walk(_)) {
+                    32
+                } else {
+                    1
+                };
+                for _ in 0..frames {
+                    let step = match accepted(action.apply(&mut next)) {
+                        Ok(step) => step,
+                        Err(reason) => {
+                            *discovery.refused.entry((world.map(), reason)).or_default() += 1;
+                            break; // Discard this entire edge, not just the failing frame.
+                        }
+                    };
+                    actions.push((action, step));
+                    if key(&next) != key(&world) {
+                        if visited.insert(key(&next)) {
+                            discovery.seen.insert(cell(&next));
+                            let index = discovery.links.len();
+                            discovery.links.push(Link {
+                                parent: Some(parent),
+                                actions,
+                            });
+                            discovery
+                                .arrivals
+                                .entry(next.map())
+                                .or_insert_with(|| (index, next.clone()));
+                            if goal == Some(next.map()) {
+                                return discovery;
+                            }
+                            queue.push_back((index, next));
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    discovery
+}
+
+fn replay<'a>(mut origin: World<'a>, actions: &[(Action, Step)]) -> World<'a> {
+    let candidate = origin.room().passive_directional_type8_special_bit_clear();
+    for (index, &(action, expected)) in actions.iter().enumerate() {
+        let actual = accepted(action.apply(&mut origin))
+            .unwrap_or_else(|error| panic!("action {index} {action:?}: {error}"));
+        assert_eq!(actual, expected, "action {index} {action:?}");
+        assert_eq!(
+            origin.room().passive_directional_type8_special_bit_clear(),
+            candidate,
+            "collision mode changed at action {index} {action:?}"
+        );
+    }
+    origin
+}
+
+/// Opt-in local artifacts only: directions are runtime frame inputs, while Open
+/// is a host face+interaction operation, NOT a claimed native button mapping.
+fn retain_route(name: &str, mut world: World<'_>, actions: &[(Action, Step)]) {
+    use serde_json::json;
+    let Some(directory) = std::env::var_os("CRYSTA_ROUTE_OUTPUT") else {
+        return;
+    };
+    let state = |world: &World<'_>| {
+        json!({
+            "map": world.map(), "position": world.position(),
+            "facing": format!("{:?}", world.facing()),
+        })
+    };
+    let start = state(&world);
+    let events = world.events().to_vec();
+    let mut trace = Vec::new();
+    for (index, &(action, expected)) in actions.iter().enumerate() {
+        let before = state(&world);
+        let (kind, direction) = match action {
+            Action::Walk(direction) => ("walk", direction),
+            Action::Open(direction) => ("face_and_interact", direction),
+        };
+        world = replay(world, &[(action, expected)]);
+        trace.push(json!({
+            "index": index, "action": kind, "direction": format!("{direction:?}"),
+            "before": before, "after": state(&world), "step": format!("{expected:?}"),
+        }));
+    }
+    let artifact = json!({
+        "schema": "crysta-candidate-route-v1",
+        "contract": "passive directional; $097C & 4 == 0; discovery only, not native qualification",
+        "start": start, "end": state(&world), "events": events,
+        "actions": trace,
+    });
+    let directory = std::path::PathBuf::from(directory);
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join(format!("{name}.json"));
+    std::fs::write(&path, serde_json::to_vec_pretty(&artifact).unwrap()).unwrap();
+}
+
+fn assert_same_arrival(actual: &World<'_>, expected: &World<'_>) {
+    assert_eq!(actual.map(), expected.map());
+    assert_eq!(actual.position(), expected.position());
+    assert_eq!(actual.facing(), expected.facing());
+    assert_eq!(actual.events(), expected.events());
+    assert_eq!(actual.residents(), expected.residents());
+    assert_eq!(actual.room(), expected.room());
+}
+
+fn reachable_maps(image: &[u8], start: u16, x: u16, y: u16) -> BTreeSet<u16> {
+    let origin = World::enter(image, start, x, y).expect("the start must build");
+    let found = discover(origin.clone(), None);
+    assert!(!found.truncated, "discovery exceeded its cell budget");
+    for (index, arrival) in found.arrivals.values() {
+        assert_same_arrival(&replay(origin.clone(), &found.route(*index)), arrival);
+    }
+    found.arrivals.keys().copied().collect()
 }
 
 #[test]
@@ -339,4 +511,293 @@ fn talking_applies_the_flags_the_script_writes() {
         0,
         "the progression flag must be set after talking"
     );
+}
+
+#[test]
+fn candidate_entry_is_explicit_and_occupancy_retains_it() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let flags = crysta_runtime::world::new_game_flags();
+    let mut candidate = World::enter_candidate(image, 0xD, 200, 700, flags).unwrap();
+    assert!(candidate
+        .room()
+        .passive_directional_type8_special_bit_clear());
+    assert!(!World::enter(image, 0xB, 120, 112)
+        .unwrap()
+        .room()
+        .passive_directional_type8_special_bit_clear());
+    let before = candidate.room().cells().to_vec();
+    let mut rebuilt = false;
+    for _ in 0..4000 {
+        assert!(!matches!(
+            candidate.step_checked(None).unwrap(),
+            crysta_runtime::world::Step::Refused(_)
+        ));
+        assert!(candidate
+            .room()
+            .passive_directional_type8_special_bit_clear());
+        if candidate.room().cells() != before {
+            rebuilt = true;
+            break;
+        }
+    }
+    assert!(rebuilt, "exercise an actual actor occupancy rebuild");
+}
+
+#[test]
+fn interaction_builds_residents_from_the_actual_events() {
+    use assets::maps::scripts::EventFlags;
+    use crysta_runtime::residents::residents;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    events[0x21 / 8] |= 1 << (0x21 % 8); // Despawn the opening resident.
+    let mut exercised = 0;
+    for source in MAPS {
+        let exits = ExitList::from_rom(image, source).unwrap();
+        for record in exits.records() {
+            let Ok(destination) = record.direct_destination() else {
+                continue;
+            };
+            if !MAPS.contains(&destination) {
+                continue;
+            }
+            let actual = residents(image, destination, EventFlags::Bitmap(&events)).unwrap();
+            let defaults = residents(
+                image,
+                destination,
+                EventFlags::Bitmap(&crysta_runtime::world::new_game_flags()),
+            )
+            .unwrap();
+            if actual == defaults {
+                continue;
+            }
+            for candidate in [false, true] {
+                let x = u16::from(record.x()) * 16 + 8;
+                let y = u16::from(record.y()) * 16 + 16;
+                let mut world = if candidate {
+                    World::enter_candidate(image, source, x, y, events.clone())
+                } else {
+                    World::enter_with_events(image, source, x, y, events.clone())
+                }
+                .unwrap();
+                assert_eq!(
+                    world.interact_checked().unwrap(),
+                    Step::Entered {
+                        from: source,
+                        to: destination
+                    }
+                );
+                assert_eq!(world.events(), events);
+                assert_eq!(world.residents(), actual);
+                let (x, y) = record.destination_position();
+                let expected = if candidate {
+                    World::enter_candidate(image, destination, x, y, events.clone())
+                } else {
+                    World::enter_with_events(image, destination, x, y, events.clone())
+                }
+                .unwrap();
+                assert_same_arrival(&world, &expected);
+                exercised += 1;
+            }
+        }
+    }
+    assert!(
+        exercised > 0,
+        "must exercise flag-dependent destination rosters"
+    );
+}
+
+fn report_missing_routes(image: &[u8], found: &Discovery<'_>) {
+    for missing in MAPS.filter(|map| !found.arrivals.contains_key(map)) {
+        eprintln!(
+            "missing ${missing:04X}: no checked route discovered (not proof of unreachability)"
+        );
+        for source in MAPS {
+            let exits = ExitList::from_rom(image, source).unwrap();
+            for exit in exits
+                .records()
+                .iter()
+                .filter(|exit| exit.direct_destination() == Ok(missing))
+            {
+                let (x, y) = (u16::from(exit.x()), u16::from(exit.y()));
+                let nearest = found
+                    .seen
+                    .iter()
+                    .filter(|(map, _, _)| *map == source)
+                    .map(|(_, column, row)| column.abs_diff(x) + row.abs_diff(y))
+                    .min();
+                let built = crysta_runtime::room_candidate(image, source).unwrap();
+                let kinds: Vec<_> = [(x, y), (x, y + 1)]
+                    .into_iter()
+                    .map(|(column, row)| {
+                        built
+                            .room
+                            .cells()
+                            .get(usize::from(row) * usize::from(built.width) + usize::from(column))
+                            .map(|raw| (raw >> 9) & 0x1F)
+                    })
+                    .collect();
+                eprintln!("  incoming ${source:04X} exit ({x},{y}) {}x{}; source reached={}; nearest explored cell distance={nearest:?}; trigger/below types={kinds:?}",
+                    exit.width(), exit.height(), found.arrivals.contains_key(&source));
+            }
+        }
+    }
+}
+
+fn report_return_gap(map: u16, reached: &World<'_>, back: &Discovery<'_>) {
+    for (&destination, (index, state)) in &back.arrivals {
+        if destination == map {
+            continue;
+        }
+        let prefix = back.route(*index);
+        retain_route(
+            &format!("{map:04X}-return-prefix-to-{destination:04X}"),
+            reached.clone(),
+            &prefix,
+        );
+        eprintln!(
+            "    return prefix enters ${destination:04X} at {:?}",
+            state.position()
+        );
+    }
+}
+
+#[test]
+fn candidate_routes_replay_from_the_opening_house_and_return_from_reached_states() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let origin = World::enter_candidate(
+        image,
+        0xB,
+        120,
+        112,
+        crysta_runtime::world::new_game_flags(),
+    )
+    .unwrap();
+    let found = discover(origin.clone(), None);
+    assert!(!found.truncated);
+    eprintln!(
+        "candidate reached {}/24: {:04X?}",
+        found.arrivals.len(),
+        found.arrivals.keys().collect::<Vec<_>>()
+    );
+    let mut totals = BTreeMap::new();
+    for ((map, reason), count) in &found.refused {
+        *totals.entry(reason).or_insert(0usize) += count;
+        eprintln!("  ${map:04X} {reason}: {count} discarded edges");
+    }
+    eprintln!("candidate refusal totals: {totals:?}");
+    report_missing_routes(image, &found);
+    assert!(
+        found.arrivals.contains_key(&0xA),
+        "must leave opening house and reach town"
+    );
+    let mut returns = BTreeSet::new();
+    let mut transition_actions = [0usize; 2];
+    for (&map, (index, arrival)) in &found.arrivals {
+        let outward = found.route(*index);
+        for (action, step) in &outward {
+            if matches!(step, Step::Entered { .. }) {
+                transition_actions[usize::from(matches!(action, Action::Open(_)))] += 1;
+            }
+        }
+        let reached = replay(origin.clone(), &outward);
+        assert_same_arrival(&reached, arrival);
+        retain_route(&format!("opening-to-{map:04X}"), origin.clone(), &outward);
+        if map == origin.map() {
+            continue;
+        }
+        // Half-cell keys retain doorway approaches lost by full-cell merging.
+        // No arbitrary arrival construction: start at the actual outbound endpoint.
+        let back = discover_with_stride(reached.clone(), Some(origin.map()), 8);
+        if let Some((index, home)) = back.arrivals.get(&origin.map()) {
+            let return_actions = back.route(*index);
+            retain_route(
+                &format!("{map:04X}-to-opening"),
+                reached.clone(),
+                &return_actions,
+            );
+            let returned = replay(reached, &return_actions);
+            assert_same_arrival(&returned, home);
+            returns.insert(map);
+            eprintln!(
+                "  ${map:04X}: {} outbound actions, {} return actions",
+                outward.len(),
+                return_actions.len()
+            );
+        } else {
+            eprintln!(
+                "  ${map:04X}: no return route discovered; truncated={}, refusals={:?}",
+                back.truncated, back.refused
+            );
+            report_return_gap(map, &reached, &back);
+        }
+    }
+    eprintln!(
+        "checked roundtrips from {}/{} non-opening reached maps: {returns:04X?}",
+        returns.len(),
+        found.arrivals.len() - 1
+    );
+    assert!(
+        transition_actions.iter().all(|count| *count > 0),
+        "exercise walking and interaction transitions"
+    );
+    assert_eq!(
+        found.arrivals.len(),
+        24,
+        "every map has a checked outbound route"
+    );
+    let missing_returns: Vec<_> = found
+        .arrivals
+        .keys()
+        .copied()
+        .filter(|map| *map != origin.map() && !returns.contains(map))
+        .collect();
+    assert_eq!(
+        missing_returns,
+        vec![0x19, 0x1E],
+        "record the remaining return-search gaps, not an unreachability claim"
+    );
+}
+
+#[test]
+fn checked_interaction_reports_destination_exit_decode_failure() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let source = 0xB;
+    let exits = ExitList::from_rom(cartridge.image(), source).unwrap();
+    let record = exits
+        .records()
+        .iter()
+        .find(|record| {
+            record
+                .direct_destination()
+                .is_ok_and(|map| MAPS.contains(&map) && map != source)
+        })
+        .unwrap();
+    let destination = record.direct_destination().unwrap();
+    let mut damaged = cartridge.image().to_vec();
+    let pointer = 0x18000 + usize::from(destination) * 2;
+    damaged[pointer..pointer + 2].copy_from_slice(&1u16.to_le_bytes());
+    let mut world = World::enter_candidate(
+        &damaged,
+        source,
+        u16::from(record.x()) * 16 + 8,
+        u16::from(record.y()) * 16 + 16,
+        crysta_runtime::world::new_game_flags(),
+    )
+    .unwrap();
+    let before = world.clone();
+    assert!(
+        matches!(world.interact_checked(), Err(WorldError::Exits { map, .. }) if map == destination)
+    );
+    assert_same_arrival(&world, &before);
 }

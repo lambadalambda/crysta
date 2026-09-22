@@ -571,3 +571,55 @@ residents/occupancy are resolved. Host doorway interaction is not a claim about
 native action-controller qualification or Pandora story progression. The existing
 resident-resolution fallback to an empty roster is explicitly retained; these
 APIs do not claim fully fail-closed decoding of every world subsystem.
+
+### Checked 24-map candidate traversal
+
+The ROM-backed `local_world` search is now discovery only: it retains parent
+links and exact movement/host-interaction actions, records and discards refused
+edges, and distinguishes budget exhaustion. Every found route is independently
+replayed from the opening house; no intermediate warps, position resets or flag
+injection can supply connectivity. Cell/half-cell merging can miss routes; it
+cannot prove a missing route impossible.
+
+- Conservative default: **19/24**, unchanged.
+- Explicit clear-bit candidate: **24/24 outbound**, with zero discovery core
+  refusals or build errors and no rejected action on accepted routes.
+- Checked returns from the actual outbound endpoint: **21/23 non-opening maps**.
+  Return searches for `$19` and `$1E` remain incomplete.
+
+This is host free-roam geometry under its candidate contract, **not native
+new-game progression or globally qualified collision**. In particular, the
+host doorway operation does not implement the native cellar/pot/choice state
+machine. The earlier explanation that `$20/$21` were missing solely because of
+progression was misleading: the candidate now reaches them without changing
+story state, exposing the host geometry distinction.
+
+Reproduce and retain per-action positions, results, events and transition traces:
+
+```sh
+CRYSTA_ROUTE_OUTPUT="$PWD/local/candidate-routes" \
+  cargo test -p crysta-runtime --test local_world -- --nocapture
+```
+
+The owned JP ROM must be present at the documented local path; these tests are
+optional without it. Artifacts are host route recipes, not native input-only
+captures; `interact` explicitly includes a host-facing operation.
+
+#### Two return gaps need arrival-controller evidence
+
+Bounded inspection explains the observed bounce without inventing an 8px snap:
+
+| Return edge | Raw arrival | What the candidate does |
+| --- | --- | --- |
+| `$19 → $17`, record `$818F42`, selector14 | `(448,352)` | Static corner nudges Down to `(456,352)`, entering reverse trigger `(28,21)` before moving south |
+| `$1E → $0A`, record `$818F9B`, selector5 | `(784,752)` | Resident occupancy at `(48,47)` nudges Down to `(792,752)`, entering reverse trigger `(49,46)` |
+
+Without exit processing, ordinary movement proceeds south after those nudges.
+The current host installs raw destinations and rearms when the fine exit test
+misses; it omits the selector-driven load/arrival sequence. Existing source-backed
+selector code describes loader coordinate conversion, forced arrival movement
+and the native `$097C & $10` exit-scan gate. These **two specific edges still need
+native confirmation** of queued coordinates, loaded and settled anchors, arrival
+controller ownership, reverse-exit suppression and town occupancy. The relevant
+existing implementations are `map-inspector/src/pandora_progression.rs` and
+`pandora_navigation.rs`. Neither a guessed timer nor coordinate offset was added.

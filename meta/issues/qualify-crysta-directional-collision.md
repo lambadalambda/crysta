@@ -72,3 +72,30 @@ beyond its current 19 of 24 reachable maps.
 - Still open: exhaustive native branch controls, broad 5/21/29 qualification,
   type8 state handling, full map-$41 envelope, production opt-in and retained
   error-checked 24-map movement/round-trip routes. Production remains **19/24**.
+
+### Clear-bit type8 and checked host traversal
+
+- Added a separate type8 opt-in asserting `$097C & 4 == 0` plus the complete
+  ordinary-player/passive contract. Sixteen table entries, raw slope probes and
+  Down6/raw8 ordering have synthetic controls; old constructors still reject8.
+- Nine pinned native windows now replay **5,541 frames**, plus **2,223** legacy
+  transitions. Added the 2,482-frame town cap window (Up-first8, Up Open/8,
+  Down-first8), 207 passive closed-door5 frames, and a fresh 880-frame map-$41
+  window with live layers/velocities. Horizontal8 and several pair/flag branches
+  remain synthetic-only; the full map-$41 envelope is not claimed.
+- Further town descent exits ordinary player mode at14469→14470 (flags
+  `$0415→$0431`, special1, no player D107). The bounded window ends before this;
+  the probe refuses the continuation rather than dropping that frame.
+- Added explicit candidate room/world construction preserved across occupancy
+  and transitions, checked movement/interaction, and actual events at destination
+  construction. Legacy resident-decoding fallback is documented, not broadened.
+- Candidate discovery now reaches **24/24** and replays every accepted action
+  without core refusal/load error. **21/23** non-opening destinations have checked
+  returns from their real outbound endpoints. Production remains conservative
+  **19/24**; no global enablement or native progression equivalence is claimed.
+- Two return gaps (`$19→$17`, `$1E→$0A`) align into the reverse doorway before
+  arrival completes. The host omits selector-driven arrival ownership/coordinate
+  conversion and native exit-scan suppression. Capture those actual native edges
+  before changing arrival behavior; see the detailed collision document.
+- Acceptance remains open: remaining native material/branch/mode qualification,
+  full envelope, two arrival/round-trip cases, then justified production enablement.
