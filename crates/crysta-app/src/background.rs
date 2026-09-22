@@ -1,20 +1,172 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
-use assets::maps::visual::StaticBackground;
+use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
+use assets::maps::visual::{crysta_animation::CrystaAnimation, StaticBackground};
+
+/// Presentation age since entry, advanced by host simulation updates, not redraws.
+pub struct VisitClock {
+    map: u16,
+    tick: u64,
+}
+
+impl VisitClock {
+    pub const fn new(map: u16) -> Self {
+        Self { map, tick: 0 }
+    }
+
+    pub fn advance(&mut self, map: u16) {
+        if self.map == map {
+            self.tick = self.tick.saturating_add(1);
+        } else {
+            *self = Self::new(map);
+        }
+    }
+
+    pub const fn tick(&self) -> u64 {
+        self.tick
+    }
+}
 
 /// Load the static baseline without changing the inspector's export policy.
-pub fn load(cartridge: &rom::Rom, map: u16) -> Result<crate::frame::Background, String> {
+pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
     let rendered = map_inspector::render_static_background(cartridge, map)
         .map_err(|error| error.to_string())?;
     let mut background =
         crate::frame::decode_bmp(&rendered.bitmap).ok_or("invalid static background bitmap")?;
     background.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
-    if map == 0xA {
+    let animation = if map == 0xA {
         let scene = StaticBackground::from_rom(cartridge.image(), map)
             .map_err(|error| error.to_string())?;
         let color = exterior_backdrop(cartridge.image(), &scene)?;
         composite_backdrop(&mut background.pixels, &rendered.indices, color)?;
+        Some(AnimatedExterior::new(cartridge.image(), scene, color)?)
+    } else {
+        None
+    };
+    Ok(CachedBackground {
+        frame: background,
+        animation,
+    })
+}
+
+/// Static pixels with an optional, bounded map-A animation overlay.
+pub struct CachedBackground {
+    pub frame: crate::frame::Background,
+    animation: Option<AnimatedExterior>,
+}
+
+impl CachedBackground {
+    pub fn update(&mut self, age: u64) {
+        if let Some(animation) = &mut self.animation {
+            animation.update(age, &mut self.frame);
+        }
     }
-    Ok(background)
+}
+
+struct AnimatedExterior {
+    scene: StaticBackground,
+    source: CrystaAnimation,
+    tiles: Vec<Tile4bpp>,
+    palette: [Bgr555; 128],
+    backdrop: u32,
+    // Map cell index and bitmask of source phase-key slots it depends on.
+    cells: Vec<(usize, u8)>,
+    key: Option<[Option<u64>; 7]>,
+}
+
+impl AnimatedExterior {
+    fn new(image: &[u8], scene: StaticBackground, backdrop: u32) -> Result<Self, String> {
+        let source = CrystaAnimation::from_rom(image).map_err(|error| error.to_string())?;
+        let masks: Vec<u8> = scene
+            .metatiles()
+            .iter()
+            .map(|words| {
+                words.iter().fold(0, |mask, word| {
+                    // CrystaAnimation::phase_key documents these disjoint destinations.
+                    let graphics = match word.tile_index() {
+                        9..=12 => 1,
+                        tile @ 496..=511 => 1 << (1 + (tile - 496) / 4),
+                        _ => 0,
+                    };
+                    let palette = match word.palette() {
+                        6 => 1 << 5,
+                        7 => 1 << 6,
+                        _ => 0,
+                    };
+                    mask | graphics | palette
+                })
+            })
+            .collect();
+        let cells = scene
+            .layer()
+            .cells()
+            .iter()
+            .enumerate()
+            .filter_map(|(i, cell)| {
+                let mask = masks[usize::from(cell.raw() & 511)];
+                (mask != 0).then_some((i, mask))
+            })
+            .collect();
+        Ok(Self {
+            tiles: scene.tiles().to_vec(),
+            palette: *scene.palette(),
+            scene,
+            source,
+            backdrop,
+            cells,
+            key: None,
+        })
+    }
+
+    fn update(&mut self, age: u64, frame: &mut crate::frame::Background) {
+        let key = self.source.phase_key(age);
+        let changed = (0..7).fold(0u8, |mask, i| {
+            mask | if self.key.is_none_or(|old| old[i] != key[i]) {
+                1 << i
+            } else {
+                0
+            }
+        });
+        if changed == 0 {
+            return;
+        }
+        // Reset before random seeking, including re-entry into startup ages0..2.
+        // Only 768 tiles; no ROM decode, allocation or elapsed-frame replay here.
+        self.tiles.copy_from_slice(self.scene.tiles());
+        self.palette = *self.scene.palette();
+        self.source
+            .apply(age, &mut self.tiles, &mut self.palette)
+            .expect("validated animation destination extents");
+        let width = self.scene.layer().width();
+        for &(cell, dependencies) in &self.cells {
+            if dependencies & changed == 0 {
+                continue;
+            }
+            let words =
+                &self.scene.metatiles()[usize::from(self.scene.layer().cells()[cell].raw() & 511)];
+            for y in 0..16 {
+                for x in 0..16 {
+                    let (color, high) = match graphics::sample_metatile(words, &self.tiles, x, y)
+                        .expect("validated map definitions and tile extents")
+                    {
+                        IndexedPixel::Transparent => (self.backdrop, false),
+                        IndexedPixel::Opaque {
+                            palette_index,
+                            priority,
+                        } => (rgb(self.palette[usize::from(palette_index)]), priority),
+                    };
+                    let offset = (cell / width * 16 + y) * frame.width + cell % width * 16 + x;
+                    frame.pixels[offset] = color;
+                    frame.high[offset] = high;
+                }
+            }
+        }
+        self.key = Some(key);
+    }
+}
+
+fn rgb(color: Bgr555) -> u32 {
+    let [r, g, b] = color.rgb8();
+    u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
 }
 
 /// The ordinary map initialization copies staged palette color32 to backdrop0.
@@ -30,8 +182,7 @@ fn exterior_backdrop(image: &[u8], scene: &StaticBackground) -> Result<u32, Stri
     if image.get(0xD_8C52..0xD_8C52 + COPY.len()) != Some(COPY) {
         return Err("unsupported exterior backdrop initialization".into());
     }
-    let [r, g, b] = scene.palette()[32].rgb8();
-    Ok(u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b))
+    Ok(rgb(scene.palette()[32]))
 }
 
 fn composite_backdrop(pixels: &mut [u32], indices: &[u8], color: u32) -> Result<(), String> {
@@ -49,6 +200,75 @@ fn composite_backdrop(pixels: &mut [u32], indices: &[u8], color: u32) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn dirty_updates_match_full_source_render_including_wrap_and_reentry() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let mut cached = load(&rom, 0xA).unwrap();
+        let base = StaticBackground::from_rom(rom.image(), 0xA).unwrap();
+        let source = CrystaAnimation::from_rom(rom.image()).unwrap();
+        let backdrop = exterior_backdrop(rom.image(), &base).unwrap();
+        for age in [0, 1, 2, 8, 42, 64, 528, 3, 2, 1, 1, 0] {
+            cached.update(age);
+            let mut tiles = base.tiles().to_vec();
+            let mut palette = *base.palette();
+            source.apply(age, &mut tiles, &mut palette).unwrap();
+            for y in 0..cached.frame.height {
+                for x in 0..cached.frame.width {
+                    let cell = base.layer().cells()[y / 16 * base.layer().width() + x / 16];
+                    let (color, high) = match graphics::sample_metatile(
+                        &base.metatiles()[usize::from(cell.raw() & 511)],
+                        &tiles,
+                        x % 16,
+                        y % 16,
+                    )
+                    .unwrap()
+                    {
+                        IndexedPixel::Transparent => (backdrop, false),
+                        IndexedPixel::Opaque {
+                            palette_index,
+                            priority,
+                        } => (rgb(palette[usize::from(palette_index)]), priority),
+                    };
+                    let i = y * cached.frame.width + x;
+                    assert_eq!(
+                        (cached.frame.pixels[i], cached.frame.high[i]),
+                        (color, high),
+                        "age {age}, pixel {x},{y}"
+                    );
+                }
+            }
+        }
+        // A non-exterior map remains byte-for-byte the existing static baseline.
+        let mut indoor = load(&rom, 0xB).unwrap();
+        let original = indoor.frame.pixels.clone();
+        indoor.update(100);
+        assert_eq!(indoor.frame.pixels, original);
+        let static_bg = map_inspector::render_static_background(&rom, 0xB).unwrap();
+        assert_eq!(
+            indoor.frame.pixels,
+            crate::frame::decode_bmp(&static_bg.bitmap).unwrap().pixels
+        );
+    }
+
+    #[test]
+    fn visit_clock_resets_on_entry_and_advances_independently_of_drawing() {
+        let mut clock = VisitClock::new(0xF);
+        assert_eq!(clock.tick(), 0);
+        clock.advance(0xF);
+        assert_eq!(clock.tick(), 1);
+        clock.advance(0xA);
+        assert_eq!(clock.tick(), 0);
+        for _ in 0..20 {
+            clock.advance(0xA);
+        }
+        assert_eq!(clock.tick(), 20);
+        clock.advance(0xB);
+        clock.advance(0xA);
+        assert_eq!(clock.tick(), 0);
+    }
 
     #[test]
     fn only_transparent_indices_receive_the_backdrop() {

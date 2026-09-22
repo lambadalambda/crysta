@@ -164,6 +164,7 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
                 eprintln!("cannot enter {map:#06x}: {error}");
                 std::process::exit(1);
             });
+            session.background_clock = background::VisitClock::new(map);
             continue;
         }
         let (what, count) = step.split_once(':').unwrap_or((step, "1"));
@@ -261,7 +262,8 @@ struct Session {
     world: World<'static>,
     image: &'static [u8],
     atlas: ArkAtlas,
-    backgrounds: HashMap<u16, frame::Background>,
+    backgrounds: HashMap<u16, background::CachedBackground>,
+    background_clock: background::VisitClock,
     /// Resident art for the roster it was computed for, keyed by map and by
     /// which records were present, since the flags can change the roster.
     art: Option<RosterArt>,
@@ -285,6 +287,7 @@ impl Session {
             image,
             atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
             backgrounds: HashMap::new(),
+            background_clock: background::VisitClock::new(START.0),
             art: None,
             sprites: HashMap::new(),
             dialogue: None,
@@ -301,6 +304,13 @@ impl Session {
     /// While a conversation is open the player stands still and the button
     /// turns pages; the last page's acknowledgement closes it.
     fn advance(&mut self, direction: Option<Direction>, interact: bool) {
+        self.advance_world(direction, interact);
+        if self.fault.is_none() {
+            self.background_clock.advance(self.world.map());
+        }
+    }
+
+    fn advance_world(&mut self, direction: Option<Direction>, interact: bool) {
         if self.fault.is_some() {
             return;
         }
@@ -399,6 +409,7 @@ impl Session {
         };
         let (x, y) = self.world.position();
         serde_json::json!({"kind":"frame", "tick":self.tick,
+            "background_tick":self.background_clock.tick(),
             "input":{"direction":direction,"interact":interact},
             "before":{"map":before.0,"x":before.1.0,"y":before.1.1},
             "after":{"map":self.world.map(),"x":x,"y":y},
@@ -426,6 +437,10 @@ impl Session {
             };
             slot.insert(decoded);
         }
+        self.backgrounds
+            .get_mut(&map)
+            .expect("loaded background")
+            .update(self.background_clock.tick());
     }
 
     /// Decodes bodies for the current roster, recomputed when it changes.
@@ -484,6 +499,7 @@ impl Session {
         let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
+        let background = &background.frame;
         let camera = frame::camera(position, (background.width, background.height));
         frame::draw_background(frame, background, camera);
         let count = residents.len();
@@ -850,6 +866,37 @@ mod session_tests {
 
     #[test]
     #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn river_changes_while_standing_without_requiring_intermediate_redraws() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let image = Box::leak(rom.image().to_vec().into_boxed_slice());
+        let mut session = Session::new(image);
+        session.world = World::enter(image, 0xA, 640, 400).unwrap();
+        session.background_clock = background::VisitClock::new(0xA);
+        session.ensure_background(&rom);
+        let river = |session: &Session| {
+            let bg = &session.backgrounds[&0xA].frame;
+            (352..600)
+                .map(|y| bg.pixels[y * bg.width + 672])
+                .collect::<Vec<_>>()
+        };
+        let first = river(&session);
+        let mut changed = false;
+        for count in [1, 3, 7, 21] {
+            // Screenshot scripts can run multiple updates before first composition.
+            for _ in 0..count {
+                session.advance(None, false);
+            }
+            session.ensure_background(&rom);
+            changed |= river(&session) != first;
+        }
+        assert_eq!(session.world.position(), (640, 400));
+        assert!(changed, "the river must flow while Ark stands still");
+        assert_eq!(session.background_clock.tick(), 32);
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
     fn exterior_transparency_uses_source_backdrop_not_inspector_checkerboard() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
         let rom = rom::Rom::load(&bytes).unwrap();
@@ -857,7 +904,7 @@ mod session_tests {
         let mut session = Session::new(image);
         session.world = World::enter(image, 0xA, 504, 769).unwrap();
         session.ensure_background(&rom);
-        let background = &session.backgrounds[&0xA];
+        let background = &session.backgrounds[&0xA].frame;
         let source = assets::maps::visual::StaticBackground::from_rom(image, 0xA).unwrap();
         assert_eq!(source.palette()[32].raw(), 0x15ed);
         let [r, g, b] = source.palette()[32].rgb8();
@@ -1037,6 +1084,7 @@ mod session_tests {
         app.advance();
         assert!(app.session().fault.is_some());
         let tick = app.session().tick;
+        let background_tick = app.session().background_clock.tick();
         let position = app.session().world.position();
         let recorded = std::fs::read(&path).unwrap(); // Failure is flushed.
         assert!(String::from_utf8_lossy(&recorded).contains("stopped"));
@@ -1045,6 +1093,7 @@ mod session_tests {
         }
         app.log.as_mut().unwrap().flush().unwrap();
         assert_eq!(app.session().tick, tick);
+        assert_eq!(app.session().background_clock.tick(), background_tick);
         assert_eq!(app.session().world.position(), position);
         assert_eq!(std::fs::read(&path).unwrap(), recorded);
         drop(app);

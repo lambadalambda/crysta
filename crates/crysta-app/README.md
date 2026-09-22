@@ -66,8 +66,21 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
 Exterior tree transparency uses the ROM-derived scene backdrop, not the asset
 inspector's gray checkerboard. This does not yet reproduce the exterior's
 additive floating-leaf effects, secondary scrolling or full color math. Static
-inspection exports deliberately keep their checkerboard. River animation is
-tracked separately in [the native river issue](../../meta/issues/animate-native-crysta-river.md).
+inspection exports deliberately keep their checkerboard. The river now runs its original palette cycle (seven phases, six host simulation
+updates each), together with the source-backed exterior graphics animation.
+Animation continues while standing still and during dialogue, resets on map
+entry, and stops with a fatal world error. Redrawing does not advance its clock;
+only affected map cells are refreshed. Logs include `background_tick` to help
+diagnose phase-dependent rendering bugs.
+
+This preserves the existing host simulation cadence; it does not claim native
+video-frame phase synchronization. [Source and native-state comparison](../../tools/crysta-animation-qualification/README.md).
+
+```sh
+CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
+  cargo test --release --manifest-path crates/crysta-app/Cargo.toml \
+  background::tests -- --include-ignored
+```
 
 ## Music scope and architecture
 
