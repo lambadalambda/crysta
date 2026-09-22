@@ -38,6 +38,85 @@ fn triggers(image: &[u8], map: u16) -> Vec<((u16, u16), u16)> {
 }
 
 #[test]
+fn outdoor_unknown_slope_refusal_is_atomic_but_interactive_host_can_escape() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    // Parent's screenshot-matching exterior position. This tests host recovery,
+    // not native slope admission: type 6 must remain refused.
+    let mut strict = World::enter(cartridge.image(), 0xA, 360, 472).unwrap();
+    for _ in 0..2 {
+        assert_eq!(
+            strict.step_checked(Some(Direction::Right)).unwrap(),
+            Step::Stayed
+        );
+    }
+    let poised = strict.clone();
+    let refused = Step::Refused(room_core::Unqualified::UnsupportedType(6));
+    assert!(!poised.residents().is_empty());
+    assert!(poised
+        .residents()
+        .iter()
+        .any(|resident| resident.pose_age == 2));
+    for (input, frames) in [
+        (Some(Direction::Right), 30),
+        (None, 8),
+        (Some(Direction::Left), 32),
+        (Some(Direction::Up), 32),
+    ] {
+        for _ in 0..frames {
+            assert_eq!(strict.step_checked(input).unwrap(), refused);
+            assert_eq!(strict.position(), (360, 472));
+            assert_eq!(strict.residents(), poised.residents());
+            assert_eq!(strict.events(), poised.events());
+        }
+    }
+    for direction in [Direction::Left, Direction::Up] {
+        let mut interactive = poised.clone();
+        assert_eq!(
+            interactive
+                .step_interactive(Some(Direction::Right))
+                .unwrap(),
+            refused
+        );
+        assert_eq!(interactive.position(), (360, 472));
+        assert_eq!(interactive.residents().len(), poised.residents().len());
+        for (after, before) in interactive.residents().iter().zip(poised.residents()) {
+            assert_eq!(after.record, before.record);
+        }
+        // Script pose changes can reset age; unchanged poses continue ticking.
+        assert!(interactive
+            .residents()
+            .iter()
+            .zip(poised.residents())
+            .any(|(after, before)| after.pose_age == before.pose_age + 1));
+        for _ in 0..8 {
+            assert_eq!(interactive.step_interactive(None).unwrap(), Step::Stayed);
+            assert_eq!(interactive.position(), (360, 472));
+        }
+        for _ in 0..32 {
+            let before = interactive.position();
+            if matches!(
+                interactive.step_interactive(Some(direction)).unwrap(),
+                Step::Refused(_)
+            ) {
+                // Escape may encounter another unsupported boundary; it too
+                // must remain non-displacing rather than being admitted.
+                assert_eq!(interactive.position(), before);
+            }
+        }
+        let (x, y) = interactive.position();
+        match direction {
+            Direction::Left => assert!(x < 360),
+            Direction::Up => assert!(y < 472),
+            _ => unreachable!(),
+        }
+        assert_eq!(interactive.map(), 0xA);
+        assert_eq!(interactive.events(), poised.events());
+    }
+}
+
+#[test]
 fn a_world_starts_where_it_is_told_and_knows_its_map() {
     let Some(cartridge) = owned_rom() else {
         return;

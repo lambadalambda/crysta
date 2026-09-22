@@ -345,6 +345,33 @@ impl<'a> World<'a> {
         })
     }
 
+    /// Walks one frame with opt-in interactive host recovery after a core refusal.
+    ///
+    /// Uses [`Self::step_checked`], including its scripted arrival ownership. On
+    /// [`Step::Refused`], discards walking input/cadence at the identical position,
+    /// stands facing the checked step's facing, and ticks residents once. Returns
+    /// the original refusal, never a successful route action; no exit is tested
+    /// or rearmed on that rejected frame and no collision admission is broadened.
+    /// The next input starts with fresh walking latency.
+    ///
+    /// This is host recovery, not native movement qualification. [`Self::step`]
+    /// and [`Self::step_checked`] retain the atomic-refused walking baseline for
+    /// discovery and replay (including retained delayed input).
+    ///
+    /// # Errors
+    /// As [`Self::step_checked`], including actor occupancy failures during
+    /// recovery. On error the caller must discard the potentially advanced world.
+    pub fn step_interactive(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
+        let step = self.step_checked(direction)?;
+        if matches!(step, Step::Refused(_)) {
+            let (x, y) = self.position();
+            self.walking = WalkingState::new(x, y);
+            self.animation = AnimationState::standing(self.facing);
+            self.run_actors()?;
+        }
+        Ok(step)
+    }
+
     /// Runs every resident's script for one frame and moves bodies.
     ///
     /// Each actor sees the player's cell and every other body's cell and
@@ -919,6 +946,178 @@ mod tests {
         world.residents = vec![resident()];
         world.actors = vec![Actor::new((24, 32), None, 0, 0)];
         assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
+    }
+
+    // Right's first displacement probes an unknown column; Left remains open.
+    fn poised_at_unknown_boundary() -> World<'static> {
+        let mut world = synthetic_world();
+        world.armed = false;
+        let mut cells = vec![0; 64];
+        for row in 0..8 {
+            cells[row * 8 + 4] = 1 << 9;
+        }
+        world.base.room = Room::new(8, 8, cells).unwrap();
+        world.residents = vec![resident()];
+        world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+        world.blocked = body_cells(&world.residents);
+        world.room = occupy(world.base.clone(), &world.residents).unwrap();
+        for _ in 0..2 {
+            assert_eq!(
+                world.step_checked(Some(Direction::Right)).unwrap(),
+                Step::Stayed
+            );
+        }
+        world
+    }
+
+    #[test]
+    fn strict_refusal_keeps_delayed_input_locked_even_on_release_or_reversal() {
+        for legacy in [false, true] {
+            let mut world = poised_at_unknown_boundary();
+            let before = world.clone();
+            for direction in [Some(Direction::Right), None, Some(Direction::Left), None] {
+                let step = if legacy {
+                    world.step(direction)
+                } else {
+                    world.step_checked(direction).unwrap()
+                };
+                assert_eq!(step, Step::Refused(Unqualified::UnsupportedType(1)));
+                assert_eq!(world.position(), before.position());
+                assert_eq!(
+                    world.walking.encode_snapshot(),
+                    before.walking.encode_snapshot()
+                );
+                assert_eq!(world.residents(), before.residents());
+                assert_eq!(world.events(), before.events());
+            }
+        }
+    }
+
+    #[test]
+    fn interactive_refusal_resets_history_in_place_and_ticks_actors_once() {
+        for direction in [None, Some(Direction::Right), Some(Direction::Left)] {
+            let mut world = poised_at_unknown_boundary();
+            // An armed exit underfoot would fail to build from this empty image.
+            // Refusal must neither take it nor change its arming state.
+            world.armed = true;
+            let before = world.clone();
+            let facing = direction.unwrap_or(before.facing());
+            assert_eq!(
+                world.step_interactive(direction).unwrap(),
+                Step::Refused(Unqualified::UnsupportedType(1))
+            );
+            assert_eq!(world.position(), before.position());
+            assert_eq!(world.map(), before.map());
+            assert_eq!(world.arrival(), None);
+            assert_eq!(world.armed, before.armed);
+            assert_eq!(world.facing(), facing);
+            assert_eq!(world.animation(), AnimationState::standing(facing).frame());
+            assert_eq!(
+                world.walking.encode_snapshot(),
+                WalkingState::new(56, 64).encode_snapshot()
+            );
+            assert_eq!(world.events(), before.events());
+            let mut residents = before.residents.clone();
+            residents[0].pose_age += 1;
+            assert_eq!(world.residents(), residents);
+            assert_eq!(world.room(), before.room());
+        }
+    }
+
+    #[test]
+    fn interactive_refusal_allows_release_and_turning_away_but_not_unknown_tiles() {
+        let mut world = poised_at_unknown_boundary();
+        let position = world.position();
+        // Continued pressure still refuses every attempted displacement: recovery
+        // only restarts input latency, never admits the unknown column.
+        for _ in 0..4 {
+            assert_eq!(
+                world.step_interactive(Some(Direction::Right)).unwrap(),
+                Step::Refused(Unqualified::UnsupportedType(1))
+            );
+            assert_eq!(world.position(), position);
+            for _ in 0..2 {
+                assert_eq!(
+                    world.step_interactive(Some(Direction::Right)).unwrap(),
+                    Step::Stayed
+                );
+                assert_eq!(world.position(), position);
+            }
+        }
+        assert!(matches!(
+            world.step_interactive(None).unwrap(),
+            Step::Refused(_)
+        ));
+        for _ in 0..4 {
+            assert_eq!(world.step_interactive(None).unwrap(), Step::Stayed);
+            assert_eq!(world.position(), position);
+        }
+        for _ in 0..2 {
+            assert_eq!(
+                world.step_interactive(Some(Direction::Left)).unwrap(),
+                Step::Stayed
+            );
+        }
+        assert_eq!(
+            world.step_interactive(Some(Direction::Left)).unwrap(),
+            Step::Walked
+        );
+        assert!(world.position().0 < position.0);
+        assert_eq!(world.position().1, position.1);
+    }
+
+    #[test]
+    fn interactive_arrivals_follow_checked_path_without_cancellation_or_extra_ticks() {
+        for route in [ReturnRoute::Town, ReturnRoute::Stairs] {
+            let mut world = synthetic_world();
+            world.arrival = Some(Arrival::new(route));
+            world.residents = vec![resident()];
+            world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+            world.blocked = body_cells(&world.residents);
+            let mut strict = world.clone();
+            for frame in 0..100 {
+                if world.arrival().is_none() {
+                    break;
+                }
+                let direction = if frame % 2 == 0 {
+                    Some(Direction::Left)
+                } else {
+                    None
+                };
+                assert_eq!(
+                    world.step_interactive(direction).unwrap(),
+                    strict.step_checked(direction).unwrap()
+                );
+                assert_eq!(world.position(), strict.position());
+                assert_eq!(world.arrival(), strict.arrival());
+                assert_eq!(
+                    world.walking.encode_snapshot(),
+                    strict.walking.encode_snapshot()
+                );
+                assert_eq!(world.facing(), strict.facing());
+                assert_eq!(world.animation(), strict.animation());
+                assert_eq!(world.residents(), strict.residents());
+                assert_eq!(world.events(), strict.events());
+                assert_eq!(world.armed, strict.armed);
+            }
+            assert_eq!(world.arrival(), None);
+        }
+    }
+
+    #[test]
+    fn interactive_propagates_transition_and_refused_frame_occupancy_errors() {
+        let mut world = synthetic_world();
+        assert!(matches!(
+            world.step_interactive(None),
+            Err(WorldError::Residents { .. })
+        ));
+        let mut world = poised_at_unknown_boundary();
+        world.base.width = 0;
+        world.blocked.clear();
+        assert!(matches!(
+            world.step_interactive(None),
+            Err(WorldError::Room(_))
+        ));
     }
 
     #[test]

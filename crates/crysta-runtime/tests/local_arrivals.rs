@@ -97,6 +97,47 @@ fn transition_paths_own_arrival_until_free_despite_hostile_inputs() {
 }
 
 #[test]
+fn interactive_steps_preserve_checked_exit_and_arrival_behavior() {
+    let Some(rom) = owned_rom() else { return };
+    for (source, destination, x, y, direction) in [
+        (0x1E, 0xA, 632, 204, Direction::Down),
+        (0x19, 0x17, 936, 340, Direction::Up),
+    ] {
+        let mut strict =
+            World::enter_candidate(rom.image(), source, x, y, new_game_flags()).unwrap();
+        let mut interactive = strict.clone();
+        let mut entered = false;
+        for frame in 0..110 {
+            let input = if !entered {
+                Some(direction)
+            } else if frame % 2 == 0 {
+                Some(Direction::Left)
+            } else {
+                None
+            };
+            let expected = strict.step_checked(input).unwrap();
+            assert!(!matches!(expected, Step::Refused(_)));
+            assert_eq!(interactive.step_interactive(input).unwrap(), expected);
+            assert_eq!(interactive.map(), strict.map());
+            assert_eq!(interactive.position(), strict.position());
+            assert_eq!(interactive.arrival(), strict.arrival());
+            assert_eq!(interactive.facing(), strict.facing());
+            assert_eq!(interactive.animation(), strict.animation());
+            assert_eq!(interactive.events(), strict.events());
+            assert_eq!(interactive.residents(), strict.residents());
+            assert_eq!(interactive.room(), strict.room());
+            entered |= matches!(expected, Step::Entered { .. });
+            if entered && interactive.arrival().is_none() {
+                break;
+            }
+        }
+        assert!(entered);
+        assert_eq!(interactive.map(), destination);
+        assert_eq!(interactive.arrival(), None);
+    }
+}
+
+#[test]
 fn explicit_entry_remains_raw_and_unqualified_target_records_fail_closed() {
     let Some(rom) = owned_rom() else { return };
     for (source, destination, offset, raw) in [
