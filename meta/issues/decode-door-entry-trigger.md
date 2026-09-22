@@ -49,10 +49,12 @@ probe_y = (player_y - 16) & ($085E | $0F)   -> $0960, tile $0964
 
 The masks are power-of-two wrap masks, not the extent minus one. Measured live
 in the town: standing at `(496,768)` writes `(488,752)` and tile `(30,47)`,
-which `ExitList::probe_origin` now reproduces. The scan additionally requires `$097C` bit 4 to be **set** — `$8D:879F` takes
-the no-match tail when it is clear — and a non-zero exit-list pointer at
-`$0480`. The probe never observed that bit set at sample time, so the recorded
-`exit_gate` corroborates nothing about it.
+which `ExitList::probe_origin` now reproduces. The scan requires `$097C` bit 4
+**clear**: `$8D:87A5 BEQ $87AA` continues when clear; otherwise `$87A7`
+jumps to the return tail. `$0480` must also be nonzero. This corrects the
+original opposite-polarity annotation (whose `$879F` was an operand byte),
+verified directly against the owned ROM during return-arrival qualification.
+Frame-end samples do not establish the gate value at every scan invocation.
 
 **This makes the conflict exact.** The house's own front door is the `1x1` rect
 at tile `(31,46)`. Firing it needs `probe_y` in `736..=751`, so player `y` in

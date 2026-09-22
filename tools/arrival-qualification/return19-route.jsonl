@@ -1,0 +1,119 @@
+{"buttons": ["Down"], "frames": 100, "label": "leave-bedroom"}
+{"buttons": [], "frames": 120, "label": "settle-hall"}
+{"buttons": ["Right"], "frames": 62, "label": "align-opening"}
+{"buttons": [], "frames": 38, "label": "release-opening"}
+{"buttons": ["Down"], "frames": 67, "label": "leave-opening"}
+{"buttons": [], "frames": 83, "label": "settle10"}
+{"buttons": ["Down"], "frames": 42, "label": "south10"}
+{"buttons": [], "frames": 12, "label": "release10"}
+{"buttons": ["Left"], "frames": 78, "label": "west10"}
+{"buttons": [], "frames": 90, "label": "roomC"}
+{"buttons": ["Left"], "frames": 12, "label": "crossC"}
+{"buttons": [], "frames": 100, "label": "settledC"}
+{"buttons": ["Left"], "frames": 61, "label": "alignC"}
+{"buttons": [], "frames": 12, "label": "releaseC"}
+{"buttons": ["Down"], "frames": 45, "label": "leaveC"}
+{"buttons": [], "frames": 120, "label": "settleD"}
+{"buttons": ["Down"], "frames": 100, "label": "leaveD"}
+{"buttons": [], "frames": 120, "label": "settleTown"}
+{"buttons": ["Down", "A"], "frames": 1, "label": "door-talk"}
+{"buttons": [], "frames": 180, "label": "door-wait"}
+{"buttons": ["Up"], "frames": 90, "label": "returnC"}
+{"buttons": [], "frames": 120, "label": "settleC-return"}
+{"buttons": ["Up"], "frames": 110, "label": "toB"}
+{"buttons": [], "frames": 120, "label": "settleB"}
+{"buttons": ["Right"], "frames": 12, "label": "alignB"}
+{"buttons": [], "frames": 12, "label": "releaseB"}
+{"buttons": ["Up", "A"], "frames": 1, "label": "openB"}
+{"buttons": [], "frames": 100, "label": "openB-wait"}
+{"buttons": ["Up"], "frames": 70, "label": "enterB"}
+{"buttons": [], "frames": 120, "label": "B-entry"}
+{"buttons": ["A"], "frames": 1, "label": "openB-facing"}
+{"buttons": [], "frames": 100, "label": "openB-facing-wait"}
+{"buttons": ["Up"], "frames": 70, "label": "enterB-again"}
+{"buttons": [], "frames": 120, "label": "B-entry-wait"}
+{"buttons": ["A"], "frames": 1, "label": "B-entry-ack"}
+{"buttons": [], "frames": 180, "label": "B-entry-ack-wait"}
+{"buttons": ["Up"], "frames": 60, "label": "B-approach"}
+{"buttons": [], "frames": 12, "label": "B-approach-release"}
+{"buttons": ["A"], "frames": 1, "label": "elder-ack1"}
+{"buttons": [], "frames": 180, "label": "elder-wait1"}
+{"buttons": ["A"], "frames": 1, "label": "elder-ack2"}
+{"buttons": [], "frames": 180, "label": "elder-wait2"}
+{"buttons": ["A"], "frames": 1, "label": "elder-ack3"}
+{"buttons": [], "frames": 180, "label": "elder-wait3"}
+{"buttons": ["A"], "frames": 1, "label": "elder-ack4"}
+{"buttons": [], "frames": 180, "label": "elder-wait4"}
+{"buttons": ["A"], "frames": 1, "label": "elder-ack5"}
+{"buttons": [], "frames": 180, "label": "elder-wait5"}
+{"buttons": ["Down"], "frames": 60, "label": "leaveB"}
+{"buttons": [], "frames": 100, "label": "settleC-open"}
+{"buttons": ["A"], "frames": 1, "label": "elder-final"}
+{"buttons": [], "frames": 180, "label": "elder-final-wait"}
+{"buttons": ["Down"], "frames": 60, "label": "leaveB-open"}
+{"buttons": [], "frames": 100, "label": "settleC-granted"}
+{"buttons": ["Left"], "frames": 12, "label": "alignD-open"}
+{"buttons": [], "frames": 12, "label": "releaseD-open"}
+{"buttons": ["Down"], "frames": 82, "label": "southC-open"}
+{"buttons": [], "frames": 100, "label": "settleD-open"}
+{"buttons": ["Down"], "frames": 80, "label": "exitD-open"}
+{"buttons": [], "frames": 160, "label": "settleTown-open"}
+{"buttons": ["Right"], "frames": 82, "label": "town-east"}
+{"buttons": [], "frames": 12, "label": "town-east-release"}
+{"buttons": ["Up"], "frames": 165, "label": "town-north"}
+{"buttons": [], "frames": 12, "label": "town-north-release"}
+{"buttons": ["Right"], "frames": 8, "label": "town-east-nudge"}
+{"buttons": [], "frames": 12, "label": "town-east-nudge-release"}
+{"buttons": ["Up"], "frames": 165, "label": "town-north-retry"}
+{"buttons": [], "frames": 12, "label": "town-north-retry-release"}
+{"buttons": ["Right"], "frames": 12, "label": "town-align-north"}
+{"buttons": [], "frames": 12, "label": "town-align-release"}
+{"buttons": ["Up"], "frames": 115, "label": "town-upper"}
+{"buttons": [], "frames": 12, "label": "town-upper-release"}
+{"buttons": ["Right"], "frames": 105, "label": "town-upper-east"}
+{"buttons": [], "frames": 12, "label": "town-upper-east-release"}
+{"buttons": ["Up"], "frames": 24, "label": "town-northeast"}
+{"buttons": [], "frames": 12, "label": "town-northeast-release"}
+{"buttons": ["Right"], "frames": 42, "label": "town-house17"}
+{"buttons": [], "frames": 12, "label": "town-house17-release"}
+{"buttons": ["Up"], "frames": 30, "label": "enter17"}
+{"buttons": [], "frames": 140, "label": "settle17"}
+{"buttons": ["Right"], "frames": 8, "label": "align17-native"}
+{"buttons": [], "frames": 12, "label": "align17-native-release"}
+{"buttons": ["Up"], "frames": 30, "label": "enter17-native"}
+{"buttons": [], "frames": 140, "label": "settle17-native"}
+{"buttons": ["Left"], "frames": 2, "label": "align17-one"}
+{"buttons": [], "frames": 12, "label": "align17-one-release"}
+{"buttons": ["Up"], "frames": 30, "label": "enter17-exact"}
+{"buttons": [], "frames": 140, "label": "settle17-exact"}
+{"buttons": ["Down"], "frames": 20, "label": "back-from17-wall"}
+{"buttons": [], "frames": 12, "label": "back-from17-release"}
+{"buttons": ["Up"], "frames": 30, "label": "enter17-centered"}
+{"buttons": [], "frames": 140, "label": "settle17-centered"}
+{"buttons": ["Left"], "frames": 12, "label": "correct17-x"}
+{"buttons": [], "frames": 12, "label": "correct17-x-release"}
+{"buttons": ["Up"], "frames": 30, "label": "correct17-y"}
+{"buttons": [], "frames": 140, "label": "correct17-settle"}
+{"buttons": ["A"], "frames": 1, "label": "open17-door"}
+{"buttons": [], "frames": 100, "label": "open17-wait"}
+{"buttons": ["Up"], "frames": 40, "label": "enter17-open"}
+{"buttons": [], "frames": 140, "label": "settle17-open"}
+{"buttons": ["Right"], "frames": 44, "label": "room17-east"}
+{"buttons": [], "frames": 12, "label": "room17-east-release"}
+{"buttons": ["Up"], "frames": 75, "label": "room17-north"}
+{"buttons": [], "frames": 140, "label": "room19-settle"}
+{"buttons": ["Right"], "frames": 44, "label": "room17-east-floor"}
+{"buttons": [], "frames": 12, "label": "room17-east-floor-release", "arrival": true}
+{"buttons": ["Up"], "frames": 60, "label": "room17-stairs", "arrival": true}
+{"buttons": [], "frames": 140, "label": "room19-stairs-settle", "arrival": true}
+{"buttons": [], "frames": 180, "label": "room19-stable", "arrival": true}
+{"buttons": ["Right"], "frames": 24, "label": "return19-right", "arrival": true}
+{"buttons": [], "frames": 220, "label": "return17-stable", "arrival": true}
+{"buttons": ["Left"], "frames": 12, "label": "return19-align", "arrival": true}
+{"buttons": [], "frames": 12, "label": "return19-pretrigger", "arrival": true}
+{"buttons": ["Up"], "frames": 14, "label": "return19-trigger", "arrival": true}
+{"buttons": [], "frames": 300, "label": "return17-arrival", "arrival": true}
+{"buttons": [], "frames": 180, "label": "return17-released-neutral", "arrival": true}
+{"buttons": ["Down"], "frames": 24, "label": "return17-ordinary-walk", "arrival": true}
+{"buttons": [], "frames": 24, "label": "return17-walk-release", "arrival": true}
+{"finish": true}

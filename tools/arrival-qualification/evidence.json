@@ -1,0 +1,1075 @@
+{
+  "schema": "crysta-return-arrivals-v1",
+  "rom_sha256": "f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548",
+  "cursor": "completed-frame elapsed from initialized player; inclusive cursor zero",
+  "exit_scan_gate": {
+    "address": 9275296,
+    "mask": 16,
+    "clear": "permits scanning",
+    "set": "suppresses scanning"
+  },
+  "edges": {
+    "1e": {
+      "source_map": 30,
+      "destination_map": 10,
+      "selector": 5,
+      "source_record": {
+        "rom_offset": 102299,
+        "cpu_address": 8490907,
+        "rectangle": [
+          39,
+          12,
+          1,
+          4
+        ],
+        "destination": 10,
+        "mode": 0,
+        "selector": 5,
+        "raw_position": [
+          784,
+          752
+        ]
+      },
+      "capture_sha256": "cfaff0e8868706e65c1bd2f10d20fd631343a929a054ddbfaaea89abc4c46ffa",
+      "recipe": "return1e-route.jsonl",
+      "recipe_sha256": "56a7d89cdb29161b7e8b5d19e190199ed598508de15a5e7e51abbe7ab677b780",
+      "queue_observations": [
+        {
+          "frame": 12815,
+          "position": [
+            784,
+            752
+          ],
+          "mode": 0
+        },
+        {
+          "frame": 12816,
+          "position": [
+            784,
+            736
+          ],
+          "mode": 0
+        }
+      ],
+      "loaded_frame": 12914,
+      "free_frame": 12950,
+      "advances": 36,
+      "samples": 37,
+      "loaded_position": [
+        792,
+        752
+      ],
+      "settled_position": [
+        792,
+        769
+      ],
+      "positions": [
+        [
+          0,
+          792,
+          752
+        ],
+        [
+          15,
+          792,
+          753
+        ],
+        [
+          18,
+          792,
+          754
+        ],
+        [
+          20,
+          792,
+          755
+        ],
+        [
+          21,
+          792,
+          756
+        ],
+        [
+          22,
+          792,
+          757
+        ],
+        [
+          23,
+          792,
+          758
+        ],
+        [
+          24,
+          792,
+          759
+        ],
+        [
+          25,
+          792,
+          760
+        ],
+        [
+          26,
+          792,
+          761
+        ],
+        [
+          27,
+          792,
+          762
+        ],
+        [
+          28,
+          792,
+          763
+        ],
+        [
+          29,
+          792,
+          764
+        ],
+        [
+          30,
+          792,
+          765
+        ],
+        [
+          31,
+          792,
+          766
+        ],
+        [
+          32,
+          792,
+          767
+        ],
+        [
+          33,
+          792,
+          768
+        ],
+        [
+          34,
+          792,
+          769
+        ]
+      ],
+      "phases": {
+        "initialized": 0,
+        "ownership": 14,
+        "forced": 15,
+        "endpoint": 34,
+        "recovery": 35,
+        "free": 36
+      },
+      "state_changes": [
+        {
+          "elapsed": 0,
+          "map": 10,
+          "control": 0,
+          "flags": 17428,
+          "player_script": 8692014,
+          "controller_script": 0,
+          "controller_flags": 0,
+          "control_slot": 4480,
+          "special": 0,
+          "facing": 0
+        },
+        {
+          "elapsed": 9,
+          "map": 10,
+          "control": 0,
+          "flags": 17428,
+          "player_script": 8692014,
+          "controller_script": 8947756,
+          "controller_flags": 20736,
+          "control_slot": 4480,
+          "special": 0,
+          "facing": 0
+        },
+        {
+          "elapsed": 14,
+          "map": 10,
+          "control": 0,
+          "flags": 17428,
+          "player_script": 8692258,
+          "controller_script": 8685518,
+          "controller_flags": 37888,
+          "control_slot": 5504,
+          "special": 32768,
+          "facing": 0
+        },
+        {
+          "elapsed": 15,
+          "map": 10,
+          "control": 0,
+          "flags": 21520,
+          "player_script": 8698736,
+          "controller_script": 8698711,
+          "controller_flags": 37888,
+          "control_slot": 5504,
+          "special": 32768,
+          "facing": 0
+        },
+        {
+          "elapsed": 19,
+          "map": 10,
+          "control": 0,
+          "flags": 5136,
+          "player_script": 8698736,
+          "controller_script": 8698711,
+          "controller_flags": 37888,
+          "control_slot": 5504,
+          "special": 32768,
+          "facing": 0
+        },
+        {
+          "elapsed": 35,
+          "map": 10,
+          "control": 0,
+          "flags": 1044,
+          "player_script": 8692483,
+          "controller_script": 8685802,
+          "controller_flags": 33792,
+          "control_slot": 5504,
+          "special": 0,
+          "facing": 0
+        },
+        {
+          "elapsed": 36,
+          "map": 10,
+          "control": 0,
+          "flags": 1044,
+          "player_script": 8692312,
+          "controller_script": 8685802,
+          "controller_flags": 33792,
+          "control_slot": 5504,
+          "special": 0,
+          "facing": 0
+        }
+      ],
+      "hostile": {
+        "status": "captured",
+        "capture_sha256": "c853f3f99618347000cf595f9a81e52c6d01d7025f0f951f2bd002b71985ab72",
+        "recipe": "return1e-hostile-route.jsonl",
+        "recipe_sha256": "007f8b1403faa9e6992f6d299cf1e68264c2365fe545c3fd88054739e6f5c0bb",
+        "inputs": [
+          [
+            0,
+            [
+              "Left",
+              "A"
+            ]
+          ],
+          [
+            35,
+            []
+          ]
+        ],
+        "comparison": {
+          "first_frame": 12914,
+          "last_frame": 12950,
+          "selected_differences": [],
+          "ancillary_differences": [
+            {
+              "frame": 12934,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12935,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12936,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12937,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12938,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12939,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12940,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12941,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12942,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12943,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12944,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12945,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12946,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12947,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12948,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 12949,
+              "fields": [
+                "service_words"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "19": {
+      "source_map": 25,
+      "destination_map": 23,
+      "selector": 14,
+      "source_record": {
+        "rom_offset": 102210,
+        "cpu_address": 8490818,
+        "rectangle": [
+          58,
+          20,
+          1,
+          1
+        ],
+        "destination": 23,
+        "mode": 0,
+        "selector": 14,
+        "raw_position": [
+          448,
+          352
+        ]
+      },
+      "capture_sha256": "f43f3682b41596913e98ca94e4ae9944f6b6fa0d1a3f6a07d552e9d5bf861a91",
+      "recipe": "return19-route.jsonl",
+      "recipe_sha256": "e652fe4761880559ec3abee0e4cb14df1c213a3cd0c89429cdf64e46dda55c2b",
+      "queue_observations": [
+        {
+          "frame": 14429,
+          "position": [
+            448,
+            352
+          ],
+          "mode": 0
+        },
+        {
+          "frame": 14430,
+          "position": [
+            434,
+            329
+          ],
+          "mode": 0
+        }
+      ],
+      "loaded_frame": 14498,
+      "free_frame": 14576,
+      "advances": 78,
+      "samples": 79,
+      "loaded_position": [
+        442,
+        345
+      ],
+      "settled_position": [
+        456,
+        368
+      ],
+      "positions": [
+        [
+          0,
+          442,
+          345
+        ],
+        [
+          14,
+          444,
+          346
+        ],
+        [
+          18,
+          446,
+          347
+        ],
+        [
+          22,
+          448,
+          348
+        ],
+        [
+          27,
+          450,
+          349
+        ],
+        [
+          32,
+          452,
+          350
+        ],
+        [
+          36,
+          453,
+          351
+        ],
+        [
+          40,
+          454,
+          352
+        ],
+        [
+          44,
+          455,
+          353
+        ],
+        [
+          48,
+          455,
+          354
+        ],
+        [
+          52,
+          456,
+          355
+        ],
+        [
+          56,
+          456,
+          356
+        ],
+        [
+          60,
+          456,
+          357
+        ],
+        [
+          61,
+          456,
+          358
+        ],
+        [
+          62,
+          456,
+          359
+        ],
+        [
+          63,
+          456,
+          360
+        ],
+        [
+          66,
+          456,
+          361
+        ],
+        [
+          67,
+          456,
+          362
+        ],
+        [
+          68,
+          456,
+          363
+        ],
+        [
+          69,
+          456,
+          364
+        ],
+        [
+          72,
+          456,
+          365
+        ],
+        [
+          73,
+          456,
+          366
+        ],
+        [
+          74,
+          456,
+          367
+        ],
+        [
+          75,
+          456,
+          368
+        ]
+      ],
+      "phases": {
+        "initialized": 0,
+        "ownership": 9,
+        "forced": 9,
+        "endpoint": 75,
+        "recovery": 77,
+        "free": 78
+      },
+      "state_changes": [
+        {
+          "elapsed": 0,
+          "map": 23,
+          "control": 0,
+          "flags": 17428,
+          "player_script": 8692014,
+          "controller_script": 0,
+          "controller_flags": 0,
+          "control_slot": 4416,
+          "special": 0,
+          "facing": 0
+        },
+        {
+          "elapsed": 9,
+          "map": 23,
+          "control": 0,
+          "flags": 21520,
+          "player_script": 8699262,
+          "controller_script": 8699237,
+          "controller_flags": 37888,
+          "control_slot": 4416,
+          "special": 32768,
+          "facing": 5
+        },
+        {
+          "elapsed": 13,
+          "map": 23,
+          "control": 0,
+          "flags": 5136,
+          "player_script": 8699262,
+          "controller_script": 8699237,
+          "controller_flags": 37888,
+          "control_slot": 4416,
+          "special": 32768,
+          "facing": 5
+        },
+        {
+          "elapsed": 28,
+          "map": 23,
+          "control": 0,
+          "flags": 5136,
+          "player_script": 8699262,
+          "controller_script": 8699237,
+          "controller_flags": 37888,
+          "control_slot": 4416,
+          "special": 32768,
+          "facing": 0
+        },
+        {
+          "elapsed": 76,
+          "map": 23,
+          "control": 0,
+          "flags": 5136,
+          "player_script": 8699266,
+          "controller_script": 8699237,
+          "controller_flags": 37888,
+          "control_slot": 4416,
+          "special": 32768,
+          "facing": 0
+        },
+        {
+          "elapsed": 77,
+          "map": 23,
+          "control": 0,
+          "flags": 1044,
+          "player_script": 8692483,
+          "controller_script": 8685802,
+          "controller_flags": 33792,
+          "control_slot": 4416,
+          "special": 0,
+          "facing": 0
+        },
+        {
+          "elapsed": 78,
+          "map": 23,
+          "control": 0,
+          "flags": 1044,
+          "player_script": 8692312,
+          "controller_script": 8685802,
+          "controller_flags": 33792,
+          "control_slot": 4416,
+          "special": 0,
+          "facing": 0
+        }
+      ],
+      "hostile": {
+        "status": "captured",
+        "capture_sha256": "6628868dcd71a9c2d5fcd8dd6ab75a27dd99cdc08ebcd077c8721f965e1e852d",
+        "recipe": "return19-hostile-route.jsonl",
+        "recipe_sha256": "c72467e357ecce522c3ca1ab2063d072cc146d32bcdfafc2232caf71ade04d68",
+        "inputs": [
+          [
+            0,
+            [
+              "Left",
+              "A"
+            ]
+          ],
+          [
+            77,
+            []
+          ]
+        ],
+        "comparison": {
+          "first_frame": 14498,
+          "last_frame": 14576,
+          "selected_differences": [],
+          "ancillary_differences": [
+            {
+              "frame": 14511,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14512,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14513,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14514,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14515,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14516,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14517,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14518,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14519,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14520,
+              "fields": [
+                "player_words",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14521,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14522,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14523,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14524,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14525,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14526,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14527,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14528,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14529,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14530,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14531,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14532,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14533,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14534,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14535,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14536,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14537,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14538,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14539,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14540,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14541,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14542,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14543,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14544,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14545,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14546,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14547,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14548,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14549,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14550,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14551,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14552,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14553,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14554,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14555,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14556,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14557,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14558,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14559,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14560,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14561,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14562,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14563,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14564,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14565,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14566,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14567,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14568,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14569,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14570,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14571,
+              "fields": [
+                "actors",
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14572,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14573,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14574,
+              "fields": [
+                "service_words"
+              ]
+            },
+            {
+              "frame": 14575,
+              "fields": [
+                "service_words"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

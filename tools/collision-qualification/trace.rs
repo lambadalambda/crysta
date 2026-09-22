@@ -62,11 +62,44 @@ fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
         "service_words": [word(w, 0x454), word(w, 0x956), word(w, 0x966), word(w, 0x968), word(w, 0x999)],
         "player_slot": word(w, 0xdea),
         // The player slot's `$7F` mirror, `$7F:0000 + slot`, thirty-two words.
-        "player_extra": (0..32)
-            .map(|i| word(w, 0x10000 + usize::from(word(w, 0xdea)) + 2 * i))
-            .collect::<Vec<u16>>(),
+        "player_extra": w.get(0x10000 + usize::from(word(w, 0xdea))..)
+            .and_then(|tail| tail.get(..64))
+            .map(|bytes| (0..32).map(|i| word(bytes, 2 * i)).collect::<Vec<_>>()),
         "actors": actors,
     })
+}
+
+/// Dense arrival observations, including transient loader state. A decoded
+/// layer here is evidence, not permission to walk during loading or forced motion.
+fn arrival_sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
+    let mut value = sample(w, label, held, frames);
+    value["kind"] = json!("arrival");
+    for (name, at) in [
+        ("pending_map", 0x47C),
+        ("previous_map", 0x482),
+        ("exit_list_map", 0x480),
+        ("selector", 0x490),
+        ("special", 0x97C),
+        ("request_mode", 0x484),
+        ("control_slot", 0xDEE),
+        ("input_mask", 0x45E),
+    ] {
+        value[name] = json!(word(w, at));
+    }
+    value["queued_position"] = json!([word(w, 0x492), word(w, 0x494)]);
+    value["exit_origin"] = json!([word(w, 0x95E), word(w, 0x960)]);
+    value["exit_cell"] = json!([word(w, 0x962), word(w, 0x964)]);
+    value["control_words"] = json!((0..32)
+        .map(|i| word(w, usize::from(word(w, 0xDEE)) + 2 * i))
+        .collect::<Vec<_>>());
+    value["player_words"] = json!((0..32).map(|i| word(w, 0x1000 + 2 * i)).collect::<Vec<_>>());
+    value["layer"] = assets::maps::LoadedMap::from_wram(w).map_or(Value::Null, |layer| {
+        json!({
+            "width": layer.width(), "height": layer.height(),
+            "cells": layer.cells().iter().map(|cell| cell.raw()).collect::<Vec<_>>()
+        })
+    });
+    value
 }
 
 fn emit(value: &Value) {
@@ -160,7 +193,11 @@ fn motion_frame(s: &mut Session, label: &str, held: &[&str]) -> Value {
                 word(&start, 0x97C), word(&end, 0x97C), word(&start, 0x980), word(&end, 0x980)
             );
         }
-        assert_eq!(s.frame_state().frames, frame, "motion entry crossed a frame");
+        assert_eq!(
+            s.frame_state().frames,
+            frame,
+            "motion entry crossed a frame"
+        );
         remaining -= entry.entries.len();
         if s.cpu_registers().x == 0x1000 {
             break;
@@ -300,13 +337,95 @@ fn main() {
                 continue;
             }
             s.run_frame();
-            emit(&sample(
-                &s.wram_image(),
-                label,
-                &held,
-                s.frame_state().frames,
-            ));
+            let state = s.wram_image();
+            emit(&if c["arrival"] == true {
+                arrival_sample(&state, label, &held, s.frame_state().frames)
+            } else {
+                sample(&state, label, &held, s.frame_state().frames)
+            });
         }
     }
     panic!("itinerary missing finish");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn transient_player_mirror_is_bounded_and_distinct_from_fixed_player_words() {
+        let mut w = vec![0; 0x20000];
+        w[0x1000] = 42;
+        w[0x1FFC0] = 99;
+        for slot in [0xFFC0u16, 0xFFC1, 0xFFFF] {
+            w[0xDEA..0xDEC].copy_from_slice(&slot.to_le_bytes());
+            let row = arrival_sample(&w, "transient", &[], 1);
+            assert_eq!(row["player_slot"], slot);
+            assert_eq!(row["player_words"][0], 42);
+            if slot == 0xFFC0 {
+                assert_eq!(row["player_extra"][0], 99);
+                assert_eq!(row["player_extra"].as_array().unwrap().len(), 32);
+            } else {
+                assert!(row["player_extra"].is_null());
+            }
+        }
+    }
+
+    #[test]
+    fn arrival_fields_keep_loader_queue_and_controller_state_distinct() {
+        let mut w = vec![0; 0x20000];
+        for (at, value) in [
+            (0x47C, 0x17u16),
+            (0x47E, 0x19),
+            (0x480, 0x18),
+            (0x482, 0x16),
+            (0x490, 14),
+            (0x492, 448),
+            (0x494, 352),
+            (0x97C, 0x10),
+            (0x980, 0xA0),
+            (0x1000, 442),
+            (0x1002, 345),
+            (0x1004, 0x0415),
+            (0xDEA, 0x1000),
+            (0x484, 0x80),
+            (0xDEE, 0x1040),
+            (0x45E, 0xFFFF),
+            (0x95E, 440),
+            (0x960, 329),
+            (0x962, 27),
+            (0x964, 20),
+            (0x1040, 123),
+            (0x107E, 456),
+        ] {
+            w[at..at + 2].copy_from_slice(&value.to_le_bytes());
+        }
+        let row = arrival_sample(&w, "return", &[], 123);
+        for (name, expected) in [
+            ("pending_map", 0x17),
+            ("map", 0x19),
+            ("exit_list_map", 0x18),
+            ("previous_map", 0x16),
+            ("selector", 14),
+            ("special", 0x10),
+            ("control", 0xA0),
+        ] {
+            assert_eq!(row[name], expected);
+        }
+        assert_eq!(row["kind"], "arrival");
+        assert_eq!(row["queued_position"], json!([448, 352]));
+        assert_eq!(row["position"], json!([442, 345]));
+        assert_eq!(row["player_words"][2], 0x0415);
+        assert_eq!(row["request_mode"], 0x80);
+        assert_eq!(row["control_slot"], 0x1040);
+        assert_eq!(row["input_mask"], 0xFFFF);
+        assert_eq!(row["exit_origin"], json!([440, 329]));
+        assert_eq!(row["exit_cell"], json!([27, 20]));
+        assert_eq!(row["control_words"][0], 123);
+        assert_eq!(row["control_words"][31], 456);
+        assert!(
+            row["layer"].is_null(),
+            "invalid transient dimensions are not a layer"
+        );
+    }
 }

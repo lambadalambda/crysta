@@ -65,8 +65,8 @@ fn sample(w: &[u8], label: &str, held: &[&str], frames: u32) -> Value {
         "actors": actors,
         // The exit geometry scan at $8D:8797 reads none of the player words.
         // Its fine test compares $095E/$0960 in pixels and its coarse test
-        // $0962/$0964 in tiles. $097C bit 4 must be SET for the scan to run:
-        // $8D:879F branches to the no-match tail when it is clear.
+        // $0962/$0964 in tiles. $097C bit 4 inhibits the scan when SET:
+        // $8D:87A5 branches to the scan prerequisites when it is clear.
         "probe": [word(w, 0x95e), word(w, 0x960)],
         "probe_tile": [w[0x962], w[0x964]],
         "exit_gate": word(w, 0x97c),
