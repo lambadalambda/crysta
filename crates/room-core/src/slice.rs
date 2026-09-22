@@ -201,7 +201,7 @@ impl GameData {
     /// identity must remain unchanged. No A exits or actors are admitted.
     /// The source D cell $8592 is privately cloned to $0592 for post-grant reloads.
     /// A is 64x80 cells; every ordinary collision sample is restricted to the
-    /// half-open source-qualified halo [29,47,36,53], independently of map bounds.
+    /// half-open source-qualified halo `[29,47,36,53]`, independently of map bounds.
     /// # Errors
     /// Rejects legacy/twice-extended data, changed gate/dimensions/ROM, or non-open
     /// material/occupancy in the 42-cell admitted exterior halo.

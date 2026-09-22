@@ -53,9 +53,9 @@ pub const CHAINED_DESPAWN: u8 = 0x47;
 /// Services that test a chain of event-flag conditions.
 ///
 /// Both handlers open like [`BRANCH_ON_FLAG`] but, after testing a word,
-/// examine its high nibble. A bit in [`CHAIN_CONTINUES`] names a combinator and
+/// examine its high nibble. A bit in `CHAIN_CONTINUES` names a combinator and
 /// pulls in a further condition word; a clear nibble ends the chain, and so
-/// does [`CHAIN_NEGATES`], which is tested first and inverts the result. Their
+/// does `CHAIN_NEGATES`, which is tested first and inverts the result. Their
 /// length is therefore a property of the stream, not of the handler, exactly
 /// as the spawn stream's `$FA` is -- there the mask is `$F800`.
 pub const CHAINED_CONDITION: [u8; 2] = [CHAINED_BRANCH, CHAINED_DESPAWN];
@@ -97,7 +97,7 @@ pub fn chained_condition_length(image: &[u8], first_word: usize) -> Option<usize
 /// consumed without being tested, which matters because a later or would
 /// otherwise revive it. The terminating word's bit 15 inverts the result.
 ///
-/// Returns `None` for truncation, a chain past [`MAX_CHAIN_WORDS`], or a flag
+/// Returns `None` for truncation, a chain past `MAX_CHAIN_WORDS`, or a flag
 /// outside the bitmap.
 #[must_use]
 pub fn chained_condition_holds(

@@ -359,7 +359,7 @@ pub struct ContactSpec {
 /// It does not impose facing, button edges or movement admission.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoxOpeningGate {
-    /// Inclusive [left, top, right, bottom]; source gate is [120,368,152,400].
+    /// Inclusive `[left, top, right, bottom]`; source gate is `[120,368,152,400]`.
     pub raw_bounds: [u16; 4],
 }
 impl BoxOpeningGate {

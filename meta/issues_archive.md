@@ -82,3 +82,4 @@
 - [x] [Derive resident art from spawn records across the Crysta slice](issues/crysta-resident-art.md)
 - [x] [Draw the resident lines the house text profile refuses](issues/crysta-refused-text-controls.md)
 - [x] [Walkers stop and face the player who faces them](issues/crysta-walker-stops-for-player.md)
+- [x] [Fix actor-script rustdoc links to private constants](issues/fix-actor-script-rustdoc-links.md)
