@@ -119,7 +119,12 @@ fn goto(s: &mut Session, target: (u16, u16), label: &str) -> &'static str {
         }
         hold(s, &[json!(want)]);
         s.run_frame();
-        emit(&sample(&s.wram_image(), label, &[want], s.frame_state().frames));
+        emit(&sample(
+            &s.wram_image(),
+            label,
+            &[want],
+            s.frame_state().frames,
+        ));
         if position(&s.wram_image()) == (x, y) {
             still += 1;
             if still >= 30 {
@@ -160,7 +165,12 @@ fn main() {
         }
         s.run_frame();
     }
-    emit(&sample(&s.wram_image(), "boot", &[], s.frame_state().frames));
+    emit(&sample(
+        &s.wram_image(),
+        "boot",
+        &[],
+        s.frame_state().frames,
+    ));
 
     for line in std::io::stdin().lock().lines() {
         let line = line.unwrap();
@@ -168,6 +178,19 @@ fn main() {
         if c["finish"] == true {
             std::io::stdout().flush().unwrap();
             std::process::exit(0);
+        }
+        if let Some(target) = c["goto"].as_array() {
+            let label = c["label"].as_str().unwrap();
+            let target = (
+                u16::try_from(target[0].as_u64().unwrap()).unwrap(),
+                u16::try_from(target[1].as_u64().unwrap()).unwrap(),
+            );
+            let result = goto(&mut s, target, label);
+            emit(
+                &json!({"kind": "goto", "label": label, "target": target, "result": result,
+                         "position": position(&s.wram_image())}),
+            );
+            continue;
         }
         let buttons = c["buttons"].as_array().unwrap();
         assert!(buttons
@@ -181,10 +204,21 @@ fn main() {
             // An address never executed, so the trace runs out the frame.
             let trace = s.trace_until_pc(0xFF_FFFF, 2_000_000, 1).unwrap();
             let after = s.frame_state().frames;
+            assert_eq!(
+                trace.stop,
+                oracle::CpuTraceStop::FrameLimit,
+                "incomplete frame trace"
+            );
+            assert_eq!(after, before + 1, "trace must advance exactly one frame");
             let mut bytes = Vec::with_capacity(trace.entries.len() * 8);
             for entry in &trace.entries {
                 bytes.extend_from_slice(&entry.address.to_le_bytes());
-                bytes.extend_from_slice(&[entry.status, u8::from(entry.emulation), entry.data_bank, 0]);
+                bytes.extend_from_slice(&[
+                    entry.status,
+                    u8::from(entry.emulation),
+                    entry.data_bank,
+                    0,
+                ]);
             }
             std::fs::write(out.join(format!("{name}.trace")), bytes).unwrap();
             emit(&json!({
@@ -193,17 +227,6 @@ fn main() {
                 "frames": [before, after],
             }));
             emit(&sample(&s.wram_image(), name, &held, after));
-            continue;
-        }
-        if let Some(target) = c["goto"].as_array() {
-            let label = c["label"].as_str().unwrap();
-            let target = (
-                u16::try_from(target[0].as_u64().unwrap()).unwrap(),
-                u16::try_from(target[1].as_u64().unwrap()).unwrap(),
-            );
-            let result = goto(&mut s, target, label);
-            emit(&json!({"kind": "goto", "label": label, "target": target, "result": result,
-                         "position": position(&s.wram_image())}));
             continue;
         }
         let label = c["label"].as_str().unwrap();

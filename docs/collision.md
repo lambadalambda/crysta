@@ -1,9 +1,10 @@
 # Movement collision: measured attribute semantics
 
-Status: **the cell attribute is decoded exactly; its movement semantics are
-qualified for four values in one map.** This is a bounded measurement, not a
-complete passability specification, and not yet a trace of the admission
-routine itself. See [the open issue](../meta/issues/qualify-collision-predicate.md).
+Status: **bounded movement measurements plus a traced controller probe and
+native slope witnesses; not a complete passability specification.** The table
+at `$80:E85C` is decoded, but `COP CA` does not decide ordinary walking.
+The motion resolver's direction/pair and slope behavior is the remaining gate
+for 24-map free roam. See [the open issue](../meta/issues/qualify-collision-predicate.md).
 
 ## The attribute field, and the bit that is not attribute
 
@@ -164,14 +165,15 @@ only at `>= 60`, where the contact count collapses to 15.
   unknown, not walkable. The exterior's four are the ones that matter for
   walking the town, and reaching map `$000A` needs the `$0026` progression
   gate.
-- **The admission routine has not been traced.** Everything here is inferred
-  from observed movement. Until the predicate is found and disassembled, a
-  second input (facing, object bits, an actor plane, a per-map table) could
-  refine any of it.
+- **There is no single binary cell-admission predicate established here.**
+  The traced `COP CA` branch and its table are described below. The actual
+  `$80:D107` motion resolver also reads direction, the sample pair, old-edge
+  slope types and controller flags. Table zero/nonzero cannot replace it.
 - **The layer is snapshotted once per map**, at entry. Given that bit 15 is
   written during play, in-run layer drift is not excluded by this method.
-- **Nothing here is wired into the portable core yet.** `room-core` still uses
-  its per-room qualified collision responses.
+- **The new probe-table decoder is not wired into ordinary movement.**
+  `room-core` uses its qualified O/S/P responses and bounded aliases for 5/25/29;
+  the Crysta builder installs those aliases. Unknown types still fail closed.
 
 ## Reproduce
 
@@ -253,3 +255,149 @@ the town run also pays for its route prefix. `derive.py` prints
 `NO CONSISTENT OFFSET` rather than a best fit when samples contradict a
 single-point model, refuses samples that span maps, and warns if the consistent
 offsets touch the edge of the search window.
+
+## Traced table: a controller-action gate, not walking admission
+
+`tools/collision-qualification/admission-route.jsonl` reproduces two Right-held,
+Right-facing frames in map `$000F`, ordinary control `$00A0` throughout each
+witness. Each starts from the same empty-SRAM boot route; positions are reached
+by pad input, never assigned. These are not identical complete machine states:
+the route walks from the open floor to the wall.
+
+| Witness | Completed frames | Position before → after | `$80:ADAD` successor |
+| --- | --- | --- | --- |
+| `right-admitted` | 6850 → 6851 | `(331,112)` → `(332,112)` | `$80:ADAF` (zero) |
+| `right-refused` | 6975 → 6976 | `(472,112)` → `(472,112)` | `$80:ADB7` (nonzero) |
+
+The names describe observed displacement, not causation. Both traces execute
+`$84:8E6C`, the `COP CA` handler `$80:AD39`, ordinary stream selection at
+`$84:8E76`, and motion application at `$80:D107`. Fresh replay reproduces the
+retained instruction-trace hashes:
+
+- admitted: `a966f3a739bb2ef6021ef96eeb6317a13a07dbd5e2a21754af085a5a53f325c7`
+- refused: `3d9faf531790c3ee40550796f7a4d7e7a6b2b085248e59abf6d7d0fc4c30a41d`
+
+### Source contract and two corrections
+
+At `$84:8E6C`, `COP CA $8E76` skips `COP 2B $4100,$90F3` when its probe is
+nonzero, then **continues COP61**. `$84:90F3` is the Right accelerated-action
+entry already identified in [input admission](input-admission.md). Thus the
+probe gates that branch opportunity; it does not skip the ordinary move.
+Linear CPU disassembly must not interpret COP operands as instructions.
+
+In the traced ordinary branch (`$0868 & $0080 == 0`), `$80:AD52` computes the
+right probe from player X plus the signed X offset and width, and Y plus its
+offset. The retained mirror words are `(-8,16,-16,16)`, so the probe is at
+`(x+8,y-16)`. `$8D:8C7E` maps the coordinates into the runtime layer;
+`$8D:8D3D` advances by the byte row stride at `$087E`, with layer wrapping.
+The handler checks one row when aligned and two when the 16px height straddles
+rows. Map-edge wrapping and the alternate `$0868` branch are not decoded here.
+
+At `$80:AD95`, the high byte of the cell word is read from `$7E:A001,X`:
+
+1. If bit 7 is set, substitute **6 for the high byte**.
+2. Shift right once, then mask with `$1F`.
+3. Read the byte at `$80:E85C + index`; nonzero branches at `$80:ADAD`.
+
+The dynamic override therefore selects **entry 3, not entry 6**. The unfinished
+decoder had applied that substitution after the shift; a red → green control
+with different entries 3 and 6 now catches it. Word bit 14 does not reach this
+lookup. This does not redefine the loader's seven-bit attribute field.
+
+`assets::maps::collision::ProbeTable` decodes only the table and CA's lookup:
+
+- zero entries: `{0,1,2,17,19,20,22,23,24,30}`;
+- entries 6 and 7: `$06` and `$07`;
+- every other entry: `$0F`.
+
+All six previously undecided attributes have nonzero probe entries. **That
+is not a verdict that all six are solid.** The resolver's `$80:E849` helper
+also reads this table, without CA's dynamic-bit substitution.
+
+### Why the remaining work is directional collision
+
+The actual motion applier is `$80:D107`. Its special-player dispatch has four
+32-word tables per direction: first sample, then second sample with O/P/S first.
+The first-table addresses are Up `$D542`, Down `$D8E8`, Left `$DC60`, Right
+`$DFDC`, all in bank `$80`; successive pair tables are `$40` bytes apart.
+The owned-ROM test checks these useful constraints:
+
+| Type | Source finding | What it does not establish |
+| --- | --- | --- |
+| 5 | Same targets as partial16 in all 16 tables | All action hooks/modes or map scopes |
+| 6/7 | Dedicated slope handlers; old-edge diversion precedes new-edge override | Full four-direction, neighbour-dependent slope behavior |
+| 8 | Up first target `$D506` tests `$097C` bit2; Down first target shares Open | A global Open/Solid classification |
+| 21 | Same targets as solid12 in all 16 tables | All action hooks/modes |
+| 29 | Same as Open in 15 tables; Right S-first differs | A global Open alias |
+
+Right S-first at `$80:E09C` sends 29 to `$DEFC` (block without nudge), whereas
+0 goes to `$DEE6` (positive-nudge test). Existing narrow Up stair aliases remain
+valid; broadening 29 to Open would erase a real source distinction.
+
+### New slope discovery reaches the missing terrain
+
+`slope_route.py Right|Left` reuses the house conversation prefix through
+`exterior-walk-down`, then holds Down for 76 more frames, releases for 12, and
+holds the selected horizontal direction for 40. It avoids the old exact-target
+`goto` experiment, which exhausted/oscillated and repeatedly missed its targets.
+Discovery was validated by native replay rather than a guessed physics test.
+
+Both runs reach `(504,929)` and climb opposite sides of the town's slope:
+Right finishes at `(560,912)`, Left at `(448,912)`. The traced frame is
+11979 → 11980, control `$00A0` before and after:
+
+| Input | Before → after | Slope path reached | Trace SHA-256 |
+| --- | --- | --- | --- |
+| Right | `(509,923)` → `(510,922)` | `$80:DF74 → DFA2`, type6 | `37e7691d1449dc859a5bb077b5e14068efa9c5f913916a0ffeaccd6f6c17376b` |
+| Left | `(499,923)` → `(498,922)` | `$80:DBF8 → DC26`, type7 | `acade0fdbc7d884516ce397c92c6031e5f5955b801e5f8eb515334feb231a9ce` |
+
+Separate movement-probe and trace-probe replays agree on every frame's map,
+position, facing, held buttons and control, including the prefix. Neutral/setup
+frames also contain control zero; they are not reclassified as walking evidence.
+The entry layer places type6 at `(32,57)` and type7 at `(30,57)`. The *leading
+edge* contacts them while the top-left collision point remains on type0: a
+point-only occupancy census cannot establish slope coverage.
+
+These are discovery witnesses, not a qualified portable slope implementation.
+The five missing maps remain missing; no unknown cells were made passable.
+
+### Reproduce the new evidence
+
+```sh
+sh tools/collision-qualification/build.sh
+ROM='local/Tenchi Souzou (Japan).sfc'
+D=local/collision-qualification
+P="$D/probe/target/release"
+"$P/trace" "$ROM" "$D/admission-review" \
+  < tools/collision-qualification/admission-route.jsonl > "$D/admission-review.jsonl"
+python3 -B tools/collision-qualification/check_trace.py \
+  "$D/admission-review.jsonl" "$D/admission-review"
+
+for direction in Right Left; do
+  python3 -B tools/collision-qualification/slope_route.py "$direction" > "$D/slope-$direction-route.jsonl"
+  "$P/collision-probe" "$ROM" "$D/slope-$direction" \
+    < "$D/slope-$direction-route.jsonl" > "$D/slope-$direction.jsonl"
+  python3 -B tools/collision-qualification/slope_route.py "$direction" --trace > "$D/slope-$direction-trace-route.jsonl"
+  "$P/trace" "$ROM" "$D/slope-$direction-trace" \
+    < "$D/slope-$direction-trace-route.jsonl" > "$D/slope-$direction-trace.jsonl"
+done
+
+cargo test -p assets --test local_collision
+python3 -B -m unittest discover -s tools/collision-qualification -p 'test_*.py'
+python3 -B -O -m unittest discover -s tools/collision-qualification -p 'test_*.py'
+```
+
+`check_admission.py ROM RUN.jsonl ...` is a **diagnostic comparison**, not a
+walking acceptance gate. It authenticates/normalizes the JP ROM, requires the
+matching layer for every sampled map and live-actor evidence, and refuses stale
+zero-attribute layers or missing coverage. It accepts both current actor schemas
+and historical coordinate pairs. Stalls cannot bridge frame/control/map gaps.
+Exit status is 0 for no projection disagreements, 1 for disagreements, 2 for
+invalid evidence. A zero result still does not qualify final movement.
+
+On the retained `ext3.jsonl`, the diagnostic reports 33 disagreements: 21
+occupancy frames on dynamic-bit cells in town, 11 on type14 in map C, and one
+map-B sustained contact whose sampled cells have zero entries. These are not
+silently excused: entry-layer drift, controller/actor effects and sampling
+geometry remain unverified inputs. Missing layers in the old `town.jsonl` and
+missing actor evidence in early captures now fail instead of looking green.

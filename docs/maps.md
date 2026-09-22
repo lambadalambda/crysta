@@ -104,8 +104,10 @@ not an SNES VRAM tile number. Initialization writes the metatile attribute into
 bits 9..15, and the community overlay code `(raw >> 8) & $FE` is exactly twice
 that value, so the two are the same field in different scales. Bit 15 is then
 reused during play, so only bits 9..14 are unambiguous on a runtime layer.
-Four base attributes now have [measured movement semantics](collision.md); the
-rest are **not verified passability**. Raw words are preserved either way.
+The [measured movement classes and source-derived probe lookup](collision.md)
+are bounded: the traced controller uses bits 9..13 and a dynamic-bit override,
+while ordinary movement also depends on directional/pair and slope dispatch.
+The community field is **not a passability predicate**. Raw words are preserved.
 The conflicting imported field `$7E:081E` is intentionally not used.
 
 ## Provenance and unresolved work
@@ -132,9 +134,9 @@ The conflicting imported field `$7E:081E` is intentionally not used.
 The [map-ID script projection](map-scripts.md) now handles a bounded loading
 subset. Still required: conditional loading and final composition, broader metatile/graphics reconstruction,
 indoor/outdoor/dungeon/world-map coverage, placements/regions/transitions, and
-trace-qualified collision behavior — the attribute semantics in
-[collision](collision.md) are measured from movement, not yet read off the
-admission routine. This tool is a visual aid for that work,
+trace-qualified collision behavior — [collision](collision.md) separates the
+traced controller probe from the ordinary motion resolver and its remaining
+slope/directional gaps. This tool is a visual aid for that work,
 not a portable gameplay collision API or an asset pack.
 
 ## Validation

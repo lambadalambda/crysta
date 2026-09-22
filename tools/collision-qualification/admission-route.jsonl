@@ -1,0 +1,8 @@
+{"label":"settle","buttons":[],"frames":30}
+{"label":"right-open","buttons":["Right"],"frames":20}
+{"trace":"right-admitted","buttons":["Right"]}
+{"label":"right-open-2","buttons":["Right"],"frames":3}
+{"trace":"right-admitted-2","buttons":["Right"]}
+{"label":"right-wall","buttons":["Right"],"frames":120}
+{"trace":"right-refused","buttons":["Right"]}
+{"finish":true}
