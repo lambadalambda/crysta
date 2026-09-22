@@ -23,6 +23,44 @@ pause preserves the playback position. The title shows the music status.
 Use `--no-music` after the ROM path to avoid opening an audio device entirely.
 The existing `--screenshot <path> <script>` mode also does not initialize audio.
 
+## Outdoor refusals and diagnostic logs
+
+Unsupported collision remains blocked, but no longer locks the input queue or
+freezes residents: release the direction and turn away. This is a native-host
+recovery policy, not admission of additional collision behavior. A checked world
+loading failure instead stops simulation, names the error in the window title
+and terminal, and leaves Escape available; restart the app after such an error.
+
+Normal windowed runs automatically print a log path under
+`local/crysta-app/logs/crysta-session-N/`. **After finding a bug, send both
+`events-*.jsonl` files from that session folder** (or the only one, if it has not
+rotated), along with what you saw. Copy them before launching several more runs.
+Screenshot mode does not create session logs.
+
+- JSONL records contain schema/build/ROM hashes, simulation ticks, semantic
+  direction/interact inputs, before/after map coordinates, separate movement and
+  interaction results, dialogue page numbers, refusals and checked world errors.
+  Music-control state and normal quit are recorded too. No ROM bytes, dialogue
+  text, extracted assets or secrets are logged.
+- Four recent session slots, each with two 8 MiB segments, bound storage to about
+  64 MiB. Within a session, sort by the header's `segment` number, not filename.
+  Each segment repeats its session identity/header. Only run **one app at a time**
+  from the same working directory; concurrent writers are not supported.
+- Headers/refusals/world errors/quit flush immediately; normal records flush
+  every 60 records or on the first write after one second. An abrupt kill can
+  lose the buffered tail. Logging errors disable logging, not gameplay.
+- These are **partial diagnostic histories**, not save states or guaranteed
+  complete replays. Rotation may discard the setup for a bug; logs identify
+  where and how a refusal happened but do not establish native-reference fidelity.
+
+Owned-ROM recovery, trace ordering, logging failure and fatal-stop regressions:
+
+```sh
+CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
+  cargo test --release --manifest-path crates/crysta-app/Cargo.toml \
+  session_tests -- --ignored --nocapture
+```
+
 ## Music scope and architecture
 
 This first music slice plays **fresh Crysta selection3**, continuously across

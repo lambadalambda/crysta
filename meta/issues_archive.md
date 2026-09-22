@@ -89,3 +89,5 @@
 - [x] [Qualify the route from the Pandora tour to the first tower](issues/qualify-tower-approach-route.md)
 - [x] [Play Crysta music in the native app](issues/native-crysta-music.md)
 - [x] [Resolve remaining Crysta exterior resident placeholders](issues/fix-crysta-exterior-placeholders.md)
+- [x] [Fix native Crysta outdoor stalls](issues/fix-native-crysta-outdoor-stalls.md)
+- [x] [Record native play-session diagnostics](issues/native-play-session-diagnostics.md)

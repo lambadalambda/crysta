@@ -4,6 +4,7 @@
 //! input and music playback. Backgrounds come from the qualified renderer rather
 //! than a second decode path, and sprites from the runtime's art module.
 
+mod diagnostics;
 mod frame;
 mod music;
 mod music_controls;
@@ -13,7 +14,7 @@ mod music_output;
 use assets::text::{Acknowledgement, DialoguePage};
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::residents::Conversation;
-use crysta_runtime::world::World;
+use crysta_runtime::world::{Step, World};
 use frame::{VIEW_HEIGHT, VIEW_WIDTH};
 use gilrs::{Axis, Button, Gilrs};
 use room_core::Direction;
@@ -91,10 +92,38 @@ fn main() {
     };
     let event_loop = EventLoop::new().expect("an event loop");
     event_loop.set_control_flow(ControlFlow::Poll);
-    let mut app = App::new(cartridge, image, music);
+    let log = start_diagnostics(&cartridge, music.is_some());
+    let mut app = App::new(cartridge, image, music, log);
     if let Err(error) = event_loop.run_app(&mut app) {
         eprintln!("{error}");
         std::process::exit(1);
+    }
+}
+
+fn start_diagnostics(cartridge: &rom::Rom, music: bool) -> Option<diagnostics::SessionLog> {
+    let executable_sha256 = std::env::current_exe()
+        .ok()
+        .and_then(|path| std::fs::read(path).ok())
+        .map(|bytes| rom::digests(&bytes).sha256);
+    let metadata = serde_json::json!({
+        "app_version": env!("CARGO_PKG_VERSION"), "executable_sha256": executable_sha256,
+        "rom_sha256": cartridge.digests().sha256, "music_available": music,
+        "initial": {"map": START.0, "x": START.1, "y": START.2},
+        "movement_policy": "interactive-refusal-reset-v1",
+        "limits": "portable-host diagnostics, not native qualification; rotated history may be incomplete"
+    });
+    match diagnostics::SessionLog::start(std::path::Path::new("local/crysta-app/logs"), metadata) {
+        Ok(log) => {
+            eprintln!(
+                "Diagnostic log: {} (send both events-*.jsonl files in this session folder)",
+                log.path().display()
+            );
+            Some(log)
+        }
+        Err(error) => {
+            eprintln!("diagnostic logging unavailable (continuing): {error}");
+            None
+        }
     }
 }
 
@@ -159,6 +188,10 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
         for _ in 0..count {
             session.advance(direction, false);
         }
+    }
+    if let Some(error) = &session.fault {
+        eprintln!("screenshot run stopped: {error}");
+        std::process::exit(1);
     }
     let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
     let camera = session.compose(cartridge, &mut frame);
@@ -237,6 +270,11 @@ struct Session {
     dialogue: Option<Dialogue>,
     /// Frames simulated so far, which drives resident animation.
     tick: u64,
+    last_step: Option<Step>,
+    last_interaction: Option<Step>,
+    last_refusal: Option<room_core::Unqualified>,
+    /// Checked build failures are fatal to this world, not retryable input refusals.
+    fault: Option<String>,
 }
 
 impl Session {
@@ -250,6 +288,10 @@ impl Session {
             sprites: HashMap::new(),
             dialogue: None,
             tick: 0,
+            last_step: None,
+            last_interaction: None,
+            last_refusal: None,
+            fault: None,
         }
     }
 
@@ -258,7 +300,12 @@ impl Session {
     /// While a conversation is open the player stands still and the button
     /// turns pages; the last page's acknowledgement closes it.
     fn advance(&mut self, direction: Option<Direction>, interact: bool) {
+        if self.fault.is_some() {
+            return;
+        }
         self.tick += 1;
+        self.last_step = None;
+        self.last_interaction = None;
         if let Some(open) = &mut self.dialogue {
             if interact {
                 let last = open.index + 1 >= open.pages.len();
@@ -272,7 +319,23 @@ impl Session {
             }
             return;
         }
-        self.world.step(direction);
+        match self.world.step_interactive(direction) {
+            Ok(step) => {
+                self.last_step = Some(step);
+                if let Step::Refused(reason) = step {
+                    if self.last_refusal != Some(reason) {
+                        eprintln!("movement refused at map {:#06x} {:?}: {reason:?}; input reset, choose another direction", self.world.map(), self.world.position());
+                    }
+                    self.last_refusal = Some(reason);
+                } else if matches!(step, Step::Walked | Step::Entered { .. }) {
+                    self.last_refusal = None;
+                }
+            }
+            Err(error) => {
+                self.fail_world(&error);
+                return;
+            }
+        }
         if !interact {
             return;
         }
@@ -292,10 +355,65 @@ impl Session {
                 eprintln!("the resident's script stops at COP ${service:02x}");
             }
             Some(Conversation::Silent) => eprintln!("..."),
-            None => {
-                self.world.interact();
-            }
+            None => match self.world.interact_checked() {
+                Ok(step) => self.last_interaction = Some(step),
+                Err(error) => self.fail_world(&error),
+            },
         }
+    }
+
+    fn trace_frame(
+        &self,
+        before: (u16, (u16, u16)),
+        direction: Option<Direction>,
+        interact: bool,
+    ) -> serde_json::Value {
+        let direction = direction.map(|direction| match direction {
+            Direction::Up => "up",
+            Direction::Down => "down",
+            Direction::Left => "left",
+            Direction::Right => "right",
+        });
+        let describe = |step: Option<Step>| match step {
+            Some(Step::Stayed) => serde_json::json!({"kind":"stayed"}),
+            Some(Step::Walked) => serde_json::json!({"kind":"walked"}),
+            Some(Step::Entered { from, to }) => {
+                serde_json::json!({"kind":"entered", "from":from, "to":to})
+            }
+            Some(Step::Refused(reason)) => {
+                serde_json::json!({"kind":"refused", "reason":format!("{reason:?}")})
+            }
+            None => serde_json::Value::Null,
+        };
+        let outcome = if self.fault.is_some() {
+            serde_json::json!({"kind":"stopped"})
+        } else if self.last_step.is_none() {
+            serde_json::json!({"kind":"dialogue"})
+        } else {
+            describe(
+                self.last_interaction
+                    .filter(|step| *step != Step::Stayed)
+                    .or(self.last_step),
+            )
+        };
+        let (x, y) = self.world.position();
+        serde_json::json!({"kind":"frame", "tick":self.tick,
+            "input":{"direction":direction,"interact":interact},
+            "before":{"map":before.0,"x":before.1.0,"y":before.1.1},
+            "after":{"map":self.world.map(),"x":x,"y":y},
+            "outcome":outcome, "movement":describe(self.last_step),
+            "interaction":describe(self.last_interaction), "error":self.fault,
+            "dialogue_page":self.dialogue.as_ref().map(|open|open.index+1)})
+    }
+
+    fn fail_world(&mut self, error: &crysta_runtime::world::WorldError) {
+        let message = format!(
+            "map {:#06x} {:?}: {error}",
+            self.world.map(),
+            self.world.position()
+        );
+        eprintln!("world stopped: {message}; restart the app (Escape still exits)");
+        self.fault = Some(message);
     }
 
     /// Renders and caches the current map's background and its priority mask.
@@ -455,10 +573,16 @@ struct App {
     interact_was_down: bool,
     music: Option<music_output::Music>,
     music_controls: music_controls::Controls,
+    log: Option<diagnostics::SessionLog>,
 }
 
 impl App {
-    fn new(cartridge: rom::Rom, image: &'static [u8], music: Option<music_output::Music>) -> Self {
+    fn new(
+        cartridge: rom::Rom,
+        image: &'static [u8],
+        music: Option<music_output::Music>,
+        log: Option<diagnostics::SessionLog>,
+    ) -> Self {
         Self {
             cartridge,
             image,
@@ -473,6 +597,16 @@ impl App {
             interact_was_down: false,
             music,
             music_controls: music_controls::Controls::default(),
+            log,
+        }
+    }
+
+    fn record_diagnostic(&mut self, event: &serde_json::Value, urgent: bool) {
+        if let Some(log) = &mut self.log {
+            if let Err(error) = log.record(event, urgent) {
+                eprintln!("diagnostic logging disabled (game continues): {error}");
+                self.log = None;
+            }
         }
     }
 
@@ -483,6 +617,16 @@ impl App {
                 self.music = None;
             }
         }
+        self.record_diagnostic(
+            &serde_json::json!({"kind":"host", "event":"music_state",
+            "playing":self.music_controls.playing(), "volume":self.music_controls.volume(),
+            "available":self.music.is_some()}),
+            true,
+        );
+        self.update_title();
+    }
+
+    fn update_title(&self) {
         if let Some(window) = &self.window {
             let status = if self.music.is_none() {
                 "unavailable".to_string()
@@ -491,7 +635,12 @@ impl App {
             } else {
                 format!("{:.0}%", self.music_controls.volume() * 100.0)
             };
-            window.set_title(&format!("Crysta — music {status} | M: pause, -/+: volume"));
+            let fault = self.state.as_ref().and_then(|state| state.fault.as_deref());
+            let suffix =
+                fault.map_or_else(String::new, |error| format!(" | WORLD STOPPED: {error}"));
+            window.set_title(&format!(
+                "Crysta — music {status} | M: pause, -/+: volume{suffix}"
+            ));
         }
     }
 
@@ -524,7 +673,13 @@ impl ApplicationHandler for App {
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _: WindowId, event: WindowEvent) {
         match event {
-            WindowEvent::CloseRequested => event_loop.exit(),
+            WindowEvent::CloseRequested => {
+                self.record_diagnostic(
+                    &serde_json::json!({"kind":"shutdown", "reason":"window_close"}),
+                    true,
+                );
+                event_loop.exit();
+            }
             // OS auto-repeat would page through a whole conversation on a
             // held button and shuffle held directions; a repeat is not a press.
             WindowEvent::KeyboardInput { event, .. } if !event.repeat => {
@@ -552,6 +707,10 @@ impl ApplicationHandler for App {
                         None
                     }
                     PhysicalKey::Code(KeyCode::Escape) if pressed => {
+                        self.record_diagnostic(
+                            &serde_json::json!({"kind":"shutdown", "reason":"escape"}),
+                            true,
+                        );
                         event_loop.exit();
                         None
                     }
@@ -577,9 +736,13 @@ impl ApplicationHandler for App {
         }
     }
 
-    fn about_to_wait(&mut self, _: &ActiveEventLoop) {
+    fn about_to_wait(&mut self, event_loop: &ActiveEventLoop) {
         self.poll_pad();
         self.advance();
+        if self.session().fault.is_some() {
+            event_loop.set_control_flow(ControlFlow::Wait);
+            return;
+        }
         if let Some(window) = &self.window {
             window.request_redraw();
         }
@@ -635,7 +798,20 @@ impl App {
     fn advance(&mut self) {
         let direction = self.held;
         let interact = std::mem::take(&mut self.interact_down);
-        self.session().advance(direction, interact);
+        let session = self.session();
+        if session.fault.is_some() {
+            return;
+        }
+        let before = (session.world.map(), session.world.position());
+        session.advance(direction, interact);
+        let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
+        if self.log.is_some() {
+            let event = self.session().trace_frame(before, direction, interact);
+            self.record_diagnostic(&event, urgent);
+        }
+        if self.session().fault.is_some() {
+            self.update_title();
+        }
     }
 
     fn draw(&mut self) {
@@ -654,6 +830,9 @@ impl App {
         self.session();
         let frame = &mut self.frame;
         let session = self.state.as_mut().expect("just created");
+        if session.fault.is_some() {
+            return;
+        } // Do not render/reuse a partially advanced world.
         session.compose(&cartridge, frame);
         if let Some(surface) = &mut self.surface {
             surface.resize(width, height).expect("resize");
@@ -665,5 +844,185 @@ impl App {
             );
             buffer.present().expect("present");
         }
+    }
+}
+
+#[cfg(test)]
+mod session_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn outdoor_tree_refusal_does_not_lock_native_session() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let image = Box::leak(rom.image().to_vec().into_boxed_slice());
+        let mut session = Session::new(image);
+        session.world = World::enter(image, 0xA, 360, 472).unwrap();
+        for _ in 0..3 {
+            session.advance(Some(Direction::Right), false);
+        }
+        assert_eq!(
+            session.world.position(),
+            (360, 472),
+            "refused step must not move"
+        );
+        for _ in 0..8 {
+            session.advance(None, false);
+        }
+        for _ in 0..16 {
+            session.advance(Some(Direction::Left), false);
+        }
+        assert!(
+            session.world.position().0 < 360,
+            "must be able to turn away from the refused tree edge"
+        );
+        assert!(
+            session.world.residents()[0].pose_age > 2,
+            "residents must not remain frozen"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn outdoor_trace_records_refusal_escape_and_survives_logging_failure() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let image = Box::leak(rom.image().to_vec().into_boxed_slice());
+        let root = std::env::temp_dir().join(format!(
+            "crysta-app-trace-{}-{}",
+            std::process::id(),
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
+        let path = log.path().to_owned();
+        let mut app = App::new(rom, image, None, Some(log));
+        app.session().world = World::enter(image, 0xA, 360, 472).unwrap();
+        for (direction, count) in [
+            (Some(Direction::Right), 3),
+            (None, 8),
+            (Some(Direction::Left), 16),
+        ] {
+            app.held = direction;
+            for _ in 0..count {
+                app.advance();
+            }
+        }
+        app.log.as_mut().unwrap().flush().unwrap();
+        let records: Vec<serde_json::Value> = std::fs::read_to_string(&path)
+            .unwrap()
+            .lines()
+            .map(|line| serde_json::from_str(line).unwrap())
+            .collect();
+        assert_eq!(records.len(), 28); // Header + 27 host updates.
+        for (index, record) in records[1..].iter().enumerate() {
+            assert_eq!(record["tick"], index + 1);
+            assert_eq!(record["before"]["map"], 10);
+            assert_eq!(record["after"]["map"], 10);
+            assert_eq!(record["input"]["interact"], false);
+            assert!(record["error"].is_null());
+            if index > 0 {
+                assert_eq!(record["before"], records[index]["after"]);
+            }
+            let direction = match index {
+                0..=2 => serde_json::json!("right"),
+                3..=10 => serde_json::Value::Null,
+                _ => serde_json::json!("left"),
+            };
+            assert_eq!(record["input"]["direction"], direction);
+        }
+        assert_eq!(
+            records[3]["outcome"],
+            serde_json::json!({"kind":"refused", "reason":"UnsupportedType(6)"})
+        );
+        assert_eq!(
+            records[3]["before"],
+            serde_json::json!({"map":10,"x":360,"y":472})
+        );
+        assert_eq!(records[3]["before"], records[3]["after"]);
+        assert!(records.last().unwrap()["after"]["x"].as_u64().unwrap() < 360);
+        // A record too large for the bounded logger follows the same error path
+        // as failed I/O: the host disables logging and keeps simulating.
+        app.record_diagnostic(&serde_json::json!("x".repeat(8 * 1024 * 1024)), true);
+        assert!(app.log.is_none());
+        let before = app.session().world.position();
+        app.held = Some(Direction::Up);
+        for _ in 0..32 {
+            app.advance();
+        }
+        assert_ne!(app.session().world.position(), before);
+        assert!(app.session().fault.is_none());
+        std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn fatal_frame_is_logged_once_and_outcomes_preserve_each_action() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let mut damaged = rom.image().to_vec();
+        let exits = assets::maps::exits::ExitList::from_rom(&damaged, 0xB).unwrap();
+        let record = exits
+            .records()
+            .iter()
+            .find(|record| {
+                record
+                    .direct_destination()
+                    .is_ok_and(|map| map != 0xB && crysta_runtime::MAPS.contains(&map))
+            })
+            .unwrap();
+        let destination = record.direct_destination().unwrap();
+        let position = (
+            u16::from(record.x()) * 16 + 8,
+            u16::from(record.y()) * 16 + 16,
+        );
+        let pointer = 0x18000 + usize::from(destination) * 2;
+        damaged[pointer..pointer + 2].copy_from_slice(&1u16.to_le_bytes());
+        let image = Box::leak(damaged.into_boxed_slice());
+        let root = std::env::temp_dir().join(format!("crysta-fatal-trace-{}", std::process::id()));
+        let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
+        let path = log.path().to_owned();
+        let mut app = App::new(rom, image, None, Some(log));
+        app.session().world = World::enter(image, 0xB, position.0, position.1).unwrap();
+        // Exercise trace precedence without needing a naturally coincident
+        // refused movement + successful interaction at the same doorway.
+        let session = app.session();
+        session.last_step = Some(Step::Refused(room_core::Unqualified::UnsupportedType(6)));
+        session.last_interaction = Some(Step::Entered {
+            from: 0xB,
+            to: destination,
+        });
+        let frame = session.trace_frame((0xB, position), Some(Direction::Right), true);
+        assert_eq!(frame["movement"]["kind"], "refused");
+        assert_eq!(frame["interaction"]["kind"], "entered");
+        assert_eq!(frame["outcome"]["kind"], "entered");
+        let error = session.world.interact_checked().unwrap_err();
+        session.last_step = Some(Step::Walked);
+        session.fail_world(&error);
+        let frame = session.trace_frame((0xB, position), None, true);
+        assert_eq!(frame["outcome"]["kind"], "stopped");
+        assert_eq!(frame["movement"]["kind"], "walked");
+        assert!(frame["error"].as_str().unwrap().contains("exits"));
+        // Now drive a real checked destination failure through the host.
+        session.fault = None;
+        app.interact_down = true;
+        app.advance();
+        assert!(app.session().fault.is_some());
+        let tick = app.session().tick;
+        let position = app.session().world.position();
+        let recorded = std::fs::read(&path).unwrap(); // Failure is flushed.
+        assert!(String::from_utf8_lossy(&recorded).contains("stopped"));
+        for _ in 0..100 {
+            app.advance();
+        }
+        app.log.as_mut().unwrap().flush().unwrap();
+        assert_eq!(app.session().tick, tick);
+        assert_eq!(app.session().world.position(), position);
+        assert_eq!(std::fs::read(&path).unwrap(), recorded);
+        drop(app);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
