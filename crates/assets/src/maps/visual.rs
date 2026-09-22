@@ -1,4 +1,5 @@
 //! Allowlisted ROM-only first backgrounds, not a general scene compositor.
+pub mod crysta_animation;
 pub mod pandora;
 
 use super::{
