@@ -85,9 +85,11 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
 The restricted development session currently reports **“No matching default
 audio unit found”** at device creation. Source extraction, upload verification,
 PCM rendering and unit tests pass, but this does **not** constitute audible
-hardware verification. Run the app/device test from an ordinary desktop terminal;
-[the native music issue](../../meta/issues/native-crysta-music.md) remains open
-until that check succeeds.
+hardware verification by the agent. **The user subsequently confirmed audible
+playback on the desktop**, completing the bounded
+[native music issue](../../meta/issues/native-crysta-music.md). The automated
+device control test above remains available for a normal desktop terminal; it
+is not claimed to have passed in this restricted session.
 
 Tests were red before implementation. A separate no-settling mutation removed
 the required32-cycle payload-ACK delay and failed with an upload mismatch at

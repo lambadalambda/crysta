@@ -20,7 +20,6 @@
 - [ ] [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
 - [ ] [Implement the classic renderer](issues/classic-renderer.md)
 - [ ] [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
-- [ ] [Play Crysta music in the native app](issues/native-crysta-music.md)
 - [ ] [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
 - [ ] [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
 - [ ] [Complete Chapters 2 and 3](issues/complete-chapters-two-three.md)

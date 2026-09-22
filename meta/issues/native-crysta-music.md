@@ -35,7 +35,7 @@ integration and sound effects remain separate.
 - Bounded child of [SPC backend](spc-audio-backend.md) and
   [audio protocol discovery](reverse-audio-protocol.md); neither parent is closed by this work.
 
-## Implemented; hardware playback verification pending
+## Completed: desktop playback confirmed
 
 [Run instructions, controls and licenses](../../crates/crysta-app/README.md).
 
@@ -66,5 +66,10 @@ integration and sound effects remain separate.
   unit found” in this restricted session.** Deterministic PCM is not audible
   hardware verification. Run the documented app/device test in a desktop terminal.
 
-The issue remains open for the actual playback/pause/resume/shutdown device check;
-no archive move or full SPC-backend/protocol completion is claimed.
+The user confirmed **“it works!”** when running the native app on the desktop,
+and confirmed that music continues during the separately reported outdoor
+gameplay stall. This supplies the manual audible-playback smoke check; the
+automated device pause/resume/shutdown test remains unavailable in the restricted
+session, not a claimed passing run. Together with the source, PCM, control and
+backend tests above, this completes the bounded native-music issue. Full
+SPC-backend/protocol work remains open.
