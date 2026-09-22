@@ -228,7 +228,7 @@ fn frame_index(frame: AnimationFrame) -> usize {
 pub struct Animation {
     /// One raster per record, in list order.
     pub frames: Vec<Raster>,
-    /// Frames each record holds for; zero holds forever.
+    /// Raw native countdown bytes: each record lasts `duration + 1` ticks.
     pub durations: Vec<u8>,
 }
 
@@ -237,16 +237,19 @@ impl Animation {
     ///
     /// The list loops: the ordinary loop re-selects the pose and waits for
     /// it to resolve, so a resident cycles their records for as long as they
-    /// stand there. A record with zero duration ends the cycle on itself.
+    /// stand there. $80:EDA0 stores the raw duration at actor+$0E, and
+    /// $80:C72C decrements before testing negative: zero therefore lasts one
+    /// tick. Looping/reselection is still a host policy, not a full script VM.
     #[must_use]
     pub fn frame_at(&self, tick: u64) -> &Raster {
-        let total: u64 = self.durations.iter().map(|d| u64::from(*d)).sum();
+        let total: u64 = self.durations.iter().map(|d| u64::from(*d) + 1).sum();
         let mut remaining = if total == 0 { 0 } else { tick % total };
         for (raster, duration) in self.frames.iter().zip(&self.durations) {
-            if *duration == 0 || remaining < u64::from(*duration) {
+            let hold = u64::from(*duration) + 1;
+            if remaining < hold {
                 return raster;
             }
-            remaining -= u64::from(*duration);
+            remaining -= hold;
         }
         &self.frames[0]
     }
@@ -352,4 +355,50 @@ pub fn residents_art(
             }
         })
         .collect()
+}
+
+#[cfg(test)]
+mod timing_tests {
+    use super::{Animation, Raster};
+
+    fn animation(durations: &[u8]) -> Animation {
+        Animation {
+            frames: durations
+                .iter()
+                .enumerate()
+                .map(|(i, _)| Raster {
+                    width: 1,
+                    height: 1,
+                    offset: (0, 0),
+                    pixels: vec![u32::try_from(i).unwrap()],
+                })
+                .collect(),
+            durations: durations.to_vec(),
+        }
+    }
+
+    #[test]
+    fn native_countdown_seven_holds_eight_ticks_and_four_records_take_32() {
+        let animation = animation(&[7, 7, 7, 7]);
+        for tick in 0..96 {
+            assert_eq!(
+                u64::from(animation.frame_at(tick).pixels[0]),
+                (tick / 8) % 4
+            );
+        }
+    }
+
+    #[test]
+    fn zero_is_one_tick_and_maximum_byte_is_256_ticks() {
+        let animation = animation(&[0, 255]);
+        assert_eq!(animation.frame_at(0).pixels[0], 0);
+        assert_eq!(animation.frame_at(1).pixels[0], 1);
+        assert_eq!(animation.frame_at(255).pixels[0], 1);
+        assert_eq!(animation.frame_at(256).pixels[0], 1);
+        assert_eq!(animation.frame_at(257).pixels[0], 0);
+        assert_eq!(
+            animation.frame_at(u64::MAX),
+            animation.frame_at(u64::MAX % 257)
+        );
+    }
 }

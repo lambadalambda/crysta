@@ -46,8 +46,10 @@ interaction remains level-polled: taps wholly between polls can still be missed.
   source-qualified speed. Loop waits/setup are additional, so eight ticks is not
   the entire interval between random choices.
 - Resident raster durations are raw native countdown bytes. The source scheduler
-  decrements before testing negative, so a duration7 record should last **eight
-  ticks**, not seven. Exact movement/script scheduling remains a separate question.
+  decrements before testing negative, so a duration7 record lasts **eight
+  ticks**, not seven. The resident raster player now uses that rule, including
+  zero→one tick and255→256 ticks. Four duration7 records take32 ticks (~0.532s).
+  Exact movement/script scheduling remains a separate question.
 - The map-D wanderer `$83:8CB4` is the bounded native speed investigation target;
   its four duration7 records alone do not prove a tile-walk duration.
 

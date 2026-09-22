@@ -42,3 +42,19 @@ too fast and asks what movement/animation speed should actually be.
 - [Timing contract and remaining NPC questions](../../docs/native-crysta-timing.md).
 - Issue remains open while source/native NPC per-tick timing is investigated;
   no arbitrary global NPC slowdown has been applied.
+
+## Resident raster countdown
+
+- Confirmed a separate off-by-one in resident raster playback: raw duration7
+  was displayed for7 ticks rather than8. `$80:ED99..EDA4` stores the raw byte at
+  actor+$0E; `$80:C72C..C731` decrements and resumes only when negative.
+- Corrected the raster player's hold length to duration+1, preserving the existing
+  looping presentation policy rather than claiming full actor script timing.
+  A four-record duration7 list now takes32 ticks. Zero lasts1 tick (a one-record
+  list still looks held), and255 lasts256 without overflow.
+- Two pure regressions failed before correction and pass afterward; seven
+  owned-ROM art tests and strict runtime Clippy pass. Translation/wait timing
+  remains a separate, active investigation.
+- Independent raster-cadence review confirmed the generic16-bit actor countdown
+  and approved with no blockers. Root formatting, strict workspace Clippy and
+  release workspace tests pass after the correction.

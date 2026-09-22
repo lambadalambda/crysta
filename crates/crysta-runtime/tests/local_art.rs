@@ -211,8 +211,8 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
 
 #[test]
 fn a_four_record_resident_cycles_by_duration() {
-    // Map $000C's residents keep four records at seven frames each, so the
-    // list is 28 frames long and every record shows for its seven.
+    // Map $000C's residents have four raw countdown-7 records: eight ticks
+    // per record, 32 ticks per cycle (decrement before testing negative).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -232,22 +232,22 @@ fn a_four_record_resident_cycles_by_duration() {
         &raw const animated.frames[0]
     ));
     assert!(std::ptr::eq(
-        animated.frame_at(6),
+        animated.frame_at(7),
         &raw const animated.frames[0]
     ));
     assert!(std::ptr::eq(
-        animated.frame_at(7),
+        animated.frame_at(8),
         &raw const animated.frames[1]
     ));
     assert!(std::ptr::eq(
-        animated.frame_at(27),
+        animated.frame_at(31),
         &raw const animated.frames[3]
     ));
     assert!(std::ptr::eq(
-        animated.frame_at(28),
+        animated.frame_at(32),
         &raw const animated.frames[0]
     ));
-    // A single zero-duration record holds.
+    // A single zero-countdown list repeats the same raster each tick.
     let held = art
         .iter()
         .filter_map(|entry| entry.as_ref().ok())
