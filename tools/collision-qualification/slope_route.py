@@ -75,9 +75,42 @@ def tree_route(side):
     return commands + [{'finish': True}]
 
 
+def type8_route():
+    """Approach and leave the town's type8 fence in a continuous window."""
+    commands = tree_route('east')[:-1]
+    for index, (button, frames) in enumerate([
+            ('Left', 170), ('Up', 48), ('Down', 96),
+            ('Left', 64), ('Up', 96), ('Right', 100)]):
+        commands += [
+            {'label': f'type8-{index}', 'frames': frames,
+             'buttons': [button], 'motion': True},
+            {'label': f'type8-{index}-settle', 'frames': 12,
+             'buttons': [], 'motion': True},
+        ]
+    return commands + [{'finish': True}]
+
+
+def type8_gap_route():
+    """Reach the cap from above; stop before the later nonordinary descent."""
+    commands = type8_route()[:-1]
+    for name, moves in [
+            ('type8-cross', [('Left', 190), ('Up', 64), ('Right', 130),
+                             ('Down', 40), ('Left', 100)]),
+            ('type8-gap', [('Up', 90), ('Right', 78), ('Up', 64), ('Right', 88),
+                           ('Down', 44), ('Left', 30), ('Right', 60)])]:
+        for index, (button, frames) in enumerate(moves):
+            commands += [
+                {'label': f'{name}-{index}', 'frames': frames,
+                 'buttons': [button], 'motion': True},
+                {'label': f'{name}-{index}-settle', 'frames': 12,
+                 'buttons': [], 'motion': True},
+            ]
+    return commands + [{'finish': True}]
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('direction', choices=('Right', 'Left', 'TreeEast', 'TreeBottom'))
+    parser.add_argument('direction', choices=('Right', 'Left', 'TreeEast', 'TreeBottom', 'Type8', 'Type8Gap'))
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument('--trace', action='store_true')
     mode.add_argument('--motion', action='store_true')
@@ -85,10 +118,13 @@ if __name__ == '__main__':
     args = parser.parse_args()
     if args.vertical and not args.motion:
         parser.error('--vertical requires --motion')
-    if args.direction.startswith('Tree'):
+    named = {'TreeEast': lambda: tree_route('east'),
+             'TreeBottom': lambda: tree_route('bottom'),
+             'Type8': type8_route, 'Type8Gap': type8_gap_route}
+    if args.direction in named:
         if args.trace or args.motion or args.vertical:
-            parser.error('tree routes always record motion; no extra flags')
-        commands = tree_route(args.direction[4:].lower())
+            parser.error('named routes always record motion; no extra flags')
+        commands = named[args.direction]()
     else:
         commands = route(args.direction, args.trace, motion=args.motion, vertical=args.vertical)
     for command in commands:

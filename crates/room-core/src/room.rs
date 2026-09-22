@@ -131,6 +131,7 @@ pub struct Room {
     cells: Vec<u16>,
     passive_flags: bool,
     passive_directional: bool,
+    type8_special_bit_clear: bool,
     sample_halo: Option<[u16; 4]>,
     material_policy: Vec<MaterialRule>,
 }
@@ -157,6 +158,7 @@ impl Room {
             cells,
             passive_flags: false,
             passive_directional: false,
+            type8_special_bit_clear: false,
             sample_halo: None,
             material_policy: Vec::new(),
         })
@@ -189,8 +191,9 @@ impl Room {
     /// This also enables the passive bit15 contract of [`Self::new_passive`].
     /// Old-edge slope dispatch and raw slope-neighbor probes precede/ignore that
     /// override, respectively. This is geometry only, not gameplay side effects
-    /// or qualification of a room/route. Type8 remains unsupported: its Up branch
-    /// needs the additional `$097C & 4` input. Other unknown types still fail closed.
+    /// or qualification of a room/route. Type8 remains unsupported unless
+    /// [`Self::with_passive_directional_type8_special_bit_clear`] supplies its
+    /// additional `$097C & 4` contract. Other unknown types still fail closed.
     /// The immutable policy is retained on clone/patch; hosts must bind it to room
     /// identity on snapshot restore. Existing constructors keep their old behavior.
     #[must_use]
@@ -198,6 +201,32 @@ impl Room {
         self.passive_flags = true;
         self.passive_directional = true;
         self
+    }
+
+    /// Additionally admit directional type8 with the special-mode bit clear.
+    ///
+    /// Asserts all contracts of [`Self::with_passive_directional_collision`] and
+    /// `$097C & $0004 == 0` throughout every resolve using this room. This is an
+    /// explicit state qualification, not simulated gameplay or a global Open
+    /// alias: Up first8 uses partial dispatch, ordered pairs retain their own
+    /// handlers, and raw slope probes classify8 as an obstruction.
+    ///
+    /// The set-bit Up branch `$D511..$D53F` is outside admission. A host lacking
+    /// this assertion must use the existing constructors/opt-in, which reject
+    /// unflagged8. Hosts must bind this immutable contract to room identity on
+    /// restore and stop using it if the special bit changes. Clone and raw-cell
+    /// patches preserve it; walking snapshots do not encode this assertion.
+    #[must_use]
+    pub fn with_passive_directional_type8_special_bit_clear(self) -> Self {
+        let mut room = self.with_passive_directional_collision();
+        room.type8_special_bit_clear = true;
+        room
+    }
+
+    /// Whether directional type8's explicit `$097C & 4 == 0` contract is installed.
+    #[must_use]
+    pub const fn passive_directional_type8_special_bit_clear(&self) -> bool {
+        self.type8_special_bit_clear
     }
 
     /// Whether the caller opted into passive directional geometry.

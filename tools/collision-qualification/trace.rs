@@ -145,19 +145,29 @@ fn motion_frame(s: &mut Session, label: &str, held: &[&str]) -> Value {
     use oracle::CpuTraceStop::{FrameLimit, TargetReached};
     let frame = s.frame_state().frames;
     let start = s.wram_image();
-    let entry = s.trace_until_pc(0x80_D107, 100_000, 1).unwrap();
-    assert_eq!(entry.stop, TargetReached, "player motion entry not reached");
-    assert_eq!(
-        s.frame_state().frames,
-        frame,
-        "motion entry crossed a frame"
-    );
+    // Resident scheduling can put another actor ahead of Ark. Select the
+    // player call by slot, never by call order; retain one shared trace budget
+    // and refuse any frame without an ordinary player resolver invocation.
+    let mut remaining = 100_000;
+    loop {
+        let entry = s.trace_until_pc(0x80_D107, remaining, 1).unwrap();
+        if entry.stop != TargetReached {
+            let end = s.wram_image();
+            panic!(
+                "player motion entry not reached: {:?}, frame {} -> {}, XY {:?} -> {:?}, flags {:04x} -> {:04x}, special {:04x} -> {:04x}, control {:04x} -> {:04x}",
+                entry.stop, frame, s.frame_state().frames,
+                position(&start), position(&end), word(&start, 0x1004), word(&end, 0x1004),
+                word(&start, 0x97C), word(&end, 0x97C), word(&start, 0x980), word(&end, 0x980)
+            );
+        }
+        assert_eq!(s.frame_state().frames, frame, "motion entry crossed a frame");
+        remaining -= entry.entries.len();
+        if s.cpu_registers().x == 0x1000 {
+            break;
+        }
+        assert!(remaining > 0, "player motion search exhausted");
+    }
     let before = s.wram_image();
-    assert_eq!(
-        s.cpu_registers().x,
-        0x1000,
-        "first resolver call is not Ark"
-    );
     assert_eq!(word(&before, 0xDEA), 0x1000);
     assert_eq!(
         position(&start),

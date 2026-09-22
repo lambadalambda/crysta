@@ -103,7 +103,7 @@ impl Room {
             return Ok(12);
         } // $E838/$E750/$E777 class3 override
         let kind = ((raw >> 9) & 31) as u8;
-        if matches!(kind, 5 | 6 | 7 | 21 | 29) {
+        if matches!(kind, 5 | 6 | 7 | 21 | 29) || (kind == 8 && self.type8_special_bit_clear) {
             return Ok(kind);
         }
         // Retain existing finite policies (notably town25), without broadening them.
@@ -124,6 +124,8 @@ impl Room {
         match kind {
             0 | 2 | 22 => Ok(0),
             6 | 7 => Ok(kind),
+            // Both $E85C[8] and $E88F[8] are $0F, even with raw bit15 set.
+            8 if self.type8_special_bit_clear => Ok(15),
             5 | 12 | 14 | 16 | 21 | 29 => Ok(15),
             25 => {
                 // Authenticate the existing scoped alias even for a raw probe.
@@ -298,6 +300,17 @@ impl Room {
     fn new_directional(&self, edge: Edge) -> Result<Response, Unqualified> {
         let cell = edge.cell();
         let first = self.directional_kind(cell, edge.direction)?;
+        // $D542[8] -> $D506: qualified $097C&4 clear -> partial ($D3B6).
+        // $D8E8/$DC60/$DFDC[8] use open FIRST dispatch only, not a raw alias.
+        let first = if first == 8 {
+            if edge.direction == Direction::Up {
+                16
+            } else {
+                0
+            }
+        } else {
+            first
+        };
         if first == edge.first_slope() {
             // First-table6/7: $D440/$D827/$DBC9/$DF45 unconditional probe.
             if self.slope_probe(edge.neighbor(cell), edge.direction)? != 0 {
@@ -319,8 +332,14 @@ impl Room {
             if self.slope_probe(probe_cell, edge.direction)? != 15 {
                 return self.corner_response(edge);
             }
-            // Up's type26 and Down's type8 exceptions are intentionally outside
-            // admission; slope_probe has already rejected those raw inputs.
+            // $D893..$D8A0: Down6 checks stored8 AFTER the raw probe, before
+            // second-table bit15 override, and takes the both-way corner path.
+            if edge.direction == Direction::Down
+                && (self.directional_raw(probe_cell)? >> 9) & 31 == 8
+            {
+                return self.corner_response(edge);
+            }
+            // Up's analogous raw26 exception remains outside admission.
             let second = self.directional_kind(edge.neighbor(cell), edge.direction)?;
             return self.pair_response(edge, 16, second);
         }
@@ -360,6 +379,30 @@ impl Room {
         let plus = Response::Block(i32::from(edge.q() >= 8));
         let minus = Response::Block(-i32::from(edge.q() < 8));
         let solid = Response::Block(0);
+        if second == 8 {
+            // O/P/S table [8] targets are direction- and order-dependent.
+            // Up: D3F1/D3CD/D3E6; Down: D7BE/D7C1/D7C8;
+            // Left: DB66/DB7B/DB86; Right: DEDC/DEF1/DEFC.
+            return if open(first) {
+                Ok(if edge.direction == Direction::Up {
+                    minus
+                } else {
+                    Response::Pass
+                })
+            } else if partial(first) {
+                if edge.direction.horizontal() {
+                    Ok(minus)
+                } else {
+                    self.corner_response(edge)
+                }
+            } else {
+                Ok(if edge.direction.horizontal() {
+                    solid
+                } else {
+                    plus
+                })
+            };
+        }
         if matches!(second, 6 | 7) {
             if open(first) {
                 return if second == edge.first_slope() {
@@ -435,6 +478,172 @@ mod tests {
             if d.horizontal() { delta } else { 0 },
             if d.horizontal() { 0 } else { delta },
         )
+    }
+
+    #[test]
+    fn type8_first_dispatch_is_partial_up_and_open_elsewhere_only() {
+        // First tables D542/D8E8/DC60/DFDC [8] -> D506/D7A0/DB48/DEBE.
+        // With $097C&4 clear, D506 -> D3B6 (partial), not D3AC (open).
+        for d in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            for q in 0..16 {
+                let edge = Edge {
+                    u: 48 + if d.horizontal() { 8 } else { q },
+                    v: 48 + if d.horizontal() { q } else { 8 },
+                    direction: d,
+                };
+                let a = edge.cell();
+                let b = edge.neighbor(a);
+                for second in [0, 5, 6, 7, 12, 16, 21, 29] {
+                    let cells = [
+                        (
+                            usize::try_from(a.0).unwrap(),
+                            usize::try_from(a.1).unwrap(),
+                            8 << 9,
+                        ),
+                        (
+                            usize::try_from(b.0).unwrap(),
+                            usize::try_from(b.1).unwrap(),
+                            second << 9,
+                        ),
+                    ];
+                    let candidate = grid(&cells).with_passive_directional_type8_special_bit_clear();
+                    let mut aliases = cells;
+                    aliases[0].2 = if d == Direction::Up { 16 << 9 } else { 0 };
+                    // First dispatch is open, but the opposite-slope handler's
+                    // base probe still sees raw8 (15), not the open alias (0).
+                    let expected = if d != Direction::Up
+                        && q != 0
+                        && second == u16::from(13 - edge.first_slope())
+                        && edge.sum(false) >= 17
+                    {
+                        Ok(Response::Block(0))
+                    } else {
+                        grid(&aliases).new_directional(edge)
+                    };
+                    assert_eq!(
+                        candidate.new_directional(edge),
+                        expected,
+                        "{d:?} q{q} 8/{second}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn type8_second_dispatch_keeps_all_twelve_pair_table_targets() {
+        // [8], O/P/S: Up D582/D5C2/D602 -> D3F1/D3CD/D3E6;
+        // Down D928/D968/D9A8 -> D7BE/D7C1/D7C8;
+        // Left DCA0/DCE0/DD20 -> DB66/DB7B/DB86;
+        // Right E01C/E05C/E09C -> DEDC/DEF1/DEFC.
+        for d in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            for q in 1..16 {
+                let edge = Edge {
+                    u: 48 + if d.horizontal() { 8 } else { q },
+                    v: 48 + if d.horizontal() { q } else { 8 },
+                    direction: d,
+                };
+                let a = edge.cell();
+                let b = edge.neighbor(a);
+                for first in [0, 5, 8, 12, 16, 21, 29] {
+                    let candidate = grid(&[
+                        (
+                            usize::try_from(a.0).unwrap(),
+                            usize::try_from(a.1).unwrap(),
+                            first << 9,
+                        ),
+                        (
+                            usize::try_from(b.0).unwrap(),
+                            usize::try_from(b.1).unwrap(),
+                            8 << 9,
+                        ),
+                    ])
+                    .with_passive_directional_type8_special_bit_clear();
+                    let expected = match (d, first) {
+                        // Up8/8 suppresses D3CD's nudge for equal indexes.
+                        (Direction::Up, 8) | (Direction::Left | Direction::Right, 12 | 21) => {
+                            Response::Block(0)
+                        }
+                        (Direction::Up, 0 | 29) | (Direction::Left | Direction::Right, 5 | 16) => {
+                            Response::Block(-i32::from(q < 8))
+                        }
+                        (Direction::Up | Direction::Down, 5 | 16) => {
+                            Response::Block(if q < 8 { -1 } else { 1 })
+                        }
+                        (Direction::Up | Direction::Down, 12 | 21) => {
+                            Response::Block(i32::from(q >= 8))
+                        }
+                        _ => Response::Pass,
+                    };
+                    assert_eq!(
+                        candidate.new_directional(edge),
+                        Ok(expected),
+                        "{d:?} q{q} {first}/8"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn down6_raw_neighbor8_takes_both_way_corner_even_when_flagged() {
+        // D882 unaligned -> E767 -> E849[8]=15; D893 reads raw stored8,
+        // D89B/D8A0 -> D7C1 instead of the normal partial redispatch D7AA.
+        for q in 1..16 {
+            let edge = Edge {
+                u: 48 + q,
+                v: 56,
+                direction: Direction::Down,
+            };
+            for flag in [0, 0x8000] {
+                let candidate = grid(&[(3, 3, 6 << 9), (4, 3, flag | 8 << 9)])
+                    .with_passive_directional_type8_special_bit_clear();
+                assert_eq!(
+                    candidate.new_directional(edge),
+                    Ok(Response::Block(if q < 8 { -1 } else { 1 }))
+                );
+                let control = grid(&[(3, 3, 6 << 9), (4, 3, flag | 12 << 9)]);
+                assert_eq!(
+                    control.new_directional(edge),
+                    Ok(Response::Block(-i32::from(q < 8)))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn type8_raw_slope_probes_are_obstructions_not_open_or_flag_overrides() {
+        for d in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            for flag in [0, 0x8000] {
+                let ordinary = grid(&[(3, 3, flag | 8 << 9)]);
+                assert_eq!(
+                    ordinary.slope_probe((3, 3), d),
+                    Err(Unqualified::UnsupportedType(8))
+                );
+                let admitted = ordinary.with_passive_directional_type8_special_bit_clear();
+                // Both E85C[8] and E88F[8] are 15, raw bit15 ignored.
+                assert_eq!(admitted.slope_probe((3, 3), d), Ok(15));
+                assert_eq!(
+                    admitted.directional_kind((3, 3), d),
+                    Ok(if flag == 0 { 8 } else { 12 })
+                );
+            }
+        }
     }
 
     #[test]

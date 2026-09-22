@@ -38,6 +38,21 @@ const CASES: &[(&str, &str, usize)] = &[
         "10b86a42c91f1dde9dba3f5df7e5d0ed96d2cfc10839b1c7198ccd851e533955",
         706,
     ),
+    (
+        "motion-type8-gap-bounded",
+        "6a79fa70e595aceef210081e3e3f5072959273095eddc9c4ec9ab511ac43b1c5",
+        2482,
+    ),
+    (
+        "motion-door5-contact",
+        "efdf26290581b40230d4af6db74cbe1aa0195a28241c533ea77a0700ff1dcf2f",
+        207,
+    ),
+    (
+        "motion-map41",
+        "63952a21cdd18e7a9e1c9855f7ada777f7901564fc8ab8fe55487936f2ce6c61",
+        880,
+    ),
 ];
 
 fn number(row: &Value, field: &str) -> u16 {
@@ -53,7 +68,6 @@ fn pair(value: &Value) -> (u16, u16) {
 }
 
 fn live_room(row: &Value) -> Room {
-    assert_eq!(number(row, "map"), 0x000A);
     assert_eq!(number(row, "flags") & 0x0406, 0x0404);
     assert_eq!(number(row, "special"), 0);
     assert_eq!(row["bounds"], serde_json::json!([65528, 16, 65520, 16]));
@@ -71,12 +85,12 @@ fn live_room(row: &Value) -> Room {
     Room::new_passive(number(row, "width"), number(row, "height"), cells)
         .unwrap()
         .with_material_policy(crysta_runtime::qualified_policy(
-            0x000A,
+            number(row, "map"),
             number(row, "width"),
             number(row, "height"),
         ))
         .unwrap()
-        .with_passive_directional_collision()
+        .with_passive_directional_type8_special_bit_clear()
 }
 
 fn player_path(row: &Value) -> Vec<u64> {
@@ -97,6 +111,33 @@ fn player_path(row: &Value) -> Vec<u64> {
     path[..=end].to_vec()
 }
 
+fn type8_witnesses(rows: &[Value]) {
+    // Shared Open handlers do not by themselves demonstrate type8 coverage.
+    // Pin both the dispatched cells and player-only PCs for the bounded cases.
+    for (frame, cells, pcs) in [
+        (12915, vec![(22, 11, 8)], vec![0x80_D506, 0x80_D50E]),
+        (
+            13948,
+            vec![(8, 16, 0), (9, 16, 8)],
+            vec![0x80_D3B3, 0x80_D3F1],
+        ),
+        (14328, vec![(22, 11, 8)], vec![0x80_D79D, 0x80_D7A0]),
+    ] {
+        let row = rows.iter().find(|row| row["frame"] == frame).unwrap();
+        let path = player_path(row);
+        for pc in pcs {
+            assert!(path.contains(&pc), "missing type8 witness {frame}/{pc:06x}");
+        }
+        for (x, y, kind) in cells {
+            let raw = row["cells"][y * usize::from(number(row, "width")) + x]
+                .as_u64()
+                .unwrap();
+            assert_eq!(raw & 0x8000, 0);
+            assert_eq!((raw >> 9) & 31, kind);
+        }
+    }
+}
+
 fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
     let actual = rom::digests(bytes)
         .sha256
@@ -113,6 +154,7 @@ fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
         .collect();
     let start = rows.iter().position(|row| row["kind"] == "motion").unwrap();
     let origin = pair(&rows[start]["before"]);
+    let map = number(&rows[start], "map");
     let first = rows[start]["frame"].as_u64().unwrap();
     // Initialize once, only after twelve contiguous, settled neutral frames.
     for (index, row) in rows[start - 12..start].iter().enumerate() {
@@ -122,7 +164,7 @@ fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
             first - 12 + u64::try_from(index).unwrap()
         );
         assert!(row["held"].as_array().unwrap().is_empty());
-        assert_eq!(number(row, "map"), 0x000A);
+        assert_eq!(number(row, "map"), map);
         assert_eq!(pair(&row["position"]), origin);
     }
     let mut state = WalkingState::new(origin.0, origin.1);
@@ -135,6 +177,7 @@ fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
         assert_eq!(row["kind"], "motion");
         let frame = row["frame"].as_u64().unwrap();
         assert_eq!(frame, first + u64::try_from(index).unwrap());
+        assert_eq!(number(row, "map"), map);
         let room = live_room(row);
         let held = row["held"].as_array().unwrap();
         assert!(held.len() <= 1);
@@ -170,6 +213,9 @@ fn replay(bytes: &[u8], name: &str, hash: &str, count: usize) -> BTreeSet<u64> {
         assert_eq!(restored.step(&room, input).unwrap(), out);
         restored = WalkingState::decode_snapshot(&room, &restored.encode_snapshot()).unwrap();
         assert_eq!(restored.encode_snapshot(), state.encode_snapshot());
+    }
+    if name == "motion-type8-gap-bounded" {
+        type8_witnesses(motion);
     }
     eprintln!("{name}: {count} native motion frames, zero exclusions");
     coverage

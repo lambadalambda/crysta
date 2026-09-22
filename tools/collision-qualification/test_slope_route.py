@@ -46,6 +46,28 @@ class MotionRoutes(unittest.TestCase):
         with self.assertRaises(ValueError):
             tree_route('north')
 
+    def test_type8_route_extends_the_live_tree_window(self):
+        from slope_route import tree_route, type8_route
+        commands = type8_route()
+        prefix = tree_route('east')[:-1]
+        self.assertEqual(commands[:len(prefix)], prefix)
+        window = [c for c in commands if c.get('motion')]
+        self.assertEqual(sum(c['frames'] for c in window), 1360)
+        self.assertEqual(commands[-1], {'finish': True})
+        self.assertEqual([c['buttons'] for c in commands[len(prefix):-1:2]],
+                         [['Left'], ['Up'], ['Down'], ['Left'], ['Up'], ['Right']])
+        self.assertTrue(all(c['buttons'] == [] and c['frames'] == 12
+                            for c in commands[len(prefix) + 1:-1:2]))
+
+    def test_type8_gap_window_stops_before_the_mode_change(self):
+        from slope_route import type8_route, type8_gap_route
+        commands = type8_gap_route()
+        prefix = type8_route()[:-1]
+        self.assertEqual(commands[:len(prefix)], prefix)
+        self.assertEqual(sum(c['frames'] for c in commands if c.get('motion')), 2482)
+        self.assertEqual(commands[-2]['label'], 'type8-gap-6-settle')
+        self.assertEqual(commands[-1], {'finish': True})
+
     def test_historical_discovery_routes_are_unchanged(self):
         self.assertEqual(route('Left')[-2], {
             'label': 'slope-left', 'frames': 40, 'buttons': ['Left']})

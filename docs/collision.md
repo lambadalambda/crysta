@@ -409,7 +409,8 @@ translation of the special-player branches for 6/7, source-equivalent passive
 5/21 geometry, and 29's directional exception. **Neither the default core nor
 production `crysta-runtime` enables it.** Callers assert fixed `(-8,-16)`
 offsets, 16×16 bounds and inactive action hooks (`$0980 & $0050 == 0`). Type8
-still fails closed; no global alias bypasses its extra state input.
+still fails closed under this original opt-in; the additional clear-bit contract
+below admits its source-derived geometry without inventing a global alias.
 
 The implementation preserves old-edge slope diversion before the bit15
 substitution, raw (not overridden) slope-neighbor probes, exact positive-edge
@@ -423,14 +424,15 @@ snapshots. These are source/implementation controls, not substitute native data.
 ### What the new captures prove
 
 The trace probe accepts `"motion": true` on a bounded frame command. From one
-empty-SRAM, input-only session it stops immediately before the first `$80:D107`,
-requires player X/slot `$1000`, unchanged pre-collision XY and the same frame,
+empty-SRAM, input-only session it searches for `$80:D107` with player X/slot
+`$1000`, using one shared instruction budget across any earlier NPC calls. It
+requires unchanged pre-collision XY and the same frame,
 and reads the **live layer and attempted velocities**. It then finishes exactly
 one frame. Incomplete traces or map changes abort the capture. No warps, memory
 patches, state restoration or per-frame player resets are involved.
 
-`crysta-runtime/tests/local_collision.rs` pins six complete JSONL hashes and
-replays **1,972 consecutive motion frames** across six independent sessions.
+The original six cases in `crysta-runtime/tests/local_collision.rs` pin complete
+JSONL hashes and replay **1,972 motion frames** across six independent sessions.
 Each starts after twelve contiguous, settled neutral frames. Every motion frame
 checks map, special state, player flags, passive controls, fixed bounds, attempted
 velocity and final XY, with an independent snapshot-restored walking history.
@@ -463,19 +465,57 @@ The existing authenticated house suites additionally advance an independent
 candidate history: **1,985 trajectory transitions plus 238 passive-material
 transitions**, including three P/S nudges, all agree without additional exclusions.
 These inherit the earlier fixtures' admission/source assumptions; they do not
-newly measure every candidate precondition. Total committed native/regression
-comparisons: **4,195**.
+newly measure every candidate precondition. That first checkpoint provided
+**4,195** comparisons; the additional windows below bring the total to **7,764**.
 
-A separate diagnostic of retained map-$41 discovery data matched its first
-**880 cardinal/neutral frames (41789–42668)**, initialized once at `(120,192)`;
-the snapshot replay also agreed. This stops before the A command, uses the
-initial checkpoint grid, lacks native velocities/per-frame layer observations,
-and is not a pinned full-envelope test. Type15 was not reclassified. The wider
-map-$41 envelope remains a qualification gate, not a completed acceptance claim.
+A fresh input-only recapture now pins the first **880 cardinal/neutral map-$41
+frames (41789–42668)**, initialized once at `(120,192)`, with live layers and
+attempted velocities. All agree, including snapshots. This upgrades the earlier
+checkpoint-grid diagnostic, but still stops before the A command: the wider
+map-$41 envelope remains unqualified. Type15 was not reclassified.
 
-### Reproduce the six pinned motion captures
+### Type8 clear-bit geometry and additional native windows
 
-Capture implementation/input recipes: tooling commit `6300ec3`, using the
+`Room::with_passive_directional_type8_special_bit_clear()` additionally asserts
+`$097C & 4 == 0` throughout the ordinary resolver. Other constructors retain
+their previous behavior. The Up first8 handler `$D506` then takes Partial
+geometry, while Down/Left/Right first8 share Open. Ordered second8 tables still
+differ; raw slope probes return15 even for flagged8. Down6's `$D893..D8A0`
+raw8 exception precedes the flagged second-sample override. Sixteen dispatch
+entries, the raw exception, flags and defaults have synthetic regression controls.
+The set-bit `$D511..D53F` branch remains outside admission.
+
+Three additional complete, pinned input-only windows pass every frame:
+
+| Capture | Map | Frames | Bounded evidence |
+| --- | --- | ---: | --- |
+| `motion-type8-gap-bounded` | `$0A` | 2,482 | Up first8, Up Open/8, Down first8; special0 throughout |
+| `motion-door5-contact` | `$0C` | 207 | Passive contacts with the still-closed type5 door after the first real pot hit |
+| `motion-map41` | `$41` | 880 | First ordinary cardinal/neutral discovery window, freshly recaptured |
+
+The nine native windows total **5,541 frames**, with no frame exclusions or
+walking-state resets. The suite also requires actual type8 cells and player-only
+PC witnesses: frame12915 reaches `$D506 → D50E`; frame13948 samples Open/8 and
+reaches `$D3F1`; frame14328 samples aligned8 and reaches `$D79D → D7A0`.
+TDD first failed at12915 with `UnsupportedType(8)`, then the whole window passed.
+
+**Native coverage is not complete:** Left/Right type8 dispatch, the Down ordered
+pairs, Up Partial/Solid pairs, flagged8 and `$D8A0` remain synthetic-only. Walking
+horizontally somewhere in the capture does not count as type8 dispatch coverage.
+
+Continuing Down after the bounded window reveals a real mode boundary:
+frame14469→14470 moves `(408,185) → (408,188)`, player flags change
+`$0415 → $0431`, `$097C` is already1 at that frame's start, and control changes
+`$00A0 → $0000`. No player `$D107` occurs, despite NPC calls. The probe now
+selects by player slot rather than call order and still refuses this frame.
+This descent is **outside ordinary movement admission**, not a collision replay
+to silently omit or a reason to enable the candidate globally. `$097C & 4 == 0`
+alone is not sufficient: the rest of the ordinary-player contract still matters.
+
+### Reproduce the nine pinned motion captures
+
+Original six-capture tooling: commit `6300ec3`; additional window recipes are
+`Type8Gap` and `window_route.py` in the current source. All use the
 workspace oracle and owned normalized JP ROM (SHA-256
 `f331e3941e595cc41e26968c20b6e31563ad19603e5e204d93e3ee2e22344548`).
 Complete output pins live in the replay test; raw outputs remain ignored.
@@ -492,7 +532,10 @@ for direction in Right Left; do
 done
 python3 tools/collision-qualification/slope_route.py TreeEast > "$D/motion-tree-east-route.jsonl"
 python3 tools/collision-qualification/slope_route.py TreeBottom > "$D/motion-tree-bottom-route.jsonl"
-for name in motion-Right motion-Left motion-Right-vertical motion-Left-vertical motion-tree-east motion-tree-bottom; do
+python3 tools/collision-qualification/slope_route.py Type8Gap > "$D/motion-type8-gap-bounded-route.jsonl"
+python3 tools/collision-qualification/window_route.py Door5 > "$D/motion-door5-contact-route.jsonl"
+python3 tools/collision-qualification/window_route.py Map41 > "$D/motion-map41-route.jsonl"
+for name in motion-Right motion-Left motion-Right-vertical motion-Left-vertical motion-tree-east motion-tree-bottom motion-type8-gap-bounded motion-door5-contact motion-map41; do
   "$D/probe/target/release/trace" "$ROM" "$D/$name" \
     < "$D/$name-route.jsonl" > "$D/$name.jsonl"
 done
@@ -506,9 +549,8 @@ ROOM_CORE_MATERIAL_FIXTURES="$PWD/local/house-materials" \
 ### Remaining production gate
 
 The candidate is deliberately opt-in. Native branch/mutation qualification is
-still incomplete, broad passive 5/21/29 admission needs native route evidence,
-type8 needs its state input, and the map-$41 envelope needs a reproducible gate.
-Only then should the free-roam builder/occupancy rebuild opt in. The existing
-reachability search still merges by cell and drops errors; it is not evidence
-for a new 24-map claim. Actual successful routes must retain and check every
-step, transitions and round trips. **19/24 remains the production result.**
+still incomplete; broader 5/21/29 cases, remaining type8 branches and mode changes,
+and the full map-$41 envelope remain gates. Runtime routes must retain and check
+every step, transitions and round trips rather than treating rejected materials
+as walls or reporting a cell-keyed search as proof of impossibility.
+**19/24 remains the conservative production result.**

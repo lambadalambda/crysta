@@ -21,6 +21,122 @@ fn step(room: &Room, x: u16, y: u16, direction: Direction) -> (u16, u16) {
 }
 
 #[test]
+fn type8_requires_its_separate_state_contract_and_preserves_defaults() {
+    let cells = vec![8 << 9; 8 * 8];
+    for candidate in [
+        Room::new(8, 8, cells.clone()).unwrap(),
+        Room::new_passive(8, 8, cells.clone()).unwrap(),
+        Room::new(8, 8, cells.clone())
+            .unwrap()
+            .with_passive_directional_collision(),
+    ] {
+        assert!(!candidate.passive_directional_type8_special_bit_clear());
+        // Without the $097C&4-clear assertion (including unknown/set state),
+        // neither the legacy constructors nor the ordinary opt-in admit raw8.
+        for direction in [
+            Direction::Up,
+            Direction::Down,
+            Direction::Left,
+            Direction::Right,
+        ] {
+            let mut state = WalkingState::new(56, 64);
+            let input = FrameInput {
+                direction: Some(direction),
+            };
+            state.step(&candidate, input).unwrap();
+            state.step(&candidate, input).unwrap();
+            let before = state.encode_snapshot();
+            assert_eq!(
+                state.step(&candidate, input),
+                Err(Unqualified::UnsupportedType(8))
+            );
+            assert_eq!(state.encode_snapshot(), before);
+        }
+    }
+}
+
+#[test]
+fn type8_aligned_movement_and_down6_corner_use_source_coordinates() {
+    for (direction, x, y, expected) in [
+        (Direction::Up, 56, 72, (56, 72)),
+        (Direction::Down, 56, 56, (56, 57)),
+        (Direction::Left, 64, 64, (63, 64)),
+        (Direction::Right, 48, 64, (49, 64)),
+    ] {
+        let candidate = room(8, 3, 3).with_passive_directional_type8_special_bit_clear();
+        assert_eq!(step(&candidate, x, y, direction), expected, "{direction:?}");
+    }
+    for flag in [0, 0x8000] {
+        let mut cells = vec![0; 8 * 8];
+        cells[3 * 8 + 3] = 6 << 9;
+        cells[3 * 8 + 4] = flag | 8 << 9;
+        let candidate = Room::new(8, 8, cells)
+            .unwrap()
+            .with_passive_directional_type8_special_bit_clear();
+        for (x, expected_x) in [(60, 59), (64, 65), (68, 69)] {
+            assert_eq!(step(&candidate, x, 56, Direction::Down), (expected_x, 56));
+        }
+        // The corner's neighbor must still be admitted by the sample halo.
+        let bounded = candidate.with_sample_halo([3, 3, 4, 4]).unwrap();
+        let mut state = WalkingState::new(60, 56);
+        let input = FrameInput {
+            direction: Some(Direction::Down),
+        };
+        state.step(&bounded, input).unwrap();
+        state.step(&bounded, input).unwrap();
+        let before = state.encode_snapshot();
+        assert_eq!(
+            state.step(&bounded, input),
+            Err(Unqualified::SampleOutsideAdmission)
+        );
+        assert_eq!(state.encode_snapshot(), before);
+    }
+}
+
+#[test]
+fn type8_contract_is_immutable_and_does_not_admit_other_unknown_types() {
+    let raw = Room::new(8, 8, vec![8 << 9; 8 * 8]).unwrap();
+    let candidate = raw
+        .clone()
+        .with_passive_directional_type8_special_bit_clear();
+    assert_eq!(candidate.cells(), raw.cells());
+    assert!(candidate.passive_directional_collision());
+    assert!(candidate
+        .clone()
+        .passive_directional_type8_special_bit_clear());
+    let mut state = WalkingState::new(56, 64);
+    let input = FrameInput {
+        direction: Some(Direction::Down),
+    };
+    for _ in 0..7 {
+        state.step(&candidate, input).unwrap();
+    }
+    let mut restored = WalkingState::decode_snapshot(&candidate, &state.encode_snapshot()).unwrap();
+    for _ in 0..20 {
+        assert_eq!(
+            state.step(&candidate, input),
+            restored.step(&candidate, input)
+        );
+        assert_eq!(state.encode_snapshot(), restored.encode_snapshot());
+    }
+    for kind in [1, 9, 17, 26, 30, 31] {
+        let unknown = room(kind, 3, 4).with_passive_directional_type8_special_bit_clear();
+        let mut state = WalkingState::new(48, 73);
+        let input = FrameInput {
+            direction: Some(Direction::Right),
+        };
+        state.step(&unknown, input).unwrap();
+        state.step(&unknown, input).unwrap();
+        let before = state.encode_snapshot();
+        assert_eq!(
+            state.step(&unknown, input),
+            Err(Unqualified::UnsupportedType(u8::try_from(kind).unwrap()))
+        );
+        assert_eq!(state.encode_snapshot(), before);
+    }
+}
+
+#[test]
 fn old_edge_slopes_slide_in_all_directions_and_mirrors() {
     // $D447/$D4C4, $D82E/$D8A6, $DBD0/$DC26, $DF4C/$DFA2.
     for (kind, direction, x, y, col, row, expected) in [
