@@ -1,9 +1,11 @@
-# Crysta class-0 cadence qualification
+# Crysta ordinary walker cadence qualification
 
-Bounded source-to-native witness for map `$000D`, resident slot `$1040`.
+Bounded source-to-native witnesses for map `$000D`, resident slot `$1040`, and
+a class-2 town walker, map `$000A` slot `$1300`.
 No production runtime changes and no embedded ROM, decoded assets or captures.
-`REPORT.md` records the source chain and interpretation; this tool does not
-qualify other classes, private movement resources or arbitrary VM waits.
+`REPORT.md` records the source chain and interpretation. It covers classes 0
+and 2 on the common movement base only; it does not qualify other classes,
+private movement resources or arbitrary VM waits.
 
 ## Build
 
@@ -82,6 +84,33 @@ buttons through the shared 6800-frame bootstrap and committed itinerary,
 then explicitly releases all buttons and samples 400 further neutral native
 frames (401 snapshots including the initial settledD state). Accessors are
 passive: no savestate, memory write, warp or debugger intervention.
+
+## Class-2 town walker
+
+`town-route.jsonl` is the arrival route's input-only itinerary up to
+`settleTown-open`, where the elder has opened the house door and the player
+stands in the town. The probe's optional `SLOT-HEX SAMPLES` arguments select
+another slot; without them it samples map D's `$1040` for 400 frames as before.
+
+```sh
+out=$(mktemp -d local/crysta-cadence-qualification/town-XXXXXX)
+for run in a b; do
+  "$BIN/crysta-cadence-probe" "$ROM" "$out/$run" \
+    tools/crysta-cadence-qualification/town-route.jsonl 1300 200 >"$out/$run.jsonl"
+  python3 -B tools/crysta-cadence-qualification/verify.py \
+    --rom "$ROM" --decoder "$BIN/crysta-cadence-decode" --town \
+    --wram "$out/$run/settleTown-open.wram" --samples "$out/$run.jsonl"
+done
+cmp "$out/a.jsonl" "$out/b.jsonl"
+```
+
+`--town` samples slot `$1300` (record `$83:8A2D`) over frames
+**11394..11594** and checks every one: map `$0A` and class 2 throughout; all
+6668 common-resource bytes against the town WRAM; four complete steps
+(right, down, up, right) and a final partial step against the decoded
+class-0 row streams; two 16-frame idles and an idle tail against packet
+`$D4:7890`'s two-record lists; and the seven one-frame loop gaps with list
+index and repetition count zero. See [REPORT.md](REPORT.md).
 
 ## Retention checks
 

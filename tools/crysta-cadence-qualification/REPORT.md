@@ -68,3 +68,31 @@ Native **8227..8242 inclusive** stays `(72,688)`, selector 0, display duration 0
 `$80:C72C` pre-decrements display counter and skips script dispatch while nonnegative. `$80:EDA0` loads the raw duration byte into that counter; `$80:EDFB` increments next-record index. `$80:A33F` (COP8F) calls `$80:ED75`; exhaustion returns carry via `$80:ED51..ED74`, decrements `+$22`, and either restarts the list immediately or resumes the script. Therefore raw **7 means eight frames**, and raw **0 means one frame**, including native-visible list/repeat progression, not only raster selection.
 
 This establishes COP26 class-0 idle/refusal, **not every VM wait opcode**. There is no claim that arbitrary script delays/COPC1 should be globally changed by this factor.
+
+## Class-2 town walker
+
+**Result:** class is **descriptor mode `& $0F`** (`$80:FAA4`), not a header
+byte. Records `$83:8A19/8A23/8A2D` are class 2: `$8A19`'s descriptor
+`$83:ED37` (`90 78 D4 22`) has mode `$22`, and the other two have a zero
+descriptor pointer, which reuses the previous record's class, base and packet
+(`$80:FAF9..FB1A`). The movement base is `$4000 + (mode & $70) << 8` =
+`$6000`, the common resource.
+
+- `$80:8F32` uses `class & $FFFC`, so class 2 reads the class-0 row
+  (`$68/$69/$60`): 16 px in 32 frames, as on map D.
+- `$80:8F85` uses `class & 3`: row 2 at `$80:8FC5` is one idle repetition.
+  Packet `$D4:7890`'s idle lists are two duration-7 records, so an idle also
+  lasts **16 frames**, for a different reason than class 0's 16 x 1.
+- Header byte 1 is the low byte of entity +`$04`. Its bit `$0004` selects the
+  collision-checked position update at `$80:D101`; on free cells the deltas
+  are the same.
+
+A fresh input-only probe (`town-route.jsonl`) reaches map `$0A`; its WRAM
+holds the same 6668-byte common resource at `$7F:6000`. Slot `$1300` is
+sampled for 200 frames, 11394..11594. Four steps (right 11409, down 11459,
+up 11509, right 11542) each apply the exact decoded 1,0 stream for 32
+frames; the idles 11442..11457 (selector 2) and 11492..11507 (selector 0)
+hold position over two 8-frame records. After every action one frame shows
+list index and repetition count zero and no action: this script closes its
+loop with `COP 03` (`$80:85F8`), which yields exactly one frame when it
+loops back. That frame belongs to the script, not to the action.

@@ -29,3 +29,16 @@ moving one walks 16 px in 32 ticks with 1,0 deltas and idles 16 ticks
 ## Notes
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
+
+## Result
+
+- `probe.rs` takes optional `SLOT-HEX SAMPLES`; defaults keep map D.
+  `town-route.jsonl` is a literal prefix of the arrival route plus `finish`.
+  `decode.rs` authenticates records `$83:8A19/8A23/8A2D`, descriptor
+  `$83:ED37` and packet `$D4:7890`. `verify.py --town` checks every frame
+  11394..11594 of slot `$1300`, including the common resource in the town
+  WRAM, four full steps, two idles and seven one-frame `COP 03` loop gaps.
+- Red: town tests errored before `verify_town` existed. Green: 5 synthetic
+  tests (21 town mutation cases). Three fresh town probes are byte-identical
+  and pass; a fresh map-D probe passes the unchanged map-D checks.
+  Independent review approved; its should-fix items were applied.

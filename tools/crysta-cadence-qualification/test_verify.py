@@ -46,6 +46,46 @@ def fixture():
     return common, body, wram, rows
 
 
+def town_fixture():
+    common, _, wram, _ = fixture()
+    def word(data, at, value):
+        data[at:at + 2] = value.to_bytes(2, "little")
+    body = bytearray(0x71d)
+    for selector in range(6):
+        at = 0x20 + selector * 20
+        word(body, selector * 2, at)
+        for duration in [7] * (2 if selector < 3 else 4):
+            word(body, at, duration)
+            at += 4
+        word(body, at, 0xffff)
+    rows = [{"sample": i, "frame": 11394 + i, "map": 10, "class": 2,
+             "e": [0] * 32, "aux": [0] * 32} for i in range(201)]
+    frames = {r["frame"]: r for r in rows}
+    position = [552, 416]
+    def idle(first, selector, begin=0):
+        for i in range(begin, 16):
+            e, aux = frames[first + i - begin]["e"], frames[first + i - begin]["aux"]
+            e[:2], e[7], e[16], e[17], aux[4] = position, 7 - i % 8, i // 8 + 1, 1, selector
+    def step(first, selector, delta, count=32):
+        for i in range(count):
+            e, aux = frames[first + i]["e"], frames[first + i]["aux"]
+            if i % 2 == 0:
+                position[:] = [position[a] + delta[a] for a in range(2)]
+            e[:2], e[7], e[16], e[17], aux[4] = list(position), 7 - i % 8, i // 8 + 1, 1, selector
+    idle(11394, 2, begin=2)
+    frames[11408]["e"][:2] = position
+    for first, kind, selector, _ in verify.TOWN_ACTIONS:
+        if kind == "idle":
+            idle(first, selector)
+            frames[first + 16]["e"][:2] = list(position)
+        else:
+            unit = {3: (0, 1), 4: (0, -1), 5: (1, 0)}[selector]
+            step(first, selector, unit)
+            frames[first + 32]["e"][:2] = list(position)
+    step(11575, 5, (1, 0), count=20)
+    return common, bytes(body), wram, rows
+
+
 class VerificationTests(unittest.TestCase):
     def test_complete_bounded_observations(self):
         verify.verify(*fixture())
@@ -66,10 +106,42 @@ class VerificationTests(unittest.TestCase):
             bad = copy.deepcopy(rows)
             bad[frame - 8175][field][index] = value
             cases.append((common, body, wram, bad))
-        for args in cases:
-            with self.subTest(case=cases.index(args)):
+        for number, args in enumerate(cases):
+            with self.subTest(case=number):
                 with self.assertRaises(AssertionError):
                     verify.verify(*args)
+
+
+class TownTests(unittest.TestCase):
+    def test_every_town_frame_is_bound(self):
+        verify.verify_town(*town_fixture())
+
+    def test_rejects_changed_town_evidence(self):
+        common, body, wram, rows = town_fixture()
+        cases = [(common, body, wram, rows[:-1]), (common, body[:-1], wram, rows)]
+        bad_wram = bytearray(wram)
+        bad_wram[0x179ff] ^= 1
+        cases.append((common, body, bytes(bad_wram), rows))
+        for at in (0x20 + 20, 0x20 + 3 * 20):  # an idle and a walking record
+            bad_body = bytearray(body)
+            bad_body[at] = 6
+            cases.append((common, bytes(bad_body), wram, rows))
+        for frame, field, index, value in [
+                (11394, "class", None, 0), (11400, "map", None, 13), (11409, "e", 0, 552),
+                (11441, "e", 17, 1), (11441, "e", 16, 4), (11450, "aux", 4, 5),
+                (11457, "e", 0, 569), (11470, "e", 16, 1), (11500, "aux", 12, 1),
+                (11520, "e", 1, 400), (11560, "aux", 4, 3), (11574, "aux", 8, 1),
+                (11590, "e", 0, 700), (11400, "e", 7, 3)]:
+            bad = copy.deepcopy(rows)
+            if index is None:
+                bad[frame - 11394][field] = value
+            else:
+                bad[frame - 11394][field][index] = value
+            cases.append((common, body, wram, bad))
+        for number, args in enumerate(cases):
+            with self.subTest(case=number):
+                with self.assertRaises(AssertionError):
+                    verify.verify_town(*args)
 
 
 if __name__ == "__main__":

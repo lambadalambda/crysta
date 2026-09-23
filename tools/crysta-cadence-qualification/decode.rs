@@ -37,6 +37,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let common = decode(0x2bf037, 0x2bf8f7, 0x1a0c);
     let body = decode(0x181022, 0x18118a, 0x28b);
-    println!("{}", json!({"common": common, "body": body}));
+
+    // Town class-2 walkers: $83:8A19 carries descriptor $83:ED37 (mode $22,
+    // class = mode & $0F = 2, base $6000); $8A23 and the sampled $8A2D reuse it.
+    assert_eq!(
+        &image[0x38a19..0x38a37],
+        &[
+            1, 0x1c, 0x1a, 0, 0xad, 0x80, 0x88, 0x37, 0xed, 0x83, //
+            1, 0x27, 0x1d, 0, 0xad, 0x80, 0x88, 0, 0, 0, //
+            1, 0x23, 0x1a, 0, 0x03, 0x81, 0x88, 0, 0, 0,
+        ]
+    );
+    assert_eq!(&image[0x3ed37..0x3ed3b], &[0x90, 0x78, 0xd4, 0x22]);
+    let town_body = decode(0x147890, 0x147bf2, 0x71d);
+    println!("{}", json!({"common": common, "body": body, "town_body": town_body}));
     Ok(())
 }

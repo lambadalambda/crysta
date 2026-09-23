@@ -149,7 +149,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)
-- [Witness a class-2 Crysta walker natively](issues/witness-class-two-walker.md)
 - [Derive each walker's step and idle timing from source](issues/derive-walker-cadence-from-source.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>

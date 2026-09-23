@@ -41,7 +41,17 @@ fn capture(s: &Session, out: &std::path::Path, label: &str) {
 }
 fn main() {
     let a: Vec<_> = std::env::args().collect();
-    assert_eq!(a.len(), 4, "probe ROM local/OUT ROUTE.jsonl");
+    assert!(
+        a.len() == 4 || a.len() == 6,
+        "probe ROM local/OUT ROUTE.jsonl [SLOT-HEX SAMPLES]"
+    );
+    // Map D's wanderer by default; the town itinerary samples its class-2 slot.
+    let (slot, samples) = if a.len() == 6 {
+        (usize::from_str_radix(&a[4], 16).unwrap(), a[5].parse::<u32>().unwrap())
+    } else {
+        (0x1040, 400)
+    };
+    assert!((0x1000..0x2000).contains(&slot) && slot % 0x40 == 0 && samples <= 2000);
     let out = std::path::Path::new(&a[2]);
     assert!(
         out.starts_with("local")
@@ -80,10 +90,10 @@ fn main() {
             for (button, _) in BUTTONS {
                 s.set_button(button, false);
             }
-            for sample in 0..=400 {
+            for sample in 0..=samples {
                 let w = s.wram_image();
                 let u = |p| u16::from_le_bytes([w[p], w[p + 1]]);
-                let e = 0x1040;
+                let e = slot;
                 println!(
                     "{}",
                     json!({"sample":sample,"frame":s.frame_state().frames,"map":u(0x47e),
@@ -91,7 +101,7 @@ fn main() {
                     "aux":(0..0x40).step_by(2).map(|i|u(0x10000+e+i)).collect::<Vec<_>>(),
                     "class":u(0x12018+e)})
                 );
-                if sample < 400 {
+                if sample < samples {
                     s.run_frame();
                 }
             }
