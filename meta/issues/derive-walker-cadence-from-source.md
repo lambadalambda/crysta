@@ -35,3 +35,27 @@ class-0 and class-2 walker in the slice gets source timing.
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Source: `$80:F4EA` (record), `$80:F599..F5C3` (header), `$80:FA65..FB1A`
   (descriptor, class, base, reuse), `$80:8F32`/`$80:8F85` (class tables).
+
+## Result
+
+- `actors/cadence.rs` now derives `Cadence { walk: [u16; 4], idle }` per
+  resident or returns a `Refusal`. It audits the `$80:8F6D` class-0 row, the
+  whole `$80:8FB5` table, both common load sites and the three class-0
+  streams, and decodes the resident's own packet lists.
+- Actors keep `Option<Cadence>`; an admitted action lasts the derived ticks,
+  and movement parity counts from the action's first tick, so a 31-tick list
+  still covers 16 px. The exact-site exceptions became a per-service
+  allowlist backed by the handler reads.
+- All eight walkers derive as tabled in `docs/native-crysta-timing.md`;
+  `$1A`'s up walk is 31 ticks. Refusals are tested for class 4, a private
+  base, changed tables, streams and packets, an `$FD` record and a record
+  outside the map.
+- New tests did not compile against the old API (red), then pass: 39
+  runtime tests, workspace fmt/Clippy/tests, 65 app tests with the ROM.
+  Pure tests cover the reuse chain, pointer range and list sums; an
+  owned-ROM census finds exactly eight drawn COP26-then-COP8F walkers in
+  the 24 maps and all eight derive.
+- Independent review approved. Applied: overflow-checked idle with zero
+  refused, pure tests, stricter pointer range, exact refusal asserts. The
+  sprite loader's reuse rule steps over `$00`/`$FD` records while this one
+  refuses them; both are cross-referenced rather than merged.

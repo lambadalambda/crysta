@@ -9,9 +9,9 @@
 //!
 //! What is modelled is what `$80:8E56` decides -- the rectangle, the random
 //! draw, the probe -- and what `$80:8F32` selects. What is approximated is
-//! timing outside the source-admitted map-D class-0 action: other tiles use
-//! [`STEP_FRAMES`] and step waits use [`WAIT_FRAMES`]. The admitted action
-//! follows the decoded common velocity/list cadence: 32 ticks moving, 16 idle.
+//! timing outside a source-admitted COP26 action: other tiles use
+//! [`STEP_FRAMES`] and step waits use [`WAIT_FRAMES`]. An admitted action
+//! lasts as long as the resident's own walking or idle list; see `cadence`.
 
 mod cadence;
 
@@ -101,6 +101,7 @@ enum State {
     /// final display frame. A zero remainder resumes commands next tick.
     Ordinary {
         direction: Option<Direction>,
+        ticks: u16,
         ticks_left: u16,
         destination: Option<(u16, u16)>,
     },
@@ -149,7 +150,8 @@ pub struct Actor {
     pc: usize,
     state: State,
     rng: u32,
-    ordinary_cadence: bool,
+    /// Source-derived COP26 timing, until a skipped service revokes it.
+    cadence: Option<cadence::Cadence>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -180,7 +182,7 @@ impl Actor {
             state,
             // A zero seed would stay zero.
             rng: seed | 1,
-            ordinary_cadence: false,
+            cadence: None,
             lengths: vec![None; 256],
         }
     }
@@ -194,8 +196,10 @@ impl Actor {
         seed: u32,
     ) -> Self {
         let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
-        actor.ordinary_cadence =
-            resident.body && cadence::qualifies(image, map, resident.record, resident.script);
+        actor.cadence = resident
+            .body
+            .then(|| cadence::derive(image, map, resident.record).ok())
+            .flatten();
         actor
     }
 
@@ -277,13 +281,14 @@ impl Actor {
     fn tick_ordinary(&mut self) {
         let State::Ordinary {
             direction,
+            ticks,
             ticks_left,
             destination,
         } = self.state
         else {
             return;
         };
-        if let Some(direction) = direction.filter(|_| ticks_left % 2 == 0) {
+        if let Some(direction) = direction.filter(|_| (ticks - ticks_left) % 2 == 0) {
             let (dx, dy) = delta(direction);
             self.position = (
                 self.position.0.wrapping_add_signed(dx),
@@ -292,6 +297,7 @@ impl Actor {
         }
         self.state = State::Ordinary {
             direction,
+            ticks,
             ticks_left: ticks_left - 1,
             destination,
         };
@@ -387,23 +393,25 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                let qualified = self.ordinary_cadence
-                    && self.pc == cadence::STEP_SITE
-                    && image.get(operands + 4..operands + 6) == Some(&[2, WAIT_STEP]);
+                let qualified = self
+                    .cadence
+                    .filter(|_| image.get(operands + 4..operands + 6) == Some(&[2, WAIT_STEP]));
                 self.pc = operands + 4;
                 let moving = self.random_step([rect[0], rect[1], rect[2], rect[3]], around);
-                if qualified {
+                if let Some(cadence) = qualified {
                     // COP8F resolves this very action; it is not an extra wait.
                     self.pc += 2;
                     self.pose_age = 0;
                     self.walking = moving;
+                    let ticks = if moving {
+                        cadence.walk(self.facing)
+                    } else {
+                        cadence.idle
+                    };
                     self.state = State::Ordinary {
                         direction: moving.then_some(self.facing),
-                        ticks_left: if moving {
-                            cadence::WALK_TICKS
-                        } else {
-                            cadence::IDLE_TICKS
-                        },
+                        ticks,
+                        ticks_left: ticks,
                         destination: self.destination(),
                     };
                     self.tick_ordinary();
@@ -423,7 +431,9 @@ impl Actor {
             // includes text and flag writes: the loop's ambient effects
             // are not the runtime's to apply from here.
             other => {
-                self.ordinary_cadence &= cadence::benign_skipped_service(image, self.pc);
+                if !cadence::benign_skipped_service(image, self.pc) {
+                    self.cadence = None;
+                }
                 let length = *self.lengths[usize::from(other)]
                     .get_or_insert_with(|| actor_script::operand_length(image, other));
                 let Some(length) = length else {
@@ -1139,6 +1149,8 @@ mod stop_for_player_tests {
 mod cadence_tests {
     use super::*;
 
+    const SITE: usize = 0x08_A868;
+
     fn seed_for(choice: u8) -> u32 {
         (1..100_000)
             .find(|seed| {
@@ -1149,23 +1161,27 @@ mod cadence_tests {
             | 1
     }
 
-    fn run_action(choice: u8, refused: bool) {
-        let mut image = vec![0; cadence::STEP_SITE + 10];
-        image[cadence::STEP_SITE..].copy_from_slice(&[2, 0x26, 0, 7, 0, 7, 2, 0x8F, 0x80, 0xF6]);
-        let cells = vec![if refused { 14 << 9 } else { 0 }; 64];
-        let around = Surroundings {
-            image: &image,
+    fn surroundings<'a>(image: &'a [u8], cells: &'a [u16]) -> Surroundings<'a> {
+        Surroundings {
+            image,
             events: &[0; 512],
-            cells: &cells,
+            cells,
             width: 8,
             height: 8,
             occupied: &[],
             player: (0, 0),
             facing: Direction::Down,
-        };
+        }
+    }
+
+    fn run_action(choice: u8, refused: bool, cadence: cadence::Cadence) {
+        let mut image = vec![0; SITE + 10];
+        image[SITE..].copy_from_slice(&[2, 0x26, 0, 7, 0, 7, 2, 0x8F, 0x80, 0xF6]);
+        let cells = vec![if refused { 14 << 9 } else { 0 }; 64];
+        let around = surroundings(&image, &cells);
         let seed = seed_for(choice);
         let mut actor = Actor::new((56, 64), Some(0x88_A868), 0, seed);
-        actor.ordinary_cadence = true;
+        actor.cadence = Some(cadence);
         let moving = choice < 4 && !refused;
         let direction = match choice {
             0 => Direction::Down,
@@ -1174,7 +1190,11 @@ mod cadence_tests {
             _ => Direction::Right,
         };
         let (dx, dy) = if moving { delta(direction) } else { (0, 0) };
-        let duration = if moving { 32 } else { 16 };
+        let duration = if moving {
+            cadence.walk(direction)
+        } else {
+            cadence.idle
+        };
         for action in 0..2 {
             let start = actor.position;
             let cell = actor.collision_cell();
@@ -1185,7 +1205,7 @@ mod cadence_tests {
             actor.rng = seed;
             for tick in 0..duration {
                 actor.tick(&around);
-                let pixels = tick / 2 + 1;
+                let pixels = i16::try_from(tick / 2 + 1).unwrap();
                 assert_eq!(
                     actor.position,
                     (
@@ -1193,11 +1213,7 @@ mod cadence_tests {
                         start.1.wrapping_add_signed(dy * pixels)
                     )
                 );
-                assert_eq!(
-                    actor.pose_age,
-                    u32::try_from(tick).unwrap(),
-                    "action {action}"
-                );
+                assert_eq!(actor.pose_age, u32::from(tick), "action {action}");
                 assert_eq!(actor.walking, moving);
                 assert_eq!(
                     actor.destination(),
@@ -1205,42 +1221,61 @@ mod cadence_tests {
                     "reservation must not drift mid-step"
                 );
             }
+            let travelled = (
+                actor.position.0.abs_diff(start.0),
+                actor.position.1.abs_diff(start.1),
+            );
+            assert_eq!(travelled.0 + travelled.1, if moving { 16 } else { 0 });
         }
     }
+
+    const CLASS_ZERO: cadence::Cadence = cadence::Cadence {
+        walk: [32; 4],
+        idle: 16,
+    };
 
     #[test]
     fn qualified_actions_start_immediately_and_restart_all_four_directions_without_gaps() {
         for choice in 0..4 {
-            run_action(choice, false);
+            run_action(choice, false, CLASS_ZERO);
         }
     }
 
     #[test]
-    fn qualified_random_idle_and_all_refusals_take_sixteen_ticks() {
-        run_action(4, false);
+    fn qualified_random_idle_and_all_refusals_take_the_idle_length() {
+        run_action(4, false, CLASS_ZERO);
         for choice in 0..4 {
-            run_action(choice, true);
+            run_action(choice, true, CLASS_ZERO);
         }
+        let short = cadence::Cadence {
+            walk: [32; 4],
+            idle: 9,
+        };
+        run_action(4, false, short);
     }
 
     #[test]
-    fn a_skipped_service_outside_the_audited_path_revokes_admission() {
-        // Known-length COPBB, but not the verified entry site/operand.
-        let mut image = vec![0; cadence::STEP_SITE + 3];
-        image[cadence::STEP_SITE..].copy_from_slice(&[2, 0xBB, 0]);
-        let around = Surroundings {
-            image: &image,
-            events: &[0; 512],
-            cells: &[],
-            width: 0,
-            height: 0,
-            occupied: &[],
-            player: (0, 0),
-            facing: Direction::Down,
+    fn a_thirty_one_tick_list_still_walks_sixteen_pixels() {
+        let cadence = cadence::Cadence {
+            walk: [32, 31, 32, 32],
+            idle: 16,
         };
-        let mut actor = Actor::new((0, 0), Some(0x88_A868), 0, 1);
-        actor.ordinary_cadence = true;
-        actor.tick(&around);
-        assert!(!actor.ordinary_cadence);
+        run_action(1, false, cadence);
+    }
+
+    #[test]
+    fn a_skipped_service_that_could_change_movement_revokes_admission() {
+        for (bytes, kept) in [
+            ([2, 0xBB, 0x0C], true),
+            ([2, 0xBB, 0x40], false),
+            ([2, 0x28, 4], false),
+        ] {
+            let mut image = vec![0; SITE + 3];
+            image[SITE..].copy_from_slice(&bytes);
+            let mut actor = Actor::new((0, 0), Some(0x88_A868), 0, 1);
+            actor.cadence = Some(CLASS_ZERO);
+            actor.tick(&surroundings(&image, &[]));
+            assert_eq!(actor.cadence.is_some(), kept, "{bytes:02X?}");
+        }
     }
 }

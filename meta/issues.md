@@ -44,5 +44,4 @@
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
 - [ ] [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)
-- [ ] [Derive each walker's step and idle timing from source](issues/derive-walker-cadence-from-source.md)
 - [ ] [Execute counted loops, timed waits and the map branch in resident scripts](issues/execute-script-loops-and-waits.md)

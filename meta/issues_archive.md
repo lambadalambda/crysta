@@ -99,3 +99,4 @@
 - [x] [Clip dialogue pages to their box](issues/clip-wide-dialogue-pages.md)
 - [x] [Name the river test's inputs when they are missing](issues/name-river-test-inputs.md)
 - [x] [Witness a class-2 Crysta walker natively](issues/witness-class-two-walker.md)
+- [x] [Derive each walker's step and idle timing from source](issues/derive-walker-cadence-from-source.md)

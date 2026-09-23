@@ -46,7 +46,8 @@ interaction remains level-polled: taps wholly between polls can still be missed.
   **30.05 pixels/second** while walking, or **0.532 seconds per tile**. Its
   ordinary idle/refusal action lasts **16 ticks**, approximately **0.266 seconds**.
   This replaces two pixels per moving tick and an appended eight-tick wait.
-  Other residents/classes retain the existing explicitly approximate projection.
+- The other seven drawn `COP 26` walkers in the slice now derive the same
+  kind of timing from their own source chains (see below), classes 0 and 2. Residents outside that subset keep the approximate projection.
 - Resident raster durations are raw native countdown bytes. The source scheduler
   decrements before testing negative, so a duration7 record lasts **eight
   ticks**, not seven. The resident raster player now uses that rule, including
@@ -89,6 +90,36 @@ COP06 long-jump path. The qualified action consumes its own COP8F, restarts
 movement and raster phase even for consecutive equal poses, and reserves a fixed
 destination until completion. It does **not** alter arbitrary COP8E/COP8F/COPC1
 waits, other classes/private resources, native RNG or callback execution.
+
+## Every slice walker
+
+The class is **descriptor mode `& $0F`** (`$80:FAA4`); a zero descriptor
+pointer reuses the previous record's class, base and packet. `$80:8F32`
+picks the movement row by `class & ~3` and `$80:8F85` the idle count by
+`class & 3`. The runtime admits the class-0 row on the common `$6000` base
+and derives, per resident: walk ticks = the direction's walking list (sum of
+duration + 1), idle ticks = idle count x the idle list. A walk must cover
+exactly 16 px at the row's 1,0 stream; idle lengths must not depend on facing.
+
+| Map | Record | Class | Walk ticks (down/up/left/right) | Idle ticks |
+|---|---|---:|---|---:|
+| `$0D` | `$83:8CB4` | 0 | 32/32/32/32 | 16 (1 x 16) |
+| `$0A` | `$83:89FB` | 0 | 32/32/32/32 | 16 (1 x 16) |
+| `$0A` | `$83:8A19`, `8A23`, `8A2D` | 2 | 32/32/32/32 | 16 (16 x 1) |
+| `$15` | `$83:8F67` | 0 | 32/32/32/32 | 16 (1 x 16) |
+| `$1A` | `$83:90BD` | 0 | 32/**31**/32/32 | 16 (1 x 16) |
+| `$1B` | `$83:90F7` | 0 | 32/32/32/32 | 16 (1 x 16) |
+
+That is 30.05 px/s while walking (0.532 s per tile; `$1A` walks up in
+0.516 s) and 0.266 s per idle or refusal. The class-2 row was witnessed
+natively in the town; see the qualification tool. Skipped services keep
+admission only when their handlers write none of the assumed state: `COP 02`,
+`03`, `0A`, `21`, `3B`, `65`, and `BB` below `$40`. `COP 06`, class setters
+and anything else revoke it.
+
+Not yet modelled: `COP 03` loops back with a one-frame yield, and
+`COP C1 n` waits n frames; the runtime skips both, so loop overhead and
+entry delays are still approximate.
 
 Reusable evidence tools and reproduction commands are in
 [`tools/crysta-cadence-qualification`](../tools/crysta-cadence-qualification/README.md).
