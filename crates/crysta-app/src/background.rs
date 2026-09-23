@@ -28,8 +28,40 @@ impl VisitClock {
     }
 }
 
+/// A world map's flat Mode 7 plane, its whole extent as the region. The
+/// native view is in perspective and wraps; neither is drawn.
+fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
+    let world = assets::maps::visual::world::WorldMap::from_rom(cartridge.image(), map)
+        .map_err(|error| error.to_string())?;
+    let (width, height) = (world.width() * 16, world.height() * 16);
+    let pixels = (0..height)
+        .flat_map(|y| (0..width).map(move |x| (x, y)))
+        .map(|(x, y)| rgb(world.color(world.pixel(x, y))))
+        .collect();
+    let edge = |pixels: usize| u16::try_from(pixels).unwrap_or(u16::MAX);
+    Ok(CachedBackground {
+        frame: crate::frame::Background {
+            pixels,
+            width,
+            height,
+            high: Vec::new(),
+        },
+        region: CameraRegion {
+            record_offset: 0,
+            bounds: [0, 0, edge(width), edge(height)],
+            vertical_extent: edge(height),
+        },
+        animation: None,
+        patches: Patches::default(),
+        world: true,
+    })
+}
+
 /// Load the static baseline without changing the inspector's export policy.
 pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
+    if crysta_runtime::WORLD_MAPS.contains(&map) {
+        return load_world(cartridge, map);
+    }
     let region =
         CameraRegion::from_rom(cartridge.image(), map).map_err(|error| error.to_string())?;
     let scene = assets::maps::visual::first_background(cartridge.image(), map)
@@ -51,6 +83,7 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
         region,
         animation,
         patches: Patches::default(),
+        world: false,
     })
 }
 
@@ -109,9 +142,20 @@ pub struct CachedBackground {
     pub region: CameraRegion,
     animation: Option<AnimatedExterior>,
     patches: Patches,
+    /// A world map: its camera follows the player unclamped (`$87:9123`).
+    pub world: bool,
 }
 
 impl CachedBackground {
+    /// The camera for the player: a world map's, or the region's clamp.
+    pub fn camera(&self, player: (u16, u16), width: usize) -> (i32, i32) {
+        if self.world {
+            crate::frame::world_camera(player, width)
+        } else {
+            crate::frame::camera(&self.region, player, width)
+        }
+    }
+
     /// Draws the world's patched cells (`COP 44`), and restores cells that
     /// are no longer patched, from the map's own metatiles.
     pub fn apply_patches(&mut self, image: &[u8], map: u16, patched: &[(u16, u16, u16)]) {
@@ -514,6 +558,21 @@ mod patch_tests {
         for map in 0x41..=0x44 {
             assert!(super::load(&rom, map).is_ok(), "map {map:#x}");
         }
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn the_underworld_loads_as_its_flat_mode_7_plane() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let loaded = super::load(&rom, 0x3).unwrap();
+        assert!(loaded.world);
+        assert_eq!((loaded.frame.width, loaded.frame.height), (1024, 1024));
+        assert_eq!(loaded.region.bounds, [0, 0, 1024, 1024]);
+        let world = assets::maps::visual::world::WorldMap::from_rom(rom.image(), 0x3).unwrap();
+        let (x, y) = (536, 530);
+        let expected = super::rgb(world.color(world.pixel(x, y)));
+        assert_eq!(loaded.frame.pixels[y * 1024 + x], expected);
     }
 
     #[test]

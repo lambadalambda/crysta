@@ -510,7 +510,7 @@ impl Session {
             return (0, 0);
         };
         let region = background.region;
-        let camera = frame::camera(&region, position, frame.width);
+        let camera = background.camera(position, frame.width);
         let background = &background.frame;
         frame::draw_background(frame, background, camera);
         let count = residents.len();

@@ -90,6 +90,16 @@ pub fn camera(region: &CameraRegion, player: (u16, u16), width: usize) -> (i32, 
     (x, i32::from(y))
 }
 
+/// A world map's camera (`$87:9123`): the player 160 lines down and
+/// centred across, unclamped.
+#[must_use]
+pub fn world_camera(player: (u16, u16), width: usize) -> (i32, i32) {
+    (
+        i32::from(player.0) - signed(width) / 2,
+        i32::from(player.1) - 160,
+    )
+}
+
 /// Blanks every pixel whose layer position is outside `bounds`, so a wide
 /// view never shows a neighbouring room.
 pub fn mask_outside(canvas: &mut Canvas, camera: (i32, i32), bounds: [u16; 4]) {
@@ -354,6 +364,12 @@ mod tests {
         let mut canvas = Canvas::new(width);
         canvas.pixels.fill(colour);
         canvas
+    }
+
+    #[test]
+    fn the_world_camera_keeps_the_player_160_lines_down() {
+        // Native `underworld-arrival`: (536,544) -> origin (408,384).
+        assert_eq!(world_camera((536, 544), CLASSIC_WIDTH), (408, 384));
     }
 
     #[test]
