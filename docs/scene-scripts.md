@@ -47,6 +47,8 @@ callback on a confirm press when nothing else owns the window.
 | `0D` | `$80:87C2` | facing, 4 cell offsets, target | as `0F`, on the player inside a rectangle of cells around the actor (raw X, raw Y-8, inclusive) |
 | `DF` | `$80:B827` | long script | retries while the player is in a forced action (`$097C & $0810`, the recoil), then takes the player's script; the host player stands |
 | `14` | `$80:8A23` | map, mode, selector, x, y | queues a transfer; the world loads it at the frame's end at (x+8, y+16), keeping the pad mask |
+| `00` / `01` | `$80:8592` / `85B8` | long target / — | calls a long subroutine keeping one return (`$7F:0004`); `01` returns there, or goes on when none is kept |
+| `99` | `$80:A4B6` | long script, flags | spawns as `A2` does, at the head of the actor list and without a parent link |
 | `ED` / `EE` | `$80:9F4C` / `9F93` | pose, dx, dy / speed | an eased move: `EE` adds its speed to a phase each frame and places the actor on the cosine table `$81:F462` between start and target, until the phase's bit 7 |
 | `91` | `$80:A395` | — | plays the pose and ends the script's frame as an `RTL` does |
 | `23` / `24` | `$80:8D1E` / `8D0B` | (pose,) target | faces a facing player, takes interaction, jumps; otherwise drops interaction |
@@ -86,7 +88,14 @@ through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
 mismatch branch: the runtime's Ark only stands and walks. Short runs that
 only use script scratch words (`$0440`, `$04BC..$04C3`: `STZ`, `STA`,
 `LDA`, `INC`, `DEC`, `CMP`, `TSB`/`TRB` and branches) execute, as the tour's guide and
-controller take turns through `$04BC`; the words outlive map loads. Tile patches
+controller take turns through `$04BC`; the words outlive map loads. Such a
+run may also narrow the accumulator, write PPU registers, push and pull, and
+call the palette routines `$8D:A8EA`/`AA96`/`A8FD` and the nested frame
+`$80:80DF` (the freezing's whitening). The nested frames run the actors with
+`+$04` bit 12 natively (the figure, the particles); they are not modelled,
+so those timers skip about 37 frames. Native
+writes to `+$04` bits 12 and 8 are accepted and not modelled; `+$06`'s
+interaction bits follow writes to them. Tile patches
 survive a move between maps that share the first layer (`B`..`$11`, `$20`),
 because `$86:9145` does not reload it.
 
@@ -159,6 +168,12 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   the same cell; natively it lacks `+$04` bit 8, which the dispatcher
   (`$87:C783`) requires. The runtime, without `+$04`, talks to the first
   interactable actor on the cell instead.
+- **The frozen return, `$21`**: the figure (`$88:B2FF`, a long call into
+  its scene) and the guide (`$88:AEB8`) cooperate through locals and
+  sixteen pages; the guide's whitening runs, then `$88:AF3F`/`AF43` set
+  `$FE` and `$23`, the pad unlocks and the guide leaves. The scene's player
+  scripts (`COP DF`, `COP 84` streams) are not modelled: Ark stays at
+  (136,368), natively (136,464). The whitening's six particles stay frozen.
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'

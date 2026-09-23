@@ -805,3 +805,45 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
     assert_eq!(world.items(), [0x81], "the Crystal Spear");
     assert_eq!((world.map(), world.position()), (0x0021, (136, 368)));
 }
+
+#[test]
+fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
+    // Back in `$21` with the spear: the figure (`$88:B2FF`, a long call into
+    // `$88:D33D`'s scene) and the guide (`$88:AEB8`, the whitening, then
+    // `$88:AF3F`/`AF43`) cooperate through locals and requests; the guide
+    // sets `$FE` and `$23`, unlocks the pad and leaves.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244, 0x240, 0x241, 0x242] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
+    for _ in 0..4000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(flag(&world, 0xFE) && flag(&world, 0x23));
+    assert!(!world.pad_locked());
+    // Only the whitening's particles stay frozen: spawned, bodiless.
+    assert!(
+        world
+            .frozen_scripts()
+            .iter()
+            .all(|&(record, _)| record == 0),
+        "{:x?}",
+        world.frozen_scripts()
+    );
+    // Natively the scene's player scripts (`COP 84` streams) leave Ark at
+    // (136,464); they are not modelled, so he stays where he returned.
+    let before = world.position();
+    replay(&mut world, &[(1, 12), (5, 12)]);
+    assert_ne!(world.position(), before, "Ark walks again, toward the exit");
+}

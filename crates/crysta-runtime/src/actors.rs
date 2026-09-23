@@ -147,6 +147,10 @@ const STAMP: u8 = 0x3D;
 const UNSTAMP: u8 = 0x3E;
 /// Spawns an actor running a long script with a flags word; `$80:A71B`.
 const SPAWN: u8 = 0xA2;
+/// Spawns one the same way, at the head of the actor list (`$0DFA`) rather
+/// than after its parent, and without a parent link; `$80:A4B6`. Spawns all
+/// run from the next frame here.
+const SPAWN_LINKED: u8 = 0x99;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
 /// Services without a modelled effect: a palette-fade helper (`31` spawns
@@ -170,6 +174,10 @@ const NEAR_BRANCH: u8 = 0x0D;
 const TAKE_PLAYER: u8 = 0xDF;
 /// Plays the pose and ends the script's frame as an `RTL` does; `$80:A395`.
 const ANIMATE_AND_END: u8 = 0x91;
+/// Calls a long subroutine, keeping one return (`$7F:0004`); `$80:8592`.
+const CALL: u8 = 0x00;
+/// Returns from it, or goes on when none is kept; `$80:85B8`.
+const RETURN: u8 = 0x01;
 /// Starts an eased move: pose, then x and y offsets; `$80:9F4C`.
 const EASE_START: u8 = 0xED;
 /// Steps it by a speed each frame until it ends; `$80:9F93`.
@@ -376,6 +384,8 @@ pub struct Actor {
     contact: Option<usize>,
     /// An eased move `COP ED` started (`$7F:2000..200C`).
     ease: Option<ease::Ease>,
+    /// The return `COP 00` kept (`$7F:0004`).
+    call: Option<usize>,
     /// `+$04` bit `$0200`: the actor takes contact. Set at spawn, as the
     /// box's `$5220` is natively before any script runs; how the loader
     /// derives `+$04` is not traced.
@@ -452,6 +462,7 @@ impl Actor {
             walked: false,
             contact: None,
             ease: None,
+            call: None,
             touchable: true,
             pc,
             state,
@@ -670,7 +681,11 @@ impl Actor {
         bank: usize,
         scratch: &mut native::Scratch,
     ) -> Option<usize> {
-        const MODELLED: u16 = 0x8000 | 0x0200;
+        // Bits 12 and 8 are accepted and not modelled: the guide clears and
+        // sets 12 around the freezing's whitening (`$88:B507`, `$88:B53F`)
+        // and clears 8, the dispatcher's target bit, before it leaves
+        // (`$88:AF1A`).
+        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100;
         let at = self.pc;
         if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
             let value = u16::from_le_bytes([low, high]);
@@ -681,6 +696,19 @@ impl Actor {
             };
             self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
             self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
+            return Some(at + 9);
+        }
+        // `+$06`'s interaction bits (`$0200` any side, `$0100` facing), as
+        // the figure in `$21` sets them before registering its callback
+        // (`$88:D33D`).
+        if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
+            const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
+            let value = u16::from_le_bytes([low, high]);
+            match op {
+                0x09 if value & !INTERACTION == 0 => self.interaction |= value,
+                0x29 if !value & !INTERACTION == 0 => self.interaction &= value,
+                _ => return None,
+            }
             return Some(at + 9);
         }
         let code = image.get(at..at + CONTACT.len())?;
@@ -843,12 +871,13 @@ impl Actor {
 
     fn run(&mut self, around: &mut Surroundings<'_>) -> Run {
         let image = around.image;
-        let bank = self.pc & 0xFF_0000;
         // `+$0A` at entry: where an `RTL` comes back to next frame unless
         // `COP BC`/`C0` point it elsewhere first.
         let entry = self.pc;
         self.continuation = None;
         for _ in 0..BUDGET {
+            // Per step: a long jump or call may have changed it.
+            let bank = self.pc & 0xFF_0000;
             let Some(window) = image.get(self.pc..self.pc + 2) else {
                 self.state = State::Frozen;
                 return Run::Yielded;
@@ -927,13 +956,22 @@ impl Actor {
                 return self.script_service(service, operands, around)
             }
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
+            CALL => {
+                let Some(target) = image.get(operands..operands + 3).and_then(long) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.call = Some(operands + 3);
+                self.pc = target;
+            }
+            RETURN => self.pc = self.call.take().unwrap_or(operands),
             GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, around),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x38 | 0x6A | 0x76 | 0xD9 => {
+            | SPAWN_LINKED | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x38 | 0x6A | 0x76 | 0xD9 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -1209,7 +1247,7 @@ impl Actor {
                 }
                 self.pc = operands + 3;
             }
-            SPAWN => {
+            SPAWN | SPAWN_LINKED => {
                 let (Some(script), Some(flags)) = (
                     image.get(operands..operands + 3).and_then(long),
                     cadence::word(image, operands + 3),
@@ -2945,6 +2983,46 @@ mod script_service_tests {
         tick_at(&mut actor, &image, &mut globals, (0, 0));
         assert_eq!(globals.items, [0x81]);
         assert_eq!(actor.selector, 7);
+    }
+
+    #[test]
+    fn cop_00_calls_a_long_subroutine_and_cop_01_returns_once() {
+        // COP00 $88:8010; pose 7; yield. $8010: pose 5; COP01; COP01 again
+        // goes on (nothing kept); yield.
+        let mut code = vec![2, 0x00, 0x10, 0x80, 0x88, 2, 0x80, 7, 2, 0xBD];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x80, 5, 2, 0x01]);
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!(actor.selector, 7, "returned after the call");
+        assert_eq!(actor.call, None);
+    }
+
+    #[test]
+    fn the_interaction_bits_follow_native_writes_to_06() {
+        // LDA $0006,X; ORA #$0200; STA $0006,X; yield.
+        let code = [
+            0xBD, 0x06, 0x00, 0x09, 0x00, 0x02, 0x9D, 0x06, 0x00, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!(actor.interaction, INTERACT_ANY_SIDE);
+        // Another bit is refused.
+        let code = [
+            0xBD, 0x06, 0x00, 0x09, 0x00, 0x04, 0x9D, 0x06, 0x00, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert!(actor.frozen_at().is_some());
+    }
+
+    #[test]
+    fn cop_99_spawns_as_cop_a2_does() {
+        let code = [2, 0x99, 0x29, 0x80, 0x88, 0x00, 0x40, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.spawns, [(0x08_8029, 0x4000, actor.position)]);
     }
 
     #[test]
