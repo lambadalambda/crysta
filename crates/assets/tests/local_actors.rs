@@ -710,3 +710,17 @@ fn the_broken_blue_door_reopens_cs_stairs_on_every_load() {
     assert_eq!(for_map(image, 0x0C, |_| false), Some(vec![]));
     assert_eq!(for_map(image, 0x0E, |_| true), Some(vec![]), "E has none");
 }
+
+#[test]
+fn decode_at_follows_item_label_calls() {
+    // The tour's requests `$88:B064` and `$88:B0FB` name an item through
+    // `E4 25` (`$92:C5E7`), which only the Pandora profile admitted.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    for source in [0x88_B064, 0x88_B0FB] {
+        let pages = assets::text::HouseDialogue::decode_at(cartridge.image(), source)
+            .unwrap_or_else(|error| panic!("{source:#08x}: {error}"));
+        assert!(!pages.is_empty());
+    }
+}

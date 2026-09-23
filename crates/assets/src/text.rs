@@ -195,14 +195,18 @@ impl HouseDialogue {
     /// `from_rom` compiles a fixed list of qualified sources. This decodes an
     /// arbitrary one, for a caller that found it some other way — an actor
     /// spawn record's script pointer, for instance. It validates the same
-    /// commands, so an address that is not dialogue is rejected rather than
+    /// commands, and also follows the button (`$E3`) and item-label (`$E4`)
+    /// calls the Pandora texts use, still refusing labels outside their
+    /// qualified set. An address that is not dialogue is rejected rather than
     /// returning noise, but a successful decode is not by itself evidence that
     /// the address *is* a text source.
     ///
     /// # Errors
     /// Rejects unsupported addresses, truncation and unsupported commands.
     pub fn decode_at(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
-        decode(image, source)
+        // With the Pandora profile's button and item-label calls, whose
+        // tables refuse what is not qualified.
+        decode_profile(image, source, true)
     }
 
     /// Source-ID lookup. Page index is a stable zero-based key within the text ID;
