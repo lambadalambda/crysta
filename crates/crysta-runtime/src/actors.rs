@@ -14,6 +14,9 @@
 //! lasts as long as the resident's own walking or idle list; see `cadence`.
 
 mod cadence;
+mod ease;
+mod native;
+pub use native::Scratch;
 
 use crate::scene::Globals;
 use assets::maps::actor_script::{
@@ -159,6 +162,12 @@ const NEAR_BRANCH: u8 = 0x0D;
 /// Takes the player's script once no forced action runs (`$097C & $0810`);
 /// `$80:B827`. Operand: the long script.
 const TAKE_PLAYER: u8 = 0xDF;
+/// Plays the pose and ends the script's frame as an `RTL` does; `$80:A395`.
+const ANIMATE_AND_END: u8 = 0x91;
+/// Starts an eased move: pose, then x and y offsets; `$80:9F4C`.
+const EASE_START: u8 = 0xED;
+/// Steps it by a speed each frame until it ends; `$80:9F93`.
+const EASE_STEP: u8 = 0xEE;
 /// Queues a map transfer: map, mode, selector, x, y; `$80:8A23`.
 const TRANSFER: u8 = 0x14;
 /// Inline native code that registers the contact callback: `LDA #target;
@@ -359,6 +368,8 @@ pub struct Actor {
     walked: bool,
     /// The contact callback (`$7F:1010`).
     contact: Option<usize>,
+    /// An eased move `COP ED` started (`$7F:2000..200C`).
+    ease: Option<ease::Ease>,
     /// `+$04` bit `$0200`: the actor takes contact. Set at spawn, as the
     /// box's `$5220` is natively before any script runs; how the loader
     /// derives `+$04` is not traced.
@@ -434,6 +445,7 @@ impl Actor {
             hidden: false,
             walked: false,
             contact: None,
+            ease: None,
             touchable: true,
             pc,
             state,
@@ -644,8 +656,14 @@ impl Actor {
     /// - `LDA $0004,X; ORA/AND #imm; STA $0004,X` on the bits modelled:
     ///   bit 15 hides the actor, bit 9 (`$0200`) arms its contact.
     /// - [`CONTACT`] registers the contact callback.
-    /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`] and [`display_code`].
-    fn native_idiom(&mut self, image: &[u8], bank: usize) -> Option<usize> {
+    /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`], [`display_code`], and runs on
+    ///   script scratch words ([`native::run`]).
+    fn native_idiom(
+        &mut self,
+        image: &[u8],
+        bank: usize,
+        scratch: &mut native::Scratch,
+    ) -> Option<usize> {
         const MODELLED: u16 = 0x8000 | 0x0200;
         let at = self.pc;
         if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
@@ -674,7 +692,9 @@ impl Actor {
         if image.get(at..at + NO_DAMAGE.len()) == Some(&NO_DAMAGE) {
             return Some(at + NO_DAMAGE.len());
         }
-        player_pose_mismatch(image, at).or_else(|| display_code(image, at))
+        player_pose_mismatch(image, at)
+            .or_else(|| display_code(image, at))
+            .or_else(|| native::run(image, at, scratch))
     }
 
     /// The actor with its cell marked, as `COP 3B` would; for tests.
@@ -828,10 +848,13 @@ impl Actor {
                 return Run::Yielded;
             };
             match window[0] {
-                0x02 => {}
+                // COP 91 plays the pose and ends the frame through `PLA; PLA;
+                // RTL` without writing `+$0A` (`$80:A395`): like an RTL, it
+                // comes back to the last `+$0A` a COP 80, ED or BC wrote.
+                0x02 if window[1] != ANIMATE_AND_END => {}
                 // RTL: a callback returns; the actor's own script ends the
                 // frame and comes back at its continuation or where it began.
-                0x6B => {
+                0x02 | 0x6B => {
                     if self.outer.is_some() {
                         return Run::Ended;
                     }
@@ -858,7 +881,8 @@ impl Actor {
                     continue;
                 }
                 _ => {
-                    if let Some(next) = self.native_idiom(image, bank) {
+                    if let Some(next) = self.native_idiom(image, bank, &mut around.globals.scratch)
+                    {
                         self.pc = next;
                         continue;
                     }
@@ -896,6 +920,7 @@ impl Actor {
             | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG | OCCUPY => {
                 return self.script_service(service, operands, around)
             }
+            EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
@@ -918,6 +943,8 @@ impl Actor {
                 if self.pose_list(selector).is_some() {
                     self.pose_age = 0;
                 }
+                // `$80:A1A8` writes `+$0A`: an RTL comes back here.
+                self.continuation = Some(operands + 1);
                 self.pc = operands + 1;
             }
             CLEAR_HFLIP | SET_HFLIP => {
@@ -1669,6 +1696,55 @@ impl Actor {
             return false;
         }
         !moving
+    }
+
+    /// `COP ED` and `COP EE`: an eased move ([`ease::Ease`]). Returns
+    /// whether execution continues this frame.
+    fn ease_service(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        match service {
+            EASE_START => {
+                let (Some(&pose), Some(dx), Some(dy)) = (
+                    image.get(operands),
+                    cadence::word(image, operands + 1),
+                    cadence::word(image, operands + 3),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let hflip = self.hflip;
+                self.set_pose(pose, hflip);
+                // `$80:9F8A` writes `+$0A`, as COP 80 and BC do.
+                self.continuation = Some(operands + 5);
+                self.ease = Some(ease::Ease::new(
+                    self.position,
+                    (dx.cast_signed(), dy.cast_signed()),
+                ));
+                self.pc = operands + 5;
+            }
+            EASE_STEP => {
+                let (Some(&speed), Some(mut ease)) = (image.get(operands), self.ease) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let Some((position, arrived)) = ease.step(image, speed) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.position = position;
+                self.walking = !arrived;
+                self.ease = (!arrived).then_some(ease);
+                if !arrived {
+                    // `$80:9FD1`: the same command again next frame.
+                    return false;
+                }
+                self.pc = operands + 1;
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        }
+        true
     }
 
     /// `COP 0F`, `0D`, `DF` and `14`: the player's position, script and map.

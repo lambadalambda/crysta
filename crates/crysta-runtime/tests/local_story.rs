@@ -656,3 +656,52 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     assert_eq!((world.map(), world.position()), (0x0041, (136, 208)));
     assert_eq!(reading_frames, 14, "one A per page over the four requests");
 }
+
+#[test]
+fn the_guide_tours_44_42_43_and_back_to_41_then_frees_ark() {
+    // `$89:D3B1` and the guide `$89:D2AD` take turns through `$04BC`; the
+    // controller transfers 41 -> 44 -> 42 -> 43 -> 41, sets `$243` on the
+    // last, then `$244` after its last request, and unlocks the pad.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    events[0x22 / 8] |= 1 << (0x22 % 8);
+    let mut world = World::enter_with_events(image, 0x0041, 136, 208, events).unwrap();
+    let mut landings = Vec::new();
+    for _ in 0..3000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        let map = world.map();
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if world.map() != map {
+            landings.push((world.map(), world.position()));
+        }
+        if flag(&world, 0x244) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert_eq!(
+        landings,
+        [
+            (0x0044, (392, 464)),
+            (0x0042, (136, 464)),
+            (0x0043, (392, 208)),
+            (0x0041, (136, 208))
+        ]
+    );
+    assert!(flag(&world, 0x243) && flag(&world, 0x244));
+    assert!(
+        world
+            .frozen_scripts()
+            .iter()
+            .all(|&(_, at)| at == 0x09_D253),
+        "only the graphics controller, whose loads the background compiles: {:x?}",
+        world.frozen_scripts()
+    );
+    // Ark walks again: native `pandora-left-rest`, Left 12 then neutral.
+    replay(&mut world, &[(2, 12), (5, 120)]);
+    assert_eq!(world.position(), (120, 208));
+}

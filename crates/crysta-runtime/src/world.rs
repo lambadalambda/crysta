@@ -988,6 +988,7 @@ impl<'a> World<'a> {
             self.base.room.passive_directional_type8_special_bit_clear(),
         )?;
         entered.globals.items.clone_from(&self.globals.items);
+        entered.globals.scratch.clone_from(&self.globals.scratch);
         // The same first layer is not reloaded: its patches stay, and the
         // load's own patches go on top.
         if entered.base.layer_source == self.base.layer_source {

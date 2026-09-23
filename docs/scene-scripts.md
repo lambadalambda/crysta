@@ -46,6 +46,8 @@ callback on a confirm press when nothing else owns the window.
 | `0D` | `$80:87C2` | facing, 4 cell offsets, target | as `0F`, on the player inside a rectangle of cells around the actor (raw X, raw Y-8, inclusive) |
 | `DF` | `$80:B827` | long script | retries while the player is in a forced action (`$097C & $0810`, the recoil), then takes the player's script; the host player stands |
 | `14` | `$80:8A23` | map, mode, selector, x, y | queues a transfer; the world loads it at the frame's end at (x+8, y+16), keeping the pad mask |
+| `ED` / `EE` | `$80:9F4C` / `9F93` | pose, dx, dy / speed | an eased move: `EE` adds its speed to a phase each frame and places the actor on the cosine table `$81:F462` between start and target, until the phase's bit 7 |
+| `91` | `$80:A395` | — | plays the pose and ends the script's frame as an `RTL` does |
 | `23` / `24` | `$80:8D1E` / `8D0B` | (pose,) target | faces a facing player, takes interaction, jumps; otherwise drops interaction |
 | `C0` | `$80:AAFB` | long target | from a callback, redirects the resident's own script |
 | `06` | `$80:864C` | long target | long jump |
@@ -79,7 +81,10 @@ shadows `$0468..$046B`, the actor's scratch `$7F:201C` and the helper flag
 `$7E:46E6` -- is stepped over; anything else still freezes the script.
 Code that tests the player's animation (`LDA $7F:2016,X` / `$7F:0008,X`
 through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
-mismatch branch: the runtime's Ark only stands and walks. Tile patches
+mismatch branch: the runtime's Ark only stands and walks. Short runs that
+only use script scratch words (`$0440`, `$04BC..$04C3`: `STZ`, `STA`,
+`LDA`, `INC`, `DEC`, `CMP` and branches) execute, as the tour's guide and
+controller take turns through `$04BC`; the words outlive map loads. Tile patches
 survive a move between maps that share the first layer (`B`..`$11`, `$20`),
 because `$86:9145` does not reload it.
 
@@ -136,6 +141,14 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   recoil, `$22` is set and `COP 14` reloads `$21` at (136,368). The native
   route's presses reproduce each step (26805 contact, 26832 rest, the
   opening at (136,368)).
+- **The tour inside the box, `$41`..`$44`**: the reloaded `$21`'s controller
+  (`$88:AE64`) shows four requests and transfers to `$41`; there the
+  controller `$89:D3B1` and the guide `$89:D2AD` take turns through `$04BC`
+  (eased moves, eleven requests), transferring 41 -> 44 -> 42 -> 43 -> 41,
+  setting `$243` on the last and `$244` after the final request. Ark then
+  walks as natively (`pandora-left-rest`). The tour maps load through the
+  Pandora compile (`first_background`). The graphics controller `$89:D253`
+  stays frozen: its loads are the compile's.
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'

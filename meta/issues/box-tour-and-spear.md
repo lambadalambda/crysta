@@ -21,3 +21,12 @@ Inside the box a guide leads a forced tour through `$41..$44` (`$243`, `$244`), 
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Parent: [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
+## Progress
+
+- `$41`..`$44` load (rooms and the app) through the Pandora tour compile.
+- The tour runs from the reloaded `$21` to `$244`: text item-label calls,
+  native scratch-word runs (`$04BC`), eased moves (`COP ED`/`EE`) and
+  `COP 91`. Landings match `COP 14`'s operands; Ark then walks as natively.
+- Remaining: the corridor to the weapon door and `$42`'s spear (`$240`..`$242`,
+  `COP 60` item `$81`), and the return to `$21`.

@@ -40,6 +40,9 @@ pub struct Globals {
     pub player_action: bool,
     /// A map transfer `COP 14` queued: map and player position.
     pub transfer: Option<(u16, u16, u16)>,
+    /// WRAM words scripts keep as their own variables (see
+    /// `actors::native`); they outlive map loads, as WRAM does.
+    pub scratch: crate::actors::Scratch,
     /// Items scripts have given (`COP 54`), in order. The inventory's slots
     /// and limits (`$7F:8000`) are not modelled.
     pub items: Vec<u8>,
@@ -71,6 +74,7 @@ impl Globals {
             pad: 0,
             player_action: false,
             transfer: None,
+            scratch: crate::actors::Scratch::new(),
             items: Vec::new(),
             counters: vec![0; 0x80],
             patches: Vec::new(),
