@@ -21,6 +21,7 @@ baserom.*
 /target/
 # crysta-app sits outside the workspace and keeps its own build directory.
 crates/crysta-app/target/
+crates/crysta-web/target/
 crates/crysta-app/Cargo.lock
 __pycache__/
 *.pyc

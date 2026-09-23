@@ -16,17 +16,27 @@ edition = "2021"
 license = "MIT"
 repository = "https://github.com/lainsoykaf/terranigma"
 
+[features]
+default = ["native"]
+native = ["dep:gilrs", "dep:softbuffer", "dep:winit", "dep:rodio"]
+
+[[bin]]
+name = "crysta-app"
+path = "src/main.rs"
+required-features = ["native"]
+
 [dependencies]
 assets = { path = "../assets" }
 crysta-runtime = { path = "../crysta-runtime" }
 map-inspector = { path = "../map-inspector" }
 rom = { path = "../rom" }
 room-core = { path = "../room-core" }
-gilrs = "0.11"
-softbuffer = "0.4"
-winit = "0.30"
+# The native window's; the web page builds the library without them.
+gilrs = { version = "0.11", optional = true }
+softbuffer = { version = "0.4", optional = true }
+winit = { version = "0.30", optional = true }
 # MIT OR Apache-2.0; PCM playback only, no file codecs.
-rodio = { version = "=0.20.1", default-features = false }
+rodio = { version = "=0.20.1", default-features = false, optional = true }
 # Project MIT wrapper around the existing MIT LakeSnes audio core only.
 spc-player = { path = "spc-player" }
 # MIT OR Apache-2.0; structured local diagnostics, already in the dependency tree.

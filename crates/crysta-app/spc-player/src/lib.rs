@@ -6,6 +6,9 @@
 
 use std::{ffi::c_void, fmt, marker::PhantomData, ptr::NonNull, rc::Rc};
 
+#[cfg(target_arch = "wasm32")]
+mod wasm_libc;
+
 /// Native DSP stereo frames per second (not interleaved sample count).
 pub const SAMPLE_RATE: u32 = 32_000;
 /// Maximum SPC cycles requested per setup call (one nominal second).
