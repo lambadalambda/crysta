@@ -1,6 +1,7 @@
 //! Native audio output, kept entirely outside the simulation.
 
 use crate::music_controls::Controls;
+use crysta_app::music::Synth;
 use crysta_runtime::audio::Cue;
 use rodio::{OutputStream, Sink, Source};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError, TrySendError};
@@ -74,20 +75,6 @@ fn apply_controls(sink: &Sink, controls: Controls) {
     } else {
         sink.pause();
     }
-}
-
-/// What the worker drives: requests go in as they come, PCM comes out.
-pub trait Synth {
-    /// Takes a request.
-    ///
-    /// # Errors
-    /// One the synth cannot follow; the worker stops.
-    fn cue(&mut self, cue: Cue) -> Result<(), String>;
-    /// Fills interleaved stereo.
-    ///
-    /// # Errors
-    /// A backend failure; the worker stops.
-    fn render(&mut self, samples: &mut [i16]) -> Result<(), String>;
 }
 
 /// Messages to the worker.

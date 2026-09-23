@@ -11,10 +11,12 @@ pub struct VisitClock {
 }
 
 impl VisitClock {
+    /// A visit to `map` starting now.
     pub const fn new(map: u16) -> Self {
         Self { map, tick: 0 }
     }
 
+    /// One frame in `map`; another map starts a new visit.
     pub fn advance(&mut self, map: u16) {
         if self.map == map {
             self.tick = self.tick.saturating_add(1);
@@ -23,6 +25,7 @@ impl VisitClock {
         }
     }
 
+    /// Frames into the visit.
     pub const fn tick(&self) -> u64 {
         self.tick
     }
@@ -137,6 +140,7 @@ impl Patches {
 
 /// Static pixels with an optional, bounded map-A animation overlay.
 pub struct CachedBackground {
+    /// The composed first background.
     pub frame: crate::frame::Background,
     /// The part of the shared layer this map's camera may show.
     pub region: CameraRegion,
@@ -191,6 +195,7 @@ impl CachedBackground {
         self.patches.drawn = patched.to_vec();
     }
 
+    /// Advances the animation to `age` frames into the visit.
     pub fn update(&mut self, age: u64) {
         if let Some(animation) = &mut self.animation {
             animation.update(age, &mut self.frame);

@@ -7,7 +7,6 @@
 //! audible; sound effects go out as the NMI hands the latch `$04B6` to ports
 //! 2 and 3 -- on every other frame, with zeros between.
 use crate::music_data::{Driver, Track, TransferGroup, Upload};
-use crate::music_output::Synth;
 use crysta_runtime::audio::Cue;
 use spc_player::Apu;
 use std::collections::VecDeque;
@@ -74,6 +73,20 @@ fn change(stop_parameter: u8, upload: Upload, fade: bool, play: bool) -> Vec<Op>
         ops.extend([Op::Frames(3), Op::Write(0, 0xf4)]);
     }
     ops
+}
+
+/// What the worker drives: requests go in as they come, PCM comes out.
+pub trait Synth {
+    /// Takes a request.
+    ///
+    /// # Errors
+    /// One the synth cannot follow; the worker stops.
+    fn cue(&mut self, cue: Cue) -> std::result::Result<(), String>;
+    /// Fills interleaved stereo.
+    ///
+    /// # Errors
+    /// A backend failure; the worker stops.
+    fn render(&mut self, samples: &mut [i16]) -> std::result::Result<(), String>;
 }
 
 /// The driver with its host: tracks load on request, sound effects play.

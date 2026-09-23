@@ -8,10 +8,14 @@ use std::time::Duration;
 /// ares/sfc/ppu/counter/inline.hpp and ares/ares/ares.hpp. Host pacing only;
 /// this does not reproduce game logic skipped during a native lag frame.
 pub const FRAME_PERIOD: Duration = Duration::from_nanos(16_639_263);
+/// Frames one poll may run to catch up.
 pub const MAX_CATCH_UP: usize = 4;
 
+/// What a poll asks the host to run.
 pub struct Batch {
+    /// Frames due.
     pub steps: usize,
+    /// Whether more were due and were dropped.
     pub dropped_backlog: bool,
 }
 
@@ -21,20 +25,24 @@ pub struct Clock {
 }
 
 impl Clock {
+    /// A clock whose first frame is due one period after `now`.
     pub fn new(now: Duration) -> Self {
         Self {
             next: now + FRAME_PERIOD,
         }
     }
 
+    /// Starts again from `now`.
     pub fn reset(&mut self, now: Duration) {
         *self = Self::new(now);
     }
 
+    /// When the next frame is due.
     pub const fn deadline(&self) -> Duration {
         self.next
     }
 
+    /// The frames due at `now`.
     pub fn poll(&mut self, now: Duration) -> Batch {
         let mut steps = 0;
         while now >= self.next && steps < MAX_CATCH_UP {
