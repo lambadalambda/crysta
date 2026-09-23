@@ -1,6 +1,7 @@
 //! Native audio output, kept entirely outside the simulation.
 
 use crate::music_controls::Controls;
+use crysta_runtime::audio::Cue;
 use rodio::{OutputStream, Sink, Source};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender, TryRecvError, TrySendError};
 use std::thread::JoinHandle;
@@ -75,11 +76,31 @@ fn apply_controls(sink: &Sink, controls: Controls) {
     }
 }
 
+/// What the worker drives: requests go in as they come, PCM comes out.
+pub trait Synth {
+    /// Takes a request.
+    ///
+    /// # Errors
+    /// One the synth cannot follow; the worker stops.
+    fn cue(&mut self, cue: Cue) -> Result<(), String>;
+    /// Fills interleaved stereo.
+    ///
+    /// # Errors
+    /// A backend failure; the worker stops.
+    fn render(&mut self, samples: &mut [i16]) -> Result<(), String>;
+}
+
+/// Messages to the worker.
+enum Message {
+    Controls(Controls),
+    Cue(Cue),
+}
+
 /// Owns the device and generator worker, not a gameplay clock. The factory runs
 /// on that worker so even a non-Send SPC instance never crosses a thread boundary.
 /// Only owned PCM blocks cross into rodio's callback.
 pub struct Music {
-    controls: Option<Sender<Controls>>,
+    controls: Option<Sender<Message>>,
     worker: Option<JoinHandle<()>>,
 }
 
@@ -87,7 +108,7 @@ impl Music {
     pub fn start<F, R>(factory: F) -> Result<Self, String>
     where
         F: FnOnce() -> Result<R, String> + Send + 'static,
-        R: FnMut(&mut [i16]) -> Result<(), String>,
+        R: Synth,
     {
         let (tx, rx) = mpsc::channel();
         let (ready_tx, ready_rx) = mpsc::channel();
@@ -121,10 +142,19 @@ impl Music {
     }
 
     pub fn update(&self, controls: Controls) -> Result<(), String> {
+        self.send(Message::Controls(controls))
+    }
+
+    /// Passes a request from the game on to the synth.
+    pub fn cue(&self, cue: Cue) -> Result<(), String> {
+        self.send(Message::Cue(cue))
+    }
+
+    fn send(&self, message: Message) -> Result<(), String> {
         self.controls
             .as_ref()
             .ok_or("music is closed")?
-            .send(controls)
+            .send(message)
             .map_err(|_| "music worker is no longer running".into())
     }
 }
@@ -140,21 +170,21 @@ impl Drop for Music {
 
 fn run<F, R>(
     factory: F,
-    controls_rx: &Receiver<Controls>,
+    controls_rx: &Receiver<Message>,
     ready: &Sender<Result<(), String>>,
 ) -> Result<(), String>
 where
     F: FnOnce() -> Result<R, String>,
-    R: FnMut(&mut [i16]) -> Result<(), String>,
+    R: Synth,
 {
     let (_stream, handle) = OutputStream::try_default().map_err(|e| e.to_string())?;
     let sink = Sink::try_new(&handle).map_err(|e| e.to_string())?;
-    let mut render = factory()?;
+    let mut synth = factory()?;
     let (pcm_tx, pcm_rx) = mpsc::sync_channel(2);
     // Prime before playback, then keep at most two queued blocks plus one pending.
     for _ in 0..2 {
         let mut block = vec![0; BLOCK_SAMPLES];
-        render(&mut block)?;
+        synth.render(&mut block)?;
         pcm_tx.send(block).map_err(|e| e.to_string())?;
     }
     let mut controls = Controls::default();
@@ -164,9 +194,15 @@ where
     let mut pending = None;
     loop {
         match controls_rx.recv_timeout(Duration::from_millis(2)) {
-            Ok(next) => {
+            Ok(Message::Controls(next)) => {
                 controls = next;
                 apply_controls(&sink, controls);
+            }
+            // A request the synth cannot follow is skipped, not fatal.
+            Ok(Message::Cue(cue)) => {
+                if let Err(error) = synth.cue(cue) {
+                    eprintln!("music request {cue:x?} skipped: {error}");
+                }
             }
             Err(RecvTimeoutError::Disconnected) => return Ok(()),
             Err(RecvTimeoutError::Timeout) => {}
@@ -178,7 +214,7 @@ where
             block
         } else {
             let mut block = vec![0; BLOCK_SAMPLES];
-            render(&mut block)?;
+            synth.render(&mut block)?;
             block
         };
         match pcm_tx.try_send(block) {
@@ -193,6 +229,23 @@ where
 mod tests {
     use super::*;
     use rodio::Source;
+
+    /// Counts the blocks it renders.
+    struct Counted(
+        crate::music::Player,
+        std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    );
+
+    impl Synth for Counted {
+        fn cue(&mut self, cue: Cue) -> Result<(), String> {
+            self.0.cue(cue)
+        }
+        fn render(&mut self, samples: &mut [i16]) -> Result<(), String> {
+            self.0.render(samples)?;
+            self.1.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            Ok(())
+        }
+    }
 
     #[test]
     #[ignore = "requires owned JP ROM (CRYSTA_JP_ROM), a real output device and \
@@ -209,18 +262,16 @@ mod tests {
         }
         let rom = rom::Rom::load(&std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap())
             .unwrap();
-        let data = crate::music_data::extract_crysta_music(&rom).unwrap();
         let count = Arc::new(AtomicUsize::new(0));
         let rendered = Arc::clone(&count);
-        let music = Music::start(move || {
-            let mut apu = crate::music::initialize(&data).map_err(|e| e.to_string())?;
-            Ok(move |samples: &mut [i16]| {
-                apu.render(samples).map_err(|e| e.to_string())?;
-                rendered.fetch_add(1, Ordering::Relaxed);
-                Ok(())
+        let music =
+            Music::start(move || Ok(Counted(crate::start_player(&rom)?, rendered))).unwrap();
+        music
+            .cue(Cue::Track {
+                track: 4,
+                fade: false,
             })
-        })
-        .unwrap();
+            .unwrap();
         std::thread::sleep(Duration::from_secs(2));
         assert!(
             count.load(Ordering::Relaxed) > 8,

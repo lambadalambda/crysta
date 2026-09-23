@@ -147,16 +147,18 @@ fn start_diagnostics(
 }
 
 fn start_music(cartridge: &rom::Rom) -> Result<music_output::Music, String> {
-    let data = music_data::extract_crysta_music(cartridge).map_err(|error| error.to_string())?;
-    music_output::Music::start(move || {
-        let mut player = music::initialize(&data).map_err(|error| error.to_string())?;
-        Ok(move |samples: &mut [i16]| {
-            player
-                .render(samples)
-                .map(|_| ())
-                .map_err(|error| error.to_string())
-        })
+    let cartridge = cartridge.clone();
+    music_output::Music::start(move || start_player(&cartridge))
+}
+
+/// Boots the driver; tracks come from the cartridge as the game asks.
+fn start_player(cartridge: &rom::Rom) -> Result<music::Player, String> {
+    let driver = music_data::extract_driver(cartridge).map_err(|error| error.to_string())?;
+    let cartridge = cartridge.clone();
+    music::Player::new(&driver, move |track| {
+        Ok(music_data::extract_track(&cartridge, track)?)
     })
+    .map_err(|error| error.to_string())
 }
 
 /// Runs a step script and writes the composed view as a PPM.
@@ -654,12 +656,29 @@ impl App {
         }
     }
 
+    /// Passes the game's music and sound requests on to the driver.
+    fn play(&mut self, cues: &[crysta_runtime::audio::Cue]) {
+        let Some(music) = &self.music else {
+            return;
+        };
+        if let Some(error) = cues.iter().find_map(|&cue| music.cue(cue).err()) {
+            self.lose_music(&error);
+            self.update_title();
+        }
+    }
+
+    fn lose_music(&mut self, error: &str) {
+        eprintln!("music unavailable: {error}");
+        self.music = None;
+    }
+
     fn update_music(&mut self) {
-        if let Some(music) = &self.music {
-            if let Err(error) = music.update(self.music_controls) {
-                eprintln!("music unavailable: {error}");
-                self.music = None;
-            }
+        if let Some(Err(error)) = self
+            .music
+            .as_ref()
+            .map(|music| music.update(self.music_controls))
+        {
+            self.lose_music(&error);
         }
         self.record_diagnostic(
             &serde_json::json!({"kind":"host", "event":"music_state",
@@ -922,9 +941,14 @@ impl App {
         let before = (session.world.map(), session.world.position());
         session.advance(direction, interact, cancel);
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
+        let cues = session.world.take_cues();
+        self.play(&cues);
         if self.log.is_some() {
             let mut event = self.session().trace_frame(before, direction, interact);
             event["host_elapsed_ns"] = serde_json::json!(self.started.elapsed().as_nanos());
+            if !cues.is_empty() {
+                event["cues"] = serde_json::json!(format!("{cues:x?}"));
+            }
             self.record_diagnostic(&event, urgent);
         }
         if self.session().fault.is_some() {

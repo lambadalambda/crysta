@@ -1,6 +1,8 @@
-//! Source-only Japanese Crysta music extraction; no captured machine state.
+//! Source-only Japanese music and sound effect extraction; no captured
+//! machine state.
 //!
-//! Only fresh-game selection 3 is qualified. Transfer protocol and evidence are
+//! Selection 3 (track 4) is qualified byte for byte; other tracks share its
+//! framing through the track table. Transfer protocol and evidence are
 //! documented in `tools/native-music-qualification/README.md`.
 
 use std::ops::Range;
@@ -9,9 +11,9 @@ use rom::{Revision, Rom, RuntimeRomAddress};
 
 const MAX_BLOCKS: usize = 16;
 const BOOTSTRAP: usize = 0x06_ac42;
-const MUSIC_LIST_SLOT: usize = 0x06_959c;
 const SAMPLE_POOL: usize = 0x38_8000;
-const LAST_SAMPLE: u8 = 0x1e;
+/// The highest sample ID a selection may name; the pool is scanned to it.
+const LAST_SAMPLE: u8 = 0x7f;
 
 /// One ROM-derived payload to transfer through APU ports, never by RAM injection.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,19 +36,35 @@ pub struct TransferGroup {
     pub terminal_destination: u16,
 }
 
-/// Source-derived recipe for bootstrapping and playing the bounded Crysta track.
+/// Source-derived uploads for one track.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct MusicData {
-    /// Qualified FC music selection, not an SPC command or a general track API.
-    pub selection: u8,
-    /// Parameter for the host's F0 command before replacing music.
-    pub stop_parameter: u8,
+pub struct Upload {
+    /// Sequence, instruments, and directory metadata.
+    pub sequence: TransferGroup,
+    /// Sample payloads in the tail's order.
+    pub samples: TransferGroup,
+}
+
+/// The driver and what it keeps loaded under every track.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Driver {
     /// Initial physical-IPL upload; terminal destination is the driver entry.
     pub bootstrap: TransferGroup,
-    /// Selection-specific sequence, instruments, and directory metadata.
-    pub sequence: TransferGroup,
-    /// Sample payloads in the selection's tail order.
-    pub samples: TransferGroup,
+    /// The sound effect bank (`$C6:2191`): effect sequences and samples 0-B
+    /// below `$76AA`, where every track's sequence starts.
+    pub sounds: Upload,
+}
+
+/// One entry of the track table `$96:F2A0`. A map's `08 FC` selection `n`
+/// plays track `n + 1`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Track {
+    /// The table index, as `COP 30` names it.
+    pub index: u8,
+    /// Parameter for the host's `F0` and `F1` commands before this track.
+    pub stop_parameter: u8,
+    /// The track's uploads.
+    pub upload: Upload,
 }
 
 /// Extraction fails closed on revision, framing, source, or destination errors.
@@ -81,14 +99,15 @@ impl std::error::Error for MusicDataError {}
 
 type Result<T> = std::result::Result<T, MusicDataError>;
 
-/// Extract the initial Crysta selection directly from an authenticated ROM.
-///
-/// This does not execute game code, accept snapshots, access an audio device,
-/// or implement other tracks, effects, or event-dependent music transitions.
-///
-/// # Errors
-/// Rejects unauthenticated/non-Japanese images and invalid bounded framing.
-pub fn extract_crysta_music(rom: &Rom) -> Result<MusicData> {
+/// The track table `$96:F2A0`: a long pointer, then the parameter's low
+/// nibble (`$86:AC26`).
+const TRACKS: usize = 0x16_f2a0;
+/// The last entry that points at a track; later ones are other data.
+const LAST_TRACK: u8 = 0x3b;
+/// The sound effect bank the host uploads before any track.
+const SOUND_BANK: usize = 0x06_2191;
+
+fn authenticated(rom: &Rom) -> Result<&[u8]> {
     let digest = rom.digests();
     if rom.revision() != Revision::Japan
         || digest.sha256 != Revision::Japan.sha256()
@@ -96,21 +115,59 @@ pub fn extract_crysta_music(rom: &Rom) -> Result<MusicData> {
     {
         return Err(MusicDataError::UnsupportedRom);
     }
-    let image = rom.image();
-    let source = selection_source(image)?;
+    Ok(rom.image())
+}
+
+/// Extract the driver and its sound effect bank.
+///
+/// # Errors
+/// Rejects unauthenticated/non-Japanese images and invalid bounded framing.
+pub fn extract_driver(rom: &Rom) -> Result<Driver> {
+    let image = authenticated(rom)?;
     let (bootstrap, _) = inline_group(image, BOOTSTRAP)?;
-    let (sequence, tail) = inline_group(image, source)?;
-    let pool = sample_pool(image, SAMPLE_POOL, LAST_SAMPLE)?;
-    let samples = sample_group(image, tail, sequence.terminal_destination, &pool)?;
-    // $86:AC26 indexes the low nibble of this table with (selection + 1) * 4.
-    let stop_parameter = bytes(image, 0x16_f2a3 + 4 * 4, 1)?[0] & 15;
-    Ok(MusicData {
-        selection: 3,
-        stop_parameter,
+    Ok(Driver {
         bootstrap,
-        sequence,
-        samples,
+        sounds: upload_at(image, SOUND_BANK)?,
     })
+}
+
+/// Extract a track of the table.
+///
+/// # Errors
+/// As [`extract_driver`], and rejects an index the table does not hold.
+pub fn extract_track(rom: &Rom, track: u8) -> Result<Track> {
+    let image = authenticated(rom)?;
+    let (source, stop_parameter) = track_source(image, track)?;
+    Ok(Track {
+        index: track,
+        stop_parameter,
+        upload: upload_at(image, source)?,
+    })
+}
+
+fn track_source(image: &[u8], track: u8) -> Result<(usize, u8)> {
+    if !(1..=LAST_TRACK).contains(&track) {
+        return Err(MusicDataError::Invalid("track outside the table"));
+    }
+    let entry = bytes(image, TRACKS + usize::from(track) * 4, 4)?;
+    let pointer = RuntimeRomAddress::new(u32::from_le_bytes([entry[0], entry[1], entry[2], 0]))
+        .map_err(|_| MusicDataError::Invalid("track pointer"))?;
+    Ok((pointer.normalized().value() as usize, entry[3] & 15))
+}
+
+/// An inline group, then the sample IDs after its terminator
+/// (`$86:AAA9`).
+fn upload_at(image: &[u8], source: usize) -> Result<Upload> {
+    let (sequence, tail) = inline_group(image, source)?;
+    let count = usize::from(bytes(image, tail, 1)?[0]);
+    let last = bytes(image, tail + 1, count)?
+        .iter()
+        .copied()
+        .max()
+        .unwrap_or(0);
+    let pool = sample_pool(image, SAMPLE_POOL, last)?;
+    let samples = sample_group(image, tail, sequence.terminal_destination, &pool)?;
+    Ok(Upload { sequence, samples })
 }
 
 fn bytes(image: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
@@ -122,34 +179,6 @@ fn bytes(image: &[u8], offset: usize, length: usize) -> Result<&[u8]> {
 fn word(image: &[u8], offset: usize) -> Result<u16> {
     let b = bytes(image, offset, 2)?;
     Ok(u16::from_le_bytes([b[0], b[1]]))
-}
-
-fn selection_source(image: &[u8]) -> Result<usize> {
-    let b = bytes(image, MUSIC_LIST_SLOT, 3)?;
-    let list = RuntimeRomAddress::new(u32::from_le_bytes([b[0], b[1], b[2], 0]))
-        .map_err(|_| MusicDataError::Invalid("music list pointer"))?;
-    let start = list.normalized().value() as usize;
-    // $86:9047 scans opcode 02 + five operand bytes. Do not follow arbitrary VM.
-    for index in 0..=3 {
-        let record = bytes(image, start + index * 6, 6)?;
-        if record[0] != 2 || usize::from(record[2]) != index {
-            return Err(MusicDataError::Invalid("selection list order"));
-        }
-        if index == 3 {
-            if record[1] != 1 {
-                return Err(MusicDataError::Invalid(
-                    "selection does not request playback",
-                ));
-            }
-            return assets::maps::scripts::unpack_pointer(
-                [record[3], record[4], record[5]],
-                list.bank(),
-            )
-            .map(|p| p.normalized().value() as usize)
-            .map_err(|_| MusicDataError::Invalid("selection packed pointer"));
-        }
-    }
-    Err(MusicDataError::Invalid("selection not found"))
 }
 
 fn check_destination(destination: u16, length: usize) -> Result<()> {
@@ -307,36 +336,12 @@ mod tests {
     }
 
     #[test]
-    fn selection_source_checks_opcode_order_and_selected_play_flag() {
-        const LIST: usize = 0x08_9000;
-        let mut image = vec![0; LIST + 4 * 6];
-        image[MUSIC_LIST_SLOT..MUSIC_LIST_SLOT + 3].copy_from_slice(&[0x00, 0x90, 0x88]);
-        for index in 0_u8..4 {
-            let start = LIST + usize::from(index) * 6;
-            image[start..start + 6].copy_from_slice(&[2, 1, index, 0x23, 0x81, 0]);
-        }
-        // Synthetic packed pointer: bank increment1, offset0123 -> $89:8123.
-        assert_eq!(selection_source(&image), Ok(0x09_8123));
-        for index in 0..4 {
-            for (field, invalid) in [(0, 3), (2, 4)] {
-                let mut malformed = image.clone();
-                malformed[LIST + index * 6 + field] = invalid;
-                assert_eq!(
-                    selection_source(&malformed),
-                    Err(MusicDataError::Invalid("selection list order")),
-                    "record {index}, field {field}"
-                );
-            }
-        }
-        for invalid in [0, 2] {
-            let mut malformed = image.clone();
-            malformed[LIST + 3 * 6 + 1] = invalid;
-            assert_eq!(
-                selection_source(&malformed),
-                Err(MusicDataError::Invalid(
-                    "selection does not request playback"
-                ))
-            );
+    fn a_track_entry_is_a_long_pointer_and_the_parameters_low_nibble() {
+        let mut image = vec![0; TRACKS + 0x100];
+        image[TRACKS + 4 * 4..TRACKS + 4 * 5].copy_from_slice(&[0x82, 0x8c, 0xaa, 0x27]);
+        assert_eq!(track_source(&image, 4), Ok((0x2a_8c82, 7)));
+        for outside in [0, LAST_TRACK + 1] {
+            assert!(track_source(&image, outside).is_err());
         }
     }
 
@@ -391,7 +396,51 @@ mod tests {
             }],
         )
         .unwrap();
-        assert!(extract_crysta_music(&fake).is_err());
+        assert!(extract_driver(&fake).is_err());
+        assert!(extract_track(&fake, 4).is_err());
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn the_slices_tracks_and_the_sound_bank_extract() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").expect("CRYSTA_JP_ROM")).unwrap();
+        let rom = Rom::load(&bytes).unwrap();
+        // Map selections 0, 1, 3, 5, $1B, and the scenes' $31 and $34.
+        for track in [1, 2, 4, 6, 0x1c, 0x31, 0x34] {
+            let music = extract_track(&rom, track).unwrap();
+            assert!(!music.upload.samples.blocks.is_empty(), "{track:#x}");
+            assert!(music
+                .upload
+                .sequence
+                .blocks
+                .iter()
+                .any(|block| block.destination == 0x76aa));
+        }
+        let sounds = extract_driver(&rom).unwrap().sounds;
+        let destinations = |group: &TransferGroup| -> Vec<(u16, usize)> {
+            group
+                .blocks
+                .iter()
+                .map(|b| (b.destination, b.data.len()))
+                .collect()
+        };
+        assert_eq!(
+            destinations(&sounds.sequence),
+            [
+                (0x1000, 0x48),
+                (0xfe8, 0x18),
+                (0x1100, 0xa30),
+                (0xf00, 0x30)
+            ]
+        );
+        let samples = &sounds.samples.blocks;
+        assert_eq!((samples.len(), samples[0].destination), (12, 0x1b30));
+        let last = samples.last().unwrap();
+        assert_eq!(
+            usize::from(last.destination) + last.data.len(),
+            0x76aa,
+            "the bank ends where tracks start"
+        );
     }
 
     #[test]
@@ -399,16 +448,17 @@ mod tests {
     fn authenticated_local_rom_has_qualified_groups() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").expect("CRYSTA_JP_ROM")).unwrap();
         let rom = Rom::load(&bytes).unwrap();
-        let music = extract_crysta_music(&rom).unwrap();
-        assert_eq!(music.selection, 3);
+        // Selection 3, the bedroom's, is track 4.
+        let music = extract_track(&rom, 4).unwrap();
+        let bootstrap = extract_driver(&rom).unwrap().bootstrap;
         assert_eq!(music.stop_parameter, 7);
-        assert_eq!(music.bootstrap.terminal_destination, 0x300);
-        assert_eq!(music.sequence.terminal_destination, 0x821c);
-        assert_eq!(music.samples.terminal_destination, 0xbdaa);
+        assert_eq!(bootstrap.terminal_destination, 0x300);
+        assert_eq!(music.upload.sequence.terminal_destination, 0x821c);
+        assert_eq!(music.upload.samples.terminal_destination, 0xbdaa);
         let one = |range| std::iter::once(range).collect::<Vec<_>>();
         for (group, expected, expected_ranges) in [
             (
-                &music.bootstrap,
+                &bootstrap,
                 vec![(0x1e0, 0x20), (0x300, 0xbf5), (0xff16, 0x6f)],
                 vec![
                     one(0x06_ac46..0x06_ac66),
@@ -417,7 +467,7 @@ mod tests {
                 ],
             ),
             (
-                &music.sequence,
+                &music.upload.sequence,
                 vec![
                     (0x1048, 0x30),
                     (0xfe8, 0x18),
@@ -438,7 +488,7 @@ mod tests {
                 ],
             ),
             (
-                &music.samples,
+                &music.upload.samples,
                 vec![
                     (0x821c, 0x32a),
                     (0x8546, 0x27f),

@@ -95,7 +95,14 @@ waits corresponding approximately to the host's frame waits, not gameplay):
 5. Render stereo PCM at32000 Hz. Do not run/discard setup cycles during playback.
 
 The repeat FF between groups is needed because each zero-length terminal exits
-its upload session. No additional ROM data, game CPU, or emulator save state is
+its upload session.
+
+Later changes (`crates/crysta-app/src/music.rs`) follow the game's worker
+`$8D:950A` a frame at a time while audio renders: after `F0` the driver answers
+port0=0 only once its echo buffer has drained (some 350 ms), and `COP 31`'s
+fade (`F1`, `$8D:94C5`) takes seconds. Any track comes from the table
+`$96:F2A0`; the sound effect bank `$C6:2191` (samples 0-B from `$1B30` up to
+`$76AA`) is uploaded once after the bootstrap, without `F4`. No additional ROM data, game CPU, or emulator save state is
 needed for this bounded startup.
 
 ## Verification / reproduction
