@@ -143,6 +143,20 @@ pub struct SpawnList {
     map_id: u16,
     entry: u16,
     records: Vec<SpawnRecord>,
+    world_layer: Option<WorldLayerRecord>,
+}
+
+/// A world map's layer record (`$F0`, `$80:F689`): `F0 w h m7sel ptr24`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct WorldLayerRecord {
+    /// Width in pages of 16 cells (`$0826 = w << 8` pixels).
+    pub width_pages: u8,
+    /// Height in pages of 16 cells.
+    pub height_pages: u8,
+    /// The Mode 7 settings byte written to `M7SEL`.
+    pub m7sel: u8,
+    /// Normalized offset of the uncompressed byte-per-cell layer.
+    pub source: usize,
 }
 impl SpawnList {
     /// Decodes one map's spawn stream.
@@ -166,6 +180,7 @@ impl SpawnList {
         // Two-byte list header, skipped by the loader's own INC A / INC A.
         let mut cursor = base + 2;
         let mut records = Vec::new();
+        let mut world_layer = None;
         loop {
             if records.len() > MAX_RECORDS {
                 return Err(ActorError::Budget);
@@ -186,6 +201,15 @@ impl SpawnList {
             let bytes = image
                 .get(cursor..cursor + length)
                 .ok_or(ActorError::Truncated { offset: cursor })?;
+            if opcode == 0xF0 {
+                world_layer = Some(WorldLayerRecord {
+                    width_pages: bytes[1],
+                    height_pages: bytes[2],
+                    m7sel: bytes[3],
+                    source: (usize::from(bytes[6] & 0x3F) << 16)
+                        | usize::from(u16::from_le_bytes([bytes[4], bytes[5]])),
+                });
+            }
             if matches!(opcode, 0x00 | 0x01 | 0xFD) {
                 records.push(SpawnRecord {
                     opcode,
@@ -204,6 +228,7 @@ impl SpawnList {
                     map_id,
                     entry,
                     records,
+                    world_layer,
                 });
             }
         }
@@ -329,6 +354,11 @@ impl SpawnList {
     pub fn records(&self) -> &[SpawnRecord] {
         &self.records
     }
+    /// The world map layer the stream declares, if any.
+    #[must_use]
+    pub const fn world_layer(&self) -> Option<WorldLayerRecord> {
+        self.world_layer
+    }
 }
 
 /// Why a stream could not be resolved against event flags.
@@ -391,7 +421,8 @@ fn record_length(image: &[u8], at: usize, opcode: u8, selector: u8) -> Option<us
         } else {
             10
         }),
-        0xFD => Some(7),
+        // `$F0` (`$80:F689`) is a world map's Mode 7 layer, not an actor.
+        0xFD | 0xF0 => Some(7),
         0xFB | 0xFE => Some(5),
         0xFF => Some(2),
         // `$80:F759` reads a condition word and tests it through `$80:BBC7`,

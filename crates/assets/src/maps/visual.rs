@@ -2,6 +2,7 @@
 pub mod camera;
 pub mod crysta_animation;
 pub mod pandora;
+pub mod world;
 
 use super::{
     scripts::{self, Command, Limits, ResourceKind},
