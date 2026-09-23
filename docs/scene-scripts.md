@@ -175,6 +175,14 @@ their script at bytes 2..4 (`docs/house-scene.md`); the runtime runs them.
 The `FD` record with `$84:A129` is the player's own and is skipped. Stairs
 (selector 14) settle at the raw anchor plus (8,16).
 
+A facing Up at a wooden door's lower cell (low nine bits `$F3`, sampled 24
+pixels above the feet, from a cell-aligned y) runs the door script
+`$87:97CA`: half open at 12 frames, open (`$F7`/`$F6`) at 20, the player
+free at 28. Doors with exits are then walked through, as natively; the
+tour's arches (`$89:DCA4`) transfer on seeing `$F7`. The tour maps use
+room-core's directional candidate, so the corridor in `$41` slides along
+its slopes (types 6/7) to the native rests.
+
 Every map load also applies the flag-gated patch table `$96:CD9D`
 (`$8D:8FB4`): each flag from `$280` owns one primary entry (a tile at a
 cell, or a block copy within the grid) plus continuations, applied when the

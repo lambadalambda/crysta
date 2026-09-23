@@ -20,6 +20,7 @@ use room_core::{
 use std::fmt;
 
 mod contact;
+mod door;
 mod pots;
 pub use pots::{CarriedPot, LIFTED_TILE};
 
@@ -58,6 +59,8 @@ pub struct World<'a> {
     touched: Option<usize>,
     /// The player's recoil from a contact.
     recoil: Option<contact::Recoil>,
+    /// A wooden door the player is opening.
+    opening: Option<door::Opening>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -262,6 +265,7 @@ impl<'a> World<'a> {
             pots: None,
             touched: None,
             recoil: None,
+            opening: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -645,6 +649,11 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        if self.opening.is_some() {
+            self.door_frame()?;
+            self.apply_patches()?;
+            return Ok((Step::Stayed, None));
+        }
         let busy = self.globals.dialogue.busy();
         self.globals.dialogue.press(presses);
         let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
@@ -656,7 +665,7 @@ impl<'a> World<'a> {
         }
         let step = self.step_interactive(direction)?;
         let free = !busy && self.scene.is_none() && !self.globals.dialogue.busy();
-        let opened = if presses.confirm && free && !self.talk() {
+        let opened = if presses.confirm && free && !self.talk() && !self.open_door() {
             Some(self.interact_checked()?)
         } else {
             None
@@ -691,6 +700,7 @@ impl<'a> World<'a> {
     /// Puts the player at a position in this map, standing; for hosts and
     /// tests, like a debug warp. Scripts and patches stay as they are.
     pub fn place(&mut self, x: u16, y: u16) {
+        self.opening = None;
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
     }
@@ -1225,6 +1235,7 @@ mod tests {
             pots: None,
             touched: None,
             recoil: None,
+            opening: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

@@ -705,3 +705,54 @@ fn the_guide_tours_44_42_43_and_back_to_41_then_frees_ark() {
     replay(&mut world, &[(2, 12), (5, 120)]);
     assert_eq!(world.position(), (120, 208));
 }
+
+#[test]
+fn the_corridor_turns_up_to_the_weapon_door_which_opens_by_hand() {
+    // `tools/tower-approach-qualification`: from (120,192), Left 8, Up 32,
+    // Up 32, Left 8, Up 32 with neutral 12 between legs settle at (110,192),
+    // (104,155), (104,109), (94,109), (72,80) -- the last along the slopes.
+    // A at the arch opens its wooden door (`$87:97CA`); the arch script sees
+    // `$F7` (`$89:DCA4`) and moves Ark to `$42` at (136,464).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x0041, 136, 208, events).unwrap();
+    replay(&mut world, &[(2, 12), (5, 120), (1, 12), (5, 120)]);
+    assert_eq!(world.position(), (120, 192));
+    let mut rests = Vec::new();
+    for (pad, frames) in [(2, 8), (1, 32), (1, 32), (2, 8), (1, 32)] {
+        replay(&mut world, &[(pad, frames), (5, 12)]);
+        rests.push(world.position());
+    }
+    assert_eq!(
+        rests,
+        [(110, 192), (104, 155), (104, 109), (94, 109), (72, 80)]
+    );
+    replay(&mut world, &[(5, 108), (4, 6), (5, 180)]);
+    assert_eq!((world.map(), world.position()), (0x0042, (136, 464)));
+}
+
+#[test]
+fn a_door_opens_only_from_a_cell_aligned_position() {
+    // `$87:C7F1`: A under C's wooden door (8,20) opens it from y 352, not
+    // from y 356.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    for (y, opens) in [(352, true), (356, false)] {
+        let mut world = World::enter_with_events(image, 0x000C, 136, y, after_the_door()).unwrap();
+        world.face(Direction::Up);
+        replay(&mut world, &[(4, 1), (5, 30)]);
+        assert_eq!(
+            world.patched_cells().contains(&(8, 20, 0xF7)),
+            opens,
+            "y {y}"
+        );
+    }
+}

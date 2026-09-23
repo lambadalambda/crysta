@@ -300,10 +300,15 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
         .collect();
     let width = u16::try_from(background.layer().width()).unwrap_or(u16::MAX);
     let height = u16::try_from(background.layer().height()).unwrap_or(u16::MAX);
-    let built = Room::new(width, height, cells)
+    let mut built = Room::new(width, height, cells)
         .map_err(|source| RoomError::Refused { map, source })?
         .with_material_policy(qualified_policy(map, width, height))
         .map_err(|source| RoomError::Policy { map, source })?;
+    // The tour's corridor turns along slopes (types 6/7): the directional
+    // candidate reproduces its native legs to (72,80); see `local_story`.
+    if BOX_MAPS.contains(&map) {
+        built = built.with_passive_directional_type8_special_bit_clear();
+    }
     Ok(MapRoom {
         room: built,
         map,
