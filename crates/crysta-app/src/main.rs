@@ -633,24 +633,29 @@ impl Session {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
         frame::mask_outside(frame, camera, region.bounds);
-        if let Some(view) = world.dialogue() {
-            let page = view.page;
-            let dimensions = (usize::from(page.width()), usize::from(page.height()));
-            let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
-            let origin =
-                frame::page_origin(page.placement(), dimensions, player_screen_y, frame.width);
-            frame::draw_page(
-                frame,
-                page.indexed(),
-                dimensions,
-                page.background_index(),
-                origin,
-            );
-            if let Some(cursor) = view.cursor {
-                frame::draw_cursor(frame, origin, cursor);
-            }
-        }
+        frame::dim(frame, world.brightness());
+        draw_dialogue(frame, world, position, camera);
         camera
+    }
+}
+
+/// The dialogue window over the view, placed by the player's screen row.
+fn draw_dialogue(frame: &mut Canvas, world: &World<'_>, position: (u16, u16), camera: (i32, i32)) {
+    if let Some(view) = world.dialogue() {
+        let page = view.page;
+        let dimensions = (usize::from(page.width()), usize::from(page.height()));
+        let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
+        let origin = frame::page_origin(page.placement(), dimensions, player_screen_y, frame.width);
+        frame::draw_page(
+            frame,
+            page.indexed(),
+            dimensions,
+            page.background_index(),
+            origin,
+        );
+        if let Some(cursor) = view.cursor {
+            frame::draw_cursor(frame, origin, cursor);
+        }
     }
 }
 

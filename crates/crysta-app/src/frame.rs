@@ -115,6 +115,19 @@ pub fn mask_outside(canvas: &mut Canvas, camera: (i32, i32), bounds: [u16; 4]) {
     }
 }
 
+/// Scales every channel to a screen brightness, 0 darkest to 15 full, as
+/// the PPU's `INIDISP` does: by (brightness + 1) / 16.
+pub fn dim(canvas: &mut Canvas, brightness: u8) {
+    if brightness >= 15 {
+        return;
+    }
+    let scale = u32::from(brightness) + 1;
+    for pixel in &mut canvas.pixels {
+        let channel = |shift: u32| (((*pixel >> shift) & 0xFF) * scale / 16) << shift;
+        *pixel = channel(16) | channel(8) | channel(0);
+    }
+}
+
 /// Blits a sprite raster at a world position, occluded by the background.
 ///
 /// This is the first-background compositor the browser viewer qualified,
@@ -364,6 +377,17 @@ mod tests {
         let mut canvas = Canvas::new(width);
         canvas.pixels.fill(colour);
         canvas
+    }
+
+    #[test]
+    fn brightness_scales_each_channel_by_a_sixteenth_per_step() {
+        let mut canvas = filled(4, 0x00F0_8010);
+        dim(&mut canvas, 15);
+        assert_eq!(canvas.pixels[0], 0x00F0_8010, "full");
+        dim(&mut canvas, 7);
+        assert_eq!(canvas.pixels[0], 0x0078_4008, "half");
+        dim(&mut canvas, 0);
+        assert_eq!(canvas.pixels[0], 0x0007_0400, "a sixteenth");
     }
 
     #[test]
