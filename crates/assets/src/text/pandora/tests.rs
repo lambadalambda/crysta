@@ -155,7 +155,9 @@ fn transparent_font_transforms_both_planes_and_survives_page_clear() {
         assert_eq!(page.background_index(), 0);
         assert_eq!(page.indexed()[223], 0);
     }
-    assert!(super::super::decode(&image, 0x88_8000).is_err());
+    // The ordinary decoder accepts it too: the Crysta friends' line uses it.
+    let ordinary = super::super::decode(&image, 0x88_8000).unwrap();
+    assert_eq!(&ordinary[0].indexed()[..4], &[0, 1, 2, 0]);
     assert!(
         super::super::decode_profile(&synthetic(&[0xc4, 2, 0x21, 0xd3]), 0x88_8000, true).is_err()
     );

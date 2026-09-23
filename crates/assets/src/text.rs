@@ -510,9 +510,11 @@ fn decode_profile(
             }
             c @ (0xc0 | 0xc1 | 0xda) => d.standard_window(at, c)?,
             0xc2 => d.custom_window(at)?,
+            // `$C4 0` draws the page without its window: the friends' line as
+            // the door breaks, and the Pandora guide's.
             0xc4 => match d.next()? {
                 1 => d.transparent = false,
-                0 if d.pandora => d.transparent = true,
+                0 => d.transparent = true,
                 _ => return Err(invalid(at, "unsupported font transformation")),
             },
             // Timing/sound controls do not change content or acknowledgements.
