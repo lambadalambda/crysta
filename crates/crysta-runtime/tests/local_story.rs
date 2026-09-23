@@ -287,13 +287,10 @@ fn two_hits_break_the_blue_door_and_open_the_stairs() {
         0
     );
     assert!(world.strike(DOOR), "the door takes hits");
+    assert!(!world.strike(DOOR), "not again within sixteen frames");
     frames_until(&mut world, 10, |world| world.pad_locked());
     read_out(&mut world);
     assert!(!flag(&world, 0x292));
-    // Sixteen frames later it can be hit again.
-    for _ in 0..16 {
-        world.update(None, Presses::default()).unwrap();
-    }
     assert!(world.strike(DOOR));
     frames_until(&mut world, 10, |world| flag(world, 0x292));
     read_out(&mut world);

@@ -63,7 +63,7 @@ callback on a confirm press when nothing else owns the window.
 | `44` | `$80:949B` | dx, dy, word | patches that cell: tile in bits 0-8 under its attribute (`(attr & $7F) << 9`), then waits `high >> 2` frames |
 | `65` | `$80:9D25` | target, long return | the actor can be hit; a hit sends its script to the target, 16 frames' cooldown |
 | `66` | `$80:9D5A` | — | returns to `COP 65`'s return address |
-| `4A` | `$80:9713` | counter, word, target | branches when the `$0640` counter holds the word |
+| `4A` | `$80:9713` | counter, word, target | branches when the `$0640` counter holds the word; counter bit 7: exceeds it, bit 6: is below it |
 | `3D` / `3E` | `$80:9327` / `935D` | mode, dx, dy | marks / unmarks a further cell (mode 0: offsets from the actor) |
 | `A2` | `$80:A71B` | long script, flags | spawns an actor running the script; flags bit 15 hides it |
 | `31` / `32` / `33` | `$80:9107` / `913C` / `918F` | 1 / 1 / — | palette-fade helper; not drawn, `33` keeps only its three-frame tail |

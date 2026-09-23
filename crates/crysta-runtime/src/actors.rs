@@ -97,8 +97,9 @@ const PATCH: u8 = 0x44;
 const HIT_TARGET: u8 = 0x65;
 /// Returns from a hit to `COP 65`'s return address; `$80:9D5A`.
 const HIT_RETURN: u8 = 0x66;
-/// Branches when a `COP 4B` counter holds a word; `$80:9713`. Operands: the
-/// counter, the word and the target.
+/// Branches when a `COP 4B` counter holds a word, or with the counter's
+/// bit 7 / 6 exceeds / is below it; `$80:9713`. Operands: the counter, the
+/// word and the target.
 const COUNT_BRANCH: u8 = 0x4A;
 /// Goes on while any of the mask's pad buttons is held (`$0454`), otherwise
 /// jumps; `$80:90C0`.
@@ -488,7 +489,11 @@ impl Actor {
 
     /// A hit (`$85:D5A0` then `$80:CA6D`): the script goes to `COP 65`'s
     /// target, and the actor cannot be hit again for sixteen frames.
+    /// A script that holds the world, froze or is gone takes no hit.
     pub fn strike(&mut self) -> bool {
+        if matches!(self.state, State::Blocked(_) | State::Frozen | State::Gone) {
+            return false;
+        }
         let Some((target, _)) = self.hit.filter(|_| self.cooldown == 0) else {
             return false;
         };
@@ -1084,7 +1089,14 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                if around.globals.counter(counter) == word {
+                // `$80:9713`: bit 7 branches on greater, bit 6 on less, and
+                // equal only without either.
+                let branches = match around.globals.counter(counter).cmp(&word) {
+                    std::cmp::Ordering::Equal => counter & 0xC0 == 0,
+                    std::cmp::Ordering::Greater => counter & 0x80 != 0,
+                    std::cmp::Ordering::Less => counter & 0x40 != 0,
+                };
+                if branches {
                     return self.jump(bank, target);
                 }
                 self.pc = operands + 5;
@@ -2462,6 +2474,48 @@ mod script_service_tests {
             tick_held(&mut actor, &image, pad);
             assert_eq!(actor.selector, selector, "pad {pad:#06x}");
         }
+    }
+
+    #[test]
+    fn cop_4a_branches_on_equal_or_on_its_mode_bits_greater_and_less() {
+        // COP4A op, 3, $8020; pose 7; ...; $8020: pose 9. Counter 2 holds 5.
+        for (op, branches) in [(0x02, false), (0x82, true), (0x42, false), (0xC2, true)] {
+            let mut code = vec![2, 0x4A, op, 3, 0, 0x20, 0x80, 2, 0x80, 7, 2, 0xBD];
+            code.resize(0x20, 0);
+            code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+            let (image, mut actor) = actor_running(&code);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            globals.counters[2] = 5;
+            actor.tick(&mut Surroundings {
+                image: &image,
+                globals: &mut globals,
+                cells: &[],
+                width: 0,
+                height: 0,
+                occupied: &[],
+                player: (0, 0),
+                facing: Direction::Down,
+            });
+            assert_eq!(actor.selector == 9, branches, "op {op:#04x}");
+        }
+    }
+
+    #[test]
+    fn a_hit_does_not_reach_a_script_that_holds_the_world_or_froze() {
+        // COP65 $8010 back $88:8008; COP1F with no text blocks; ...
+        let mut code = vec![2, 0x65, 0x10, 0x80, 0x08, 0x80, 0x88, 2, 0x8E];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert!(actor.hittable());
+        for state in [State::Blocked(Wait::Text), State::Frozen, State::Gone] {
+            let mut held = actor.clone();
+            held.state = state;
+            assert!(!held.strike(), "{state:?}");
+            assert_eq!(held.state, state);
+        }
+        assert!(actor.strike());
     }
 
     #[test]
