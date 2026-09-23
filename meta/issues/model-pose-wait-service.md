@@ -28,3 +28,26 @@ with `COP 8E` are affected too.
 ## Notes
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
+
+## Result
+
+- Handler: `COP 8E` plays the selected list once; the next command runs
+  T(n) = Σ(duration + 1) frames after `COP 80 n; COP 8E`, in the dispatch that
+  meets the list end (any word with bit 15 set). `COP 80` restarts the list.
+- `cadence::pose_ticks` reads every list of the resident's packet (the table
+  runs up to the lowest list it points at; an entry that does not end within
+  sixteen records is `None`). Actors wait T - 1 frames, yield once for T = 1
+  and continue for T = 0; an unknown packet or list keeps the one-frame wait.
+  `COP 80` now resets the pose age on every selection. Walk lists also end at
+  any bit-15 word now; all eight walkers derive as before.
+- Independent review found one regression, fixed: lists were read to 16
+  records while the art decoder reads 64, so map `$1D`'s `$83:919B` (a
+  304-tick pose) fell back to the short wait and, with the restart on every
+  `COP 80`, stuck on its first raster. Lists now read to 64 records, and a
+  same-pose `COP 80` restarts the raster only where the list length is
+  known. A test fails with the old unconditional restart. Table entries that
+  point back into the table now end it.
+- Red: the pure wait test, the same-pose restart test and the town walker's
+  75-tick pose section failed before, and pass after. 46 runtime unit tests,
+  every runtime integration test, workspace fmt/Clippy/tests and 65 app tests
+  with the ROM pass.

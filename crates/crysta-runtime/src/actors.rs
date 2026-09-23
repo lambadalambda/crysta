@@ -168,6 +168,9 @@ pub struct Actor {
     map: u16,
     /// `COP 02`'s loop start and remaining count; one level per actor.
     counted_loop: (usize, u16),
+    /// Ticks of each display list in the actor's packet, which `COP 8E`
+    /// holds for; `None` when the packet is not known.
+    pose_ticks: Option<Vec<Option<u16>>>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -201,6 +204,7 @@ impl Actor {
             cadence: None,
             map: 0,
             counted_loop: (0, 0),
+            pose_ticks: None,
             lengths: vec![None; 256],
         }
     }
@@ -219,6 +223,10 @@ impl Actor {
             .descriptor
             .filter(|_| resident.body)
             .and_then(|descriptor| cadence::derive(image, descriptor).ok());
+        actor.pose_ticks = resident
+            .descriptor
+            .filter(|_| resident.body)
+            .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         actor
     }
 
@@ -390,6 +398,12 @@ impl Actor {
                 };
                 let hflip = self.hflip;
                 self.set_pose(selector, hflip);
+                // `$80:A18C` restarts the list even for the same pose. Only
+                // where its length is known, or a one-frame fallback wait
+                // would hold the raster on its first frame.
+                if self.pose_list(selector).is_some() {
+                    self.pose_age = 0;
+                }
                 self.pc = operands + 1;
             }
             CLEAR_HFLIP | SET_HFLIP => {
@@ -399,8 +413,21 @@ impl Actor {
             }
             WAIT => {
                 self.pc = operands;
-                self.state = State::Waiting(1);
-                return false;
+                // `$80:A32F` plays the selected list once: the next command
+                // runs in the frame its last record ends. Unknown: the old
+                // approximation, resuming two frames later.
+                match self.pose_list(self.selector) {
+                    Some(0) => {}
+                    Some(1) => return false,
+                    Some(ticks) => {
+                        self.state = State::Waiting(ticks - 1);
+                        return false;
+                    }
+                    None => {
+                        self.state = State::Waiting(1);
+                        return false;
+                    }
+                }
             }
             WAIT_STEP => {
                 self.pc = operands;
@@ -467,6 +494,11 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// Ticks of the display list a selector names, when the packet is known.
+    fn pose_list(&self, selector: u8) -> Option<u16> {
+        *self.pose_ticks.as_ref()?.get(usize::from(selector))?
     }
 
     /// `COP 02`. Returns whether execution continues this frame.
@@ -1397,6 +1429,54 @@ mod script_service_tests {
     }
 
     #[test]
+    fn a_pose_wait_plays_the_selected_list_once() {
+        // Pose 6; COP8E; pose 9; COP8E. The command after the first wait
+        // runs in the frame the list's last record ends: F + T.
+        for (ticks, resumes) in [(Some(18u16), 19), (Some(1), 2), (Some(0), 1), (None, 3)] {
+            let (image, mut actor) = actor_running(&[2, 0x80, 6, 2, 0x8E, 2, 0x80, 9, 2, 0x8E]);
+            actor.pose_ticks = ticks.map(|ticks| {
+                let mut lists = vec![Some(5); 10];
+                lists[6] = Some(ticks);
+                lists
+            });
+            for tick_number in 1..=resumes {
+                tick(&mut actor, &image);
+                assert_eq!(
+                    actor.selector == 9,
+                    tick_number == resumes,
+                    "T {ticks:?} tick {tick_number}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_unknown_list_keeps_the_raster_running() {
+        // Pose 1 is outside a one-list table: no restart, the old wait,
+        // looping back to the start with BRA -7.
+        let (image, mut actor) = actor_running(&[2, 0x80, 1, 2, 0x8E, 0x80, 0xF9]);
+        actor.pose_ticks = Some(vec![Some(3)]);
+        for _ in 0..12 {
+            tick(&mut actor, &image);
+        }
+        assert!(actor.pose_age >= 11, "age {}", actor.pose_age);
+    }
+
+    #[test]
+    fn selecting_the_same_pose_restarts_its_list() {
+        let (image, mut actor) = actor_running(&[2, 0x80, 6, 2, 0x8E, 2, 0x80, 6, 2, 0x8E]);
+        actor.pose_ticks = Some(vec![Some(3); 10]);
+        // The second COP80 runs on tick F + 3 = 4.
+        for _ in 0..4 {
+            tick(&mut actor, &image);
+        }
+        assert_eq!(
+            actor.pose_age, 0,
+            "COP80 clears the list index even for the same pose"
+        );
+    }
+
+    #[test]
     fn a_loop_end_without_a_start_freezes_rather_than_running_on() {
         let (image, mut actor) = actor_running(&[2, 0x03, 2, 0x80, 9, 2, 0x8E]);
         tick(&mut actor, &image);
@@ -1493,10 +1573,22 @@ mod script_service_tests {
             let period = pair[1].0 - pair[0].0;
             assert_eq!(period, if pair[0].1 { 33 } else { 17 }, "{pair:?}");
         }
-        // After the sixteenth action the first counted loop ends: pose 6.
-        for _ in 0..40 {
+        // After the sixteenth action the first counted loop ends: four
+        // passes of pose 6's 18-tick list with a loop frame between them,
+        // 3 x 19 + 18 = 75 ticks to the next action, as measured natively.
+        let mut posed = None;
+        for step in 0..200u32 {
+            let was_acting = matches!(actor.state, State::Ordinary { .. });
             actor.tick(&around);
+            if actor.selector == 6 && posed.is_none() {
+                posed = Some(step);
+            }
+            let acting = matches!(actor.state, State::Ordinary { .. });
+            if let Some(start) = posed.filter(|_| acting && !was_acting) {
+                assert_eq!(step - start, 75);
+                return;
+            }
         }
-        assert_eq!(actor.selector, 6);
+        panic!("no action after the pose section");
     }
 }

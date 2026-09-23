@@ -73,7 +73,10 @@ pub(super) fn derive(image: &[u8], descriptor: usize) -> Result<Cadence, Refusal
     {
         return Err(Refusal::Tables);
     }
-    let lists = display_lists(image, packet).ok_or(Refusal::Lists)?;
+    let lists: Vec<u16> = display_lists(image, packet)
+        .and_then(|lists| lists.get(..6)?.iter().copied().collect::<Option<Vec<_>>>())
+        .filter(|lists| lists.iter().all(|ticks| *ticks > 0))
+        .ok_or(Refusal::Lists)?;
     let mut walk = [0; 4];
     for direction in [
         Direction::Down,
@@ -105,30 +108,49 @@ pub(super) fn derive(image: &[u8], descriptor: usize) -> Result<Cadence, Refusal
     })
 }
 
-fn display_lists(image: &[u8], packet: usize) -> Option<[u16; 6]> {
+/// Ticks of every display list of the packet a descriptor names, which a
+/// `COP 8E` pose wait holds for.
+pub(super) fn pose_ticks(image: &[u8], descriptor: usize) -> Option<Vec<Option<u16>>> {
+    display_lists(image, offset(image.get(descriptor..descriptor + 3)?)?)
+}
+
+fn display_lists(image: &[u8], packet: usize) -> Option<Vec<Option<u16>>> {
     list_ticks(&decode(image.get(packet..)?, 0x10000).ok()?.data)
 }
 
-/// Total ticks of each of the six ordinary display lists in a decoded
-/// packet: raw duration + 1 per record (`$80:C72C` pre-decrements), up to
-/// the `$FFFF` terminator. Control records and empty lists refuse.
-fn list_ticks(body: &[u8]) -> Option<[u16; 6]> {
-    let mut lists = [0; 6];
-    for (selector, total) in lists.iter_mut().enumerate() {
-        let mut at = usize::from(word(body, selector * 2)?);
-        for _ in 0..16 {
-            match word(body, at)? {
-                0xFFFF => break,
-                record if record >= 0x8000 => return None,
-                _ => *total += u16::from(body[at]) + 1,
-            }
-            at += 4;
+/// Total ticks of every display list in a decoded packet: raw duration + 1
+/// per record (`$80:C72C` pre-decrements), up to the first word with bit 15
+/// set, which ends a list (`$80:ED75`). The pointer table runs up to the
+/// lowest list it points at, and an entry pointing back into the table ends
+/// it. The last entry may point at frame data rather than a list, so its
+/// total need not mean anything; no slice script selects it. An entry that
+/// does not end within the art decoder's 64 records is `None`.
+fn list_ticks(body: &[u8]) -> Option<Vec<Option<u16>>> {
+    let (mut lists, mut table_end) = (Vec::new(), usize::MAX);
+    while (lists.len() + 1) * 2 <= table_end {
+        let at = usize::from(word(body, lists.len() * 2)?);
+        if at < (lists.len() + 1) * 2 {
+            break;
         }
-        if word(body, at)? != 0xFFFF || *total == 0 {
-            return None;
-        }
+        table_end = table_end.min(at);
+        lists.push(list_total(body, at));
     }
     Some(lists)
+}
+
+/// Records a list may hold, as `assets::sprites` decodes them.
+const MAX_LIST_RECORDS: usize = 64;
+
+fn list_total(body: &[u8], mut at: usize) -> Option<u16> {
+    let mut total = 0;
+    for _ in 0..MAX_LIST_RECORDS {
+        if word(body, at)? >= 0x8000 {
+            return Some(total);
+        }
+        total += u16::from(body[at]) + 1;
+        at += 4;
+    }
+    (word(body, at)? >= 0x8000).then_some(total)
 }
 
 /// Both source load sites put the common resource at `$7F:6000`, and its
@@ -210,19 +232,27 @@ mod tests {
         let d = &[0][..];
         assert_eq!(
             list_ticks(&body([d, d, d, &[7; 4], &[7, 7, 7, 6], &[7, 7]])),
-            Some([1, 1, 1, 32, 31, 16])
+            Some([1, 1, 1, 32, 31, 16].map(Some).to_vec())
         );
-        // Durations of 255 do not wrap: sixteen records are 4096 ticks.
-        assert_eq!(
-            list_ticks(&body([d, d, d, &[255; 16], d, d])).map(|l| l[3]),
-            Some(4096)
-        );
-        // An empty list, a control record, a missing terminator.
-        assert_eq!(list_ticks(&body([d, &[], d, d, d, d])), None);
-        let mut control = body([d; 6]);
-        control[13] = 0x80;
-        assert_eq!(list_ticks(&control), None);
-        assert_eq!(list_ticks(&body([d, d, d, &[0; 17], d, d])), None);
+        // Durations of 255 do not wrap: sixty-four records are 16384 ticks.
+        let long = list_ticks(&body([d, d, d, &[255; 64], d, d])).unwrap();
+        assert_eq!(long[3], Some(16384));
+        // An empty list is zero ticks; any word with bit 15 set ends a list.
+        assert_eq!(list_ticks(&body([d, &[], d, d, d, d])).unwrap()[1], Some(0));
+        let mut control = body([&[3, 3], d, d, d, d, d]);
+        control[17] = 0x80;
+        assert_eq!(list_ticks(&control).unwrap()[0], Some(4));
+        // Up to 64 records, as the art decoder reads them; 65 are no list,
+        // and the other lists still are.
+        let long = list_ticks(&body([d, d, d, &[1; 64], d, d])).unwrap();
+        assert_eq!(long[3], Some(128));
+        let endless = list_ticks(&body([d, d, d, &[0; 65], d, d])).unwrap();
+        assert_eq!((endless[3], endless[4]), (None, Some(1)));
+        // A pointer back into the table ends it: none, or a zero pointer.
+        let mut into = body([d; 6]);
+        into[4..6].copy_from_slice(&2u16.to_le_bytes());
+        assert_eq!(list_ticks(&into).map(|lists| lists.len()), Some(2));
+        assert_eq!(list_ticks(&[0, 0, 0xFF, 0xFF]), Some(vec![]));
         assert_eq!(list_ticks(&[]), None);
     }
 

@@ -113,6 +113,16 @@ movement base or bank, stream pointers, the +`$04` movement bits, +`$06` bit
 - `COP 0A word target` (`$80:8720`): branches when `word & $7FFF` equals
   `$047E`, the map; bit 15 inverts. It does not yield: a taken branch
   continues at the target in the same frame.
+- `COP 80 n` (`$80:A18C`): `$7F:0008` = n, +`$20` = 0, clears
+  `$7F:0014/16`; continues in the same frame.
+- `COP 8E` (`$80:A32F`): calls `$80:ED75` one record at a time and yields
+  with the script pointer left on itself; the record's duration goes to
+  +`$0E`, so it lasts d+1 frames. Any list word with bit 15 set ends the list
+  (`$80:ED51`), and the script continues in that same dispatch: the command
+  after `COP 80 n; COP 8E` runs T(n) = Σ(d+1) frames later. +`$22` is not
+  used. Natively, packet `$D4:7890`'s poses 6/7/8 are `7,4,4` (18 frames);
+  the town walker's `{COP 23, COP 80 6, COP 8E, COP 03} x 4` spans frames
+  11674..11749, 3 x 19 + 18 = 75.
 - `COP 21`, `3B`, `65`, `BB` write the interaction script, cell occupancy,
   the collision callback (+`$04 |= $0200`) and +`$08` bits under `$0E00`
   respectively.

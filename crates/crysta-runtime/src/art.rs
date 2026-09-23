@@ -239,7 +239,8 @@ impl Animation {
     /// it to resolve, so a resident cycles their records for as long as they
     /// stand there. $80:EDA0 stores the raw duration at actor+$0E, and
     /// $80:C72C decrements before testing negative: zero therefore lasts one
-    /// tick. Looping/reselection is still a host policy, not a full script VM.
+    /// tick. The resident's script restarts a list with `COP 80` and waits for
+    /// it with `COP 8E`; the loop here stands in only where it does not.
     #[must_use]
     pub fn frame_at(&self, tick: u64) -> &Raster {
         let total: u64 = self.durations.iter().map(|d| u64::from(*d) + 1).sum();

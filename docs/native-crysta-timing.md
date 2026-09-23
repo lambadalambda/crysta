@@ -122,9 +122,13 @@ revoke it.
 The interpreter also executes the loop and wait services these scripts use:
 `COP 02 n`/`COP 03` as a one-level counted loop whose loop-back yields one
 frame, `COP C1 n` as an n-frame suspension, and `COP 0A` as the map branch.
+`COP 8E` (`$80:A32F`) plays the selected display list once, and the next
+command runs in the frame its last record ends: Σ(duration + 1) of that list,
+read from the resident's own packet (`COP 80` restarts the list, even for the
+same pose). A resident whose packet is not known keeps a one-frame wait.
 The town walker `$83:8A2D` therefore repeats every 33 ticks after a step and
-17 after an idle, as witnessed natively, and plays its pose 6/7/8 section
-after sixteen actions. `COP 8E` waits remain the one-frame approximation.
+17 after an idle, and its pose 6/7/8 sections last 3 x 19 + 18 = 75 ticks,
+all as witnessed natively.
 
 Reusable evidence tools and reproduction commands are in
 [`tools/crysta-cadence-qualification`](../tools/crysta-cadence-qualification/README.md).

@@ -104,3 +104,4 @@
 - [x] [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)
 - [x] [Fix stale evidence paths in the cadence tool README](issues/fix-cadence-tool-readme-paths.md)
 - [x] [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)
+- [x] [Model the COP 8E pose wait from source](issues/model-pose-wait-service.md)
