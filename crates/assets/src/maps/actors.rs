@@ -120,7 +120,7 @@ impl SpawnRecord {
     #[must_use]
     pub fn script(&self) -> Option<u32> {
         // An `FE` controller has no position bytes: its pointer is bytes 2..4.
-        let field = if self.opcode == 0xFE {
+        let field = if matches!(self.opcode, 0xFB | 0xFE) {
             self.bytes.get(2..5)?
         } else {
             self.bytes.get(4..7)?
@@ -131,7 +131,8 @@ impl SpawnRecord {
         // cannot disagree on an accepted address: a pointer whose low word is
         // at least `$FFFB` carries into the next bank and lands below `$8000`,
         // which the predicate below rejects either way.
-        let start = pointer.checked_add(5)?;
+        // A compact actor's header is three bytes (`docs/house-scene.md`).
+        let start = pointer.checked_add(if self.opcode == 0xFB { 3 } else { 5 })?;
         ((0x80..=0xBF).contains(&(start >> 16)) && start & 0xFFFF >= 0x8000).then_some(start)
     }
 }
@@ -258,7 +259,7 @@ impl SpawnList {
                 }),
                 // A script-only controller: implicit descriptor, spawned at
                 // (8,0) (`docs/house-scene.md`).
-                0xFE => records.push(SpawnRecord {
+                0xFB | 0xFE => records.push(SpawnRecord {
                     opcode,
                     tile_x: 0,
                     tile_y: 0,

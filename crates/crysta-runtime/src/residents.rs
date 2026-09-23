@@ -100,6 +100,12 @@ pub enum Conversation {
 /// owns the player (`docs/house-scene.md`).
 const PLAYER: u32 = 0x84_A12E;
 
+/// `FB` compact services that loop over the engine's per-frame tile and
+/// palette animation routines (`$8D:93xx`, `docs/house-scene.md`'s **C**):
+/// display work, not scripts. Other compact actors, such as the town's
+/// scene `$88:84EF`, are scripts and run.
+const SERVICES: [u32; 2] = [0x87_98C2, 0x87_98EB];
+
 /// Residents a map installs for a given event-flag state.
 ///
 /// The spawn list's own `$FA` conditions choose which records are installed.
@@ -141,7 +147,12 @@ pub fn residents(
                 hidden: false,
             }
         })
-        .filter(|resident| resident.script != Some(PLAYER) && !despawns(image, resident, events))
+        .filter(|resident| {
+            resident
+                .script
+                .is_none_or(|script| script != PLAYER && !SERVICES.contains(&script))
+                && !despawns(image, resident, events)
+        })
         .collect())
 }
 

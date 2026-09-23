@@ -735,3 +735,25 @@ fn a_close_at_once_ends_the_spear_presentation_without_a_page() {
     let pages = assets::text::HouseDialogue::decode_at(cartridge.image(), 0x88_D165).unwrap();
     assert!(pages.is_empty());
 }
+
+#[test]
+fn the_town_resolves_its_fb_compact_actors() {
+    // `$838A6E` FB `$8884EC` -> `$8884EF`: the town scene after the Elder's
+    // mission (`COP 09 $1296 $003C`); compact headers are three bytes.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let flags = new_game_flags();
+    let active = SpawnList::resolve(
+        cartridge.image(),
+        0x000A,
+        assets::maps::scripts::EventFlags::Bitmap(&flags),
+    )
+    .unwrap();
+    let scene = active
+        .iter()
+        .find(|record| record.offset() == 0x03_8A6E)
+        .expect("the FB record");
+    assert_eq!(scene.opcode(), 0xFB);
+    assert_eq!(scene.script(), Some(0x88_84EF));
+}
