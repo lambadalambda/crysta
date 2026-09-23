@@ -407,6 +407,11 @@ fn operand_lengths_come_from_the_handlers() {
     // $80:8D0B advances once, an odd length the stream confirms: `02 24 06 78
     // 8e` is followed by `02 b6`.
     assert_eq!(operand_length(image, 0x24), Some(3));
+    // $80:BC2F reads a tile coordinate from the stream inside a call. COP 13
+    // takes a column and a row through it plus a facing byte: `02 13 0b 1a
+    // 01` is followed by `02 08`. COP 0F reads two through it.
+    assert_eq!(operand_length(image, 0x13), Some(3));
+    assert_eq!(operand_length(image, 0x0F), Some(5));
 }
 
 #[test]

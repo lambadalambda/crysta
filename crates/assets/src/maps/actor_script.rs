@@ -295,6 +295,13 @@ pub fn operand_length(image: &[u8], service: u8) -> Option<usize> {
     None
 }
 
+/// Bank-`$80` subroutines that consume stream bytes, with how many. The
+/// derivation does not follow calls; these it counts.
+///
+/// `$80:BC2F` reads one signed tile coordinate (`LDA [$36]; INC $36`) and
+/// returns it times 16; `COP 13` reads its column and row through it.
+const STREAM_READERS: [(u16, isize); 1] = [(0xBC2F, 1)];
+
 /// Paths one handler's exploration may visit.
 const MAX_PATHS: usize = 512;
 /// Instructions one path may walk.
@@ -370,6 +377,14 @@ fn explore(
         let operand = image.get(cursor + 1).copied();
         let next = crate::cpu::step(image, cursor, &mut widths)?;
         match opcode {
+            // A subroutine that reads the stream itself.
+            0x20 => {
+                let target = image.get(cursor + 1..cursor + 3)?;
+                let target = u16::from_le_bytes([target[0], target[1]]);
+                if let Some(&(_, read)) = STREAM_READERS.iter().find(|(at, _)| *at == target) {
+                    advance += read;
+                }
+            }
             // INC $36 / DEC $36 move the stream pointer itself.
             0xE6 if operand == Some(0x36) => advance += 1,
             0xC6 if operand == Some(0x36) => advance -= 1,
