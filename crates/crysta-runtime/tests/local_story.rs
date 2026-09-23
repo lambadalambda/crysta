@@ -852,7 +852,8 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
 fn the_stairs_lead_back_up_from_the_box_room_to_c() {
     // Selector 13 back up: `$21` (8,6) -> `$20`, `$20` (25,53) -> E, E (9,53)
     // -> C, each Up-only type 29 (`$3ACA`). Natively E (104,880) and C
-    // (184,368) are the raw anchor plus (8,16); `$20` rests at (360,872).
+    // (184,368) are the raw anchor plus (8,16). `$20` rests natively at
+    // (360,872); (360,880) here is a known gap, not a qualified value.
     let Some(cartridge) = owned_rom() else {
         return;
     };

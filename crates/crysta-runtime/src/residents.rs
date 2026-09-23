@@ -101,10 +101,11 @@ pub enum Conversation {
 const PLAYER: u32 = 0x84_A12E;
 
 /// `FB` compact services that loop over the engine's per-frame tile and
-/// palette animation routines (`$8D:93xx`, `docs/house-scene.md`'s **C**):
-/// display work, not scripts. Other compact actors, such as the town's
-/// scene `$88:84EF`, are scripts and run.
-const SERVICES: [u32; 2] = [0x87_98C2, 0x87_98EB];
+/// palette animation (`$8D:93xx`, `docs/house-scene.md`'s **C**; `$17` and
+/// `$19`'s pair until flag `$35`, `COP 8A`/`93`, `8C`/`95`): display work,
+/// not scripts. Other compact actors, such as the town's scene `$88:84EF`,
+/// are scripts and run.
+const SERVICES: [u32; 4] = [0x87_98C2, 0x87_98EB, 0x88_C697, 0x88_C6B8];
 
 /// Residents a map installs for a given event-flag state.
 ///

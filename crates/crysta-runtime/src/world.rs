@@ -976,9 +976,11 @@ impl<'a> World<'a> {
         }
         let (x, y) = match arrival {
             Some(arrival) => arrival.position(),
-            // Stairs settle at the raw anchor plus (8,16): `$8D:89BD`'s
-            // selector adjustment, then the stair walk back by the same. Up
-            // (13) as natively into E and C; into `$20` natively (8,8).
+            // Stairs down (14) settle at the raw anchor plus (8,16):
+            // `$8D:89BD`'s adjustment (-14,-23) and the stair walk back by
+            // the same. Up (13, `$8D:89B9`: (8,-6)) lands there too natively
+            // into E and C, but into `$20` at (8,8): the walk's end is not
+            // modelled, and this is the fit.
             None if matches!(record.selector(), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)

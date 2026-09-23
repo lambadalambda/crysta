@@ -257,8 +257,9 @@ impl SpawnList {
                     bytes: bytes.to_vec(),
                     offset: cursor,
                 }),
-                // A script-only controller: implicit descriptor, spawned at
-                // (8,0) (`docs/house-scene.md`).
+                // Script-only actors: `FE` controllers (implicit descriptor,
+                // spawned at (8,0), `docs/house-scene.md`) and `FB` compact
+                // actors (`$80:F6E6`: no position; (8,0) here, bodiless).
                 0xFB | 0xFE => records.push(SpawnRecord {
                     opcode,
                     tile_x: 0,
