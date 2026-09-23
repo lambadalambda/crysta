@@ -31,7 +31,8 @@ use winit::keyboard::{KeyCode, PhysicalKey};
 use winit::window::{Window, WindowId};
 
 /// Map the player starts in, and where: fresh startup places them at
-/// `(304,112)` in bedroom `$000F` (`docs/new-game-bootstrap.md`).
+/// `(304,112)` in bedroom `$000F` (`docs/new-game-bootstrap.md`), where Elle
+/// wakes them. The prologue title card before it is not shown.
 const START: (u16, u16, u16) = (0x000F, 304, 112);
 
 /// What a resident whose art was refused is drawn as: a block, so that
@@ -298,7 +299,15 @@ struct Session {
 impl Session {
     fn new(image: &'static [u8]) -> Self {
         Self {
-            world: World::enter(image, START.0, START.1, START.2).expect("the opening house"),
+            // A new game, before Elle wakes Ark.
+            world: World::enter_with_events(
+                image,
+                START.0,
+                START.1,
+                START.2,
+                crysta_runtime::world::fresh_game_flags(),
+            )
+            .expect("the opening house"),
             image,
             atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
             backgrounds: HashMap::new(),
@@ -500,6 +509,9 @@ impl Session {
                 continue;
             }
             let resident = &residents[index];
+            if resident.hidden {
+                continue;
+            }
             let placeholder = |frame: &mut Canvas| {
                 let (x, y) = (
                     i32::from(resident.position.0) - camera.0,
