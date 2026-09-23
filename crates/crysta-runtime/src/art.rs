@@ -354,10 +354,30 @@ pub fn residents_art(
                 Some(Err(RecordRefusal::Invalid(error))) => {
                     Err(Placeholder::Refused(error.to_string()))
                 }
+                Some(Ok(_)) if sets_own_art(image, resident) => Err(Placeholder::Refused(
+                    "the script sets its own art base (`COP D8`)".into(),
+                )),
                 Some(Ok(actor)) => Ok(Body { actor }),
             }
         })
         .collect()
+}
+
+/// Whether a resident's script opens by pointing its art elsewhere (`COP D8`,
+/// after an optional `COP B2` offset), as the spear's display `$89:D9FE`
+/// does: then its descriptor, often reused from the record before, is not
+/// what it draws.
+fn sets_own_art(image: &[u8], resident: &Resident) -> bool {
+    let Some(start) = resident
+        .script
+        .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
+    else {
+        return false;
+    };
+    let Some(code) = image.get(start..start + 6) else {
+        return false;
+    };
+    code[..2] == [2, 0xD8] || (code[..2] == [2, 0xB2] && code[4..6] == [2, 0xD8])
 }
 
 #[cfg(test)]

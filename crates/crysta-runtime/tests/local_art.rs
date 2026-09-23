@@ -356,3 +356,35 @@ fn a_roster_keeps_its_bodies_after_a_conversation_changes_the_flags() {
     }
     assert!(checked > 20);
 }
+
+#[test]
+fn yomi_draws_in_the_weapons_room_and_the_spears_display_does_not_borrow_it() {
+    // Yomi's descriptor `$83:F8A8` has mode `$0023`; the spear's display
+    // `$83:957C` reuses it but sets its own art base (`$89:D9FE`: `COP B2`,
+    // `COP D8 $A2C000`), so borrowing Yomi's body would be wrong.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let flags = new_game();
+    let present = residents(image, 0x0042, EventFlags::Bitmap(&flags)).unwrap();
+    let art = residents_art(
+        image,
+        0x0042,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
+    let of = |record: usize| {
+        present
+            .iter()
+            .position(|resident| resident.record == record)
+            .map(|index| &art[index])
+            .expect("present")
+    };
+    assert!(of(0x03_9572).is_ok(), "Yomi");
+    assert!(
+        matches!(of(0x03_957C), Err(Placeholder::Refused(_))),
+        "the spear's display"
+    );
+}

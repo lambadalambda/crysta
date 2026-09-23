@@ -796,8 +796,10 @@ impl<'a> Loader<'a> {
         let extra = match prefix[3..5] {
             // $0022 (Crysta birds, $83:ED37) has no movement pointer, like $0020;
             // nor has $00A0 (Elle, $83:F881), whose bit 7 streams her frames
-            // through WRAM instead of VRAM -- the same pixels.
-            [0x20 | 0x22 | 0xA0, 0] => 0,
+            // through WRAM instead of VRAM -- the same pixels. $0023 (Yomi,
+            // $83:F8A8) and $00A3 ($83:F8C0) differ only in the idle class,
+            // the low nibble (`$80:FAA4`).
+            [0x20 | 0x22 | 0x23 | 0xA0 | 0xA3, 0] => 0,
             [0, 0] => 3,
             _ => return Err(SpriteError::Invalid("unsupported house movement resource")),
         };

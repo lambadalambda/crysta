@@ -317,9 +317,17 @@ fn mode_0022_has_no_extra_movement_pointer_and_keeps_resource_guards() {
     assert_eq!(actor.palette(), reused.palette());
     assert!(std::ptr::eq(actor.graphics(), reused.graphics()));
     assert!(actor.source_ranges().contains(&(0x3_ed5a..0x3_ed67)));
+    // `$0023` (Yomi, `$83:F8A8`) and `$00A3` (`$83:F8C0`) have no movement
+    // pointer either: the low nibble is the idle class, bit 7 streams frames.
+    for mode in [0x23, 0xA3] {
+        let mut admitted = r.clone();
+        admitted[0x3_ed5a + 3] = mode;
+        let scenes = HouseScenes::residents_from_rom(&admitted).unwrap();
+        assert_eq!(scenes.actor(0x83_8c0a).unwrap().palette_base(), 208);
+    }
     for (at, value) in [
         (0x3_ed5a + 3, 0x21), // Unsupported neighboring modes stay refused.
-        (0x3_ed5a + 3, 0x23),
+        (0x3_ed5a + 3, 0x24),
         (0x3_ed5a + 4, 1),
         (0x3_ed5a + 7, 1), // Palette transfer shape.
         (0x3_ed5a + 8, 7), // Palette destination.
