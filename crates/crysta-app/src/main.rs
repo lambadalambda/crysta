@@ -14,10 +14,12 @@ mod music_controls;
 mod music_data;
 mod music_output;
 
+use assets::sprites::{PandoraCarryMotion, PandoraSprites};
+use crysta_runtime::art::CarryArt;
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder, Raster};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::scene::Presses;
-use crysta_runtime::world::{Step, World, LIFTED_TILE};
+use crysta_runtime::world::{Step, World};
 use frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use gilrs::{Axis, Button, Gilrs};
 use room_core::Direction;
@@ -274,6 +276,9 @@ fn screenshot(
 /// resident's pose comes from their walked script, which branches on them.
 type RosterArt = (u16, Vec<usize>, Vec<u8>, Vec<Result<Body, Placeholder>>);
 
+/// A raster and the world point it stands on.
+type Placed = ((u16, u16), Raster);
+
 /// The running world plus what it needs to draw.
 struct Session {
     world: World<'static>,
@@ -287,6 +292,11 @@ struct Session {
     /// Rasterized sequences by record, selector and mirror; `None` when the
     /// packet has no such sequence.
     sprites: HashMap<(usize, u8, bool), Option<Animation>>,
+    /// Ark's carry poses and the pots; `None` when the decoder refused them,
+    /// and then Ark carries in his ordinary frames and no pot is drawn.
+    carry_art: Option<CarryArt>,
+    /// Rasterized carry lists by art, selector and mirror.
+    carry_frames: HashMap<(u32, u8, bool), Option<Animation>>,
     /// The direction held last frame, so a new one reads as a press.
     last_direction: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
@@ -316,6 +326,10 @@ impl Session {
             background_clock: background::VisitClock::new(START.0),
             art: None,
             sprites: HashMap::new(),
+            carry_art: CarryArt::from_rom(image)
+                .inspect_err(|error| eprintln!("carry poses unavailable: {error}"))
+                .ok(),
+            carry_frames: HashMap::new(),
             last_direction: None,
             tick: 0,
             last_step: None,
@@ -465,6 +479,68 @@ impl Session {
             .map_or(&[], |(_, _, _, art)| art.as_slice())
     }
 
+    /// A carry list's frame `tick` frames in, decoded once per list; a
+    /// `once` list holds its last frame rather than looping.
+    fn carry_frame(
+        &mut self,
+        (art, selector, hflip): (u32, u8, bool),
+        tick: u64,
+        once: bool,
+    ) -> Option<Raster> {
+        let carry_art = &self.carry_art;
+        self.carry_frames
+            .entry((art, selector, hflip))
+            .or_insert_with(|| carry_art.as_ref()?.animation(art, selector, hflip).ok())
+            .as_ref()
+            .map(|animation| {
+                if once {
+                    animation.frame_once(tick)
+                } else {
+                    animation.frame_at(tick)
+                }
+                .clone()
+            })
+    }
+
+    /// Ark's carry pose while he lifts, holds or throws a pot, and the pot:
+    /// in hand at Ark's origin (its frames carry the height), then along its
+    /// flight.
+    fn carry_sprites(&mut self) -> (Option<Raster>, Option<Placed>) {
+        let carry = self.world.carry().and_then(|carry| {
+            let pose = PandoraSprites::carry_pose(carry.motion, carry.facing)?;
+            // The lift and the throw run once from their start; holding loops.
+            let once = matches!(
+                carry.motion,
+                PandoraCarryMotion::Lifting | PandoraCarryMotion::Throwing
+            );
+            let tick = if once {
+                u64::from(carry.tick)
+            } else {
+                self.tick
+            };
+            Some((pose, tick, once))
+        });
+        let ark = carry.and_then(|(pose, tick, once)| {
+            self.carry_frame(
+                (pose.ark_art, pose.ark_selector, pose.ark_hflip),
+                tick,
+                once,
+            )
+        });
+        let pot = self.world.pot().and_then(|pot| match (pot.flight, carry) {
+            (Some(at), _) => Some((
+                at,
+                self.carry_frame((pot.art, CarryArt::FLIGHT, false), self.tick, false)?,
+            )),
+            (None, Some((pose, tick, once))) => Some((
+                self.world.position(),
+                self.carry_frame((pot.art, pose.pot_selector, pose.pot_hflip), tick, once)?,
+            )),
+            (None, None) => None,
+        });
+        (ark, pot)
+    }
+
     /// Composes the view: background, depth-sorted sprites, then dialogue.
     ///
     /// Depth is world Y, ties broken by spawn order with later records first
@@ -472,29 +548,11 @@ impl Session {
     /// count includes residents that draw nothing, which keeps the relative
     /// order and only inflates the player's rank. Whatever lies outside the
     /// map's region is blanked before the dialogue goes on top.
-    /// The pot Ark carries or threw, and where it is drawn: over Ark's head,
-    /// then along its flight at the same height. A presentation choice until
-    /// the pot's own sprite is decoded.
-    fn pot_sprite(&mut self, cartridge: &rom::Rom) -> Option<((u16, u16), Raster)> {
-        let pot = self.world.pot()?;
-        let map = self.world.map();
-        let raster = self.backgrounds.get_mut(&map)?.lifted_raster(
-            cartridge.image(),
-            map,
-            (pot.tile, LIFTED_TILE),
-        )?;
-        let (x, y) = self.world.position();
-        let at = pot
-            .flight
-            .map_or((x, y.saturating_sub(20)), |(x, y)| (x, y.saturating_sub(9)));
-        Some((at, raster))
-    }
-
     fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
         frame.pixels.fill(0);
         self.ensure_background(cartridge);
         self.ensure_art();
-        let pot = self.pot_sprite(cartridge);
+        let (carried, pot) = self.carry_sprites();
         let Session {
             world,
             backgrounds,
@@ -504,7 +562,9 @@ impl Session {
             ..
         } = self;
         let position = world.position();
-        let player = atlas.frame(world.animation());
+        let player = carried
+            .as_ref()
+            .unwrap_or_else(|| atlas.frame(world.animation()));
         let residents = world.residents();
         let bodies: &[Result<Body, Placeholder>] =
             art.as_ref().map_or(&[], |(_, _, _, art)| art.as_slice());

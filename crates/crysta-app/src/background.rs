@@ -191,37 +191,6 @@ impl CachedBackground {
         self.patches.drawn = patched.to_vec();
     }
 
-    /// A lifted object's metatile as a sprite standing on its bottom centre,
-    /// cut out of the floor it leaves (`floor`): a stand-in for a pot until
-    /// its own sprite (`COP D8 $A2C000`) is decoded.
-    pub fn lifted_raster(
-        &mut self,
-        image: &[u8],
-        map: u16,
-        (tile, floor): (u16, u16),
-    ) -> Option<crysta_runtime::art::Raster> {
-        let scene = self.patches.scene(image, map)?;
-        let under = metatile_pixels(scene, floor)?;
-        let pixels = metatile_pixels(scene, tile)?
-            .into_iter()
-            .zip(under)
-            .enumerate()
-            .map(|(at, ((index, _), (floor, _)))| {
-                if index == floor {
-                    0
-                } else {
-                    0xFF00_0000 | static_rgb(index, scene, (at % 16, at / 16))
-                }
-            })
-            .collect();
-        Some(crysta_runtime::art::Raster {
-            width: 16,
-            height: 16,
-            offset: (-8, -16),
-            pixels,
-        })
-    }
-
     pub fn update(&mut self, age: u64) {
         if let Some(animation) = &mut self.animation {
             animation.update(age, &mut self.frame);
@@ -573,29 +542,5 @@ mod patch_tests {
         let (x, y) = (536, 530);
         let expected = super::rgb(world.color(world.pixel(x, y)));
         assert_eq!(loaded.frame.pixels[y * 1024 + x], expected);
-    }
-
-    #[test]
-    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
-    fn a_pot_tile_is_a_sprite_standing_on_its_bottom_centre() {
-        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
-        let rom = rom::Rom::load(&bytes).unwrap();
-        let mut cached = super::load(&rom, 0xC).unwrap();
-        let pot = cached
-            .lifted_raster(rom.image(), 0xC, (0xFA, 0xF8))
-            .unwrap();
-        assert_eq!((pot.width, pot.height, pot.offset), (16, 16, (-8, -16)));
-        assert!(pot.is_visible());
-        assert!(
-            pot.pixels.iter().any(|pixel| pixel >> 24 == 0),
-            "the floor is cut out"
-        );
-        // The pot's own cell at (3,21) in the static background.
-        let frame = &cached.frame;
-        let (x, y) = (3 * 16 + 8, 21 * 16 + 8);
-        assert_eq!(
-            pot.pixels[8 * 16 + 8] & 0x00FF_FFFF,
-            frame.pixels[y * frame.width + x]
-        );
     }
 }
