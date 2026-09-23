@@ -25,6 +25,11 @@ fn flag(world: &World<'_>, flag: usize) -> bool {
     world.events()[flag / 8] & (1 << (flag % 8)) != 0
 }
 
+/// Neutral frames until the player has arrived.
+fn settle(world: &mut World<'_>) {
+    frames_until(world, 200, |world| !world.in_transition());
+}
+
 /// Frames until `done`, each one neutral.
 fn frames_until(world: &mut World<'_>, limit: u32, done: impl Fn(&World<'_>) -> bool) -> u32 {
     for frame in 0..limit {
@@ -324,8 +329,7 @@ fn two_hits_break_the_blue_door_and_open_the_stairs() {
     // B shares C's first layer, so the game does not reload it: the opened
     // door stays open there (`$86:9145`).
     world.place(136, 300);
-    world.update(None, Presses::default()).unwrap();
-    assert_eq!(world.map(), 0x000B);
+    frames_until(&mut world, 30, |world| world.map() == 0x000B);
     assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
     assert!(world.patched_cells().contains(&(11, 20, 0xF6)));
 }
@@ -625,6 +629,8 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
             }
         }
         landings.push((world.map(), world.position()));
+        settle(&mut world);
+        landings.push((world.map(), world.position()));
         heard.push(cues(&mut world));
     }
     // Selection 5 from E on; leaving plays `$4D`, landing on stairs `$17`.
@@ -636,11 +642,16 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
             (vec![], vec![0x4D00, 0x1700])
         ]
     );
+    // Each lands where the native arrival starts, then walks down the
+    // stairs to rest.
     assert_eq!(
         landings,
         [
+            (0x000E, (138, 857)),
             (0x000E, (152, 880)),
+            (0x0020, (394, 857)),
             (0x0020, (408, 880)),
+            (0x0021, (122, 105)),
             (0x0021, (136, 128))
         ]
     );
@@ -731,7 +742,10 @@ fn a_fresh_load_of_c_after_the_door_opens_the_stairs() {
             break;
         }
     }
-    assert_eq!((world.map(), world.position()), (0x000E, (152, 880)));
+    // The stairs' arrival starts at raw + (-6,-7) and walks to raw + (8,16).
+    assert_eq!((world.map(), world.position()), (0x000E, (138, 857)));
+    settle(&mut world);
+    assert_eq!(world.position(), (152, 880));
 }
 
 #[test]
@@ -966,9 +980,9 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
 #[test]
 fn the_stairs_lead_back_up_from_the_box_room_to_c() {
     // Selector 13 back up: `$21` (8,6) -> `$20`, `$20` (25,53) -> E, E (9,53)
-    // -> C, each Up-only type 29 (`$3ACA`). Natively E (104,880) and C
-    // (184,368) are the raw anchor plus (8,16). `$20` rests natively at
-    // (360,872); (360,880) here is a known gap, not a qualified value.
+    // -> C, each Up-only type 29 (`$3ACA`). Each arrival starts at the raw
+    // anchor plus (16,10) and rests at plus (8,16), as on the native return
+    // (`departure` journey 54080, 54441, 54746).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -999,14 +1013,64 @@ fn the_stairs_lead_back_up_from_the_box_room_to_c() {
             }
         }
         landings.push((world.map(), world.position()));
+        settle(&mut world);
+        landings.push((world.map(), world.position()));
     }
     assert_eq!(
         landings,
         [
+            (0x0020, (368, 874)),
             (0x0020, (360, 880)),
+            (0x000E, (112, 874)),
             (0x000E, (104, 880)),
+            (0x000C, (192, 362)),
             (0x000C, (184, 368))
         ]
+    );
+}
+
+#[test]
+fn a_door_walks_ark_out_and_in_with_the_fades() {
+    // C down into D, as natively at 55064 (`return-C-exit`): 16 frames out
+    // from (120,464), D loads with Ark at (120,608), and he walks in to
+    // (120,625). The screen fades out over the last 16 frames and in over
+    // the first 16.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x000C, 120, 440, after_the_return()).unwrap();
+    for _ in 0..40 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        if world.in_transition() {
+            break;
+        }
+    }
+    let trigger = world.position();
+    let mut out = Vec::new();
+    while world.map() == 0x000C {
+        world.update(None, Presses::default()).unwrap();
+        out.push((world.position(), world.brightness()));
+    }
+    let leaving = &out[..out.len() - 1];
+    assert_eq!(leaving.len(), 16);
+    assert_eq!(leaving[15].0, (trigger.0, trigger.1 + 16));
+    assert_eq!(
+        leaving.iter().map(|&(_, b)| b).collect::<Vec<_>>(),
+        (0..16).rev().collect::<Vec<u8>>()
+    );
+    assert_eq!(world.position(), (120, 608), "native spawn");
+    let mut brightness = Vec::new();
+    while world.in_transition() {
+        world.update(None, Presses::default()).unwrap();
+        brightness.push(world.brightness());
+    }
+    assert_eq!(world.position(), (120, 625), "native rest");
+    assert_eq!(
+        brightness[..16],
+        (1..=15).chain([15]).collect::<Vec<u8>>()[..]
     );
 }
 
@@ -1115,7 +1179,7 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
     assert_eq!(world.position(), (536, 544), "underworld-arrival");
     // Crysta's rectangle on the plane leads back into the town.
     let mut back = world.clone();
-    replay(&mut back, &[(1, 20)]);
+    replay(&mut back, &[(1, 40)]);
     assert_eq!(back.map(), 0x000A, "back into Crysta");
     replay(&mut world, &[(0, 160), (5, 12)]);
     assert_eq!(world.position(), (536, 752), "underworld-south");

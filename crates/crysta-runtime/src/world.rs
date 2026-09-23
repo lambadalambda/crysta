@@ -24,6 +24,7 @@ use std::fmt;
 mod contact;
 mod door;
 mod pots;
+mod transition;
 pub use pots::{CarriedPot, Carry};
 
 /// A map the player is standing in, and where they are standing.
@@ -69,6 +70,15 @@ pub struct World<'a> {
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
     animation: AnimationState,
+    /// Leaving through an exit, and arriving after one ([`transition`]).
+    leaving: Option<transition::Leaving>,
+    arriving: Option<transition::Arriving>,
+    /// The brightness since the last load, which the fade-in raises a step
+    /// a frame.
+    dawn: u8,
+    /// Whether exits walk the player out and in (`update`) rather than
+    /// load at once (the stepping API the route discovery uses).
+    animate: bool,
     /// Whether an exit under the player may fire.
     ///
     /// The player arrives standing on geometry that is often an exit in its own
@@ -275,6 +285,10 @@ impl<'a> World<'a> {
             animation: AnimationState::standing(Direction::Down),
             armed: false,
             arrival: None,
+            leaving: None,
+            arriving: None,
+            dawn: 15,
+            animate: false,
         })
     }
 
@@ -661,7 +675,10 @@ impl<'a> World<'a> {
         direction: Option<Direction>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
-        let steps = self.frame(direction, presses)?;
+        self.animate = true;
+        let steps = self.frame(direction, presses);
+        self.animate = false;
+        let steps = steps?;
         // A transfer a script queued this frame loads at its end.
         let steps = match self.follow_transfer()? {
             Some(entered) => (entered, None),
@@ -682,6 +699,11 @@ impl<'a> World<'a> {
             Direction::Down => 0x0400,
             Direction::Up => 0x0800,
         });
+        self.dawn = (self.dawn + 1).min(15);
+        if let Some(step) = self.transition_frame()? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
         if self.scene.is_some() {
             self.answer_scene(presses);
             self.apply_patches()?;
@@ -719,7 +741,9 @@ impl<'a> World<'a> {
         } else {
             None
         };
-        if !matches!(step, Step::Entered { .. }) && !matches!(opened, Some(Step::Entered { .. })) {
+        let entered =
+            matches!(step, Step::Entered { .. }) || matches!(opened, Some(Step::Entered { .. }));
+        if !entered && !self.in_transition() {
             self.touch();
         }
         self.apply_patches()?;
@@ -757,6 +781,8 @@ impl<'a> World<'a> {
         self.opening = None;
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
+        self.leaving = None;
+        self.arriving = None;
     }
 
     /// Sets an event flag as `COP 07` would; for hosts and tests.
@@ -963,7 +989,11 @@ impl<'a> World<'a> {
         {
             return Ok(Step::Stayed);
         }
-        let Some(entered) = self.enter_exit(record)? else {
+        if self.animate {
+            self.leave(&record.clone());
+            return Ok(Step::Stayed);
+        }
+        let Some(entered) = self.enter_exit(record, false)? else {
             return Ok(Step::Stayed);
         };
         let destination = entered.map;
@@ -993,6 +1023,13 @@ impl<'a> World<'a> {
         if !self.armed {
             return Ok(None);
         }
+        if self.animate {
+            // Leaving starts; this frame walks on as any other.
+            if let Some(record) = self.exits.select(origin.0, origin.1).cloned() {
+                self.leave(&record);
+            }
+            return Ok(None);
+        }
         self.transition_at(origin)
     }
 
@@ -1002,7 +1039,7 @@ impl<'a> World<'a> {
         let Some(record) = self.exits.select(origin.0, origin.1) else {
             return Ok(None);
         };
-        let Some(mut entered) = self.enter_exit(record)? else {
+        let Some(mut entered) = self.enter_exit(record, false)? else {
             return Ok(None);
         };
         let destination = entered.map;
@@ -1019,7 +1056,7 @@ impl<'a> World<'a> {
 
     // Both checked exit paths share source admission, initialized placement and
     // ownership. Explicit World::enter remains a raw placement operation.
-    fn enter_exit(&self, record: &ExitRecord) -> Result<Option<Self>, WorldError> {
+    fn enter_exit(&self, record: &ExitRecord, departed: bool) -> Result<Option<Self>, WorldError> {
         // Validate pinned source identities before interpreting mutable operands.
         let arrival = qualified_arrival(self.map, record)?;
         let Ok(destination) = record.direct_destination() else {
@@ -1030,11 +1067,9 @@ impl<'a> World<'a> {
         }
         let (x, y) = match arrival {
             Some(arrival) => arrival.position(),
-            // Stairs down (14) settle at the raw anchor plus (8,16):
-            // `$8D:89BD`'s adjustment (-14,-23) and the stair walk back by
-            // the same. Up (13, `$8D:89B9`: (8,-6)) lands there too natively
-            // into E and C, but into `$20` at (8,8): the walk's end is not
-            // modelled, and this is the fit.
+            // Stairs settle at the raw anchor plus (8,16): the adjustment
+            // (`$8D:8985`, down (-14,-23), up (8,-6)) and the stair walk
+            // back by the same; [`transition`] plays the walk.
             None if matches!(record.selector(), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)
@@ -1048,11 +1083,12 @@ impl<'a> World<'a> {
             None => record.destination_position(),
         };
         // Leaving plays the exit's sound before the load (`$8D:8872`);
-        // landing on stairs plays their step (`COP 36 17`, `$84:BA19`) as
-        // the arrival walk, which is not modelled, crosses them.
+        // landing on stairs plays their step (`COP 36 17`, `$84:BA19`).
         let mut audio = self.globals.audio.clone();
-        audio.sound_port3(EXIT_SOUND);
-        audio.flush();
+        if !departed {
+            audio.sound_port3(EXIT_SOUND);
+            audio.flush();
+        }
         if matches!(record.selector(), STAIRS | STAIRS_UP) {
             audio.sound_port3(STAIR_SOUND);
         }
@@ -1098,8 +1134,8 @@ impl<'a> World<'a> {
 const EXIT_SOUND: u8 = 0x4D;
 const STAIR_SOUND: u8 = 0x17;
 /// The stair transfer selectors (decimal): 14 down, 13 back up.
-const STAIRS: u8 = 14;
-const STAIRS_UP: u8 = 13;
+pub(super) const STAIRS: u8 = 14;
+pub(super) const STAIRS_UP: u8 = 13;
 /// A closed door's collision type: C's blue door stands on its stairs with
 /// it (`$0B81`) until it breaks.
 const CLOSED_DOOR: u16 = 5;
@@ -1330,6 +1366,10 @@ mod tests {
             animation: AnimationState::standing(Direction::Down),
             armed: true,
             arrival: None,
+            leaving: None,
+            arriving: None,
+            dawn: 15,
+            animate: false,
         }
     }
 
