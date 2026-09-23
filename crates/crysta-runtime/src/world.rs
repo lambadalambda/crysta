@@ -496,6 +496,17 @@ impl<'a> World<'a> {
         Ok((step, None))
     }
 
+    /// Residents whose scripts stopped at something the interpreter does not
+    /// model: record and the normalized offset where each stopped.
+    #[must_use]
+    pub fn frozen_scripts(&self) -> Vec<(usize, usize)> {
+        self.residents
+            .iter()
+            .zip(&self.actors)
+            .filter_map(|(resident, actor)| Some((resident.record, actor.frozen_at()?)))
+            .collect()
+    }
+
     /// Whether a script has locked the pad's directions (`COP 2A`).
     #[must_use]
     pub const fn pad_locked(&self) -> bool {

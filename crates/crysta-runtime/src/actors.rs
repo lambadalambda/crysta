@@ -269,6 +269,8 @@ pub struct Actor {
     /// The cell `COP 3B` marked occupied; a scripted leg clears it
     /// (`$80:BF0E`). Nothing else does, as natively.
     stamp: Option<(u16, u16)>,
+    /// Where the script stopped at something the interpreter does not model.
+    frozen_at: Option<usize>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -310,6 +312,7 @@ impl Actor {
             outer: None,
             stream: None,
             stamp: None,
+            frozen_at: None,
             lengths: vec![None; 256],
         }
     }
@@ -415,6 +418,16 @@ impl Actor {
                 self.run(around);
             }
         }
+        if self.state == State::Frozen && self.frozen_at.is_none() {
+            self.frozen_at = Some(self.pc);
+        }
+    }
+
+    /// Where the script stopped at something the interpreter does not model,
+    /// for diagnostics.
+    #[must_use]
+    pub const fn frozen_at(&self) -> Option<usize> {
+        self.frozen_at
     }
 
     /// The cell `COP 3B` marked occupied, if one is.
@@ -1605,6 +1618,7 @@ mod tests {
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
         actor.tick(&mut around);
         assert_eq!(actor.state, State::Frozen);
+        assert_eq!(actor.frozen_at(), Some(0x08_8000), "and says where");
     }
 }
 
