@@ -629,3 +629,30 @@ fn a_fresh_load_of_c_after_the_door_opens_the_stairs() {
     }
     assert_eq!((world.map(), world.position()), (0x000E, (152, 880)));
 }
+
+#[test]
+fn the_opened_box_takes_ark_inside_to_map_41() {
+    // `$88:AE64` in the reloaded `$21`: four requests with local `$0A` cues,
+    // then `COP 14` to `$41` (mode 4, selector 2, raw (128,192)); native
+    // settled (136,208).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    events[0x22 / 8] |= 1 << (0x22 % 8);
+    let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
+    let mut reading_frames = 0;
+    for _ in 0..2000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        reading_frames += u32::from(reading);
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if world.map() == 0x0041 {
+            break;
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x0041, (136, 208)));
+    assert_eq!(reading_frames, 14, "one A per page over the four requests");
+}

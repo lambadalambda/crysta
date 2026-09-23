@@ -9,7 +9,7 @@
 //! qualification preview a corridor that fails closed at its edges; free roam
 //! wants every cell the material policy admits, and nothing narrower.
 
-use assets::maps::visual::{StaticBackground, VisualMapError};
+use assets::maps::visual::VisualMapError;
 use room_core::{
     Direction, FrameInput, MaterialAlias, MaterialPolicyError, MaterialRule, Room, Unqualified,
     WalkingState,
@@ -24,6 +24,14 @@ pub mod world;
 
 /// Maps the static exit graph bounds the Crysta slice to.
 pub const MAPS: std::ops::RangeInclusive<u16> = 0x000A..=0x0021;
+/// The tour inside Pandora's Box, reached by script transfers from `$21`.
+pub const BOX_MAPS: std::ops::RangeInclusive<u16> = 0x0041..=0x0044;
+
+/// Whether a map loads in the runtime: the slice and the box's tour.
+#[must_use]
+pub fn admitted(map: u16) -> bool {
+    MAPS.contains(&map) || BOX_MAPS.contains(&map)
+}
 
 /// A map built into a walkable room.
 #[derive(Debug, Clone)]
@@ -270,10 +278,14 @@ impl std::error::Error for RoomError {}
 /// Refuses a map outside the slice, a background that does not decode, and a
 /// grid or policy `room-core` will not accept.
 pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
-    if !MAPS.contains(&map) {
+    if !admitted(map) {
         return Err(RoomError::OutsideSlice { map });
     }
-    let background = StaticBackground::from_rom(image, map)
+    // The tour maps' full attributed sheet becomes their collision grid. The
+    // Pandora compile does not admit it as a movement halo by itself; the
+    // native tour witnesses (`pandora-left-rest`, `pandora-up-rest`) are what
+    // the story tests check walking in `$41` against.
+    let background = assets::maps::visual::first_background(image, map)
         .map_err(|source| RoomError::Background { map, source })?;
     let decoded = background.resources()[3].decoded();
     let attributes: &[u8; 512] = decoded.try_into().map_err(|_| RoomError::Attributes {
