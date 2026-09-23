@@ -32,6 +32,9 @@ pub struct Globals {
     /// `$045E`: pad buttons scripts have locked (`COP 2A`/`29`), as the SNES
     /// pad word. `$FF50` leaves A and L free to acknowledge text.
     pub input_mask: u16,
+    /// `$0454`: the pad buttons held this frame, as the SNES pad word; only
+    /// the directions are fed.
+    pub pad: u16,
     /// Items scripts have given (`COP 54`), in order. The inventory's slots
     /// and limits (`$7F:8000`) are not modelled.
     pub items: Vec<u8>,
@@ -60,6 +63,7 @@ impl Globals {
             events,
             dialogue: Dialogue::default(),
             input_mask: 0,
+            pad: 0,
             items: Vec::new(),
             counters: vec![0; 0x80],
             patches: Vec::new(),

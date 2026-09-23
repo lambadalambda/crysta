@@ -100,6 +100,37 @@ const HIT_RETURN: u8 = 0x66;
 /// Branches when a `COP 4B` counter holds a word; `$80:9713`. Operands: the
 /// counter, the word and the target.
 const COUNT_BRANCH: u8 = 0x4A;
+/// Goes on while any of the mask's pad buttons is held (`$0454`), otherwise
+/// jumps; `$80:90C0`.
+const HELD_BRANCH: u8 = 0x2F;
+/// Inline native code that tests the player's animation: `PHX; LDX $0DEA;
+/// LDA $7F:2016,X; CMP #resource; BNE; LDA $7F:0008,X; CMP #selector; BNE;
+/// PLX`, both branches to a `PLX`. Operand bytes are wildcards (`None`).
+const PLAYER_POSE_TEST: [Option<u8>; 23] = [
+    Some(0xDA),
+    Some(0xAE),
+    Some(0xEA),
+    Some(0x0D), // PHX; LDX $0DEA
+    Some(0xBF),
+    Some(0x16),
+    Some(0x20),
+    Some(0x7F),
+    Some(0xC9),
+    None,
+    None,
+    Some(0xD0),
+    None,
+    Some(0xBF),
+    Some(0x08),
+    Some(0x00),
+    Some(0x7F),
+    Some(0xC9),
+    None,
+    None,
+    Some(0xD0),
+    None,
+    Some(0xFA),
+];
 /// Marks, and unmarks, a further cell occupied; `$80:9327`/`935D`.
 /// Operands: a mode (0: offsets from the actor), then column and row.
 const STAMP: u8 = 0x3D;
@@ -707,6 +738,10 @@ impl Actor {
                         self.pc += 9;
                         continue;
                     }
+                    if let Some(next) = player_pose_mismatch(image, self.pc) {
+                        self.pc = next;
+                        continue;
+                    }
                     if let Some(next) = display_code(image, self.pc) {
                         self.pc = next;
                         continue;
@@ -749,8 +784,10 @@ impl Actor {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
-            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | STAMP | UNSTAMP | SPAWN | FADE_WAIT | 0x31
-            | 0x32 | 0x37 | 0x6A => return self.door_service(service, operands, bank, around),
+            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
+            | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x6A => {
+                return self.door_service(service, operands, bank, around)
+            }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
@@ -999,6 +1036,19 @@ impl Actor {
                     return false;
                 };
                 self.pc = resume;
+            }
+            HELD_BRANCH => {
+                let (Some(mask), Some(target)) = (
+                    cadence::word(image, operands),
+                    cadence::word(image, operands + 2),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if around.globals.pad & mask == 0 {
+                    return self.jump(bank, target);
+                }
+                self.pc = operands + 4;
             }
             COUNT_BRANCH => {
                 let (Some(&counter), Some(word), Some(target)) = (
@@ -1648,6 +1698,26 @@ fn answered(image: &[u8], pc: usize, wait: Wait, answer: u8) -> Option<usize> {
 /// actor's scratch word (`$7F:201C,X`) and the cosmetic helper's flag
 /// (`$7E:46E6`), through immediates, `SEP`/`REP` and `INC`/`DEC A`. Gameplay
 /// cannot see these writes, so the script goes on at the next `COP`.
+/// Where [`PLAYER_POSE_TEST`] at `at` goes for a player whose animation
+/// does not match: past the `PLX` its first branch reaches. The runtime's Ark
+/// plays only standing and walking, never the tables these tests ask for
+/// (the blue door's push test wants table 1, sequence 4).
+fn player_pose_mismatch(image: &[u8], at: usize) -> Option<usize> {
+    let code = image.get(at..at + PLAYER_POSE_TEST.len())?;
+    if !PLAYER_POSE_TEST
+        .iter()
+        .zip(code)
+        .all(|(expected, byte)| expected.is_none_or(|expected| expected == *byte))
+    {
+        return None;
+    }
+    let branch = |offset: usize| {
+        (at + offset + 2).wrapping_add_signed(isize::from(i8::from_ne_bytes([code[offset + 1]])))
+    };
+    let target = branch(11);
+    (image.get(target) == Some(&0xFA) && branch(20) == target).then_some(target + 1)
+}
+
 fn display_code(image: &[u8], mut at: usize) -> Option<usize> {
     let start = at;
     let mut widths = assets::cpu::Widths::native();
@@ -2325,6 +2395,59 @@ mod script_service_tests {
     use super::*;
 
     const AT: usize = 0x08_8000;
+
+    /// The door's push test (`$88:AB46`): COP2F Up, else to the reset; the
+    /// player pose idiom; pose 7 (pushing); the idiom's PLX; the reset, pose 9.
+    fn push_test() -> Vec<u8> {
+        let mut code = vec![2, 0x2F, 0x00, 0x08, 0x23, 0x80];
+        code.extend_from_slice(&[
+            0xDA, 0xAE, 0xEA, 0x0D, 0xBF, 0x16, 0x20, 0x7F, 0xC9, 0x01, 0x00, 0xD0, 0x0F, 0xBF,
+            0x08, 0x00, 0x7F, 0xC9, 0x04, 0x00, 0xD0, 0x06, 0xFA,
+        ]);
+        code.extend_from_slice(&[2, 0x80, 7, 2, 0xBD, 0xFA]);
+        assert_eq!(code.len(), 0x23);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        code
+    }
+
+    fn tick_held(actor: &mut Actor, image: &[u8], pad: u16) {
+        let mut globals = Globals::with_events(vec![0; 512]);
+        globals.pad = pad;
+        actor.tick(&mut Surroundings {
+            image,
+            globals: &mut globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        });
+    }
+
+    #[test]
+    fn cop_2f_goes_on_while_its_buttons_are_held_and_jumps_otherwise() {
+        // COP2F Up to $8023; pose 7; ... ; $8023: pose 9.
+        let mut code_with_gap = push_test()[..6].to_vec();
+        code_with_gap.extend_from_slice(&[2, 0x80, 7, 2, 0xBD]);
+        code_with_gap.resize(0x23, 0);
+        code_with_gap.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        for (pad, selector) in [(0, 9), (0x0800, 7), (0x0400, 9)] {
+            let (image, mut actor) = actor_running(&code_with_gap);
+            tick_held(&mut actor, &image, pad);
+            assert_eq!(actor.selector, selector, "pad {pad:#06x}");
+        }
+    }
+
+    #[test]
+    fn the_player_pose_test_fails_for_a_player_who_never_pushes() {
+        // The runtime's Ark plays no table-1 sequence 4, so the idiom takes
+        // its reset branch, past the PLX there, instead of freezing.
+        let (image, mut actor) = actor_running(&push_test());
+        tick_held(&mut actor, &image, 0x0800);
+        assert_eq!(actor.frozen_at(), None);
+        assert_eq!(actor.selector, 9);
+    }
 
     fn actor_running(code: &[u8]) -> (Vec<u8>, Actor) {
         let mut image = vec![0; AT + code.len() + 2];

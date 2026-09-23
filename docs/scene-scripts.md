@@ -42,6 +42,7 @@ callback on a confirm press when nothing else owns the window.
 | `07` | `$80:8669` | flag word | sets (bit 15) or clears flag `word & $0FFF` |
 | `21` | `$80:8CC8` | callback | registers the interaction callback (0 removes it) |
 | `29` / `2A` | `$80:8FE6` / `8FF5` | mask | unlocks / locks pad buttons |
+| `2F` | `$80:90C0` | mask, target | goes on while a mask button is held (`$0454`), else jumps |
 | `23` / `24` | `$80:8D1E` / `8D0B` | (pose,) target | faces a facing player, takes interaction, jumps; otherwise drops interaction |
 | `C0` | `$80:AAFB` | long target | from a callback, redirects the resident's own script |
 | `06` | `$80:864C` | long target | long jump |
@@ -67,13 +68,16 @@ callback on a confirm press when nothing else owns the window.
 | `A2` | `$80:A71B` | long script, flags | spawns an actor running the script; flags bit 15 hides it |
 | `31` / `32` / `33` | `$80:9107` / `913C` / `918F` | 1 / 1 / — | palette-fade helper; not drawn, `33` keeps only its three-frame tail |
 | `37` / `6A` | `$80:91FC` / `9DD6` | 1 / 2 | sound, cosmetic helper; stepped over |
+| `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
 
 Inline native code that writes only the display -- PPU registers, their
 shadows `$0468..$046B`, the actor's scratch `$7F:201C` and the helper flag
 `$7E:46E6` -- is stepped over; anything else still freezes the script.
-Tile patches survive a move between maps that share the first layer (`B`,
-`C`, `D`, `E`, `$20`), because `$86:9145` does not reload it.
-| `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
+Code that tests the player's animation (`LDA $7F:2016,X` / `$7F:0008,X`
+through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
+mismatch branch: the runtime's Ark only stands and walks. Tile patches
+survive a move between maps that share the first layer (`B`..`$11`, `$20`),
+because `$86:9145` does not reload it.
 
 Leg vectors come from the common resource: `$60`/`$68`/`$69` step half a
 pixel a frame, `$70`/`$78`/`$79` one, `$80`/`$88`/`$89` two; up adds one to

@@ -537,6 +537,12 @@ impl<'a> World<'a> {
         direction: Option<Direction>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
+        self.globals.pad = direction.map_or(0, |direction| match direction {
+            Direction::Right => 0x0100,
+            Direction::Left => 0x0200,
+            Direction::Down => 0x0400,
+            Direction::Up => 0x0800,
+        });
         if self.scene.is_some() {
             self.answer_scene(presses);
             self.apply_patches()?;
