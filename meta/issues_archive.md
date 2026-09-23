@@ -117,3 +117,4 @@
 - [x] [Change music in scenes](issues/music-in-scenes.md)
 - [x] [Play sound effects](issues/sound-effects.md)
 - [x] [Show Ark's lift, carry and throw poses](issues/ark-pot-poses.md)
+- [x] [Animate door and stair transitions](issues/door-and-stair-transitions.md)
