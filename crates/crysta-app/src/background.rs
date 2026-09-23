@@ -106,13 +106,10 @@ impl CachedBackground {
                 .iter()
                 .filter(|cell| !self.patches.drawn.contains(cell)),
         );
+        let backdrop = self.animation.as_ref().map(|animation| animation.backdrop);
         for (column, row, tile) in redraw {
-            draw_metatile(
-                scene,
-                &mut self.frame,
-                (usize::from(column), usize::from(row)),
-                tile,
-            );
+            let at = (usize::from(column), usize::from(row));
+            draw_metatile(scene, &mut self.frame, at, tile, backdrop);
         }
         self.patches.drawn = patched.to_vec();
     }
@@ -226,27 +223,39 @@ impl AnimatedExterior {
     }
 }
 
-/// Draws one 16x16 cell from a scene's metatile, transparent pixels in the
-/// scene's colour 0.
+/// Draws one 16x16 cell from a scene's metatile, as the static render does
+/// (`map_inspector::static_pixel_rgb`), or over the exterior's backdrop.
 fn draw_metatile(
     scene: &StaticBackground,
     frame: &mut crate::frame::Background,
     (column, row): (usize, usize),
     tile: u16,
+    backdrop: Option<u32>,
 ) {
     let Some(words) = scene.metatiles().get(usize::from(tile)) else {
         return;
     };
+    if (column + 1) * 16 > frame.width {
+        return;
+    }
     for y in 0..16 {
         for x in 0..16 {
-            let (color, high) = match graphics::sample_metatile(words, scene.tiles(), x, y) {
+            let (world_x, world_y) = (column * 16 + x, row * 16 + y);
+            let (index, high) = match graphics::sample_metatile(words, scene.tiles(), x, y) {
                 Ok(IndexedPixel::Opaque {
                     palette_index,
                     priority,
-                }) => (rgb(scene.palette()[usize::from(palette_index)]), priority),
-                _ => (rgb(scene.palette()[0]), false),
+                }) => (palette_index, priority),
+                Ok(IndexedPixel::Transparent) => (0, false),
+                Err(_) => return,
             };
-            let offset = (row * 16 + y) * frame.width + column * 16 + x;
+            let color = if let (0, Some(backdrop)) = (index, backdrop) {
+                backdrop
+            } else {
+                let [r, g, b] = map_inspector::static_pixel_rgb(index, scene, world_x, world_y);
+                u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
+            };
+            let offset = world_y * frame.width + world_x;
             if let Some(pixel) = frame.pixels.get_mut(offset) {
                 *pixel = color;
             }
