@@ -23,7 +23,7 @@ pub struct Presses {
 }
 
 /// What scripts read and write beyond their own actor.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Globals {
     /// The `$7E:06C0` event-flag bitmap.
     pub events: Vec<u8>,
@@ -35,6 +35,15 @@ pub struct Globals {
     /// Items scripts have given (`COP 54`), in order. The inventory's slots
     /// and limits (`$7F:8000`) are not modelled.
     pub items: Vec<u8>,
+    /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
+    /// door's hit count. Cleared on every map load (`$8D:8AED`).
+    pub counters: Vec<u8>,
+}
+
+impl Default for Globals {
+    fn default() -> Self {
+        Self::with_events(Vec::new())
+    }
 }
 
 impl Globals {
@@ -43,8 +52,36 @@ impl Globals {
     pub fn with_events(events: Vec<u8>) -> Self {
         Self {
             events,
-            ..Self::default()
+            dialogue: Dialogue::default(),
+            input_mask: 0,
+            items: Vec::new(),
+            counters: vec![0; 0x80],
         }
+    }
+
+    /// `COP 4B`: stores a word at `$0640 + op`, or with bit 7 adds it in BCD,
+    /// capped at 9999. Bit 6's subtraction is not modelled; returns false.
+    pub fn count(&mut self, op: u8, word: u16) -> bool {
+        let at = usize::from(op & 0x3F);
+        let Some(slot) = self.counters.get_mut(at..at + 2) else {
+            return false;
+        };
+        let value = match op & 0xC0 {
+            0 => word,
+            0x80 => bcd_add(u16::from_le_bytes([slot[0], slot[1]]), word),
+            _ => return false,
+        };
+        slot.copy_from_slice(&value.to_le_bytes());
+        true
+    }
+
+    /// A counter's word, as [`Self::count`] keeps it.
+    #[must_use]
+    pub fn counter(&self, op: u8) -> u16 {
+        let at = usize::from(op & 0x3F);
+        self.counters
+            .get(at..at + 2)
+            .map_or(0, |slot| u16::from_le_bytes([slot[0], slot[1]]))
     }
 
     /// `COP 07`'s write: bit 15 set sets flag `word & $0FFF`, clear clears it.
@@ -59,6 +96,19 @@ impl Globals {
             }
         }
     }
+}
+
+/// Four-digit BCD addition, capped at 9999.
+fn bcd_add(a: u16, b: u16) -> u16 {
+    let decimal = |bcd: u16| {
+        (0..4)
+            .rev()
+            .fold(0u32, |n, i| n * 10 + u32::from((bcd >> (i * 4)) & 0xF))
+    };
+    let sum = (decimal(a) + decimal(b)).min(9999);
+    (0..4).fold(0, |bcd, i| {
+        bcd | (u16::try_from(sum / 10u32.pow(i) % 10).unwrap_or(0) << (i * 4))
+    })
 }
 
 /// The pad's direction bits in the SNES word: Up, Down, Left, Right.

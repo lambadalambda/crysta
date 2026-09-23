@@ -22,3 +22,24 @@ Scenes move Ark and residents, run on map entry (C's changed entry, the town con
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Parent: [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
+## Progress: room C's entry scene
+
+- The static length derivation now counts `$80:BC2F`'s stream read, which
+  fixes `COP 13` (3 bytes, was 1) and eight other services' lengths.
+- New services: `COP 13` (place), `49` (map delete), `85` + `8F` (repeated
+  pose), `4B` (counters), `BD` (yield); legs at all nine common-stream
+  speeds on the common movement base; `COP 0F` compares the facing; map
+  loads clear locals and counters and keep items. `BA`/`D8` are stepped over.
+- The friends' scene plays from the ROM with real presses and matches the
+  native journey: placement, `$27`, about 41 frames to the first page, six
+  pages, a 64-frame walk, choice, two pages, `$2E`, the walk back, unlock.
+- Remaining here: the town controller scene (`$3C`) and `COP 14` map
+  transfers, which come later on the path. Also the refusal branch (`$2F`)
+  needs text command `$CB`.
+- Independent review approved (24-map trace comparison: no new freezes;
+  `$1F`'s `$83:921B` now idles in a `BD` loop with a live callback, and
+  `$20`/`$0E` residents are deleted by `COP 49` on entry, as specified).
+  Follow-ups applied: tests for `COP 0F`'s facing match and for the
+  map-load reset through a real door (locals cleared, globals and items
+  kept); `Globals::default` sizes the counters; `COP 13` mirrors only for 2.

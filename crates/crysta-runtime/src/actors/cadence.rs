@@ -153,9 +153,19 @@ fn list_total(body: &[u8], mut at: usize) -> Option<u16> {
     (word(body, at)? >= 0x8000).then_some(total)
 }
 
+/// Whether the descriptor's movement base is the common `$6000` resource
+/// (`$80:FAAF`: `$4000 + (mode & $70) << 8`), which scripted legs use.
+pub(super) fn common_base(image: &[u8], descriptor: usize) -> bool {
+    image
+        .get(descriptor + 3)
+        .is_some_and(|mode| mode & 0x70 == 0x20)
+}
+
 /// Both source load sites put the common resource at `$7F:6000`, and its
-/// class-0 row streams are the audited 1,0 loops.
-fn common_streams(image: &[u8]) -> bool {
+/// nine audited streams are as the legs expect: `$60`/`$68`/`$69` step
+/// 1, 0, 1, ... (half a pixel a frame); `$70`/`$78`/`$79` one pixel every
+/// frame; `$80`/`$88`/`$89` two.
+pub(super) fn common_streams(image: &[u8]) -> bool {
     // Packed $09F037, base bank $98, resolves to $AB:F037; destination
     // operand 2 is $7F:6000. No relocation here.
     for site in [0x18_817D, 0x18_8272] {
@@ -170,16 +180,30 @@ fn common_streams(image: &[u8]) -> bool {
     else {
         return false;
     };
-    let streams: [(usize, u16, u16, u16, u16); 3] = [
+    let streams: [(usize, u16, u16, u16, u16); 9] = [
         (0x60, 0x6D18, 0, 0x6D18, 1),
         (0x68, 0, 0x6FC8, 0x6FC8, 1),
         (0x69, 0, 0x6FD4, 0x6FD4, 0xFFFF),
+        (0x70, 0x7014, 0, 0x7014, 1),
+        (0x78, 0, 0x71F0, 0x71F0, 1),
+        (0x79, 0, 0x71F8, 0x71F8, 0xFFFF),
+        (0x80, 0x7230, 0, 0x7230, 2),
+        (0x88, 0, 0x7418, 0x7418, 2),
+        (0x89, 0, 0x7420, 0x7420, 0xFFFE),
     ];
     streams
         .into_iter()
         .all(|(selector, x, y, pointer, velocity)| {
             let at = usize::from(pointer) - 0x6000 + 2;
-            let records = [0, velocity, 0, 0, 0xFFFF, x.max(y) + 2];
+            let (half, whole) = (
+                [0, velocity, 0, 0, 0xFFFF, x.max(y) + 2],
+                [1, velocity, 0xFFFF, x.max(y) + 2, 0, 0],
+            );
+            let records = if selector & 0xF0 == 0x60 {
+                &half[..]
+            } else {
+                &whole[..4]
+            };
             word(&common, selector * 4) == Some(x)
                 && word(&common, selector * 4 + 2) == Some(y)
                 && records
@@ -201,8 +225,9 @@ pub(super) fn word(bytes: &[u8], at: usize) -> Option<u16> {
 pub(super) fn benign_skipped_service(image: &[u8], pc: usize) -> bool {
     match image.get(pc..pc + 3) {
         // Interaction, the collision callback, which sets +$04 bit $0200
-        // only, and the re-entry record at `$0600..$060F` (`$80:8B35`).
-        Some(&[2, 0x19 | 0x21 | 0x65, _]) => true,
+        // only, the re-entry record at `$0600..$060F` (`$80:8B35`), sprite
+        // priority (`BA`) and the art pointer (`D8`).
+        Some(&[2, 0x19 | 0x21 | 0x65 | 0xBA | 0xD8, _]) => true,
         // +$08 = (+$08 & $F1FF) | operand << 8: below $40 the flip bit stays.
         Some(&[2, 0xBB, operand]) => operand < 0x40,
         _ => false,

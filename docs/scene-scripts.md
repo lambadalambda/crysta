@@ -53,6 +53,19 @@ callback on a confirm press when nothing else owns the window.
 | `19` | `$80:8B35` | 14 bytes | writes the re-entry record `$0600..$060F`; stepped over |
 | `05` | `$80:862E` | flag word | yields on itself until the flag is set (bit 15 clear) or clear (bit 15 set) |
 | `3B` | `$80:9301` | — | marks the actor's cell occupied (`$80:BE8E`); a scripted leg lifts it (`$80:BF0E`) |
+| `13` | `$80:89DA` | column, row, facing | places the actor (column ×16+8, row ×16), faces it (only left mirrors), lifts its mark |
+| `49` | `$80:96E6` | map word | deletes the actor when the map matches (bit 15: when it does not) |
+| `85` | `$80:A182` | count, pose | selects the pose; the next `COP 8F` plays its list that many times |
+| `4B` | `$80:975B` | op, word | map-local counters at `$0640`: store, or BCD add capped at 9999; the bit-6 subtraction freezes |
+| `BD` | `$80:AAB3` | — | yields one frame |
+| `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
+
+Leg vectors come from the common resource: `$60`/`$68`/`$69` step half a
+pixel a frame, `$70`/`$78`/`$79` one, `$80`/`$88`/`$89` two; up adds one to
+the vector. Legs need only the common `$6000` movement base and the nine
+audited streams. `COP 0F` compares its selector with the player's facing
+unless it is `$7F`. Loading a map clears the local flags 0..31 and the
+counters (`$8D:8AED`); items carry over.
 
 Scripts also hide and show their actor with inline native code on entity
 `+$04` bit 15 (`LDA $0004,X; ORA #$8000` / `AND #$7FFF; STA $0004,X`, about
@@ -82,6 +95,13 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   first two ending `$D5 $D4`), sets `$20`, walks four legs to the door
   (unlocking the pad 320 frames after `$20`, as natively at 5903 → 6223) and
   deletes herself.
+
+- **The friends at the blue door, map `$0C`** (`$83:8C1E`, `$88:9A6F`),
+  after the weaver: `COP 13` moves the friend to (184,416), `$27` is set,
+  the pad locks, `COP 85 28 01` holds 40 frames, then three requests (six
+  pages) with a 64-pixel walk left between the second and third, and choice
+  1. Option 1: two pages, `$2E`, the walk back, the pad unlocked -- as the
+  native journey (16749 -> 18416).
 
 ## Flag-gated geometry
 

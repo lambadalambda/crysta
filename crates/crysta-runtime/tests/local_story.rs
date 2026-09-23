@@ -142,3 +142,104 @@ fn d_gate_holds_the_house_door_until_the_elder_has_spoken() {
         assert_eq!(world.map() == 0x000A, opens, "{step:?}");
     }
 }
+
+#[test]
+fn the_friends_ask_for_help_at_the_blue_door() {
+    // After the weaver (`$28`), entering C: the resident `$83:8C1E` moves to
+    // (184,416), sets `$27`, holds the pad, and after about 41 frames asks
+    // over three requests and six pages, walking left 64 pixels in 64 frames
+    // between the second and third; natively 16749 -> 17987.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x28] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 136, 368, events).unwrap();
+    let friend = |world: &World<'_>| {
+        world
+            .residents()
+            .iter()
+            .find(|r| r.record == 0x03_8C1E)
+            .unwrap()
+            .position
+    };
+    world.update(None, Presses::default()).unwrap();
+    assert_eq!(friend(&world), (184, 416));
+    assert!(flag(&world, 0x27) && world.pad_locked());
+    let silent = frames_until(&mut world, 200, |world| world.dialogue().is_some());
+    assert!((38..=44).contains(&silent), "asked after {silent} frames");
+    let (mut pages, mut gaps) = (0, Vec::new());
+    while world.dialogue().and_then(|view| view.cursor).is_none() {
+        world.update(None, A).unwrap();
+        pages += 1;
+        if world.dialogue().is_none() {
+            gaps.push(frames_until(&mut world, 200, |world| {
+                world.dialogue().is_some()
+            }));
+        }
+        assert!(pages < 20);
+    }
+    // One of the pauses between requests is the walk: 64 pixels, one a frame.
+    assert!(
+        gaps.iter().any(|gap| (63..=66).contains(gap)),
+        "gaps {gaps:?}"
+    );
+    assert_eq!(friend(&world).0, 120);
+    assert_eq!(pages, 6);
+    // Option 1, help: two more pages, then `$2E`; the friend walks back and
+    // the pad unlocks.
+    world.update(None, A).unwrap();
+    let mut follow = 0;
+    while world.in_scene() || world.dialogue().is_some() {
+        world.update(None, A).unwrap();
+        follow += 1;
+        assert!(follow < 20);
+    }
+    assert_eq!(follow, 2);
+    assert!(flag(&world, 0x2E));
+    frames_until(&mut world, 200, |world| !world.pad_locked());
+    assert_eq!(friend(&world).0, 184, "back at the door");
+}
+
+#[test]
+fn a_map_load_clears_local_flags_and_counters_and_keeps_items() {
+    // `$8D:8AED` clears the locals (flags 0..31) and `$0640` on every load.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x000F, 304, 112, fresh_game_flags()).unwrap();
+    // Through the wake-up, so Elle's items are held.
+    frames_until(&mut world, 400, |world| world.dialogue().is_some());
+    while world.in_scene() {
+        world.update(None, A).unwrap();
+    }
+    frames_until(&mut world, 600, |world| !world.pad_locked());
+    let mut local = world.clone();
+    local.set_flag(0x01);
+    assert!(flag(&local, 0x01));
+    // Walk out of the bedroom: right to the door column (exit tile (24,12)),
+    // then down through it.
+    while local.position().0 < 396 {
+        local
+            .update(Some(Direction::Right), Presses::default())
+            .unwrap();
+    }
+    let map = local.map();
+    let entered = (0..600).find(|_| {
+        local
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        local.map() != map
+    });
+    assert!(entered.is_some(), "left the bedroom");
+    assert!(!flag(&local, 0x01), "local flag cleared");
+    assert!(
+        flag(&local, 0x20) && flag(&local, 0xFB),
+        "global flags kept"
+    );
+    assert_eq!(local.items(), [0x7A, 0xA0], "items kept");
+}

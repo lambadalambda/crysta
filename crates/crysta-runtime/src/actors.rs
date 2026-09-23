@@ -70,6 +70,20 @@ const WALK_TO_COLUMN: u8 = 0x39;
 const DELETE: u8 = 0xA7;
 /// Marks the actor's cell occupied in the collision grid (`$80:BE8E`).
 const OCCUPY: u8 = 0x3B;
+/// Places the actor on a tile and faces it; `$80:89DA`. Operands: column
+/// and row (signed, read through `$80:BC2F`) and a facing, 0 down, 1 up,
+/// 2 left, 3 right; only left mirrors. It lifts the old cell's mark.
+const PLACE: u8 = 0x13;
+/// Deletes the actor on the map: when `word & $7FFF` is the map, or with
+/// bit 15 when it is not.
+const DELETE_ON_MAP: u8 = 0x49;
+/// Selects a pose and a repeat count that the next `COP 8F` plays out.
+/// Operands: the count, then the pose.
+const REPEAT_POSE: u8 = 0x85;
+/// Map-local counters at `$0640`; see [`Globals::count`].
+const COUNT: u8 = 0x4B;
+/// Yields for one frame.
+const YIELD: u8 = 0xBD;
 /// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
 /// bit 15 it waits until the flag is set, with it until the flag is clear.
 const WAIT_FOR_FLAG: u8 = 0x05;
@@ -225,6 +239,7 @@ pub struct Surroundings<'a> {
 }
 
 /// One resident's running script and where it has put them.
+#[allow(clippy::struct_excessive_bools)] // independent actor bits, not a state
 #[derive(Debug, Clone)]
 pub struct Actor {
     /// Pixel position, the record's origin until a step moves it.
@@ -263,9 +278,15 @@ pub struct Actor {
     continuation: Option<usize>,
     /// The actor's own script while a callback runs on it.
     outer: Option<Outer>,
-    /// A scripted leg's direction and frames applied, moving the actor
-    /// through the next pose wait at the class-0 stream's 1, 0, 1, ...
-    stream: Option<(Direction, u16)>,
+    /// A scripted leg's direction, frames applied and pixels per frame
+    /// (0 for the half-speed 1, 0, 1, ... stream), moving the actor through
+    /// the next pose wait.
+    stream: Option<(Direction, u16, u16)>,
+    /// Whether legs may move this actor: its movement base is the common
+    /// `$6000` resource and the nine streams are the audited ones.
+    legs: bool,
+    /// The repeat count `COP 85` set for the next `COP 8F`.
+    repeats: Option<u16>,
     /// The cell `COP 3B` marked occupied; a scripted leg clears it
     /// (`$80:BF0E`). Nothing else does, as natively.
     stamp: Option<(u16, u16)>,
@@ -311,6 +332,8 @@ impl Actor {
             continuation: None,
             outer: None,
             stream: None,
+            legs: false,
+            repeats: None,
             stamp: None,
             frozen_at: None,
             lengths: vec![None; 256],
@@ -341,6 +364,9 @@ impl Actor {
             .descriptor
             .filter(|_| resident.body)
             .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
+        actor.legs = resident.descriptor.is_some_and(|descriptor| {
+            cadence::common_base(image, descriptor) && cadence::common_streams(image)
+        });
         actor
     }
 
@@ -644,6 +670,9 @@ impl Actor {
             | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG | OCCUPY => {
                 return self.script_service(service, operands, around)
             }
+            PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
+                return self.stage_service(service, operands, around)
+            }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
@@ -666,11 +695,7 @@ impl Actor {
                 self.pc = operands;
             }
             WAIT => return self.wait_for_pose(operands),
-            WAIT_STEP => {
-                self.pc = operands;
-                self.state = State::Waiting(WAIT_FRAMES);
-                return false;
-            }
+            WAIT_STEP => return self.wait_step(operands),
             RANDOM_STEP => {
                 let Some(rect) = image.get(operands..operands + 4) else {
                     self.state = State::Frozen;
@@ -748,39 +773,62 @@ impl Actor {
     /// `COP 8E`. Returns whether execution continues this frame. A scripted
     /// leg moves through it, starting this frame, and stops when it ends.
     fn wait_for_pose(&mut self, operands: usize) -> bool {
+        // `$80:A32F` plays the selected list once: the next command runs in
+        // the frame its last record ends. Unknown: the old approximation,
+        // resuming two frames later.
+        if let Some(ticks) = self.pose_list(self.selector) {
+            return self.hold(operands, ticks);
+        }
         self.pc = operands;
         self.apply_stream();
-        // `$80:A32F` plays the selected list once: the next command
-        // runs in the frame its last record ends. Unknown: the old
-        // approximation, resuming two frames later.
-        match self.pose_list(self.selector) {
-            Some(0) => {}
-            Some(1) => return false,
-            Some(ticks) => {
-                self.state = State::Waiting(ticks - 1);
-                return false;
-            }
-            None => {
-                self.state = State::Waiting(1);
-                return false;
+        self.state = State::Waiting(1);
+        false
+    }
+
+    /// `COP 8F` outside a qualified walk: after `COP 85`, its pose's list
+    /// that many times over; otherwise the old approximation.
+    fn wait_step(&mut self, operands: usize) -> bool {
+        if let Some(count) = self.repeats.take() {
+            if let Some(ticks) = self.pose_list(self.selector) {
+                return self.hold(operands, ticks.saturating_mul(count));
             }
         }
-        true
+        self.pc = operands;
+        self.state = State::Waiting(WAIT_FRAMES);
+        false
+    }
+
+    /// Holds for `ticks` frames counting this one, the next command running
+    /// in the last; a leg moves through them.
+    fn hold(&mut self, operands: usize, ticks: u16) -> bool {
+        self.pc = operands;
+        self.apply_stream();
+        match ticks {
+            0 => true,
+            1 => false,
+            ticks => {
+                self.state = State::Waiting(ticks - 1);
+                false
+            }
+        }
     }
 
     /// One frame of a scripted leg; cleared once the pose wait is over.
     fn apply_stream(&mut self) {
-        let Some((direction, applied)) = self.stream else {
+        let Some((direction, applied, speed)) = self.stream else {
             return;
         };
-        if applied % 2 == 0 {
-            let (dx, dy) = delta(direction);
-            self.position = (
-                self.position.0.wrapping_add_signed(dx),
-                self.position.1.wrapping_add_signed(dy),
-            );
-        }
-        self.stream = Some((direction, applied + 1));
+        let pixels = if speed == 0 {
+            i16::from(applied % 2 == 0)
+        } else {
+            speed.cast_signed()
+        };
+        let (dx, dy) = delta(direction);
+        self.position = (
+            self.position.0.wrapping_add_signed(dx * pixels),
+            self.position.1.wrapping_add_signed(dy * pixels),
+        );
+        self.stream = Some((direction, applied + 1, speed));
         self.walking = true;
         let ends = match self.state {
             State::Waiting(frames) => frames <= 1,
@@ -819,23 +867,111 @@ impl Actor {
             (false, true) => (Direction::Right, pose, vector),
             (false, false) => (Direction::Left, pose, vector),
         };
-        // Only the class-0 row's audited common streams: $68/$69 down/up and
-        // $60 across, whose steps are 1, 0, 1, ... pixels.
-        let expected = match direction {
-            Direction::Down => 0x68,
-            Direction::Up => 0x69,
-            Direction::Left | Direction::Right => 0x60,
+        // Only the audited common streams: across $60/$70/$80, down
+        // $68/$78/$88, up $69/$79/$89, at half, one and two pixels a frame.
+        let axis = match direction {
+            Direction::Down => 0x08,
+            Direction::Up => 0x09,
+            Direction::Left | Direction::Right => 0x00,
         };
-        if self.cadence.is_none() || vector != expected {
+        let speed = match vector.wrapping_sub(axis) {
+            0x60 => 0,
+            0x70 => 1,
+            0x80 => 2,
+            _ => u16::MAX,
+        };
+        if !self.legs || speed == u16::MAX {
             self.state = State::Frozen;
             return false;
         }
         self.facing = direction;
         self.set_pose(pose & 0x7F, direction == Direction::Left);
         self.pose_age = 0;
-        self.stream = Some((direction, 0));
+        self.stream = Some((direction, 0, speed));
         self.stamp = None;
         self.pc = operands + 3;
+        true
+    }
+
+    /// Placement, map deletion, repeated poses, counters and a bare yield.
+    /// Returns whether execution continues this frame.
+    fn stage_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            PLACE => {
+                let Some(&[column, row, facing]) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let tile = |byte: u8| i32::from(i8::from_ne_bytes([byte])) * 16;
+                let (Ok(x), Ok(y)) = (u16::try_from(tile(column) + 8), u16::try_from(tile(row)))
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.position = (x, y);
+                self.facing = match facing & 3 {
+                    0 => Direction::Down,
+                    1 => Direction::Up,
+                    2 => Direction::Left,
+                    _ => Direction::Right,
+                };
+                // The whole byte goes to `+$14`; only exactly 2 mirrors.
+                self.hflip = facing == 2;
+                self.stream = None;
+                self.stamp = None;
+                self.pc = operands + 3;
+            }
+            DELETE_ON_MAP => {
+                let Some(word) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if (word & 0x7FFF == self.map) != (word & 0x8000 != 0) {
+                    self.state = State::Gone;
+                    return false;
+                }
+                self.pc = operands + 2;
+            }
+            REPEAT_POSE => {
+                let Some(&[count, pose]) = image.get(operands..operands + 2) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let hflip = self.hflip;
+                self.set_pose(pose, hflip);
+                self.pose_age = 0;
+                self.stream = None;
+                self.repeats = Some(u16::from(count));
+                self.pc = operands + 2;
+            }
+            COUNT => {
+                let (Some(&op), Some(word)) =
+                    (image.get(operands), cadence::word(image, operands + 1))
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if !around.globals.count(op, word) {
+                    self.state = State::Frozen;
+                    return false;
+                }
+                self.pc = operands + 3;
+            }
+            YIELD => {
+                self.pc = operands;
+                return false;
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        }
         true
     }
 
@@ -1139,7 +1275,9 @@ impl Actor {
         // `$88A3`: `SEC; SBC $0966; CMP #$11; BCS` -- an unsigned, one-sided
         // test: the position minus the player's must be 0 to 16. `$0968`
         // holds the player's Y less eight.
-        let near = id & 0x7F == 0x7F && {
+        // `$0956`'s codes are the facing's: 0 down, 1 up, 2 left, 3 right.
+        let facing = around.facing as u8;
+        let near = (id & 0x7F == 0x7F || id & 0x7F == facing) && {
             let tile = |byte: u8| i32::from(i8::from_ne_bytes([byte])) * 16;
             let (px, py) = (i32::from(around.player.0), i32::from(around.player.1) - 8);
             (0..=16).contains(&(tile(bytes[1]) - px)) && (0..=16).contains(&(tile(bytes[2]) - py))
@@ -2263,6 +2401,109 @@ mod scene_service_tests {
     }
 
     #[test]
+    fn a_near_test_with_a_selector_wants_the_player_facing_that_way() {
+        // `COP 0F 02 04 04 <target>`: tile (4,4), branch when near and the
+        // player faces left (2). Target: pose 9; fall-through: pose 5.
+        let code = [
+            2, 0x0F, 0x02, 4, 4, 0x0C, 0x80, 2, 0x80, 5, 2, 0x8E, 2, 0x80, 9, 2, 0x8E,
+        ];
+        for (facing, pose) in [(Direction::Left, 9), (Direction::Up, 5)] {
+            let mut image = vec![0; AT + 0x20];
+            image[AT..AT + code.len()].copy_from_slice(&code);
+            let mut actor = Actor::new((0, 0), Some(0x88_8000), 0, 1);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            actor.tick(&mut Surroundings {
+                player: (60, 60),
+                facing,
+                ..around(&image, &mut globals)
+            });
+            assert_eq!(actor.selector, pose, "{facing:?}");
+        }
+    }
+
+    #[test]
+    fn placing_faces_and_lifts_the_mark() {
+        let mut globals = Globals::with_events(vec![0; 512]);
+        // Mark (3,3), then place at column 11, row 26 facing left.
+        let (_, actor) = run(
+            &[(0, &[2, 0x3B, 2, 0x13, 0x0B, 0x1A, 2, 2, 0x8E])],
+            &mut globals,
+        );
+        assert_eq!(actor.position, (184, 416));
+        assert_eq!(
+            (actor.facing, actor.hflip, actor.stamp()),
+            (Direction::Left, true, None)
+        );
+    }
+
+    #[test]
+    fn a_map_delete_compares_the_map_and_inverts_on_bit_fifteen() {
+        for (word, gone) in [
+            (0x000C_u16, true),
+            (0x000D, false),
+            (0x800C, false),
+            (0x800D, true),
+        ] {
+            let [low, high] = word.to_le_bytes();
+            let mut image = vec![0; AT + 0x10];
+            image[AT..AT + 6].copy_from_slice(&[2, 0x49, low, high, 2, 0x8E]);
+            let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+            actor.map = 0x0C;
+            let mut globals = Globals::with_events(vec![0; 512]);
+            actor.tick(&mut around(&image, &mut globals));
+            assert_eq!(actor.is_gone(), gone, "{word:04X}");
+        }
+    }
+
+    #[test]
+    fn a_repeated_pose_holds_its_list_that_many_times() {
+        // `85 28 01; 8F; 80 07; 8E`: pose 1, one tick, forty times over.
+        let mut image = vec![0; AT + 0x10];
+        image[AT..AT + 10].copy_from_slice(&[2, 0x85, 0x28, 1, 2, 0x8F, 2, 0x80, 7, 2]);
+        image[AT + 10] = 0x8E;
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        actor.pose_ticks = Some(vec![Some(1); 8]);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let mut frames = 1;
+        actor.tick(&mut around(&image, &mut globals));
+        while actor.selector != 7 {
+            actor.tick(&mut around(&image, &mut globals));
+            frames += 1;
+            assert!(frames < 100);
+        }
+        // `COP 8F` ran on frame 1; forty ticks later, frame 41, the next.
+        assert_eq!(frames, 41);
+    }
+
+    #[test]
+    fn counters_store_add_and_a_yield_takes_one_frame() {
+        let mut globals = Globals::with_events(vec![0; 512]);
+        // Store 0, add 1 twice at $0640, yield between, then pose 3.
+        let (image, mut actor) = run(
+            &[(
+                0,
+                &[
+                    2, 0x4B, 0, 0, 0, 2, 0x4B, 0x80, 1, 0, 2, 0xBD, 2, 0x4B, 0x80, 1, 0, 2, 0x80,
+                    3, 2, 0x8E,
+                ],
+            )],
+            &mut globals,
+        );
+        assert_eq!((globals.counter(0), actor.selector), (1, 0));
+        actor.tick(&mut around(&image, &mut globals));
+        assert_eq!((globals.counter(0), actor.selector), (2, 3));
+        // BCD: 9 + 1 is $10; the cap is 9999.
+        globals.count(0x02, 9);
+        globals.count(0x82, 1);
+        assert_eq!(globals.counter(2), 0x10);
+        globals.count(0x02, 0x9999);
+        globals.count(0x82, 5);
+        assert_eq!(globals.counter(2), 0x9999);
+        // Bit 6's subtraction is refused rather than guessed.
+        assert!(!globals.count(0x40, 1));
+    }
+
+    #[test]
     fn input_locks_deletion_jumps_and_continuations() {
         // Lock $FF50, unlock $0F00, then wait.
         let mut globals = Globals::with_events(vec![0; 512]);
@@ -2309,17 +2550,14 @@ mod scripted_leg_tests {
 
     const AT: usize = 0x08_8000;
 
-    /// One frame of a leg service at (56,64), with class-0 timing admitted
-    /// and every pose list 32 ticks long.
+    /// One frame of a leg service at (56,64), on the common movement base
+    /// when `admitted`, with every pose list 32 ticks long.
     fn leg(code: &[u8], admitted: bool) -> Actor {
         let mut image = vec![0; AT + 0x40];
         image[AT..AT + code.len()].copy_from_slice(code);
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
         actor.pose_ticks = Some(vec![Some(32); 8]);
-        actor.cadence = admitted.then_some(cadence::Cadence {
-            walk: [32; 4],
-            idle: 16,
-        });
+        actor.legs = admitted;
         let mut globals = Globals::with_events(vec![0; 512]);
         actor.tick(&mut Surroundings {
             image: &image,
@@ -2393,6 +2631,18 @@ mod scripted_leg_tests {
         assert_eq!(stamped.stamp(), Some((3, 3)));
         let walking = leg(&[2, 0x3B, 2, 0x3A, 3, 0x68, 6, 2, 0x8E], true);
         assert_eq!(walking.stamp(), None);
+    }
+
+    #[test]
+    fn faster_vectors_move_one_or_two_pixels_every_frame() {
+        // $70 across at one pixel a frame; $88 down at two.
+        let across = leg(&[2, 0x39, 5, 0x70, 5, 2, 0x8E], true);
+        assert_eq!(across.position, (57, 64));
+        let down = leg(&[2, 0x3A, 3, 0x88, 8, 2, 0x8E], true);
+        assert_eq!(down.position, (56, 66));
+        // Up adds one to the vector: $78 becomes $79.
+        let up = leg(&[2, 0x3A, 3, 0x78, 1, 2, 0x8E], true);
+        assert_eq!(up.position, (56, 63));
     }
 
     #[test]

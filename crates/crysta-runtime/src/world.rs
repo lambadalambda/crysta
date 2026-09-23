@@ -507,6 +507,11 @@ impl<'a> World<'a> {
             .collect()
     }
 
+    /// Sets an event flag as `COP 07` would; for hosts and tests.
+    pub fn set_flag(&mut self, flag: u16) {
+        self.globals.write_flag(0x8000 | flag);
+    }
+
     /// Whether a script has locked the pad's directions (`COP 2A`).
     #[must_use]
     pub const fn pad_locked(&self) -> bool {
@@ -761,15 +766,21 @@ impl<'a> World<'a> {
         Ok(Some(entered))
     }
 
+    /// Loads the next map. `$8D:8AED` clears the map-local flags (0..31)
+    /// and counters first; the other flags and the items carry over.
     fn enter_destination(&self, map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
-        Self::enter_with_policy(
+        let mut events = self.globals.events.clone();
+        events[..4].fill(0);
+        let mut entered = Self::enter_with_policy(
             self.image,
             map,
             x,
             y,
-            self.globals.events.clone(),
+            events,
             self.base.room.passive_directional_type8_special_bit_clear(),
-        )
+        )?;
+        entered.globals.items.clone_from(&self.globals.items);
+        Ok(entered)
     }
 }
 
