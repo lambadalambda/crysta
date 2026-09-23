@@ -156,10 +156,11 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
 ```
 
 Real-device smoke test — **plays music**, verifies consumption beyond the bounded
-prebuffer, pause/resume and worker shutdown:
+prebuffer, pause/resume and worker shutdown. It is silent unless
+`CRYSTA_PLAY_AUDIO=1` is set, so `--include-ignored` runs never play audio:
 
 ```sh
-CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
+CRYSTA_PLAY_AUDIO=1 CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
   cargo test --release --manifest-path crates/crysta-app/Cargo.toml \
   native_device_play_pause_resume_and_shutdown -- --ignored --nocapture
 ```

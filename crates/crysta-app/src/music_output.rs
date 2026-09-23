@@ -195,12 +195,18 @@ mod tests {
     use rodio::Source;
 
     #[test]
-    #[ignore = "requires owned JP ROM (CRYSTA_JP_ROM) and a real output device; plays music"]
+    #[ignore = "requires owned JP ROM (CRYSTA_JP_ROM), a real output device and \
+                CRYSTA_PLAY_AUDIO=1; plays music"]
     fn native_device_play_pause_resume_and_shutdown() {
         use std::sync::{
             atomic::{AtomicUsize, Ordering},
             Arc,
         };
+        // Audible: never as a side effect of `--include-ignored`.
+        if std::env::var_os("CRYSTA_PLAY_AUDIO").is_none_or(|value| value != "1") {
+            eprintln!("skipped: set CRYSTA_PLAY_AUDIO=1 to play music on the output device");
+            return;
+        }
         let rom = rom::Rom::load(&std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap())
             .unwrap();
         let data = crate::music_data::extract_crysta_music(&rom).unwrap();
