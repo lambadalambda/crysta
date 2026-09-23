@@ -1,0 +1,58 @@
+name: Web demo
+
+# Builds the Crysta web page and publishes it to GitHub Pages. The site holds
+# code only: players select their own ROM, which never leaves the browser.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# As GitHub's own template: a deploy is never cut off halfway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: crates/crysta-web
+      - name: Clang for the sound core's wasm32 build
+        run: sudo apt-get update && sudo apt-get install -y clang llvm
+      - name: wasm-bindgen
+        run: cargo install --locked wasm-bindgen-cli --version 0.2.126
+      - name: Build
+        env:
+          WASM_BINDGEN: wasm-bindgen
+          CC_wasm32_unknown_unknown: clang
+          AR_wasm32_unknown_unknown: llvm-ar
+        run: sh crates/crysta-web/build.sh site
+      - name: No ROM data in the site
+        run: |
+          if find site \( -iname '*.sfc' -o -iname '*.smc' \) | grep .; then exit 1; fi
+          ls -la site
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
