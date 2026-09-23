@@ -24,7 +24,7 @@ use std::fmt;
 mod contact;
 mod door;
 mod pots;
-pub use pots::{CarriedPot, LIFTED_TILE};
+pub use pots::{CarriedPot, Carry};
 
 /// A map the player is standing in, and where they are standing.
 #[derive(Clone)]

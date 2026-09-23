@@ -1,5 +1,6 @@
 //! The Crysta story slice, played through the world with real presses and
 //! compared against the native input-only route.
+use assets::sprites::PandoraCarryMotion;
 use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
@@ -464,6 +465,68 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
         assert!(sounds.contains(&sound), "{sounds:x?}");
     }
     assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
+}
+
+#[test]
+fn ark_lifts_carries_and_throws_in_the_carry_poses() {
+    use PandoraCarryMotion::{Lifting, Standing, Throwing, Walking};
+    // The MISS segment frame by frame: 23 lift frames (`Lifting` ticks
+    // 0..22), held Down and Right walks with stands between, Up, then the
+    // 32-frame throw. A walk's first frame keeps the old facing, as the
+    // component's (`room_core::pots`).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    world.update(None, Presses::default()).unwrap();
+    world.place(104, 352);
+    world.face(Direction::Left);
+    let mut runs: Vec<(PandoraCarryMotion, u8, u32)> = Vec::new();
+    for &(pad, frames) in MISS {
+        for _ in 0..frames {
+            replay(&mut world, &[(pad, 1)]);
+            let Some(carry) = world.carry() else {
+                continue;
+            };
+            match runs.last_mut() {
+                Some((motion, facing, count))
+                    if *motion == carry.motion && *facing == carry.facing =>
+                {
+                    *count += 1;
+                }
+                _ => runs.push((carry.motion, carry.facing, 1)),
+            }
+        }
+    }
+    let motions: Vec<(PandoraCarryMotion, u8)> = runs
+        .iter()
+        .map(|&(motion, facing, _)| (motion, facing))
+        .collect();
+    assert_eq!(
+        motions,
+        [
+            (Lifting, 2),
+            (Standing, 2),
+            (Walking, 2),
+            (Walking, 0),
+            (Standing, 0),
+            (Walking, 0),
+            (Walking, 3),
+            (Standing, 3),
+            (Walking, 3),
+            (Standing, 1),
+            (Throwing, 1)
+        ],
+        "{runs:?}"
+    );
+    assert_eq!(runs[0].2, 23, "the lift");
+    assert_eq!(runs.last().unwrap().2, 32, "the throw and its recovery");
+    assert!(world.carry().is_none());
 }
 
 #[test]

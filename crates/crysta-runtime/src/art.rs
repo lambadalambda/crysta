@@ -11,8 +11,8 @@ use assets::graphics::{Bgr555, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{
-    ArkSprites, HouseActor, HouseFrame, RecordRefusal, ResidentPose, SpriteError, SpriteFrame,
-    SpritePixel,
+    ArkSprites, HouseActor, HouseFrame, PandoraSprites, RecordRefusal, ResidentPose, SpriteError,
+    SpriteFrame, SpritePixel,
 };
 use room_core::{AnimationFrame, AnimationSet};
 use std::fmt;
@@ -253,6 +253,76 @@ impl Animation {
             remaining -= hold;
         }
         &self.frames[0]
+    }
+
+    /// The raster `tick` frames in when the list plays once: after its end,
+    /// its last frame holds.
+    #[must_use]
+    pub fn frame_once(&self, tick: u64) -> &Raster {
+        let mut remaining = tick;
+        for (raster, duration) in self.frames.iter().zip(&self.durations) {
+            let hold = u64::from(*duration) + 1;
+            if remaining < hold {
+                return raster;
+            }
+            remaining -= hold;
+        }
+        self.frames.last().unwrap_or(&self.frames[0])
+    }
+}
+
+/// Ark's carry poses and the pots' sprites ([`PandoraSprites`]), as
+/// animations on demand.
+#[derive(Debug)]
+pub struct CarryArt {
+    sprites: PandoraSprites,
+}
+
+impl CarryArt {
+    /// A pot's list in flight, after the throw's release (`$84:C701`).
+    pub const FLIGHT: u8 = 0x3C;
+
+    /// Decodes the art from the ROM.
+    ///
+    /// # Errors
+    /// Propagates a sprite table the decoder refuses.
+    pub fn from_rom(image: &[u8]) -> Result<Self, ArtError> {
+        Ok(Self {
+            sprites: PandoraSprites::from_rom(image)?,
+        })
+    }
+
+    /// An art's list as rasters, as
+    /// [`PandoraSprites::carry_pose`] names them.
+    ///
+    /// # Errors
+    /// Refuses an art or a list the decoder does not hold, or frames outside
+    /// the qualified shape.
+    pub fn animation(&self, art: u32, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
+        let art = self
+            .sprites
+            .get(art)
+            .ok_or(SpriteError::Invalid("no such carry art"))?;
+        let list = art
+            .list(selector)
+            .ok_or(SpriteError::Invalid("no such carry list"))?;
+        let frames = list
+            .frames()
+            .iter()
+            .map(|frame| {
+                raster(
+                    frame.composition(),
+                    art.graphics(),
+                    art.palette(),
+                    art.palette_base(),
+                    hflip,
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(Animation {
+            durations: list.frames().iter().map(HouseFrame::duration).collect(),
+            frames,
+        })
     }
 }
 

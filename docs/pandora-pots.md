@@ -257,8 +257,9 @@ their source words, and a throw keeps the collision it started with. A
 consumed cell becomes a `$F8` tile patch; `door_hit` strikes the hittable
 resident in the flight's column. The catalog is the entry room's `18FA`/`18FB`
 words, so lifted pots stay lifted across maps that keep the layer. The
-native app draws the pot with its metatile, cut out of `$F8`, until the pot
-sprite is decoded.
+native app draws Ark's carry poses and the pots' own lists from
+`World::carry` and `World::pot` (`PandoraSprites::carry_pose`, flight list
+`$3C`); the lift and the throw play once, holding loops.
 
 Limits follow the contract: a lift needs the native poses, a throw one of the
 two Up lanes, and there is no put-down, so a carried pot takes no exits.

@@ -9,6 +9,7 @@
 use super::{Step, World, WorldError};
 use crate::actors::Actor;
 use crate::audio::Audio;
+use assets::sprites::PandoraCarryMotion;
 use room_core::pots::{Admission, Input, Output, Phase, PotState, SourceObject};
 use room_core::{AnimationState, Direction, Room};
 
@@ -17,7 +18,7 @@ const CELLAR: u16 = 0x000C;
 /// A source pot's word.
 const POT_WORDS: [u16; 2] = [0x18FA, 0x18FB];
 /// The tile a lifted pot's cell takes.
-pub const LIFTED_TILE: u16 = 0x00F8;
+const LIFTED_TILE: u16 = 0x00F8;
 /// The carry record `$0988` names for an `$FA` pot; `$FB` has `$098F`.
 const FA_SLOT: u16 = 0x098A;
 /// Port 3's sounds: the lift (`$84:BE6D`), the break (`$84:C6E5`), and
@@ -76,8 +77,24 @@ impl Pots {
 pub struct CarriedPot {
     /// Its tile, `$FA` or `$FB`.
     pub tile: u16,
+    /// Its sprite's art (`$96:E1A6` for `$FA`, `$96:E1AB` for `$FB`), for
+    /// [`assets::sprites::PandoraSprites::get`].
+    pub art: u32,
     /// Where it flies, once released; `None` while in hand.
     pub flight: Option<(u16, u16)>,
+}
+
+/// Ark's part in a pot action: the carry pose to draw and how far into
+/// its phase he is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Carry {
+    /// Lifting, standing or walking with the pot, or throwing it.
+    pub motion: PandoraCarryMotion,
+    /// Facing, 0 Down, 1 Up, 2 Left, 3 Right, as
+    /// [`assets::sprites::PandoraSprites::carry_pose`] takes it.
+    pub facing: u8,
+    /// Frames into the lift or the throw; 0 while held.
+    pub tick: u8,
 }
 
 impl World<'_> {
@@ -88,9 +105,42 @@ impl World<'_> {
         let state = pots.state?;
         let admission = self.admission(&pots.objects, &self.room.room);
         let slot = state.reserved_slot_in(&admission)?;
+        let (tile, art) = if slot == FA_SLOT {
+            (0xFA, 0x96_E1A6)
+        } else {
+            (0xFB, 0x96_E1AB)
+        };
         Some(CarriedPot {
-            tile: if slot == FA_SLOT { 0xFA } else { 0xFB },
+            tile,
+            art,
             flight: state.flight().map(|flight| (flight.x, flight.y)),
+        })
+    }
+
+    /// Ark's carry pose, from the lift until the throw's recovery ends.
+    #[must_use]
+    pub fn carry(&self) -> Option<Carry> {
+        let state = self.pots.as_ref()?.state?;
+        let motion = match state.phase() {
+            Phase::Empty => return None,
+            Phase::Lifting => PandoraCarryMotion::Lifting,
+            Phase::Throwing => PandoraCarryMotion::Throwing,
+            // The queued step, not the walker's retained direction: Ark
+            // stands the frame the pad is released.
+            Phase::Held if state.walking().delayed_direction().is_some() => {
+                PandoraCarryMotion::Walking
+            }
+            Phase::Held => PandoraCarryMotion::Standing,
+        };
+        Some(Carry {
+            motion,
+            facing: match state.facing() {
+                Direction::Down => 0,
+                Direction::Up => 1,
+                Direction::Left => 2,
+                Direction::Right => 3,
+            },
+            tick: state.phase_tick(),
         })
     }
 

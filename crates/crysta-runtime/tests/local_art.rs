@@ -388,3 +388,38 @@ fn yomi_draws_in_the_weapons_room_and_the_spears_display_does_not_borrow_it() {
         "the spear's display"
     );
 }
+
+#[test]
+fn every_carry_pose_and_the_flying_pots_rasterize_with_pixels() {
+    use assets::sprites::{PandoraCarryMotion, PandoraSprites};
+    use crysta_runtime::art::CarryArt;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let art = CarryArt::from_rom(cartridge.image()).unwrap();
+    let pots = [0x96_E1A6, 0x96_E1AB];
+    for motion in [
+        PandoraCarryMotion::Lifting,
+        PandoraCarryMotion::Standing,
+        PandoraCarryMotion::Walking,
+        PandoraCarryMotion::Throwing,
+    ] {
+        for facing in 0..4 {
+            let pose = PandoraSprites::carry_pose(motion, facing).unwrap();
+            let ark = art
+                .animation(pose.ark_art, pose.ark_selector, pose.ark_hflip)
+                .unwrap_or_else(|error| panic!("{motion:?} {facing}: {error}"));
+            assert!(ark.frames.iter().all(Raster::is_visible));
+            for pot in pots {
+                let held = art
+                    .animation(pot, pose.pot_selector, pose.pot_hflip)
+                    .unwrap_or_else(|error| panic!("{motion:?} {facing} pot: {error}"));
+                assert!(held.frames.iter().any(Raster::is_visible));
+            }
+        }
+    }
+    for pot in pots {
+        let flight = art.animation(pot, CarryArt::FLIGHT, false).unwrap();
+        assert!(flight.frames.iter().all(Raster::is_visible));
+    }
+}
