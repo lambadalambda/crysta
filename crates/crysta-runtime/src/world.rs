@@ -18,6 +18,9 @@ use room_core::{
 };
 use std::fmt;
 
+mod pots;
+pub use pots::{CarriedPot, LIFTED_TILE};
+
 /// A map the player is standing in, and where they are standing.
 #[derive(Clone)]
 pub struct World<'a> {
@@ -47,6 +50,8 @@ pub struct World<'a> {
     patched: Vec<(u16, u16, u16)>,
     /// The bitmap at map entry, which decided the spawn stream's branches.
     spawn_events: Vec<u8>,
+    /// The cellar's pots, when this map has them.
+    pots: Option<pots::Pots>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -86,6 +91,8 @@ pub enum WorldError {
         /// Underlying failure.
         source: ExitError,
     },
+    /// The pot component refused even a neutral frame.
+    Pot(room_core::pots::Error),
 }
 
 impl From<RoomError> for WorldError {
@@ -104,6 +111,7 @@ impl fmt::Display for WorldError {
             Self::Room(source) => write!(f, "{source}"),
             Self::Residents { map, source } => write!(f, "map {map:#06x} residents: {source}"),
             Self::Exits { map, source } => write!(f, "map {map:#06x} exits: {source}"),
+            Self::Pot(source) => write!(f, "{source}"),
         }
     }
 }
@@ -115,6 +123,7 @@ impl std::error::Error for WorldError {
             Self::Room(source) => Some(source),
             Self::Residents { source, .. } => Some(source),
             Self::Exits { source, .. } => Some(source),
+            Self::Pot(source) => Some(source),
         }
     }
 }
@@ -216,6 +225,7 @@ impl<'a> World<'a> {
         };
         let blocked = blocking_cells(&present, &actors);
         let built = occupy_cells(base.clone(), &blocked)?;
+        let cellar = pots::Pots::at_entry(map, base.room.cells());
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -234,6 +244,7 @@ impl<'a> World<'a> {
             globals: Globals::with_events(events),
             scene: None,
             patched: Vec::new(),
+            pots: cellar,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -551,7 +562,13 @@ impl<'a> World<'a> {
         let busy = self.globals.dialogue.busy();
         self.globals.dialogue.press(presses);
         let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
-        let step = self.step_interactive(direction.filter(|_| !locked))?;
+        let direction = direction.filter(|_| !locked);
+        let lift = presses.confirm && !locked && !busy && !self.globals.dialogue.busy();
+        if let Some(step) = self.pot_frame(direction, lift)? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
+        let step = self.step_interactive(direction)?;
         let free = !busy && self.scene.is_none() && !self.globals.dialogue.busy();
         if presses.confirm && free && !self.talk() {
             return Ok((step, Some(self.interact_checked()?)));
@@ -864,6 +881,8 @@ impl<'a> World<'a> {
         if entered.base.layer_source == self.base.layer_source {
             entered.globals.patches.clone_from(&self.patched);
             entered.apply_patches()?;
+            // Lifted pots stay lifted.
+            entered.pots = pots::Pots::at_entry(map, entered.base.room.cells());
         }
         Ok(entered)
     }
@@ -1085,6 +1104,7 @@ mod tests {
             globals: Globals::with_events(new_game_flags()),
             scene: None,
             patched: Vec::new(),
+            pots: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

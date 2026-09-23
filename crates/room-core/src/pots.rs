@@ -217,8 +217,13 @@ impl PotState {
         state.consumed = consumed;
         Ok(state)
     }
-    // Aggregate-only qualified forced motion: preserve the visit ledger, never a new pot.
-    pub(crate) fn rebase(&mut self, walking: WalkingState, facing: Direction) -> Result<(), Error> {
+    /// Hands back the parent's walking between actions, keeping the room visit's
+    /// consumed-cell ledger; for parents that own ordinary walking while no pot
+    /// is held. Never a new pot or a teleport during an action.
+    ///
+    /// # Errors
+    /// Refuses while a pot is owned or an A pulse is queued.
+    pub fn rebase(&mut self, walking: WalkingState, facing: Direction) -> Result<(), Error> {
         if self.phase != Phase::Empty || self.delayed_action {
             return Err(Error::Input);
         }

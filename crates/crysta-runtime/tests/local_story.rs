@@ -316,3 +316,156 @@ fn two_hits_break_the_blue_door_and_open_the_stairs() {
     assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
     assert!(world.patched_cells().contains(&(11, 20, 0xF6)));
 }
+
+/// Native pad runs from the Pandora journey's pot segments
+/// (`docs/pandora-pots.md`): 0 Down, 1 Up, 2 Left, 3 Right, 4 A, 5 neutral.
+const MISS: &[(u8, u16)] = &[
+    (4, 1),
+    (5, 120),
+    (0, 22),
+    (5, 60),
+    (3, 55),
+    (5, 60),
+    (1, 1),
+    (5, 40),
+    (4, 1),
+    (5, 180),
+];
+const FA_HIT: &[(u8, u16)] = &[
+    (4, 1),
+    (5, 120),
+    (0, 45),
+    (5, 60),
+    (0, 22),
+    (5, 60),
+    (3, 66),
+    (5, 60),
+    (1, 40),
+    (5, 60),
+    (3, 33),
+    (5, 60),
+    (1, 20),
+    (5, 80),
+    (4, 1),
+    (5, 180),
+];
+const FB_HIT: &[(u8, u16)] = &[
+    (4, 1),
+    (5, 120),
+    (3, 33),
+    (5, 60),
+    (0, 28),
+    (5, 60),
+    (3, 33),
+    (5, 60),
+    (1, 20),
+    (5, 80),
+    (4, 1),
+    (5, 240),
+];
+
+/// Plays pad runs through the world, as the host would.
+fn replay(world: &mut World<'_>, runs: &[(u8, u16)]) {
+    for &(pad, frames) in runs {
+        let direction = match pad {
+            0 => Some(Direction::Down),
+            1 => Some(Direction::Up),
+            2 => Some(Direction::Left),
+            3 => Some(Direction::Right),
+            _ => None,
+        };
+        let presses = if pad == 4 { A } else { Presses::default() };
+        for _ in 0..frames {
+            world.update(direction, presses).unwrap();
+        }
+    }
+}
+
+#[test]
+fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
+    // The three native segments, each from its lift pose: FA from (104,352)
+    // thrown from (136,368) misses; FA from (40,352) and FB from (88,352)
+    // thrown from (184,368) hit, and the second hit opens the stairs.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    for _ in 0..60 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    let read_out = |world: &mut World<'_>| {
+        for _ in 0..3000 {
+            let reading = world.dialogue().is_some() || world.in_scene();
+            world
+                .update(None, if reading { A } else { Presses::default() })
+                .unwrap();
+            if !reading && !world.pad_locked() && world.dialogue().is_none() {
+                return;
+            }
+        }
+        panic!("the reaction never ended");
+    };
+    let segment = |world: &mut World<'_>, (x, y, facing), runs| {
+        world.place(x, y);
+        world.face(facing);
+        replay(world, runs);
+    };
+
+    segment(&mut world, (104, 352, Direction::Left), MISS);
+    assert_eq!(world.position(), (136, 368));
+    assert!(world.patched_cells().contains(&(5, 21, 0xF8)), "lifted");
+    assert!(world.pot().is_none(), "broken");
+    assert!(!world.pad_locked() && world.dialogue().is_none(), "no hit");
+
+    segment(&mut world, (40, 352, Direction::Right), FA_HIT);
+    // Holding Up against the door runs its push test (`COP 2F`) unfrozen.
+    assert!(world
+        .frozen_scripts()
+        .iter()
+        .all(|(record, _)| *record != DOOR));
+    assert!(world.patched_cells().contains(&(3, 21, 0xF8)));
+    assert!(
+        world.patched_cells().contains(&(11, 21, 0x181)),
+        "the first hit"
+    );
+    read_out(&mut world);
+    assert!(!flag(&world, 0x292));
+
+    segment(&mut world, (88, 352, Direction::Left), FB_HIT);
+    assert!(flag(&world, 0x292), "the second hit");
+    read_out(&mut world);
+    assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
+}
+
+#[test]
+fn a_carried_pot_is_shown_in_hand_then_in_flight() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    world.update(None, Presses::default()).unwrap();
+    world.place(88, 352);
+    world.face(Direction::Left);
+    assert!(world.pot().is_none());
+    replay(&mut world, &FB_HIT[..2]);
+    assert_eq!(
+        world.pot().map(|pot| (pot.tile, pot.flight)),
+        Some((0xFB, None)),
+        "held"
+    );
+    // The last walk and the throw, then 19 frames to the first flight sample.
+    replay(&mut world, &FB_HIT[2..10]);
+    assert_eq!(world.position(), (184, 368));
+    replay(&mut world, &[(4, 1), (5, 19)]);
+    assert_eq!(world.pot().and_then(|pot| pot.flight), Some((184, 357)));
+}

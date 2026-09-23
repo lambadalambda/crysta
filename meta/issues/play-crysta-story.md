@@ -37,6 +37,9 @@ game's own scripts, not hand-authored graphs.
   `$28`; blue door C `$27`, `$2E`; pot hits `$292`; box `$21` `$22`; tour
   `$41..$44` `$243`, `$244`; spear `$240..$242`; frozen return `$FE`, `$23`;
   doorway Elder D `$21`, `$296`; town scene `$3C`; south gate to `$03`.
+- Open gap: a layer reload (for example `$21` back to `$20`) drops the
+  carried tile patches; the opened blue door needs the loader's flag-gated
+  patches then.
 
 ## Sub-issues
 

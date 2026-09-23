@@ -61,7 +61,12 @@ The blue door in C breaks after two pot hits, counted by controller `$838C32` in
   the door twice (host `World::strike`): `$292`, the stair patches, the
   reaction to local 9 and control return; the patches are still there in B.
 - Text `$C4 0` (a page without its window) now decodes outside Pandora.
-- Remaining: lifting, carrying and throwing pots with real presses, and the
-  pot's hit test against the door. Also flag-gated loader patches, which a
-  layer reload (for example from `$21` back to `$20`) needs to show the
-  opened door.
+- Pots run through `room_core::pots` from the world's pad
+  (`docs/pandora-pots.md`, World integration). A story test replays the
+  native presses: the throw from (136,368) misses, the two from (184,368)
+  hit, and the stairs open. The app draws the pot with its metatile.
+- `COP 2F` and the player-pose idiom keep the door's push test running;
+  occupancy follows script marks, so the door leaves the lane open.
+- Limits (component contract): native lift poses and the two Up lanes only,
+  no put-down, no exits while carrying. The push page `$AC3C` needs a push
+  pose, which the runtime's Ark does not play.

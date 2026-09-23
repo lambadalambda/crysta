@@ -245,5 +245,20 @@ integration, profiles and live preview8765 are untouched.
 The parent has independently reproduced and accepted this component and the
 strict direct Pandora source route under `headless-sync-video-v1`. This
 supersedes earlier pending observer/parent handoff statements, **not** the
-source-only coverage or fidelity/admission limits in this contract. Portable
-Pandora integration remains open and the live host stays on the house profile.
+source-only coverage or fidelity/admission limits in this contract.
+
+### World integration
+
+`crysta_runtime::world` drives this component in map C (`world/pots.rs`). The
+world owns ordinary walking and hands it over (`PotState::rebase`) on an A
+press the component admits; the component then moves the player until the
+throw's recovery. Its collision is the live room with lifted cells back at
+their source words, and a throw keeps the collision it started with. A
+consumed cell becomes a `$F8` tile patch; `door_hit` strikes the hittable
+resident in the flight's column. The catalog is the entry room's `18FA`/`18FB`
+words, so lifted pots stay lifted across maps that keep the layer. The
+native app draws the pot with its metatile, cut out of `$F8`, until the pot
+sprite is decoded.
+
+Limits follow the contract: a lift needs the native poses, a throw one of the
+two Up lanes, and there is no put-down, so a carried pot takes no exits.

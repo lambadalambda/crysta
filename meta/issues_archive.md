@@ -108,3 +108,4 @@
 - [x] [Run scene dialogue, choices and flags from scripts](issues/script-dialogue-choices.md)
 - [x] [Play Elle's wake-up scene](issues/bedroom-wake-up-scene.md)
 - [x] [Apply flag-gated doors, blockers and tile patches](issues/flag-gated-geometry.md)
+- [x] [Lift and throw pots to break the blue door](issues/pot-throw-door.md)
