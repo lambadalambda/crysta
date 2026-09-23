@@ -240,3 +240,26 @@ fn census_of_records_whose_art_decodes() {
     }
     assert!(decoded >= 9, "at least the frozen nine must decode");
 }
+
+#[test]
+fn elle_decodes_on_the_shared_record_path() {
+    // Elle's `$00` record shares `$80:F51A` with `$01` records; her descriptor
+    // `$83:F881` is mode `$A0` (class 0, common movement, streamed sprite),
+    // palette `$90`, graphics `$30`. The twin `$83:F88E` is mode `$20`.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut fresh = vec![0u8; 512];
+    fresh[251 / 8] |= 1 << (251 % 8);
+    let list = SpawnList::from_rom(image, 0x000F).unwrap();
+    let decoded = decode_map(image, 0x000F, &fresh);
+    let index = list
+        .records()
+        .iter()
+        .position(|record| record.offset() == 0x03_8D36)
+        .expect("Elle's record");
+    assert_eq!(list.records()[index].opcode(), 0);
+    let elle = decoded[index].as_ref().expect("Elle's art");
+    assert_eq!(elle.initial(), 2, "her header's first pose");
+}

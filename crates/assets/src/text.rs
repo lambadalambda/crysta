@@ -557,6 +557,10 @@ fn decode_profile(
             0xd4 => {
                 if let Some(caller) = d.stack.pop() {
                     d.pc = caller;
+                } else if d.page.glyphs.is_empty() && !d.pages.is_empty() {
+                    // `$D5 $D4`: the last page was acknowledged; return to
+                    // the script with the window open for its next request.
+                    return Ok(d.pages);
                 } else {
                     d.boundary(at, Acknowledgement::None)?;
                     return Ok(d.pages);

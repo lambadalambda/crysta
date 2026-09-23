@@ -239,7 +239,7 @@ impl HouseActor {
     /// does not. `records` should be in executed order
     /// ([`SpawnList::resolve`](crate::maps::actors::SpawnList::resolve)). The
     /// native loader always has that predecessor; this one may have refused
-    /// it, including every `$00` record, and then the reuse is refused too
+    /// it, and then the reuse is refused too
     /// rather than handed the last body that happened to decode.
     pub fn from_records(
         image: &[u8],
@@ -249,7 +249,7 @@ impl HouseActor {
     ) -> Vec<Result<Self, RecordRefusal>> {
         let mut out: Vec<Result<Self, RecordRefusal>> = Vec::with_capacity(records.len());
         for (index, record) in records.iter().enumerate() {
-            if record.opcode() != 1 || record.bytes().len() != 10 {
+            if record.opcode() > 1 || record.bytes().len() != 10 {
                 out.push(Err(RecordRefusal::NoDescriptor));
                 continue;
             }
@@ -282,7 +282,7 @@ impl HouseActor {
         previous: Option<&Self>,
     ) -> Result<Self, SpriteError> {
         let spawn = record.bytes();
-        if record.opcode() != 1 || spawn.len() != 10 {
+        if record.opcode() > 1 || spawn.len() != 10 {
             return Err(SpriteError::Invalid(
                 "spawn record carries no resource descriptor",
             ));
@@ -794,8 +794,10 @@ impl<'a> Loader<'a> {
     ) -> Result<Resource, SpriteError> {
         let prefix = take(self.image, at, 5)?;
         let extra = match prefix[3..5] {
-            // $0022 (Crysta birds, $83:ED37) has no movement pointer, like $0020.
-            [0x20 | 0x22, 0] => 0,
+            // $0022 (Crysta birds, $83:ED37) has no movement pointer, like $0020;
+            // nor has $00A0 (Elle, $83:F881), whose bit 7 streams her frames
+            // through WRAM instead of VRAM -- the same pixels.
+            [0x20 | 0x22 | 0xA0, 0] => 0,
             [0, 0] => 3,
             _ => return Err(SpriteError::Invalid("unsupported house movement resource")),
         };
@@ -807,7 +809,7 @@ impl<'a> Loader<'a> {
         if extra != 0 {
             pointer(&d[5..8])?;
         }
-        if ![0x80, 0x81].contains(&d[pal])
+        if ![0x80, 0x81, 0x90].contains(&d[pal])
             || ![0, 2, 4].contains(&d[pal + 1])
             || d[pal + 2] != 2
             || ![8, 10].contains(&d[pal + 3])
@@ -822,7 +824,7 @@ impl<'a> Loader<'a> {
         let graphics_cpu = if reuse {
             None
         } else {
-            if d[gfx..gfx + 3] != [0, 0, 0xc0] || ![0, 3].contains(&d[gfx + 3]) {
+            if d[gfx..gfx + 3] != [0, 0, 0xc0] || ![0, 3, 0x30].contains(&d[gfx + 3]) {
                 return Err(SpriteError::Invalid("unsupported house graphics transfer"));
             }
             Some(cpu(self.read(0xfda4 + usize::from(d[gfx + 3]), 3)?))
