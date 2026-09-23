@@ -47,3 +47,7 @@
 - [ ] [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
 - [ ] [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [ ] [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
+- [ ] [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
+- [ ] [Select music per map load](issues/music-per-map.md)
+- [ ] [Change music in scenes](issues/music-in-scenes.md)
+- [ ] [Play sound effects](issues/sound-effects.md)
