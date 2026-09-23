@@ -6,7 +6,7 @@
 
 use std::{ffi::c_void, fmt, marker::PhantomData, ptr::NonNull, rc::Rc};
 
-#[cfg(target_arch = "wasm32")]
+#[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
 mod wasm_libc;
 
 /// Native DSP stereo frames per second (not interleaved sample count).
