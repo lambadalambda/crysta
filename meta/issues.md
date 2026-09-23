@@ -51,3 +51,7 @@
 - [ ] [Select music per map load](issues/music-per-map.md)
 - [ ] [Change music in scenes](issues/music-in-scenes.md)
 - [ ] [Play sound effects](issues/sound-effects.md)
+- [ ] [Show Ark's lift, carry and throw poses](issues/ark-pot-poses.md)
+- [ ] [Let the friend at the blue door step aside](issues/blue-door-friend-steps-aside.md)
+- [ ] [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
+- [ ] [Animate door and stair transitions](issues/door-and-stair-transitions.md)

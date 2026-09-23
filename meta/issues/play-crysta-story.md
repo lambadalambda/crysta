@@ -51,3 +51,7 @@ game's own scripts, not hand-authored graphs.
 7. [Play the tour inside the box and take the spear](box-tour-and-spear.md)
 8. [Play the frozen return and the Elder's mission](frozen-return-mission.md)
 9. [Leave through the south gate onto the world map](south-gate-world-map.md)
+10. [Show Ark's lift, carry and throw poses](ark-pot-poses.md)
+11. [Let the friend at the blue door step aside](blue-door-friend-steps-aside.md)
+12. [Draw Yomi instead of a placeholder](yomi-sprite.md)
+13. [Animate door and stair transitions](door-and-stair-transitions.md)
