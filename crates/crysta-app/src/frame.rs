@@ -247,6 +247,7 @@ pub fn draw_cursor(canvas: &mut Canvas, (left, top): (usize, usize), [x, y]: [u1
 ///
 /// Returns `None` for anything that is not that exact shape rather than
 /// guessing at a format.
+#[cfg(test)]
 #[must_use]
 pub fn decode_bmp(bytes: &[u8]) -> Option<Background> {
     // BITMAPFILEHEADER is 14 bytes; BITMAPINFOHEADER follows.

@@ -81,6 +81,21 @@ impl VisualResource {
     }
 }
 
+/// The first background a load of `map_id` shows: the allowlisted recipes,
+/// and the box's tour maps `$41`..`$44`, which the tour controller
+/// initializes after `$21` ([`pandora::PandoraBackground`]).
+///
+/// # Errors
+/// As [`StaticBackground::from_rom`] and [`pandora::PandoraBackground::from_rom`].
+pub fn first_background(image: &[u8], map_id: u16) -> Result<StaticBackground, VisualMapError> {
+    match map_id {
+        0x0041..=0x0044 => {
+            Ok(pandora::PandoraBackground::from_rom(image, map_id)?.into_background())
+        }
+        _ => StaticBackground::from_rom(image, map_id),
+    }
+}
+
 /// Qualified first-background resources and sampling.
 ///
 /// [`Self::from_rom`] admits Japanese maps $000A–$000D, $000F–$0011 and $0128.

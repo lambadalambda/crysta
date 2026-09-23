@@ -87,6 +87,11 @@ impl PandoraBackground {
     pub const fn background(&self) -> &StaticBackground {
         &self.background
     }
+    /// The background alone, for a caller that loads the map as the game does.
+    #[must_use]
+    pub fn into_background(self) -> StaticBackground {
+        self.background
+    }
     /// Full initialized grid, not a movement halo or a dynamic-phase snapshot.
     #[must_use]
     pub fn attributed_grid(&self) -> &[MapCell] {

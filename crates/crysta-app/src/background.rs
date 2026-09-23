@@ -32,20 +32,16 @@ impl VisitClock {
 pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
     let region =
         CameraRegion::from_rom(cartridge.image(), map).map_err(|error| error.to_string())?;
-    let rendered = map_inspector::render_static_background(cartridge, map)
+    let scene = assets::maps::visual::first_background(cartridge.image(), map)
         .map_err(|error| error.to_string())?;
-    let mut background =
-        crate::frame::decode_bmp(&rendered.bitmap).ok_or("invalid static background bitmap")?;
+    let (mut background, indices) = render(&scene)?;
     let [_, _, right, bottom] = region.bounds;
     if usize::from(right) > background.width || usize::from(bottom) > background.height {
         return Err("camera region outside the decoded layer".into());
     }
-    background.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
     let animation = if map == 0xA {
-        let scene = StaticBackground::from_rom(cartridge.image(), map)
-            .map_err(|error| error.to_string())?;
         let color = exterior_backdrop(cartridge.image(), &scene)?;
-        composite_backdrop(&mut background.pixels, &rendered.indices, color)?;
+        composite_backdrop(&mut background.pixels, &indices, color)?;
         Some(AnimatedExterior::new(cartridge.image(), scene, color)?)
     } else {
         None
@@ -56,6 +52,36 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
         animation,
         patches: Patches::default(),
     })
+}
+
+/// The whole first layer, as the inspector's static export draws it, and
+/// each pixel's palette index. The same loop as `map_inspector`'s export,
+/// whose source is hash-pinned by a qualification fixture; it also covers the
+/// tour maps through `first_background`.
+fn render(scene: &StaticBackground) -> Result<(crate::frame::Background, Vec<u8>), String> {
+    let (width, height) = (scene.layer().width() * 16, scene.layer().height() * 16);
+    let mut background = crate::frame::Background {
+        pixels: Vec::with_capacity(width * height),
+        width,
+        height,
+        high: Vec::with_capacity(width * height),
+    };
+    let mut indices = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let (index, high) = match scene.pixel(x, y).map_err(|error| error.to_string())? {
+                IndexedPixel::Transparent => (0, false),
+                IndexedPixel::Opaque {
+                    palette_index,
+                    priority,
+                } => (palette_index, priority),
+            };
+            background.pixels.push(static_rgb(index, scene, (x, y)));
+            background.high.push(high);
+            indices.push(index);
+        }
+    }
+    Ok((background, indices))
 }
 
 /// Cells the world's scripts have re-tiled, and what they looked like.
@@ -70,7 +96,7 @@ struct Patches {
 impl Patches {
     fn scene(&mut self, image: &[u8], map: u16) -> Option<&StaticBackground> {
         if self.scene.is_none() {
-            self.scene = StaticBackground::from_rom(image, map).ok();
+            self.scene = assets::maps::visual::first_background(image, map).ok();
         }
         self.scene.as_ref()
     }
@@ -472,6 +498,22 @@ mod patch_tests {
         assert_ne!(cell(&cached), before);
         cached.apply_patches(rom.image(), 0xC, &[]);
         assert_eq!(cell(&cached), before, "restored when the patch is gone");
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn the_first_layer_renders_as_the_inspector_exports_it_and_the_tour_loads() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let exported = map_inspector::render_static_background(&rom, 0xF).unwrap();
+        let reference = crate::frame::decode_bmp(&exported.bitmap).unwrap();
+        let loaded = super::load(&rom, 0xF).unwrap();
+        assert_eq!(loaded.frame.pixels, reference.pixels);
+        let priorities: Vec<bool> = exported.priorities.iter().map(|bit| *bit != 0).collect();
+        assert_eq!(loaded.frame.high, priorities);
+        for map in 0x41..=0x44 {
+            assert!(super::load(&rom, map).is_ok(), "map {map:#x}");
+        }
     }
 
     #[test]
