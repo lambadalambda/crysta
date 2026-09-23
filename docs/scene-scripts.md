@@ -198,7 +198,10 @@ below the blue door; after him the slice is as before.
 Spawn lists also hold `FE` records: script-only controllers at (8,0) with
 their script at bytes 2..4 (`docs/house-scene.md`); the runtime runs them.
 The `FD` record with `$84:A129` is the player's own and is skipped. Stairs
-(selector 14) settle at the raw anchor plus (8,16).
+(selector 14) settle at the raw anchor plus (8,16), and so do the stairs back
+up (selector 13), as natively into E and C (into `$20` natively (8,8)).
+The up-stairs' type 29 cells (`$21` (8,6), `$20` (25,53), E (9,53)) are
+admitted Up-only, as the ones going down.
 
 A facing Up at a wooden door's lower cell (low nine bits `$F3`, sampled 24
 pixels above the feet, from a cell-aligned y) runs the door script

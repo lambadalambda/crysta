@@ -977,8 +977,9 @@ impl<'a> World<'a> {
         let (x, y) = match arrival {
             Some(arrival) => arrival.position(),
             // Stairs settle at the raw anchor plus (8,16): `$8D:89BD`'s
-            // selector adjustment, then the stair walk back by the same.
-            None if record.selector() == STAIRS => {
+            // selector adjustment, then the stair walk back by the same. Up
+            // (13) as natively into E and C; into `$20` natively (8,8).
+            None if matches!(record.selector(), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)
             }
@@ -1015,8 +1016,9 @@ impl<'a> World<'a> {
     }
 }
 
-/// The stair transfer selector (decimal 14).
+/// The stair transfer selectors (decimal): 14 down, 13 back up.
 const STAIRS: u8 = 14;
+const STAIRS_UP: u8 = 13;
 /// A closed door's collision type: C's blue door stands on its stairs with
 /// it (`$0B81`) until it breaks.
 const CLOSED_DOOR: u16 = 5;

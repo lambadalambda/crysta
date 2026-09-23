@@ -340,6 +340,18 @@ pub fn room_candidate(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
     Ok(built)
 }
 
+/// Up-only open stair cells (`MaterialAlias::StairOpen29`).
+fn stairs(cells: &[[u16; 4]]) -> Vec<MaterialRule> {
+    cells
+        .iter()
+        .map(|&bounds| MaterialRule {
+            bounds,
+            direction: Some(Direction::Up),
+            alias: MaterialAlias::StairOpen29,
+        })
+        .collect()
+}
+
 /// Classifications `room-core` already qualified, scoped to their own cells.
 ///
 /// Its default table leaves attributes 5, 25 and 29 undecided, but it carries
@@ -367,16 +379,10 @@ pub fn qualified_policy(map: u16, width: u16, height: u16) -> Vec<MaterialRule> 
                 alias: MaterialAlias::StairOpen29,
             },
         ],
-        0x000E => vec![MaterialRule {
-            bounds: [6, 53, 7, 54],
-            direction: Some(Direction::Up),
-            alias: MaterialAlias::StairOpen29,
-        }],
-        0x0020 => vec![MaterialRule {
-            bounds: [22, 53, 23, 54],
-            direction: Some(Direction::Up),
-            alias: MaterialAlias::StairOpen29,
-        }],
+        // Each stair down and, on the native return route, back up.
+        0x000E => stairs(&[[6, 53, 7, 54], [9, 53, 10, 54]]),
+        0x0020 => stairs(&[[22, 53, 23, 54], [25, 53, 26, 54]]),
+        0x0021 => stairs(&[[8, 6, 9, 7]]),
         _ => Vec::new(),
     }
 }
@@ -399,8 +405,8 @@ mod tests {
         for map in MAPS {
             let rules = qualified_policy(map, 64, 80);
             let expected = match map {
-                0x000A | 0x000E | 0x0020 => 1,
-                0x000C => 2,
+                0x000A | 0x0021 => 1,
+                0x000C | 0x000E | 0x0020 => 2,
                 _ => 0,
             };
             assert_eq!(rules.len(), expected, "map {map:#06x}");

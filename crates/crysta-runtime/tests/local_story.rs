@@ -847,3 +847,49 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     replay(&mut world, &[(1, 12), (5, 12)]);
     assert_ne!(world.position(), before, "Ark walks again, toward the exit");
 }
+
+#[test]
+fn the_stairs_lead_back_up_from_the_box_room_to_c() {
+    // Selector 13 back up: `$21` (8,6) -> `$20`, `$20` (25,53) -> E, E (9,53)
+    // -> C, each Up-only type 29 (`$3ACA`). Natively E (104,880) and C
+    // (184,368) are the raw anchor plus (8,16); `$20` rests at (360,872).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244, 0x240, 0x241, 0x242, 0xFE, 0x23] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
+    let mut landings = Vec::new();
+    for (column, map) in [(None, 0x0020), (Some(408), 0x000E), (Some(152), 0x000C)] {
+        if let Some(column) = column {
+            for _ in 0..200 {
+                if world.position().0 >= column {
+                    break;
+                }
+                world
+                    .update(Some(Direction::Right), Presses::default())
+                    .unwrap();
+            }
+        }
+        for _ in 0..400 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+            if world.map() == map {
+                break;
+            }
+        }
+        landings.push((world.map(), world.position()));
+    }
+    assert_eq!(
+        landings,
+        [
+            (0x0020, (360, 880)),
+            (0x000E, (104, 880)),
+            (0x000C, (184, 368))
+        ]
+    );
+}
