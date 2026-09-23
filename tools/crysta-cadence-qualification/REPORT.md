@@ -96,3 +96,23 @@ hold position over two 8-frame records. After every action one frame shows
 list index and repetition count zero and no action: this script closes its
 loop with `COP 03` (`$80:85F8`), which yields exactly one frame when it
 loops back. That frame belongs to the script, not to the action.
+
+### Script services around the action
+
+Read from the handlers (dispatch `$80:83B2 + 2*service`); none writes class,
+movement base or bank, stream pointers, the +`$04` movement bits, +`$06` bit
+`$0080`, the flip bit, the hitbox, +`$22` or the display list.
+
+- `COP 02 n` (`$80:85DF`): loop count to `$7F:0002`, loop start (after the
+  operand) to `$7F:0000`. One level per slot.
+- `COP 03` (`$80:85F8`): decrements the count; nonzero sets the script
+  pointer to the loop start and yields; `$80:C731` has cleared +`$0E`, so
+  dispatch resumes on the next frame. Zero continues after the command.
+- `COP C1 n` (`$80:AB17`): +`$0E` = n, then yields; the script resumes on
+  frame F+n+1 while movement and animation keep running.
+- `COP 0A word target` (`$80:8720`): branches when `word & $7FFF` equals
+  `$047E`, the map; bit 15 inverts. It does not yield: a taken branch
+  continues at the target in the same frame.
+- `COP 21`, `3B`, `65`, `BB` write the interaction script, cell occupancy,
+  the collision callback (+`$04 |= $0200`) and +`$08` bits under `$0E00`
+  respectively.

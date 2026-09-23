@@ -100,3 +100,5 @@
 - [x] [Name the river test's inputs when they are missing](issues/name-river-test-inputs.md)
 - [x] [Witness a class-2 Crysta walker natively](issues/witness-class-two-walker.md)
 - [x] [Derive each walker's step and idle timing from source](issues/derive-walker-cadence-from-source.md)
+- [x] [Execute counted loops, timed waits and the map branch in resident scripts](issues/execute-script-loops-and-waits.md)
+- [x] [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)

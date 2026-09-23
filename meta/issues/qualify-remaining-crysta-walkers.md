@@ -52,3 +52,13 @@ still use the approximate eight-tick, two-pixel projection.
 - Header byte 1 is the low byte of entity flags +`$04`; bit `$0004` selects
   the collision-checked movement path at `$80:D101`, with the same deltas on
   free cells.
+
+## Result
+
+- All eight drawn `COP 26` walkers in the 24 maps are admitted with
+  source-derived timing (classes 0 and 2); none is refused. The class-2 row
+  has a native witness in the town, retained in the qualification tool.
+- Expected rates per walker are tabled in `docs/native-crysta-timing.md`.
+- `COP 8E` waits stay a one-frame approximation, and a non-admitted step
+  followed by `COP C1` finishes before the wait where hardware keeps moving;
+  no slice resident does this.

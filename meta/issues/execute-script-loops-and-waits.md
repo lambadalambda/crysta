@@ -33,3 +33,19 @@ after each action and runs its four counted loops (16 steps, then pose
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Handler facts: `tools/crysta-cadence-qualification/REPORT.md`.
+
+## Result
+
+- `actors.rs` executes `COP 02/03` (one loop level per actor, loop-back
+  yields one frame), `COP C1 n` (`Waiting(n)`, resume on F+n+1; n = 0 yields
+  one frame) and `COP 0A` (map stored on the actor at spawn). They left the
+  skipped-service allowlist, which keeps `21`, `3B`, `65` and `BB < $40`.
+- Four tests failed before the services existed (red) and pass after: the
+  counted loop, three wait lengths, four map-branch cases, and the owned-ROM
+  town walker, whose action starts are 33 ticks apart after a step and 17
+  after an idle, reaching pose 6 after sixteen actions.
+- 44 runtime tests (including a `COP 03` without `COP 02`, which freezes),
+  workspace fmt/Clippy/tests and 65 app tests with the ROM pass.
+- Independent review approved; a side-by-side run of all 24 maps for 3000
+  ticks changed only five town residents, none frozen. Its should-fix items
+  (misplaced helper, duplicate word reader) were applied.

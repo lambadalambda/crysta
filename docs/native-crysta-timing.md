@@ -113,13 +113,16 @@ exactly 16 px at the row's 1,0 stream; idle lengths must not depend on facing.
 That is 30.05 px/s while walking (0.532 s per tile; `$1A` walks up in
 0.516 s) and 0.266 s per idle or refusal. The class-2 row was witnessed
 natively in the town; see the qualification tool. Skipped services keep
-admission only when their handlers write none of the assumed state: `COP 02`,
-`03`, `0A`, `21`, `3B`, `65`, and `BB` below `$40`. `COP 06`, class setters
-and anything else revoke it.
+admission only when their handlers write none of the assumed state: `COP 21`,
+`3B`, `65`, and `BB` below `$40`. `COP 06`, class setters and anything else
+revoke it.
 
-Not yet modelled: `COP 03` loops back with a one-frame yield, and
-`COP C1 n` waits n frames; the runtime skips both, so loop overhead and
-entry delays are still approximate.
+The interpreter also executes the loop and wait services these scripts use:
+`COP 02 n`/`COP 03` as a one-level counted loop whose loop-back yields one
+frame, `COP C1 n` as an n-frame suspension, and `COP 0A` as the map branch.
+The town walker `$83:8A2D` therefore repeats every 33 ticks after a step and
+17 after an idle, as witnessed natively, and plays its pose 6/7/8 section
+after sixteen actions. `COP 8E` waits remain the one-frame approximation.
 
 Reusable evidence tools and reproduction commands are in
 [`tools/crysta-cadence-qualification`](../tools/crysta-cadence-qualification/README.md).

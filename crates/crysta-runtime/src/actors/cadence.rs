@@ -198,7 +198,7 @@ fn common_streams(image: &[u8]) -> bool {
         })
 }
 
-fn word(bytes: &[u8], at: usize) -> Option<u16> {
+pub(super) fn word(bytes: &[u8], at: usize) -> Option<u16> {
     Some(u16::from_le_bytes(bytes.get(at..at + 2)?.try_into().ok()?))
 }
 
@@ -209,9 +209,9 @@ fn word(bytes: &[u8], at: usize) -> Option<u16> {
 /// COP65's callback is installed but never run here, as for every callback.
 pub(super) fn benign_skipped_service(image: &[u8], pc: usize) -> bool {
     match image.get(pc..pc + 3) {
-        // Counted loop start/end, map branch, interaction, occupancy, and the
-        // collision callback, which sets +$04 bit $0200 only.
-        Some(&[2, 0x02 | 0x03 | 0x0A | 0x21 | 0x3B | 0x65, _]) => true,
+        // Interaction, occupancy, and the collision callback, which sets
+        // +$04 bit $0200 only.
+        Some(&[2, 0x21 | 0x3B | 0x65, _]) => true,
         // +$08 = (+$08 & $F1FF) | operand << 8: below $40 the flip bit stays.
         Some(&[2, 0xBB, operand]) => operand < 0x40,
         _ => false,
@@ -290,7 +290,7 @@ mod tests {
             ([2, 0x3B, 0], true),
             ([2, 0x21, 0x94], true),
             ([2, 0x65, 0x24], true),
-            ([2, 0x03, 0x02], true),
+            ([2, 0x03, 0x02], false),
             ([2, 0xBB, 0x0E], true),
             ([2, 0xBB, 0x40], false),
             ([2, 0x06, 0x2D], false),

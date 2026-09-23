@@ -72,6 +72,18 @@ const STOP_FOR_PLAYER: u8 = 0x23;
 /// during a conversation; the runtime never sets it, so the service
 /// continues.
 const HOLD_WHILE_PAUSED: u8 = 0x59;
+/// Starts a counted loop; `$80:85DF`. Operand: a two-byte count. The count
+/// and the address after the operand are the slot's single loop level.
+const LOOP_START: u8 = 0x02;
+/// Ends a pass of the counted loop; `$80:85F8`. Decrements the count; while
+/// it is nonzero, jumps to the loop start and yields one frame.
+const LOOP_END: u8 = 0x03;
+/// Branches on the map; `$80:8720`. Operands: a word and a two-byte target.
+/// Taken when the word's low fifteen bits are the map; bit 15 inverts.
+const BRANCH_ON_MAP: u8 = 0x0A;
+/// Suspends the script for n frames and resumes on the frame after;
+/// `$80:AB17`. Operand: two-byte n. An action under way keeps moving.
+const TIMED_WAIT: u8 = 0xC1;
 
 /// Frames a one-tile step takes.
 pub const STEP_FRAMES: u16 = 8;
@@ -152,6 +164,10 @@ pub struct Actor {
     rng: u32,
     /// Source-derived COP26 timing, until a skipped service revokes it.
     cadence: Option<cadence::Cadence>,
+    /// The map the actor was spawned in, which `COP 0A` compares.
+    map: u16,
+    /// `COP 02`'s loop start and remaining count; one level per actor.
+    counted_loop: (usize, u16),
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -183,6 +199,8 @@ impl Actor {
             // A zero seed would stay zero.
             rng: seed | 1,
             cadence: None,
+            map: 0,
+            counted_loop: (0, 0),
             lengths: vec![None; 256],
         }
     }
@@ -196,6 +214,7 @@ impl Actor {
         seed: u32,
     ) -> Self {
         let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
+        actor.map = map;
         actor.cadence = resident
             .body
             .then(|| cadence::derive(image, map, resident.record).ok())
@@ -421,6 +440,10 @@ impl Actor {
             }
             BRANCH_ON_PLAYER_NEAR => return self.branch_near_player(operands, bank, around),
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
+            LOOP_START => return self.loop_start(operands, image),
+            LOOP_END => return self.loop_end(operands),
+            BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
+            TIMED_WAIT => return self.timed_wait(operands, image),
             HOLD_WHILE_PAUSED => self.pc = operands + 1,
             STOP_FOR_PLAYER => return self.stop_for_player(operands, bank, around),
             BRANCH_ON_FLAG => return self.branch_on_flag(operands, bank, around),
@@ -444,6 +467,60 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// `COP 02`. Returns whether execution continues this frame.
+    fn loop_start(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(count) = cadence::word(image, operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.pc = operands + 2;
+        self.counted_loop = (self.pc, count);
+        true
+    }
+
+    /// `COP 03`. Without a `COP 02` the count wraps and the start is zero,
+    /// which is no command, so the actor freezes there.
+    fn loop_end(&mut self, operands: usize) -> bool {
+        let (start, count) = self.counted_loop;
+        let count = count.wrapping_sub(1);
+        self.counted_loop.1 = count;
+        if count == 0 {
+            self.pc = operands;
+            return true;
+        }
+        self.pc = start;
+        false
+    }
+
+    /// `COP 0A`. Returns whether execution continues this frame.
+    fn branch_on_map(&mut self, operands: usize, bank: usize, image: &[u8]) -> bool {
+        let (Some(word), Some(target)) = (
+            cadence::word(image, operands),
+            cadence::word(image, operands + 2),
+        ) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        if (word & 0x7FFF == self.map) != (word & 0x8000 != 0) {
+            return self.jump(bank, target);
+        }
+        self.pc = operands + 4;
+        true
+    }
+
+    /// `COP C1`: always yields.
+    fn timed_wait(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(frames) = cadence::word(image, operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.pc = operands + 2;
+        if frames != 0 {
+            self.state = State::Waiting(frames);
+        }
+        false
     }
 
     /// Resumes at a bank-relative target, or freezes on one below `$8000`,
@@ -1277,5 +1354,149 @@ mod cadence_tests {
             actor.tick(&surroundings(&image, &[]));
             assert_eq!(actor.cadence.is_some(), kept, "{bytes:02X?}");
         }
+    }
+}
+
+#[cfg(test)]
+mod script_service_tests {
+    use super::*;
+
+    const AT: usize = 0x08_8000;
+
+    fn actor_running(code: &[u8]) -> (Vec<u8>, Actor) {
+        let mut image = vec![0; AT + code.len() + 2];
+        image[AT..AT + code.len()].copy_from_slice(code);
+        (image, Actor::new((56, 64), Some(0x88_8000), 0, 1))
+    }
+
+    fn tick(actor: &mut Actor, image: &[u8]) {
+        actor.tick(&Surroundings {
+            image,
+            events: &[0; 512],
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        });
+    }
+
+    #[test]
+    fn a_counted_loop_yields_one_frame_each_time_it_loops_back() {
+        // COP02 3; { pose 7; COP03 }; pose 9; wait.
+        let (image, mut actor) =
+            actor_running(&[2, 0x02, 3, 0, 2, 0x80, 7, 2, 0x03, 2, 0x80, 9, 2, 0x8E]);
+        for frame in 0..2 {
+            tick(&mut actor, &image);
+            assert_eq!(actor.selector, 7, "frame {frame} loops back and yields");
+        }
+        tick(&mut actor, &image);
+        assert_eq!(actor.selector, 9, "the third pass falls through");
+        assert_eq!(actor.state, State::Waiting(1));
+    }
+
+    #[test]
+    fn a_loop_end_without_a_start_freezes_rather_than_running_on() {
+        let (image, mut actor) = actor_running(&[2, 0x03, 2, 0x80, 9, 2, 0x8E]);
+        tick(&mut actor, &image);
+        tick(&mut actor, &image);
+        assert_eq!(actor.state, State::Frozen);
+        assert_eq!(actor.selector, 0);
+    }
+
+    #[test]
+    fn a_timed_wait_resumes_n_plus_one_frames_later() {
+        for (frames, resumes) in [(2u8, 4), (1, 3), (0, 2)] {
+            let (image, mut actor) = actor_running(&[2, 0xC1, frames, 0, 2, 0x80, 5, 2, 0x8E]);
+            for tick_number in 1..=resumes {
+                tick(&mut actor, &image);
+                assert_eq!(
+                    actor.selector == 5,
+                    tick_number == resumes,
+                    "C1 {frames} tick {tick_number}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn the_map_branch_compares_the_low_fifteen_bits_and_inverts_on_bit_fifteen() {
+        // COP0A word target; pose 1; wait; target: pose 2; wait.
+        for (word, map, taken) in [
+            (0x00D5, 0xD5, true),
+            (0x00D5, 0x0A, false),
+            (0x80D5, 0x0A, true),
+            (0x80D5, 0xD5, false),
+        ] {
+            let [low, high] = u16::to_le_bytes(word);
+            let (image, mut actor) = actor_running(&[
+                2, 0x0A, low, high, 0x0B, 0x80, 2, 0x80, 1, 2, 0x8E, 2, 0x80, 2, 2, 0x8E,
+            ]);
+            actor.map = map;
+            tick(&mut actor, &image);
+            assert_eq!(
+                actor.selector,
+                if taken { 2 } else { 1 },
+                "{word:04X} on {map:#x}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_town_walker_loops_with_one_frame_gaps_and_poses_after_sixteen_actions() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let image = rom::Rom::load(&bytes).unwrap().image().to_vec();
+        let flags = crate::world::new_game_flags();
+        let events = assets::maps::scripts::EventFlags::Bitmap(&flags);
+        let resident = crate::residents::residents(&image, 0xA, events)
+            .unwrap()
+            .into_iter()
+            .find(|resident| resident.record == 0x03_8A2D)
+            .unwrap();
+        let mut actor = Actor::for_resident(&image, 0xA, &resident, 7);
+        assert!(actor.cadence.is_some());
+        let cells = vec![0u16; 64 * 64];
+        let around = Surroundings {
+            image: &image,
+            events: &flags,
+            cells: &cells,
+            width: 64,
+            height: 64,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        };
+        // Tick of each action's start, and whether it walked.
+        let mut starts = Vec::new();
+        for tick in 0..700u32 {
+            let before = matches!(actor.state, State::Ordinary { .. });
+            actor.tick(&around);
+            if let State::Ordinary {
+                ticks, ticks_left, ..
+            } = actor.state
+            {
+                if !before || ticks_left + 1 == ticks {
+                    starts.push((tick, actor.walking));
+                }
+            }
+            if starts.len() == 16 {
+                break;
+            }
+        }
+        assert_eq!(starts.len(), 16);
+        for pair in starts.windows(2) {
+            let period = pair[1].0 - pair[0].0;
+            assert_eq!(period, if pair[0].1 { 33 } else { 17 }, "{pair:?}");
+        }
+        // After the sixteenth action the first counted loop ends: pose 6.
+        for _ in 0..40 {
+            actor.tick(&around);
+        }
+        assert_eq!(actor.selector, 6);
     }
 }
