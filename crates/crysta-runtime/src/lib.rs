@@ -19,6 +19,7 @@ use std::fmt;
 pub mod actors;
 pub mod art;
 pub mod residents;
+pub mod scene;
 pub mod world;
 
 /// Maps the static exit graph bounds the Crysta slice to.

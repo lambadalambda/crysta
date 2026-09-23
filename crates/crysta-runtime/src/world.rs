@@ -5,8 +5,9 @@
 //! player into the next one. Two exact return records additionally own the
 //! player through measured initialized-to-free arrival profiles.
 
-use crate::actors::{Actor, Surroundings};
-use crate::residents::{residents, talk_to, Conversation, Resident};
+use crate::actors::{Actor, Surroundings, Wait};
+use crate::residents::{residents, Resident};
+use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
 use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
@@ -38,7 +39,10 @@ pub struct World<'a> {
     /// Collision cells the bodies blocked when `room` was last rebuilt.
     blocked: Vec<(u16, u16)>,
     /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
-    events: Vec<u8>,
+    globals: Globals,
+    /// A script the world waits on: a blocking text or choice service in a
+    /// resident's own script, or in a callback running on one.
+    scene: Option<Scene>,
     /// The bitmap at map entry, which decided the spawn stream's branches.
     spawn_events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
@@ -225,7 +229,8 @@ impl<'a> World<'a> {
             actors,
             blocked,
             spawn_events: events.clone(),
-            events,
+            globals: Globals::with_events(events),
+            scene: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -309,6 +314,10 @@ impl<'a> World<'a> {
     /// Propagates unqualified target-arrival records, destination resident-resolution,
     /// room, exit-list and actor occupancy rebuild failures.
     pub fn step_checked(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
+        // A script holds the world until [`Self::update`] answers it.
+        if self.scene.is_some() {
+            return Ok(Step::Stayed);
+        }
         let before = self.position();
         if let Some(mut arrival) = self.arrival {
             arrival.advance();
@@ -383,26 +392,22 @@ impl<'a> World<'a> {
     /// blocked, so the player is stopped by residents wherever they are.
     fn run_actors(&mut self) -> Result<(), WorldError> {
         let (x, y) = self.position();
-        let player = (x.saturating_sub(8) / 16, y.saturating_sub(16) / 16);
         for index in 0..self.actors.len() {
-            let mut occupied = vec![player];
-            for (other, actor) in self.actors.iter().enumerate() {
-                if other != index && self.residents[other].body {
-                    occupied.push(actor.collision_cell());
-                    occupied.extend(actor.destination());
-                }
+            let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
+            let mut around = surroundings(
+                self.image,
+                &mut self.globals,
+                &self.base,
+                &occupied,
+                (x, y),
+                self.facing,
+            );
+            self.actors[index].tick(&mut around);
+            if self.actors[index].blocked().is_some() {
+                // `$80:8C4A`/`8B85` wait inside the handler: nobody after
+                // this actor runs until the window is answered.
+                break;
             }
-            let around = Surroundings {
-                image: self.image,
-                events: &self.events,
-                cells: self.base.room.cells(),
-                width: self.base.width,
-                height: self.base.height,
-                occupied: &occupied,
-                player: (x, y),
-                facing: self.facing,
-            };
-            self.actors[index].tick(&around);
         }
         let mut gone = Vec::new();
         for (index, (resident, actor)) in self.residents.iter_mut().zip(&self.actors).enumerate() {
@@ -419,6 +424,14 @@ impl<'a> World<'a> {
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
             self.actors.remove(index);
+        }
+        // Found after removals, which move indices.
+        if let Some(index) = self
+            .actors
+            .iter()
+            .position(|actor| actor.blocked().is_some())
+        {
+            self.scene = Some(Scene::Own(index));
         }
         let cells = body_cells(&self.residents);
         if cells != self.blocked {
@@ -437,7 +450,7 @@ impl<'a> World<'a> {
     /// The event-flag bitmap in force.
     #[must_use]
     pub fn events(&self) -> &[u8] {
-        &self.events
+        &self.globals.events
     }
 
     /// The event-flag bitmap at map entry, which decided who spawned and in
@@ -447,12 +460,59 @@ impl<'a> World<'a> {
         &self.spawn_events
     }
 
-    /// Talks to the resident the player is facing, if there is one.
+    /// One frame of play from the player's pad: the dialogue window takes
+    /// presses first, then walking, then interaction.
     ///
-    /// Applies the flags the conversation writes, so progression moves.
-    pub fn talk(&mut self) -> Option<Conversation> {
+    /// While a script waits in a blocking service (`COP 1F`, `COP 1A`) the
+    /// world stands still and presses only answer it; once answered, the
+    /// script goes on in the same frame. Otherwise a press acknowledges a
+    /// cooperative page (`COP 20`), the pad moves the player unless a script
+    /// locked it (`COP 2A`), and a confirm press on nothing else talks to the
+    /// faced resident's callback or opens a doorway.
+    ///
+    /// Returns the walking step and, when the confirm press opened a doorway
+    /// rather than a conversation, that step too.
+    ///
+    /// # Errors
+    /// As [`Self::step_interactive`] and [`Self::interact_checked`].
+    pub fn update(
+        &mut self,
+        direction: Option<Direction>,
+        presses: Presses,
+    ) -> Result<(Step, Option<Step>), WorldError> {
+        if self.scene.is_some() {
+            self.answer_scene(presses);
+            return Ok((Step::Stayed, None));
+        }
+        let busy = self.globals.dialogue.busy();
+        self.globals.dialogue.press(presses);
+        let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
+        let step = self.step_interactive(direction.filter(|_| !locked))?;
+        let free = !busy && self.scene.is_none() && !self.globals.dialogue.busy();
+        if presses.confirm && free && !self.talk() {
+            return Ok((step, Some(self.interact_checked()?)));
+        }
+        Ok((step, None))
+    }
+
+    /// The dialogue window, if a script has something on it.
+    #[must_use]
+    pub fn dialogue(&self) -> Option<View<'_, assets::text::DialoguePage>> {
+        self.globals.dialogue.view()
+    }
+
+    /// Whether a script holds the world still.
+    #[must_use]
+    pub const fn in_scene(&self) -> bool {
+        self.scene.is_some()
+    }
+
+    /// The interaction dispatcher (`$87:923F`): runs the callback of the
+    /// resident the player faces, when that resident takes interaction.
+    /// Returns whether one did.
+    fn talk(&mut self) -> bool {
         if self.arrival.is_some() {
-            return None;
+            return false;
         }
         let (x, y) = self.position();
         let (dx, dy) = facing_delta(self.facing);
@@ -460,28 +520,91 @@ impl<'a> World<'a> {
             (x / 16).wrapping_add_signed(dx),
             (y / 16).wrapping_add_signed(dy),
         );
-        let resident = self
+        let Some(index) = self
             .residents
             .iter()
-            .find(|resident| resident.cell() == faced)?
-            .clone();
-        let spoken = talk_to(self.image, &resident, EventFlags::Bitmap(&self.events));
-        if let Conversation::Speaks { flags, .. } = &spoken {
-            for flag in flags {
-                let index = usize::from(flag & 0x0FFF);
-                let Some(byte) = self.events.get_mut(index / 8) else {
-                    continue;
-                };
-                // Bit 15 selects set over clear, the same encoding the loading
-                // scripts and the spawn stream use.
-                if flag & 0x8000 == 0 {
-                    *byte &= !(1 << (index % 8));
-                } else {
-                    *byte |= 1 << (index % 8);
+            .position(|resident| resident.cell() == faced)
+        else {
+            return false;
+        };
+        if !self.actors[index].interactable(self.facing) {
+            return false;
+        }
+        let player = self.position();
+        let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
+        let mut around = surroundings(
+            self.image,
+            &mut self.globals,
+            &self.base,
+            &occupied,
+            player,
+            self.facing,
+        );
+        let blocked = self.actors[index].run_callback(&mut around);
+        self.scene = blocked.map(|(pc, wait)| Scene::Callback {
+            actor: index,
+            pc,
+            wait,
+        });
+        true
+    }
+
+    /// Feeds presses to the window a script waits on, and resumes it once
+    /// answered.
+    fn answer_scene(&mut self, presses: Presses) {
+        let Some(scene) = self.scene else {
+            return;
+        };
+        let answer = self.globals.dialogue.press(presses);
+        let wait = match scene {
+            Scene::Own(index) => self.actors[index].blocked(),
+            Scene::Callback { wait, .. } => Some(wait),
+        };
+        let answer = match wait {
+            Some(Wait::Text) if !self.globals.dialogue.busy() => 0,
+            Some(Wait::Choice(_)) => match answer {
+                Some(answer) => answer,
+                None => return,
+            },
+            Some(Wait::Text) => return,
+            None => {
+                self.scene = None;
+                return;
+            }
+        };
+        self.scene = None;
+        match scene {
+            Scene::Own(index) => {
+                let player = self.position();
+                let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
+                let mut around = surroundings(
+                    self.image,
+                    &mut self.globals,
+                    &self.base,
+                    &occupied,
+                    player,
+                    self.facing,
+                );
+                self.actors[index].resume(answer, &mut around);
+                if self.actors[index].blocked().is_some() {
+                    self.scene = Some(Scene::Own(index));
                 }
             }
+            Scene::Callback { actor, pc, wait } => {
+                let player = self.position();
+                let occupied = occupied_by_others(&self.actors, &self.residents, actor, player);
+                let mut around = surroundings(
+                    self.image,
+                    &mut self.globals,
+                    &self.base,
+                    &occupied,
+                    player,
+                    self.facing,
+                );
+                let blocked = self.actors[actor].resume_callback(pc, wait, answer, &mut around);
+                self.scene = blocked.map(|(pc, wait)| Scene::Callback { actor, pc, wait });
+            }
         }
-        Some(spoken)
     }
 
     /// Opens the doorway the player is standing at or facing.
@@ -612,7 +735,7 @@ impl<'a> World<'a> {
             map,
             x,
             y,
-            self.events.clone(),
+            self.globals.events.clone(),
             self.base.room.passive_directional_type8_special_bit_clear(),
         )
     }
@@ -670,6 +793,61 @@ const fn facing_delta(facing: Direction) -> (i16, i16) {
         Direction::Left => (-1, 0),
         Direction::Right => (1, 0),
     }
+}
+
+/// A script the world waits on.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Scene {
+    /// A resident's own script, blocked in it.
+    Own(usize),
+    /// A callback running on a resident, blocked at `pc`.
+    Callback {
+        /// The resident it runs on.
+        actor: usize,
+        /// Where it goes on.
+        pc: usize,
+        /// What it waits for.
+        wait: Wait,
+    },
+}
+
+/// What one actor sees this frame.
+fn surroundings<'s>(
+    image: &'s [u8],
+    globals: &'s mut Globals,
+    base: &'s MapRoom,
+    occupied: &'s [(u16, u16)],
+    player: (u16, u16),
+    facing: Direction,
+) -> Surroundings<'s> {
+    Surroundings {
+        image,
+        globals,
+        cells: base.room.cells(),
+        width: base.width,
+        height: base.height,
+        occupied,
+        player,
+        facing,
+    }
+}
+
+/// Cells one actor must not step into: the player's and every other body's,
+/// where it stands and where it is stepping.
+fn occupied_by_others(
+    actors: &[Actor],
+    residents: &[Resident],
+    index: usize,
+    (x, y): (u16, u16),
+) -> Vec<(u16, u16)> {
+    let mut occupied = vec![(x.saturating_sub(8) / 16, y.saturating_sub(16) / 16)];
+    for (other, actor) in actors.iter().enumerate() {
+        if other != index && residents[other].body {
+            occupied.push(actor.collision_cell());
+            occupied.extend(actor.destination());
+        }
+    }
+    occupied
 }
 
 /// The measured new-game flag state: 32 and 251 are set.
@@ -765,7 +943,8 @@ mod tests {
             residents: vec![],
             actors: vec![],
             blocked: vec![],
-            events: new_game_flags(),
+            globals: Globals::with_events(new_game_flags()),
+            scene: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

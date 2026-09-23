@@ -59,7 +59,6 @@ fn transition_paths_own_arrival_until_free_despite_hostile_inputs() {
             let events = world.events().to_vec();
             for _ in 0..advances {
                 world.face(Direction::Up);
-                assert!(world.talk().is_none());
                 assert_eq!(world.interact_checked().unwrap(), Step::Stayed);
                 assert_eq!(world.events(), events);
                 expected.advance();

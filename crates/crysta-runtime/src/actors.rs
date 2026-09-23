@@ -15,11 +15,13 @@
 
 mod cadence;
 
+use crate::scene::Globals;
 use assets::maps::actor_script::{
     self, chained_condition_holds, chained_condition_length, flag_branch_taken, BRANCH_ON_FLAG,
-    CHAINED_BRANCH, CHAINED_DESPAWN,
+    CHAINED_BRANCH, CHAINED_DESPAWN, REGISTER_CALLBACK, SHOW_TEXT, WRITE_FLAG,
 };
 use assets::maps::scripts::EventFlags;
+use assets::text::HouseDialogue;
 use room_core::Direction;
 
 /// Selects an animation sequence; one operand byte.
@@ -30,6 +32,35 @@ const CLEAR_HFLIP: u8 = 0xB6;
 const SET_HFLIP: u8 = 0xB7;
 /// Resolves the pose and yields until it is done.
 const WAIT: u8 = 0x8E;
+/// Shows the published text and blocks the world until it is acknowledged;
+/// `$80:8C4A`.
+const TEXT_WAIT: u8 = 0x1F;
+/// Shows the published text one step a frame while the world runs;
+/// `$80:8C9A`.
+const TEXT_STEP: u8 = 0x20;
+/// Asks a choice and blocks until it is answered, then jumps through a
+/// three-entry table (cancel, option 1, option 2); `$80:8B85`. Operands: a
+/// catalog byte and the table's bank-relative address.
+const CHOICE: u8 = 0x1A;
+/// Points the actor's own script at a long address; `$80:AAFB`.
+const SET_SCRIPT: u8 = 0xC0;
+/// Unlocks pad buttons, `$045E &= !mask`; `$80:8FE6`.
+const UNLOCK_INPUT: u8 = 0x29;
+/// Locks pad buttons, `$045E |= mask`; `$80:8FF5`.
+const LOCK_INPUT: u8 = 0x2A;
+/// [`STOP_FOR_PLAYER`] with its own pose base; `$80:8D0B`. Operands: the
+/// base selector, bit 7 keeping the mirror, then the target.
+const FACE_PLAYER_POSED: u8 = 0x24;
+/// Deletes the actor on one flag, set with bit 15, clear without; `$80:96CB`.
+const DELETE_ON_FLAG: u8 = 0x48;
+/// Long jump; `$80:864C`.
+const LONG_JUMP: u8 = 0x06;
+/// Stores the next command as the continuation and goes on; `$80:AAA5`.
+const CONTINUATION: u8 = 0xBC;
+/// Entity `+$06` bit that lets the player interact from any side.
+const INTERACT_ANY_SIDE: u16 = 0x0200;
+/// Entity `+$06` bit that lets the player interact only facing the actor.
+const INTERACT_FACING: u16 = 0x0100;
 /// Waits for a step to finish, or for one record when there was no step.
 const WAIT_STEP: u8 = 0x8F;
 /// Random walk inside a tile rectangle; `$80:8E56`.
@@ -117,18 +148,46 @@ enum State {
         ticks_left: u16,
         destination: Option<(u16, u16)>,
     },
+    /// Waiting in a blocking text or choice service; the world stops for it.
+    Blocked(Wait),
     /// Stopped at something the interpreter does not model.
     Frozen,
     /// Removed by a despawn.
     Gone,
 }
 
+/// What a blocking service waits for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Wait {
+    /// The published text, fully acknowledged.
+    Text,
+    /// A choice's answer; the jump table's normalized offset.
+    Choice(usize),
+}
+
+/// How a run of commands ended.
+enum Run {
+    /// Yielded to the next frame, or froze.
+    Yielded,
+    /// Reached `RTL` in a callback.
+    Ended,
+    /// Entered a blocking service.
+    Blocked(Wait),
+}
+
+/// A callback's view of the actor's own script, saved while it runs.
+#[derive(Debug, Clone, Copy)]
+struct Outer {
+    pc: usize,
+    state: State,
+}
+
 /// The map an actor moves through, for one frame.
 pub struct Surroundings<'a> {
     /// The ROM image.
     pub image: &'a [u8],
-    /// The event-flag bitmap.
-    pub events: &'a [u8],
+    /// Event flags, the dialogue window and the input mask, which scripts change.
+    pub globals: &'a mut Globals,
     /// Collision cells, `width * height` of them.
     pub cells: &'a [u16],
     /// Grid width in cells.
@@ -171,6 +230,15 @@ pub struct Actor {
     /// Ticks of each display list in the actor's packet, which `COP 8E`
     /// holds for; `None` when the packet is not known.
     pose_ticks: Option<Vec<Option<u16>>>,
+    /// The interaction callback `COP 21` registered, bank-relative.
+    callback: Option<u16>,
+    /// Entity `+$06`: header word, then `COP 23`/`24` switch
+    /// [`INTERACT_ANY_SIDE`] as they face the player or not.
+    interaction: u16,
+    /// Where `RTL` resumes the actor's own script: `COP C0`/`BC`.
+    continuation: Option<usize>,
+    /// The actor's own script while a callback runs on it.
+    outer: Option<Outer>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -205,6 +273,10 @@ impl Actor {
             map: 0,
             counted_loop: (0, 0),
             pose_ticks: None,
+            callback: None,
+            interaction: 0,
+            continuation: None,
+            outer: None,
             lengths: vec![None; 256],
         }
     }
@@ -219,6 +291,12 @@ impl Actor {
     ) -> Self {
         let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
         actor.map = map;
+        // `$80:F5B0`: the header's last word is entity `+$06`.
+        actor.interaction = resident
+            .script
+            .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
+            .and_then(|script| image.get(script.checked_sub(2)?..script))
+            .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]));
         actor.cadence = resident
             .descriptor
             .filter(|_| resident.body)
@@ -261,7 +339,7 @@ impl Actor {
     }
 
     /// Runs one frame.
-    pub fn tick(&mut self, around: &Surroundings<'_>) {
+    pub fn tick(&mut self, around: &mut Surroundings<'_>) {
         self.pose_age = self.pose_age.saturating_add(1);
         if matches!(self.state, State::Ordinary { ticks_left: 0, .. }) {
             self.walking = false;
@@ -269,7 +347,7 @@ impl Actor {
         }
         match self.state {
             State::Ordinary { .. } => self.tick_ordinary(),
-            State::Frozen | State::Gone => {}
+            State::Frozen | State::Gone | State::Blocked(_) => {}
             State::Waiting(frames) => {
                 self.state = if frames <= 1 {
                     State::Running
@@ -299,7 +377,99 @@ impl Actor {
                     }
                 };
             }
-            State::Running => self.run(around),
+            State::Running => {
+                self.run(around);
+            }
+        }
+    }
+
+    /// The wait a blocking service left the actor's own script in, if any.
+    #[must_use]
+    pub fn blocked(&self) -> Option<Wait> {
+        match self.state {
+            State::Blocked(wait) => Some(wait),
+            _ => None,
+        }
+    }
+
+    /// Whether the player can interact with the actor from `facing`: the
+    /// dispatcher at `$87:93B9` wants a callback and `+$06` bit `$0200`, or
+    /// `$0100` with the player facing opposite to the actor.
+    #[must_use]
+    pub fn interactable(&self, facing: Direction) -> bool {
+        self.callback.is_some()
+            && !matches!(self.state, State::Frozen | State::Gone)
+            && (self.interaction & INTERACT_ANY_SIDE != 0
+                || (self.interaction & INTERACT_FACING != 0 && opposite(facing) == self.facing))
+    }
+
+    /// Runs the registered callback as the dispatcher does, as a subroutine
+    /// on this actor with its own script held. Returns where it blocked, if it
+    /// did, so the world can resume it with [`Self::resume_callback`].
+    ///
+    /// A callback that yields hands its position to the actor's own script,
+    /// as the native `+$0A` write does.
+    pub fn run_callback(&mut self, around: &mut Surroundings<'_>) -> Option<(usize, Wait)> {
+        let callback = self.callback?;
+        let pc = (self.pc & 0xFF_0000) | usize::from(callback);
+        self.enter_callback(pc, around)
+    }
+
+    /// Continues a blocked callback at `pc` with the answer its wait needed.
+    pub fn resume_callback(
+        &mut self,
+        pc: usize,
+        wait: Wait,
+        answer: u8,
+        around: &mut Surroundings<'_>,
+    ) -> Option<(usize, Wait)> {
+        let Some(pc) = answered(around.image, pc, wait, answer) else {
+            self.state = State::Frozen;
+            return None;
+        };
+        self.enter_callback(pc, around)
+    }
+
+    fn enter_callback(
+        &mut self,
+        pc: usize,
+        around: &mut Surroundings<'_>,
+    ) -> Option<(usize, Wait)> {
+        self.outer = Some(Outer {
+            pc: self.pc,
+            state: std::mem::replace(&mut self.state, State::Running),
+        });
+        self.pc = pc;
+        let run = self.run(around);
+        let outer = self.outer.take()?;
+        match run {
+            Run::Ended => {
+                (self.pc, self.state) = (outer.pc, outer.state);
+                None
+            }
+            Run::Blocked(wait) => {
+                let blocked_at = self.pc;
+                (self.pc, self.state) = (outer.pc, outer.state);
+                Some((blocked_at, wait))
+            }
+            // The callback's position becomes the actor's own.
+            Run::Yielded => None,
+        }
+    }
+
+    /// Continues the actor's own blocked script with the answer its wait
+    /// needed, in the same frame.
+    pub fn resume(&mut self, answer: u8, around: &mut Surroundings<'_>) {
+        let State::Blocked(wait) = self.state else {
+            return;
+        };
+        match answered(around.image, self.pc, wait, answer) {
+            Some(pc) => {
+                self.pc = pc;
+                self.state = State::Running;
+                self.run(around);
+            }
+            None => self.state = State::Frozen,
         }
     }
 
@@ -338,16 +508,29 @@ impl Actor {
         }
     }
 
-    fn run(&mut self, around: &Surroundings<'_>) {
+    fn run(&mut self, around: &mut Surroundings<'_>) -> Run {
         let image = around.image;
         let bank = self.pc & 0xFF_0000;
+        // `+$0A` at entry: where an `RTL` comes back to next frame unless
+        // `COP BC`/`C0` point it elsewhere first.
+        let entry = self.pc;
+        self.continuation = None;
         for _ in 0..BUDGET {
             let Some(window) = image.get(self.pc..self.pc + 2) else {
                 self.state = State::Frozen;
-                return;
+                return Run::Yielded;
             };
             match window[0] {
                 0x02 => {}
+                // RTL: a callback returns; the actor's own script ends the
+                // frame and comes back at its continuation or where it began.
+                0x6B => {
+                    if self.outer.is_some() {
+                        return Run::Ended;
+                    }
+                    self.pc = self.continuation.take().unwrap_or(entry);
+                    return Run::Yielded;
+                }
                 // BRA: the loop's back edge.
                 0x80 => {
                     let displacement = i8::from_ne_bytes([window[1]]);
@@ -357,27 +540,31 @@ impl Actor {
                 0x4C => {
                     let Some(target) = image.get(self.pc + 1..self.pc + 3) else {
                         self.state = State::Frozen;
-                        return;
+                        return Run::Yielded;
                     };
                     let target = u16::from_le_bytes([target[0], target[1]]);
                     if target < 0x8000 {
                         self.state = State::Frozen;
-                        return;
+                        return Run::Yielded;
                     }
                     self.pc = bank | usize::from(target);
                     continue;
                 }
                 _ => {
                     self.state = State::Frozen;
-                    return;
+                    return Run::Yielded;
                 }
             }
             if !self.service(window[1], self.pc + 2, bank, around) {
-                return;
+                return match self.state {
+                    State::Blocked(wait) => Run::Blocked(wait),
+                    _ => Run::Yielded,
+                };
             }
         }
         // Spinning without yielding: a loop with no wait in it.
         self.state = State::Frozen;
+        Run::Yielded
     }
 
     /// Executes one service. Returns whether execution continues this
@@ -387,10 +574,17 @@ impl Actor {
         service: u8,
         operands: usize,
         bank: usize,
-        around: &Surroundings<'_>,
+        around: &mut Surroundings<'_>,
     ) -> bool {
         let image = around.image;
         match service {
+            SHOW_TEXT | TEXT_WAIT | TEXT_STEP | CHOICE => {
+                return self.text_service(service, operands, bank, around)
+            }
+            WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT | LONG_JUMP
+            | CONTINUATION | DELETE_ON_FLAG => {
+                return self.script_service(service, operands, around)
+            }
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
                     self.state = State::Frozen;
@@ -411,24 +605,7 @@ impl Actor {
                 self.set_pose(selector, service == SET_HFLIP);
                 self.pc = operands;
             }
-            WAIT => {
-                self.pc = operands;
-                // `$80:A32F` plays the selected list once: the next command
-                // runs in the frame its last record ends. Unknown: the old
-                // approximation, resuming two frames later.
-                match self.pose_list(self.selector) {
-                    Some(0) => {}
-                    Some(1) => return false,
-                    Some(ticks) => {
-                        self.state = State::Waiting(ticks - 1);
-                        return false;
-                    }
-                    None => {
-                        self.state = State::Waiting(1);
-                        return false;
-                    }
-                }
-            }
+            WAIT => return self.wait_for_pose(operands),
             WAIT_STEP => {
                 self.pc = operands;
                 self.state = State::Waiting(WAIT_FRAMES);
@@ -472,7 +649,14 @@ impl Actor {
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
             TIMED_WAIT => return self.timed_wait(operands, image),
             HOLD_WHILE_PAUSED => self.pc = operands + 1,
-            STOP_FOR_PLAYER => return self.stop_for_player(operands, bank, around),
+            STOP_FOR_PLAYER => return self.stop_for_player(operands, None, bank, around),
+            FACE_PLAYER_POSED => {
+                let Some(&base) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                return self.stop_for_player(operands + 1, Some(base), bank, around);
+            }
             BRANCH_ON_FLAG => return self.branch_on_flag(operands, bank, around),
             CHAINED_BRANCH | CHAINED_DESPAWN => {
                 return self.branch_on_chain(service, operands, bank, around)
@@ -499,6 +683,176 @@ impl Actor {
     /// Ticks of the display list a selector names, when the packet is known.
     fn pose_list(&self, selector: u8) -> Option<u16> {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
+    }
+
+    /// `COP 8E`. Returns whether execution continues this frame.
+    fn wait_for_pose(&mut self, operands: usize) -> bool {
+        self.pc = operands;
+        // `$80:A32F` plays the selected list once: the next command
+        // runs in the frame its last record ends. Unknown: the old
+        // approximation, resuming two frames later.
+        match self.pose_list(self.selector) {
+            Some(0) => {}
+            Some(1) => return false,
+            Some(ticks) => {
+                self.state = State::Waiting(ticks - 1);
+                return false;
+            }
+            None => {
+                self.state = State::Waiting(1);
+                return false;
+            }
+        }
+        true
+    }
+
+    /// Flag writes, callback registration, input locks, jumps and deletion.
+    /// Returns whether execution continues this frame.
+    fn script_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            WRITE_FLAG => {
+                let Some(word) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.write_flag(word);
+                self.pc = operands + 2;
+            }
+            REGISTER_CALLBACK => {
+                let Some(word) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.callback = (word != 0).then_some(word);
+                self.pc = operands + 2;
+            }
+            LOCK_INPUT | UNLOCK_INPUT => {
+                let Some(mask) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if service == LOCK_INPUT {
+                    around.globals.input_mask |= mask;
+                } else {
+                    around.globals.input_mask &= !mask;
+                }
+                self.pc = operands + 2;
+            }
+            SET_SCRIPT | LONG_JUMP => {
+                let Some(target) = image.get(operands..operands + 3).and_then(long) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if service == LONG_JUMP {
+                    self.pc = target;
+                } else if let Some(outer) = &mut self.outer {
+                    // From a callback: the actor's own script, which runs
+                    // from there with its countdown cleared.
+                    *outer = Outer {
+                        pc: target,
+                        state: State::Running,
+                    };
+                    self.pc = operands + 3;
+                } else {
+                    self.continuation = Some(target);
+                    self.pc = operands + 3;
+                }
+            }
+            CONTINUATION => {
+                self.continuation = Some(operands);
+                self.pc = operands;
+            }
+            DELETE_ON_FLAG => {
+                let Some(word) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let set = EventFlags::Bitmap(&around.globals.events).get(word & 0x0FFF);
+                if set == Some(word & 0x8000 != 0) {
+                    self.state = State::Gone;
+                    return false;
+                }
+                self.pc = operands + 2;
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        }
+        true
+    }
+
+    /// `COP 1B`, `1F`, `20` and `1A`. Returns whether execution continues
+    /// this frame. A service that finds the window busy retries next frame.
+    fn text_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        let dialogue = &mut around.globals.dialogue;
+        match service {
+            SHOW_TEXT => {
+                let Some(pointer) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if dialogue.busy() {
+                    return false;
+                }
+                let source =
+                    u32::try_from(bank).map_or(0, |bank| 0x80_0000 | bank) | u32::from(pointer);
+                let Ok(pages) = HouseDialogue::decode_at(image, source) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                dialogue.request(pages);
+                self.pc = operands + 2;
+                true
+            }
+            TEXT_WAIT => {
+                self.pc = operands;
+                if dialogue.busy() {
+                    self.state = State::Blocked(Wait::Text);
+                    return false;
+                }
+                true
+            }
+            TEXT_STEP => {
+                if dialogue.busy() {
+                    return false;
+                }
+                self.pc = operands;
+                true
+            }
+            _ => {
+                let (Some(&catalog), Some(table)) =
+                    (image.get(operands), cadence::word(image, operands + 1))
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if dialogue.busy() {
+                    return false;
+                }
+                let Ok(choice) = HouseDialogue::choice_at(image, catalog) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                dialogue.ask(choice);
+                self.pc = operands + 3;
+                self.state = State::Blocked(Wait::Choice(bank | usize::from(table)));
+                false
+            }
+        }
     }
 
     /// `COP 02`. Returns whether execution continues this frame.
@@ -568,7 +922,17 @@ impl Actor {
 
     /// `COP 23`: stops for a player who stands beside the actor and faces
     /// them. Returns whether execution continues this frame.
-    fn stop_for_player(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
+    ///
+    /// `COP 24` names its own pose base, bit 7 keeping the mirror. Both
+    /// switch [`INTERACT_ANY_SIDE`] on when the player faces the actor and
+    /// off otherwise, which is what lets the dispatcher run the callback.
+    fn stop_for_player(
+        &mut self,
+        operands: usize,
+        base: Option<u8>,
+        bank: usize,
+        around: &Surroundings<'_>,
+    ) -> bool {
         let Some(bytes) = around.image.get(operands..operands + 2) else {
             self.state = State::Frozen;
             return false;
@@ -578,14 +942,21 @@ impl Actor {
             .flatten()
             .any(|toward| toward == around.facing);
         if !faced {
+            self.interaction &= !INTERACT_ANY_SIDE;
             self.pc = operands + 2;
             return true;
         }
         // `$8DC2`: the actor's facing is the player's, reversed.
         let facing = opposite(around.facing);
         self.facing = facing;
-        let (selector, hflip) = standing_pose(facing);
+        let (offset, flip) = standing_pose(facing);
+        let (selector, hflip) = match base {
+            None => (offset, flip),
+            Some(base) if base & 0x80 != 0 => ((base & 0x7F) + offset, self.hflip),
+            Some(base) => (base + offset, flip),
+        };
         self.set_pose(selector, hflip);
+        self.interaction |= INTERACT_ANY_SIDE;
         let target = u16::from_le_bytes([bytes[0], bytes[1]]);
         // A taken branch yields whether or not the target was sound.
         self.jump(bank, target);
@@ -630,7 +1001,7 @@ impl Actor {
         };
         let condition = u16::from_le_bytes([bytes[0], bytes[1]]);
         let target = u16::from_le_bytes([bytes[2], bytes[3]]);
-        let Some(set) = EventFlags::Bitmap(around.events).get(condition) else {
+        let Some(set) = EventFlags::Bitmap(&around.globals.events).get(condition) else {
             self.state = State::Frozen;
             return false;
         };
@@ -651,7 +1022,7 @@ impl Actor {
         around: &Surroundings<'_>,
     ) -> bool {
         let image = around.image;
-        let flags = EventFlags::Bitmap(around.events);
+        let flags = EventFlags::Bitmap(&around.globals.events);
         let (Some(chain), Some(holds)) = (
             chained_condition_length(image, operands),
             chained_condition_holds(image, operands, &flags),
@@ -762,6 +1133,23 @@ const fn standing_pose(facing: Direction) -> (u8, bool) {
     }
 }
 
+/// Where a blocked script goes on: after a text wait, where it stood; after
+/// a choice, through its table's entry for the answer (0 cancel, 1, 2).
+fn answered(image: &[u8], pc: usize, wait: Wait, answer: u8) -> Option<usize> {
+    match wait {
+        Wait::Text => Some(pc),
+        Wait::Choice(table) => {
+            let target = cadence::word(image, table + 2 * usize::from(answer))?;
+            (target >= 0x8000).then_some((table & 0xFF_0000) | usize::from(target))
+        }
+    }
+}
+
+/// A long operand as a normalized ROM offset.
+fn long(bytes: &[u8]) -> Option<usize> {
+    assets::maps::actors::rom_offset(bytes)
+}
+
 /// The facing that looks back at `facing`; `$8DC2`'s `EOR #1` on the game's
 /// 0 down, 1 up, 2 left, 3 right.
 const fn opposite(facing: Direction) -> Direction {
@@ -847,9 +1235,9 @@ mod tests {
         // COP B6, COP 80 02, COP 8E, BRA -8.
         let image = image_with(&[0x02, 0xB6, 0x02, 0x80, 0x02, 0x02, 0x8E, 0x80, 0xF7]);
         let cells = open(8, 8);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &cells,
             width: 8,
             height: 8,
@@ -859,7 +1247,7 @@ mod tests {
         };
         let mut actor = Actor::new((40, 48), Some(0x88_8000), 7, 1);
         for _ in 0..200 {
-            actor.tick(&around);
+            actor.tick(&mut around);
         }
         assert_eq!(actor.position, (40, 48));
         assert_eq!((actor.selector, actor.hflip), (2, false));
@@ -875,9 +1263,9 @@ mod tests {
         let mut cells = open(8, 8);
         // Column 4, row 3 is a wall.
         cells[3 * 8 + 4] = 14 << 9;
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &cells,
             width: 8,
             height: 8,
@@ -889,7 +1277,7 @@ mod tests {
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 12345);
         let mut visited = std::collections::BTreeSet::new();
         for _ in 0..5000 {
-            actor.tick(&around);
+            actor.tick(&mut around);
             let (column, row) = actor.collision_cell();
             assert!(
                 (2..=6).contains(&column) && (2..=5).contains(&row),
@@ -907,7 +1295,7 @@ mod tests {
         );
         // Between steps, positions stay on the grid the record put them on.
         while actor.walking {
-            actor.tick(&around);
+            actor.tick(&mut around);
         }
         assert_eq!(actor.position.0 % 16, 8);
         assert_eq!(actor.position.1 % 16, 0);
@@ -919,9 +1307,9 @@ mod tests {
         // direction, so every draw stands.
         let image = image_with(&[0x02, 0x26, 3, 2, 3, 2, 0x02, 0x8F, 0x80, 0xF6]);
         let cells = open(8, 8);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &cells,
             width: 8,
             height: 8,
@@ -931,20 +1319,20 @@ mod tests {
         };
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 9, 5);
         for _ in 0..50 {
-            actor.tick(&around);
+            actor.tick(&mut around);
         }
         assert_eq!(actor.selector, 0, "standing, facing down");
         assert!(!actor.walking);
         // Open rectangle: some draw walks.
         let image = image_with(&[0x02, 0x26, 0, 7, 0, 7, 0x02, 0x8F, 0x80, 0xF6]);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
             ..around
         };
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 9, 5);
         let mut walked = false;
         for _ in 0..200 {
-            actor.tick(&around);
+            actor.tick(&mut around);
             if actor.walking {
                 walked = true;
                 assert!((3..=5).contains(&actor.selector));
@@ -967,9 +1355,9 @@ mod tests {
         let run = |player: (u16, u16), id: u8| {
             let mut image = image.clone();
             image[0x08_8002] = id;
-            let around = Surroundings {
+            let mut around = Surroundings {
                 image: &image,
-                events: &[0; 512],
+                globals: &mut Globals::with_events(vec![0; 512]),
                 cells: &cells,
                 width: 8,
                 height: 8,
@@ -978,7 +1366,7 @@ mod tests {
                 facing: Direction::Down,
             };
             let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 1);
-            actor.tick(&around);
+            actor.tick(&mut around);
             actor.selector
         };
         // Tile (3,4) is (48, 64); with Y less eight, a player at (48, 72)
@@ -998,9 +1386,9 @@ mod tests {
     fn a_jump_into_ram_freezes_and_a_jump_into_rom_is_followed() {
         let image = image_with(&[0x4C, 0x00, 0x40]);
         let cells = open(4, 4);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &cells,
             width: 4,
             height: 4,
@@ -1009,18 +1397,18 @@ mod tests {
             facing: Direction::Down,
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
-        actor.tick(&around);
+        actor.tick(&mut around);
         assert_eq!(actor.state, State::Frozen);
         let mut script = vec![0x4C, 0x10, 0x80];
         script.resize(0x10, 0xEA);
         script.extend([0x02, 0x80, 0x05, 0x02, 0x8E, 0x80, 0xFB]);
         let image = image_with(&script);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
             ..around
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
-        actor.tick(&around);
+        actor.tick(&mut around);
         assert_eq!(actor.selector, 5);
     }
 
@@ -1031,9 +1419,9 @@ mod tests {
         let cells = open(4, 4);
         let mut set = vec![0u8; 512];
         set[2] = 1;
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &set,
+            globals: &mut Globals::with_events(set.clone()),
             cells: &cells,
             width: 4,
             height: 4,
@@ -1042,24 +1430,33 @@ mod tests {
             facing: Direction::Down,
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
-        actor.tick(&around);
+        actor.tick(&mut around);
         assert!(actor.is_gone());
         let clear = vec![0u8; 512];
-        let around = Surroundings {
-            events: &clear,
+        let mut around = Surroundings {
+            globals: &mut Globals::with_events(clear.clone()),
             ..around
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
-        actor.tick(&around);
+        actor.tick(&mut around);
         assert!(!actor.is_gone());
-        // RTL where a command should be.
+        // RTL ends the actor's own script for the frame; it stays there.
         let image = image_with(&[0x6B]);
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
             ..around
         };
         let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
-        actor.tick(&around);
+        actor.tick(&mut around);
+        assert_eq!((actor.state, actor.pc), (State::Running, 0x08_8000));
+        // A native opcode the interpreter does not model freezes it.
+        let image = image_with(&[0xEA]);
+        let mut around = Surroundings {
+            image: &image,
+            ..around
+        };
+        let mut actor = Actor::new((8, 16), Some(0x88_8000), 0, 3);
+        actor.tick(&mut around);
         assert_eq!(actor.state, State::Frozen);
     }
 }
@@ -1085,9 +1482,9 @@ mod stop_for_player_tests {
     fn run(script: &[u8], player: (u16, u16), facing: Direction, frames: usize) -> Actor {
         let image = image_with(script);
         let cells = vec![0u16; 64];
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &cells,
             width: 8,
             height: 8,
@@ -1098,7 +1495,7 @@ mod stop_for_player_tests {
         // Origin (56, 64): the actor's own reference for the near test.
         let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
         for _ in 0..frames {
-            actor.tick(&around);
+            actor.tick(&mut around);
         }
         actor
     }
@@ -1270,10 +1667,14 @@ mod cadence_tests {
             | 1
     }
 
-    fn surroundings<'a>(image: &'a [u8], cells: &'a [u16]) -> Surroundings<'a> {
+    fn surroundings<'a>(
+        image: &'a [u8],
+        cells: &'a [u16],
+        globals: &'a mut Globals,
+    ) -> Surroundings<'a> {
         Surroundings {
             image,
-            events: &[0; 512],
+            globals,
             cells,
             width: 8,
             height: 8,
@@ -1287,7 +1688,8 @@ mod cadence_tests {
         let mut image = vec![0; SITE + 10];
         image[SITE..].copy_from_slice(&[2, 0x26, 0, 7, 0, 7, 2, 0x8F, 0x80, 0xF6]);
         let cells = vec![if refused { 14 << 9 } else { 0 }; 64];
-        let around = surroundings(&image, &cells);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let mut around = surroundings(&image, &cells, &mut globals);
         let seed = seed_for(choice);
         let mut actor = Actor::new((56, 64), Some(0x88_A868), 0, seed);
         actor.cadence = Some(cadence);
@@ -1313,7 +1715,7 @@ mod cadence_tests {
             ));
             actor.rng = seed;
             for tick in 0..duration {
-                actor.tick(&around);
+                actor.tick(&mut around);
                 let pixels = i16::try_from(tick / 2 + 1).unwrap();
                 assert_eq!(
                     actor.position,
@@ -1383,7 +1785,8 @@ mod cadence_tests {
             image[SITE..].copy_from_slice(&bytes);
             let mut actor = Actor::new((0, 0), Some(0x88_A868), 0, 1);
             actor.cadence = Some(CLASS_ZERO);
-            actor.tick(&surroundings(&image, &[]));
+            let mut globals = Globals::with_events(vec![0; 512]);
+            actor.tick(&mut surroundings(&image, &[], &mut globals));
             assert_eq!(actor.cadence.is_some(), kept, "{bytes:02X?}");
         }
     }
@@ -1402,9 +1805,9 @@ mod script_service_tests {
     }
 
     fn tick(actor: &mut Actor, image: &[u8]) {
-        actor.tick(&Surroundings {
+        actor.tick(&mut Surroundings {
             image,
-            events: &[0; 512],
+            globals: &mut Globals::with_events(vec![0; 512]),
             cells: &[],
             width: 0,
             height: 0,
@@ -1541,9 +1944,9 @@ mod script_service_tests {
         let mut actor = Actor::for_resident(&image, 0xA, &resident, 7);
         assert!(actor.cadence.is_some());
         let cells = vec![0u16; 64 * 64];
-        let around = Surroundings {
+        let mut around = Surroundings {
             image: &image,
-            events: &flags,
+            globals: &mut Globals::with_events(flags.clone()),
             cells: &cells,
             width: 64,
             height: 64,
@@ -1555,7 +1958,7 @@ mod script_service_tests {
         let mut starts = Vec::new();
         for tick in 0..700u32 {
             let before = matches!(actor.state, State::Ordinary { .. });
-            actor.tick(&around);
+            actor.tick(&mut around);
             if let State::Ordinary {
                 ticks, ticks_left, ..
             } = actor.state
@@ -1579,7 +1982,7 @@ mod script_service_tests {
         let mut posed = None;
         for step in 0..200u32 {
             let was_acting = matches!(actor.state, State::Ordinary { .. });
-            actor.tick(&around);
+            actor.tick(&mut around);
             if actor.selector == 6 && posed.is_none() {
                 posed = Some(step);
             }
@@ -1590,5 +1993,123 @@ mod script_service_tests {
             }
         }
         panic!("no action after the pose section");
+    }
+}
+
+#[cfg(test)]
+mod scene_service_tests {
+    use super::*;
+
+    const AT: usize = 0x08_8000;
+
+    fn run(code: &[(usize, &[u8])], globals: &mut Globals) -> (Vec<u8>, Actor) {
+        let mut image = vec![0; AT + 0x200];
+        for (offset, bytes) in code {
+            image[AT + offset..AT + offset + bytes.len()].copy_from_slice(bytes);
+        }
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        actor.tick(&mut around(&image, globals));
+        (image, actor)
+    }
+
+    fn around<'a>(image: &'a [u8], globals: &'a mut Globals) -> Surroundings<'a> {
+        Surroundings {
+            image,
+            globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        }
+    }
+
+    #[test]
+    fn a_callback_writes_flags_redirects_the_script_and_returns() {
+        let mut globals = Globals::with_events(vec![0; 512]);
+        // Own: register $8040, face-player target, then idle on a wait.
+        // Callback $8040: set flag $30, point the script at $8080, RTL.
+        let (image, mut actor) = run(
+            &[
+                (0, &[2, 0x21, 0x40, 0x80, 2, 0x8E, 0x80, 0xFC]),
+                (
+                    0x40,
+                    &[2, 0x07, 0x30, 0x80, 2, 0xC0, 0x80, 0x80, 0x88, 0x6B],
+                ),
+                (0x80, &[2, 0x80, 9, 2, 0x8E]),
+            ],
+            &mut globals,
+        );
+        assert_eq!(actor.callback, Some(0x8040));
+        actor.interaction = INTERACT_ANY_SIDE;
+        assert!(actor.interactable(Direction::Up));
+        let held = actor.state;
+        assert_eq!(actor.run_callback(&mut around(&image, &mut globals)), None);
+        assert_eq!(globals.events[6] & 1, 1, "flag $30");
+        // The own script resumes at the redirect, its wait cleared.
+        assert_eq!((actor.pc, actor.state), (AT + 0x80, State::Running));
+        assert_ne!(held, State::Running);
+        actor.tick(&mut around(&image, &mut globals));
+        assert_eq!(actor.selector, 9);
+    }
+
+    #[test]
+    fn a_callback_that_yields_takes_over_the_actor() {
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let (image, mut actor) = run(
+            &[
+                (0, &[2, 0x21, 0x40, 0x80, 2, 0x8E, 0x80, 0xFC]),
+                (0x40, &[2, 0x80, 5, 2, 0x8E]),
+            ],
+            &mut globals,
+        );
+        actor.pose_ticks = Some(vec![Some(4); 8]);
+        assert_eq!(actor.run_callback(&mut around(&image, &mut globals)), None);
+        // The actor now waits in the callback's pose wait, on its own.
+        assert_eq!(
+            (actor.pc, actor.selector, actor.state),
+            (AT + 0x45, 5, State::Waiting(3))
+        );
+    }
+
+    #[test]
+    fn input_locks_deletion_jumps_and_continuations() {
+        // Lock $FF50, unlock $0F00, then wait.
+        let mut globals = Globals::with_events(vec![0; 512]);
+        run(
+            &[(0, &[2, 0x2A, 0x50, 0xFF, 2, 0x29, 0x00, 0x0F, 2, 0x8E])],
+            &mut globals,
+        );
+        assert_eq!(globals.input_mask, 0xF050);
+        // Delete when flag $30 is set, which it is.
+        let mut set = Globals::with_events(vec![0; 512]);
+        set.write_flag(0x8030);
+        let (_, actor) = run(&[(0, &[2, 0x48, 0x30, 0x80, 2, 0x8E])], &mut set);
+        assert!(actor.is_gone());
+        let (_, actor) = run(&[(0, &[2, 0x48, 0x30, 0x00, 2, 0x8E])], &mut set);
+        assert!(!actor.is_gone());
+        // Long jump to $88:8020; BC, a body, RTL: the body runs every frame
+        // from the continuation.
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let (image, mut actor) = run(
+            &[
+                (0, &[2, 0x06, 0x20, 0x80, 0x88]),
+                (0x20, &[2, 0xBC, 2, 0x07, 0x30, 0x80, 0x6B]),
+            ],
+            &mut globals,
+        );
+        for _ in 0..3 {
+            assert_eq!(actor.pc, AT + 0x22, "RTL comes back to the continuation");
+            assert_eq!(globals.events[6] & 1, 1, "and the body ran");
+            globals.write_flag(0x0030);
+            actor.tick(&mut around(&image, &mut globals));
+        }
+        // Without BC, the frame starts over where it began.
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let (image, mut actor) = run(&[(0, &[2, 0x07, 0x30, 0x80, 0x6B])], &mut globals);
+        globals.write_flag(0x0030);
+        actor.tick(&mut around(&image, &mut globals));
+        assert_eq!((actor.pc, globals.events[6] & 1), (AT, 1));
     }
 }

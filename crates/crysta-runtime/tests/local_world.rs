@@ -1,6 +1,7 @@
 //! ROM-backed checks that the player moves between maps through real exits.
 
 use assets::maps::exits::ExitList;
+use crysta_runtime::scene::Presses;
 use crysta_runtime::{
     room,
     world::{Step, World, WorldError},
@@ -158,7 +159,15 @@ enum Action {
 }
 
 impl Action {
+    /// A script that holds the world is acknowledged first, as a player
+    /// would: discovery is about geometry, and B's Elder speaks on arrival.
     fn apply(self, world: &mut World<'_>) -> Result<Step, WorldError> {
+        for _ in 0..64 {
+            if !world.in_scene() {
+                break;
+            }
+            world.update(None, PRESS_A)?;
+        }
         match self {
             Self::Walk(direction) => world.step_checked(Some(direction)),
             Self::Open(direction) => {
@@ -506,30 +515,6 @@ fn walking_is_still_bounded_by_collision() {
 }
 
 #[test]
-fn the_player_can_walk_up_to_a_resident_and_talk() {
-    use crysta_runtime::residents::Conversation;
-    let Some(cartridge) = owned_rom() else {
-        return;
-    };
-    let image = cartridge.image();
-    // The documented resident stands at (120,112) in map $000B. Stand in the
-    // cell below and face them.
-    let mut world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
-    assert!(
-        world.residents().iter().any(|r| r.cell() == (7, 7)),
-        "the resident must be present"
-    );
-    world.face(Direction::Up);
-    match world.talk() {
-        Some(Conversation::Speaks { pages, .. }) => assert_eq!(pages.len(), 2),
-        other => panic!("expected the documented two pages, got {other:?}"),
-    }
-    // Facing away reaches nobody.
-    world.face(Direction::Down);
-    assert!(world.talk().is_none());
-}
-
-#[test]
 fn a_resident_who_is_a_body_stops_the_player() {
     // Occupancy blocks the collision cell, one row above the visual one,
     // because movement samples at (x - 8, y - 16). It is applied on entry to
@@ -565,35 +550,140 @@ fn a_resident_who_is_a_body_stops_the_player() {
     );
 }
 
+const PRESS_A: Presses = Presses {
+    confirm: true,
+    cancel: false,
+    up: false,
+    down: false,
+};
+const PRESS_B: Presses = Presses {
+    confirm: false,
+    cancel: true,
+    up: false,
+    down: false,
+};
+
+fn flag(world: &World<'_>, flag: usize) -> bool {
+    world.events()[flag / 8] & (1 << (flag % 8)) != 0
+}
+
+/// Runs neutral frames until the window shows something, then presses A
+/// until it is gone and no script holds the world. Returns the presses.
+fn read_through(world: &mut World<'_>) -> usize {
+    let mut waited = 0;
+    while world.dialogue().is_none() {
+        world.update(None, Presses::default()).unwrap();
+        waited += 1;
+        assert!(waited < 400, "nothing was said");
+    }
+    let mut presses = 0;
+    while world.dialogue().is_some() || world.in_scene() {
+        assert!(
+            world.dialogue().is_none_or(|view| view.cursor.is_none()),
+            "a choice is open"
+        );
+        world.update(None, PRESS_A).unwrap();
+        presses += 1;
+        assert!(presses < 40, "the text never ended");
+    }
+    presses
+}
+
+/// Presses A on the faced resident, then acknowledges pages until a choice
+/// opens. Returns the pages acknowledged.
+fn talk_until_choice(world: &mut World<'_>) -> usize {
+    // A frame for the resident's loop to face the player and take interaction.
+    world.update(None, Presses::default()).unwrap();
+    world.update(None, PRESS_A).unwrap();
+    assert!(world.in_scene(), "the callback must hold the world");
+    let mut pages = 0;
+    while world.dialogue().and_then(|view| view.cursor).is_none() {
+        assert!(
+            world.dialogue().is_some(),
+            "the scene ended without a choice"
+        );
+        world.update(None, PRESS_A).unwrap();
+        pages += 1;
+        assert!(pages < 40);
+    }
+    pages
+}
+
 #[test]
-fn talking_applies_the_flags_the_script_writes() {
-    use crysta_runtime::residents::Conversation;
+fn the_elder_grants_26_before_the_choice_and_either_answer_continues() {
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
-    // On a new game the callback's dispatch falls through to the documented
-    // arm, whose script writes the $0026 progression flag; check the world
-    // records it.
-    let events = crysta_runtime::world::new_game_flags();
-    let mut world = World::enter_with_events(image, 0x000B, 120, 112 + 16, events).unwrap();
-    world.face(Direction::Up);
-    let spoken = world.talk().expect("the resident is there");
-    let Conversation::Speaks { flags, .. } = &spoken else {
-        panic!("expected pages, got {spoken:?}");
+    for answer in [PRESS_A, PRESS_B] {
+        let events = crysta_runtime::world::new_game_flags();
+        let mut world = World::enter_with_events(image, 0x000B, 120, 112 + 16, events).unwrap();
+        world.face(Direction::Up);
+        // Entering, the Elder speaks unprompted and the world waits for it.
+        assert!(read_through(&mut world) >= 1);
+        assert!(!flag(&world, 0x26), "arrival text grants nothing");
+        let pages = talk_until_choice(&mut world);
+        assert!(pages >= 1);
+        assert!(
+            flag(&world, 0x26),
+            "granted after the request, before the choice"
+        );
+        // Either answer: the callback returns and hands the follow-up to the
+        // Elder's own script, which shows it while the world runs.
+        world.update(None, answer).unwrap();
+        assert!(!world.in_scene());
+        // The follow-up is cooperative, with the pad's directions locked.
+        while world.dialogue().is_none() {
+            world.update(None, Presses::default()).unwrap();
+        }
+        let before = world.position();
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        assert_eq!(world.position(), before, "COP 2A $FF50 holds the player");
+        // Option 1 has three pages natively; the last A must not talk again.
+        let pages = read_through(&mut world);
+        if answer == PRESS_A {
+            assert_eq!(pages, 3);
+        }
+        assert!(!world.in_scene() && world.dialogue().is_none());
+    }
+}
+
+#[test]
+fn the_weaver_grants_28_only_to_the_first_answer() {
+    let Some(cartridge) = owned_rom() else {
+        return;
     };
-    // The script writes $0026 with bit 15 set, which means set rather than clear.
-    let written = flags
-        .iter()
-        .find(|flag| *flag & 0x0FFF == 0x0026)
-        .copied()
-        .expect("the progression flag must be written");
-    assert_ne!(written & 0x8000, 0, "bit 15 selects set over clear");
-    assert_ne!(
-        world.events()[0x026 / 8] & (1 << (0x026 % 8)),
-        0,
-        "the progression flag must be set after talking"
-    );
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    events[0x26 / 8] |= 1 << (0x26 % 8);
+    let mut world = World::enter_with_events(image, 0x0013, 360, 144, events).unwrap();
+    world.face(Direction::Up);
+    let down = Presses {
+        down: true,
+        ..Presses::default()
+    };
+    let finish = |world: &mut World<'_>| {
+        for _ in 0..40 {
+            if !world.in_scene() {
+                return;
+            }
+            world.update(None, PRESS_A).unwrap();
+        }
+        panic!("the conversation never ended");
+    };
+    // Refuse: the second option. Nothing granted; the talk ends.
+    talk_until_choice(&mut world);
+    world.update(None, down).unwrap();
+    world.update(None, PRESS_A).unwrap();
+    finish(&mut world);
+    assert!(!flag(&world, 0x28));
+    // Asked again, the first option grants it.
+    talk_until_choice(&mut world);
+    world.update(None, PRESS_A).unwrap();
+    finish(&mut world);
+    assert!(flag(&world, 0x28));
 }
 
 #[test]

@@ -61,7 +61,8 @@ fn walking_animates_and_releasing_the_direction_stands() {
     let Some(cartridge) = owned_rom() else {
         return;
     };
-    let mut world = World::enter(cartridge.image(), 0x000B, 120, 128).unwrap();
+    // Room C: B's Elder speaks on arrival and holds the world.
+    let mut world = World::enter(cartridge.image(), 0x000C, 136, 300).unwrap();
     assert_eq!(world.animation().set, AnimationSet::Standing);
     let mut records = std::collections::BTreeSet::new();
     for _ in 0..60 {
