@@ -54,5 +54,4 @@ should show more of the map to the sides, without stretching pixels.
   blank sides) and wide exterior (`(304,768)`). Classic screenshots for three
   scripts are byte-identical to the previous commit. Wide screenshots of `$0C`,
   the exterior and an open dialogue were inspected. App Clippy is clean.
-- Not verified here: the interactive `V` toggle and window resize, because
-  this session has no display. Needs a check on the desktop.
+- The user confirmed the interactive `V` toggle and window resize on the desktop.
