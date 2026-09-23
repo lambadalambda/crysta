@@ -690,3 +690,23 @@ fn map_0021_resolves_its_fe_entry_controller() {
     assert_eq!(controller.origin(), (8, 0));
     assert_eq!(controller.script(), Some(0x88_AD89));
 }
+
+#[test]
+fn the_broken_blue_door_reopens_cs_stairs_on_every_load() {
+    // `$96:CE2D`/`CE35`: flag `$292`, map `$0C`, tiles `$CB` (11,21) and
+    // `$F6` (11,20), the door's own second-hit patches.
+    use assets::maps::flag_patches::{for_map, FlagPatch, Patch};
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let patches = for_map(image, 0x0C, |flag| flag == 0x292).unwrap();
+    let tile = |cell, tile| FlagPatch {
+        flag: 0x292,
+        second_layer: false,
+        patch: Patch::Tile { cell, tile },
+    };
+    assert_eq!(patches, [tile((11, 21), 0xCB), tile((11, 20), 0xF6)]);
+    assert_eq!(for_map(image, 0x0C, |_| false), Some(vec![]));
+    assert_eq!(for_map(image, 0x0E, |_| true), Some(vec![]), "E has none");
+}
