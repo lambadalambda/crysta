@@ -58,6 +58,8 @@ callback on a confirm press when nothing else owns the window.
 | `85` | `$80:A182` | count, pose | selects the pose; the next `COP 8F` plays its list that many times |
 | `4B` | `$80:975B` | op, word | map-local counters at `$0640`: store, or BCD add capped at 9999; the bit-6 subtraction freezes |
 | `BD` | `$80:AAB3` | — | yields one frame |
+| `42` | `$80:9444` | dx, dy, tile, target | branches when the cell at the actor's cell plus (dx, dy) holds the tile |
+| `44` | `$80:949B` | dx, dy, word | patches that cell: tile in bits 0-8 under its attribute (`(attr & $7F) << 9`), then waits `high >> 2` frames |
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
 
 Leg vectors come from the common resource: `$60`/`$68`/`$69` step half a

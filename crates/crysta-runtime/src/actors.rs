@@ -84,6 +84,14 @@ const REPEAT_POSE: u8 = 0x85;
 const COUNT: u8 = 0x4B;
 /// Yields for one frame.
 const YIELD: u8 = 0xBD;
+/// Branches when a cell holds a tile; `$80:9444`. Operands: column and row
+/// offsets from the actor's cell (signed), the tile (low nine bits) and the
+/// target.
+const TILE_BRANCH: u8 = 0x42;
+/// Patches a cell's tile; `$80:949B`. Operands: offsets as `COP 42`, then a
+/// word: the tile in bits 0-8, and in the high byte, shifted right twice, the
+/// frames to wait after.
+const PATCH: u8 = 0x44;
 /// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
 /// bit 15 it waits until the flag is set, with it until the flag is clear.
 const WAIT_FOR_FLAG: u8 = 0x05;
@@ -673,6 +681,7 @@ impl Actor {
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
+            TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
@@ -890,6 +899,45 @@ impl Actor {
         self.stream = Some((direction, 0, speed));
         self.stamp = None;
         self.pc = operands + 3;
+        true
+    }
+
+    /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns
+    /// whether execution continues this frame.
+    fn tile_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let Some(&[dx, dy, low, high]) = around.image.get(operands..operands + 4) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let (column, row) = self.collision_cell();
+        let offset =
+            |base: u16, by: u8| base.wrapping_add_signed(i16::from(i8::from_ne_bytes([by])));
+        let (column, row) = (offset(column, dx), offset(row, dy));
+        let word = u16::from_le_bytes([low, high]);
+        if service == PATCH {
+            around.globals.patches.push((column, row, word & 0x1FF));
+            return self.hold(operands + 4, u16::from(high >> 2));
+        }
+        let Some(target) = cadence::word(around.image, operands + 4) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let at = usize::from(row) * usize::from(around.width) + usize::from(column);
+        let holds = column < around.width
+            && around
+                .cells
+                .get(at)
+                .is_some_and(|cell| cell & 0x1FF == word & 0x1FF);
+        if holds {
+            return self.jump(bank, target);
+        }
+        self.pc = operands + 6;
         true
     }
 
@@ -2418,6 +2466,40 @@ mod scene_service_tests {
                 ..around(&image, &mut globals)
             });
             assert_eq!(actor.selector, pose, "{facing:?}");
+        }
+    }
+
+    #[test]
+    fn patches_queue_with_their_delay_and_a_tile_branch_reads_the_map() {
+        // At (56,64) the actor's cell is (3,3). Patch (3,2) with tile $1A7
+        // and a one-frame wait (high byte $05 >> 2), then pose 4.
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let (image, mut actor) = run(
+            &[(0, &[2, 0x44, 0, 0xFF, 0xA7, 0x05, 2, 0x80, 4, 2, 0x8E])],
+            &mut globals,
+        );
+        assert_eq!(globals.patches, [(3, 2, 0x1A7)]);
+        assert_eq!(actor.selector, 0, "waits a frame");
+        actor.tick(&mut around(&image, &mut globals));
+        assert_eq!(actor.selector, 4);
+        // `COP 42 00 FF $1A7 -> pose 9`, else pose 5, on a map holding it.
+        let code = [
+            2, 0x42, 0, 0xFF, 0xA7, 0x01, 0x0D, 0x80, 2, 0x80, 5, 2, 0x8E, 2, 0x80, 9, 2, 0x8E,
+        ];
+        for (cell, pose) in [(0x1DA7_u16, 9), (0x0581, 5)] {
+            let mut image = vec![0; AT + 0x20];
+            image[AT..AT + code.len()].copy_from_slice(&code);
+            let mut cells = vec![0u16; 64];
+            cells[2 * 8 + 3] = cell;
+            let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            actor.tick(&mut Surroundings {
+                cells: &cells,
+                width: 8,
+                height: 8,
+                ..around(&image, &mut globals)
+            });
+            assert_eq!(actor.selector, pose, "{cell:04X}");
         }
     }
 

@@ -43,6 +43,8 @@ pub struct World<'a> {
     /// A script the world waits on: a blocking text or choice service in a
     /// resident's own script, or in a callback running on one.
     scene: Option<Scene>,
+    /// Cells scripts have patched since entry (`COP 44`): column, row, tile.
+    patched: Vec<(u16, u16, u16)>,
     /// The bitmap at map entry, which decided the spawn stream's branches.
     spawn_events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
@@ -231,6 +233,7 @@ impl<'a> World<'a> {
             spawn_events: events.clone(),
             globals: Globals::with_events(events),
             scene: None,
+            patched: Vec::new(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -434,12 +437,40 @@ impl<'a> World<'a> {
         {
             self.scene = Some(Scene::Own(index));
         }
+        self.apply_patches()?;
         let cells = blocking_cells(&self.residents, &self.actors);
         if cells != self.blocked {
             self.room = occupy_cells(self.base.clone(), &cells)?;
             self.blocked = cells;
         }
         Ok(())
+    }
+
+    /// Writes the tile patches scripts queued into the base room, and the
+    /// walkable room over it.
+    fn apply_patches(&mut self) -> Result<(), WorldError> {
+        if self.globals.patches.is_empty() {
+            return Ok(());
+        }
+        let mut cells = self.base.room.cells().to_vec();
+        for (column, row, tile) in std::mem::take(&mut self.globals.patches) {
+            if column >= self.base.width || row >= self.base.height {
+                continue;
+            }
+            cells[usize::from(row) * usize::from(self.base.width) + usize::from(column)] =
+                self.base.patch_word(tile);
+            self.patched.retain(|&(c, r, _)| (c, r) != (column, row));
+            self.patched.push((column, row, tile & 0x1FF));
+        }
+        self.base = self.base.with_cells(cells)?;
+        self.room = occupy_cells(self.base.clone(), &self.blocked)?;
+        Ok(())
+    }
+
+    /// Cells scripts have patched in this map: column, row and tile.
+    #[must_use]
+    pub fn patched_cells(&self) -> &[(u16, u16, u16)] {
+        &self.patched
     }
 
     /// Residents present in the current map.
@@ -483,6 +514,7 @@ impl<'a> World<'a> {
     ) -> Result<(Step, Option<Step>), WorldError> {
         if self.scene.is_some() {
             self.answer_scene(presses);
+            self.apply_patches()?;
             return Ok((Step::Stayed, None));
         }
         let busy = self.globals.dialogue.busy();
@@ -493,6 +525,7 @@ impl<'a> World<'a> {
         if presses.confirm && free && !self.talk() {
             return Ok((step, Some(self.interact_checked()?)));
         }
+        self.apply_patches()?;
         Ok((step, None))
     }
 
@@ -948,20 +981,7 @@ fn occupy_cells(built: MapRoom, blocked: &[(u16, u16)]) -> Result<MapRoom, World
         }
         cells[usize::from(row) * usize::from(built.width) + usize::from(column)] = 14 << 9;
     }
-    let map = built.map;
-    let mut rebuilt = Room::new(built.width, built.height, cells)
-        .map_err(|source| RoomError::Refused { map, source })?
-        .with_material_policy(crate::qualified_policy(map, built.width, built.height))
-        .map_err(|source| RoomError::Policy { map, source })?;
-    if built.room.passive_directional_type8_special_bit_clear() {
-        rebuilt = rebuilt.with_passive_directional_type8_special_bit_clear();
-    } else if built.room.passive_directional_collision() {
-        rebuilt = rebuilt.with_passive_directional_collision();
-    }
-    Ok(MapRoom {
-        room: rebuilt,
-        ..built
-    })
+    Ok(built.with_cells(cells)?)
 }
 
 #[cfg(test)]
@@ -990,6 +1010,7 @@ mod tests {
             map: 0xB,
             width: 8,
             height: 8,
+            attributes: vec![0; 512],
         };
         // Synthetic exit encoding only; no ROM fixture is used by shared tests.
         let mut bytes = vec![0; 0x188B9];
@@ -1008,6 +1029,7 @@ mod tests {
             blocked: vec![],
             globals: Globals::with_events(new_game_flags()),
             scene: None,
+            patched: Vec::new(),
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -1386,5 +1408,20 @@ mod tests {
             world.step_checked(Some(Direction::Right)).unwrap(),
             Step::Refused(Unqualified::UnsupportedType(1))
         );
+    }
+
+    #[test]
+    fn a_patch_writes_the_tile_under_its_attribute_and_is_listed() {
+        let mut world = synthetic_world();
+        world.base.attributes[0x1A7] = 0x0E | 0x80;
+        world.globals.patches.push((3, 2, 0x1A7));
+        world.globals.patches.push((3, 2, 0x5A7));
+        world.apply_patches().unwrap();
+        // The attribute's low seven bits above the tile; the last patch of a
+        // cell is the one listed.
+        assert_eq!(world.base.room.cells()[2 * 8 + 3], 0x0E << 9 | 0x1A7);
+        assert_eq!(world.room.room.cells()[2 * 8 + 3], 0x0E << 9 | 0x1A7);
+        assert_eq!(world.patched_cells(), [(3, 2, 0x1A7)]);
+        assert!(world.globals.patches.is_empty());
     }
 }

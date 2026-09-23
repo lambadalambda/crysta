@@ -54,7 +54,17 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
         frame: background,
         region,
         animation,
+        patches: Patches::default(),
     })
+}
+
+/// Cells the world's scripts have re-tiled, and what they looked like.
+#[derive(Default)]
+struct Patches {
+    /// The map's static scene, decoded on the first patch.
+    scene: Option<StaticBackground>,
+    /// Cells drawn with a patched tile: column, row, tile.
+    drawn: Vec<(u16, u16, u16)>,
 }
 
 /// Static pixels with an optional, bounded map-A animation overlay.
@@ -63,9 +73,50 @@ pub struct CachedBackground {
     /// The part of the shared layer this map's camera may show.
     pub region: CameraRegion,
     animation: Option<AnimatedExterior>,
+    patches: Patches,
 }
 
 impl CachedBackground {
+    /// Draws the world's patched cells (`COP 44`), and restores cells that
+    /// are no longer patched, from the map's own metatiles.
+    pub fn apply_patches(&mut self, image: &[u8], map: u16, patched: &[(u16, u16, u16)]) {
+        if self.patches.drawn == patched {
+            return;
+        }
+        if self.patches.scene.is_none() {
+            self.patches.scene = StaticBackground::from_rom(image, map).ok();
+        }
+        let Some(scene) = &self.patches.scene else {
+            return;
+        };
+        let width = scene.layer().width();
+        let original = |column: u16, row: u16| {
+            let cell = usize::from(row) * width + usize::from(column);
+            scene.layer().cells().get(cell).map(|cell| cell.raw() & 511)
+        };
+        let mut redraw: Vec<(u16, u16, u16)> = self
+            .patches
+            .drawn
+            .iter()
+            .filter(|&&(column, row, _)| !patched.iter().any(|&(c, r, _)| (c, r) == (column, row)))
+            .filter_map(|&(column, row, _)| Some((column, row, original(column, row)?)))
+            .collect();
+        redraw.extend(
+            patched
+                .iter()
+                .filter(|cell| !self.patches.drawn.contains(cell)),
+        );
+        for (column, row, tile) in redraw {
+            draw_metatile(
+                scene,
+                &mut self.frame,
+                (usize::from(column), usize::from(row)),
+                tile,
+            );
+        }
+        self.patches.drawn = patched.to_vec();
+    }
+
     pub fn update(&mut self, age: u64) {
         if let Some(animation) = &mut self.animation {
             animation.update(age, &mut self.frame);
@@ -172,6 +223,37 @@ impl AnimatedExterior {
             }
         }
         self.key = Some(key);
+    }
+}
+
+/// Draws one 16x16 cell from a scene's metatile, transparent pixels in the
+/// scene's colour 0.
+fn draw_metatile(
+    scene: &StaticBackground,
+    frame: &mut crate::frame::Background,
+    (column, row): (usize, usize),
+    tile: u16,
+) {
+    let Some(words) = scene.metatiles().get(usize::from(tile)) else {
+        return;
+    };
+    for y in 0..16 {
+        for x in 0..16 {
+            let (color, high) = match graphics::sample_metatile(words, scene.tiles(), x, y) {
+                Ok(IndexedPixel::Opaque {
+                    palette_index,
+                    priority,
+                }) => (rgb(scene.palette()[usize::from(palette_index)]), priority),
+                _ => (rgb(scene.palette()[0]), false),
+            };
+            let offset = (row * 16 + y) * frame.width + column * 16 + x;
+            if let Some(pixel) = frame.pixels.get_mut(offset) {
+                *pixel = color;
+            }
+            if let Some(bit) = frame.high.get_mut(offset) {
+                *bit = high;
+            }
+        }
     }
 }
 
@@ -308,5 +390,29 @@ mod tests {
         assert_eq!(exterior_backdrop(&image, &scene).unwrap(), 0x00FF_0000);
         image[0xD_8C53] ^= 1;
         assert!(exterior_backdrop(&image, &scene).is_err());
+    }
+}
+
+#[cfg(test)]
+mod patch_tests {
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn a_patched_cell_is_redrawn_and_restored() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let mut cached = super::load(&rom, 0xC).unwrap();
+        let cell = |cached: &super::CachedBackground| {
+            let frame = &cached.frame;
+            (0..16)
+                .flat_map(|y| (0..16).map(move |x| (21 * 16 + y) * frame.width + 11 * 16 + x))
+                .map(|at| frame.pixels[at])
+                .collect::<Vec<_>>()
+        };
+        let before = cell(&cached);
+        // The blue door's broken tile from its second hit; the cell holds $181.
+        cached.apply_patches(rom.image(), 0xC, &[(11, 21, 0xCB)]);
+        assert_ne!(cell(&cached), before);
+        cached.apply_patches(rom.image(), 0xC, &[]);
+        assert_eq!(cell(&cached), before, "restored when the patch is gone");
     }
 }

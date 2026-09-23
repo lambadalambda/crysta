@@ -38,6 +38,9 @@ pub struct Globals {
     /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
     /// door's hit count. Cleared on every map load (`$8D:8AED`).
     pub counters: Vec<u8>,
+    /// Tile patches (`COP 44`) not yet written into the map: column, row,
+    /// tile.
+    pub patches: Vec<(u16, u16, u16)>,
 }
 
 impl Default for Globals {
@@ -56,6 +59,7 @@ impl Globals {
             input_mask: 0,
             items: Vec::new(),
             counters: vec![0; 0x80],
+            patches: Vec::new(),
         }
     }
 

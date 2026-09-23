@@ -36,9 +36,44 @@ pub struct MapRoom {
     pub width: u16,
     /// Grid height in cells.
     pub height: u16,
+    /// The map's metatile attribute table (resource 3), 512 bytes, which a
+    /// tile patch reads its collision attribute from.
+    pub attributes: Vec<u8>,
 }
 
 impl MapRoom {
+    /// The same room with other cells, keeping its material policy and
+    /// collision mode.
+    ///
+    /// # Errors
+    /// Propagates a room or policy refusal.
+    pub fn with_cells(&self, cells: Vec<u16>) -> Result<Self, RoomError> {
+        let map = self.map;
+        let mut room = Room::new(self.width, self.height, cells)
+            .map_err(|source| RoomError::Refused { map, source })?
+            .with_material_policy(qualified_policy(map, self.width, self.height))
+            .map_err(|source| RoomError::Policy { map, source })?;
+        if self.room.passive_directional_type8_special_bit_clear() {
+            room = room.with_passive_directional_type8_special_bit_clear();
+        } else if self.room.passive_directional_collision() {
+            room = room.with_passive_directional_collision();
+        }
+        Ok(Self {
+            room,
+            attributes: self.attributes.clone(),
+            ..*self
+        })
+    }
+
+    /// The cell word a tile patch writes (`$8D:8DF8`): the tile's attribute,
+    /// low seven bits, above the tile number.
+    #[must_use]
+    pub fn patch_word(&self, tile: u16) -> u16 {
+        let tile = tile & 0x1FF;
+        let attribute = self.attributes.get(usize::from(tile)).copied().unwrap_or(0);
+        u16::from(attribute & 0x7F) << 9 | tile
+    }
+
     /// Cells the player can begin a step from.
     ///
     /// Searched rather than derived, because a cell's material is only half the
@@ -259,6 +294,7 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
         map,
         width,
         height,
+        attributes: attributes.to_vec(),
     })
 }
 
