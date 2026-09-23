@@ -17,8 +17,7 @@ still use the approximate eight-tick, two-pixel projection.
   movement streams and the display lists of its composition packet.
 - Replace the single hard-coded admission with that derivation. Anything
   outside the understood subset keeps the existing projection.
-- Qualify with a native witness where the source alone leaves a question,
-  in particular class 4.
+- Qualify with a native witness where the source alone leaves a question.
 - Keep the map-`$0D` result unchanged.
 
 ## Acceptance Criteria
@@ -38,3 +37,17 @@ still use the approximate eight-tick, two-pixel projection.
 - `$80:8F6D` groups by `class & ~3`: movement `$68/$69/$60` (0.5 px/tick),
   `$78/$79/$70` (1 px/tick), `$88/$89/$80` (2 px/tick). `$80:8FB5` groups by
   `class & 3`: idle counts 16, 8, 1, 1. Map `$1A`'s down list is 31 ticks.
+
+## Sub-issues
+
+- [Witness a class-2 Crysta walker natively](witness-class-two-walker.md)
+- [Derive each walker's step and idle timing from source](derive-walker-cadence-from-source.md)
+
+## Findings
+
+- The class is descriptor mode `& $0F`, not header byte 1. The exterior
+  walkers with mode `$22` are class 2, which uses the class-0 movement row
+  and idle count 1. No walker in the slice is class 4 or higher.
+- Header byte 1 is the low byte of entity flags +`$04`; bit `$0004` selects
+  the collision-checked movement path at `$80:D101`, with the same deltas on
+  free cells.
