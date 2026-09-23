@@ -1,14 +1,49 @@
-//! Composing one 256x224 frame, without a window in sight.
+//! Composing one 224-line view, classic or wide, without a window in sight.
 //!
 //! Everything here is a pure function over decoded pixels, so the renderer can
 //! be tested without opening a window or owning a GPU.
 
+use assets::maps::visual::camera::CameraRegion;
 use assets::text::Placement;
 
-/// Native view width in pixels.
-pub const VIEW_WIDTH: usize = 256;
-/// Native view height in pixels.
+/// Classic view width in pixels.
+pub const CLASSIC_WIDTH: usize = 256;
+/// Wide view width: 224 lines at about 16:9, in whole 8-pixel tiles.
+pub const WIDE_WIDTH: usize = 400;
+/// View height in pixels, in both widths.
 pub const VIEW_HEIGHT: usize = 224;
+
+/// One composed view, `width` by [`VIEW_HEIGHT`], in `0x00RRGGBB`.
+pub struct Canvas {
+    /// Row-major pixels.
+    pub pixels: Vec<u32>,
+    /// Width in pixels.
+    pub width: usize,
+}
+
+impl Canvas {
+    /// A blank view `width` pixels across.
+    #[must_use]
+    pub fn new(width: usize) -> Self {
+        Self {
+            pixels: vec![0; width * VIEW_HEIGHT],
+            width,
+        }
+    }
+
+    /// Sets one pixel; anything off the view is dropped rather than wrapped.
+    fn set(&mut self, (x, y): (i32, i32), colour: u32) {
+        if let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) {
+            if x < self.width && y < VIEW_HEIGHT {
+                self.pixels[y * self.width + x] = colour;
+            }
+        }
+    }
+}
+
+fn signed(value: usize) -> i32 {
+    i32::try_from(value).unwrap_or(i32::MAX)
+}
 
 /// A decoded background: one map's pixels, in `0x00RRGGBB`.
 pub struct Background {
@@ -29,6 +64,45 @@ impl Background {
     pub fn occludes(&self, x: usize, y: usize) -> bool {
         x < self.width && self.high.get(y * self.width + x).copied().unwrap_or(false)
     }
+
+    /// The pixel at a world position, or `None` off the layer.
+    fn at(&self, x: i32, y: i32) -> Option<u32> {
+        let (x, y) = (usize::try_from(x).ok()?, usize::try_from(y).ok()?);
+        (x < self.width && y < self.height).then(|| self.pixels[y * self.width + x])
+    }
+}
+
+/// Top-left of a view `width` pixels across, in layer pixels.
+///
+/// At the classic width this is the source clamp. A wider view follows the
+/// player the same way inside a region wider than itself, and centres a
+/// narrower region, so the origin can be left of the layer.
+#[must_use]
+pub fn camera(region: &CameraRegion, player: (u16, u16), width: usize) -> (i32, i32) {
+    let [_, y] = region.settled_origin([player.0, player.1]);
+    let [left, _, right, _] = region.bounds.map(i32::from);
+    let width = signed(width);
+    let x = if right - left <= width {
+        left - (width - (right - left)) / 2
+    } else {
+        (i32::from(player.0) - width / 2).clamp(left, right - width)
+    };
+    (x, i32::from(y))
+}
+
+/// Blanks every pixel whose layer position is outside `bounds`, so a wide
+/// view never shows a neighbouring room.
+pub fn mask_outside(canvas: &mut Canvas, camera: (i32, i32), bounds: [u16; 4]) {
+    let [left, top, right, bottom] = bounds.map(i32::from);
+    for (row, line) in canvas.pixels.chunks_mut(canvas.width).enumerate() {
+        let y = camera.1 + signed(row);
+        for (column, pixel) in line.iter_mut().enumerate() {
+            let x = camera.0 + signed(column);
+            if !(left..right).contains(&x) || !(top..bottom).contains(&y) {
+                *pixel = 0;
+            }
+        }
+    }
 }
 
 /// Blits a sprite raster at a world position, occluded by the background.
@@ -38,9 +112,9 @@ impl Background {
 /// pixel under an opaque high-priority tile is the tile's. Later sprites in
 /// the draw list overwrite earlier ones where both are opaque.
 pub fn draw_sprite(
-    frame: &mut [u32],
+    canvas: &mut Canvas,
     background: &Background,
-    camera: (usize, usize),
+    camera: (i32, i32),
     raster: &crysta_runtime::art::Raster,
     at: (u16, u16),
 ) {
@@ -52,24 +126,16 @@ pub fn draw_sprite(
             if pixel >> 24 == 0 {
                 continue;
             }
-            let (Ok(column_i), Ok(row_i)) = (i64::try_from(column), i64::try_from(row)) else {
+            let world_x = i32::from(at.0) + i32::from(raster.offset.0) + signed(column);
+            let world_y = i32::from(at.1) + i32::from(raster.offset.1) + signed(row);
+            let (Ok(x), Ok(y)) = (usize::try_from(world_x), usize::try_from(world_y)) else {
                 continue;
             };
-            let world_x = i64::from(at.0) + i64::from(raster.offset.0) + column_i;
-            let world_y = i64::from(at.1) + i64::from(raster.offset.1) + row_i;
-            let (Ok(world_x), Ok(world_y)) = (usize::try_from(world_x), usize::try_from(world_y))
-            else {
-                continue;
-            };
-            if background.occludes(world_x, world_y) {
-                continue;
-            }
-            let (Some(x), Some(y)) = (world_x.checked_sub(camera.0), world_y.checked_sub(camera.1))
-            else {
-                continue;
-            };
-            if x < VIEW_WIDTH && y < VIEW_HEIGHT {
-                frame[y * VIEW_WIDTH + x] = pixel & 0x00FF_FFFF;
+            if !background.occludes(x, y) {
+                canvas.set(
+                    (world_x - camera.0, world_y - camera.1),
+                    pixel & 0x00FF_FFFF,
+                );
             }
         }
     }
@@ -94,22 +160,26 @@ const PAGE_MARGIN: usize = 8;
 /// top when the player's screen row is in the lower half, as `$85964D` does
 /// against the camera. A `$C2` window puts its content at its tile column
 /// and row, with the box drawn around it.
+///
+/// In a wide view the page keeps to the classic area in the middle.
 #[must_use]
 pub fn page_origin(
     placement: Placement,
     (width, height): (usize, usize),
     player_screen_y: usize,
+    view_width: usize,
 ) -> (usize, usize) {
-    let box_width = (width + 2 * PAGE_MARGIN).min(VIEW_WIDTH);
+    let classic = view_width.saturating_sub(CLASSIC_WIDTH) / 2;
+    let box_width = (width + 2 * PAGE_MARGIN).min(CLASSIC_WIDTH);
     let box_height = (height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT);
-    let centred = (VIEW_WIDTH - box_width) / 2;
+    let centred = classic + (CLASSIC_WIDTH - box_width) / 2;
     let bottom = VIEW_HEIGHT.saturating_sub(box_height + PAGE_MARGIN);
     let top = match placement {
         Placement::AwayFromPlayer if player_screen_y >= VIEW_HEIGHT / 2 => PAGE_MARGIN,
         Placement::Bottom | Placement::AwayFromPlayer => bottom,
         Placement::Tile { column, row } => {
             return (
-                (usize::from(column) * 8).saturating_sub(PAGE_MARGIN),
+                classic + (usize::from(column) * 8).saturating_sub(PAGE_MARGIN),
                 (usize::from(row) * 8).saturating_sub(PAGE_MARGIN),
             )
         }
@@ -122,7 +192,7 @@ pub fn page_origin(
 /// `indexed` is the page's row-major two-bit pixels, `width * height` of
 /// them, and `background_index` is the index that reads as clear.
 pub fn draw_page(
-    frame: &mut [u32],
+    canvas: &mut Canvas,
     indexed: &[u8],
     (width, height): (usize, usize),
     background_index: u8,
@@ -131,39 +201,26 @@ pub fn draw_page(
     if width == 0 || height == 0 || indexed.len() < width * height {
         return;
     }
-    let box_width = (width + 2 * PAGE_MARGIN).min(VIEW_WIDTH);
-    let box_height = (height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT);
-    let (left_i, top_i) = (
-        i32::try_from(left).unwrap_or(0),
-        i32::try_from(top).unwrap_or(0),
-    );
-    let (box_w, box_h) = (
-        i32::try_from(box_width).unwrap_or(0),
-        i32::try_from(box_height).unwrap_or(0),
-    );
-    fill(frame, (left_i, top_i), (box_w, box_h), PAGE_BORDER);
+    let (left, top) = (signed(left), signed(top));
+    let box_width = signed((width + 2 * PAGE_MARGIN).min(CLASSIC_WIDTH));
+    let box_height = signed((height + 2 * PAGE_MARGIN).min(VIEW_HEIGHT));
+    fill(canvas, (left, top), (box_width, box_height), PAGE_BORDER);
     fill(
-        frame,
-        (left_i + 1, top_i + 1),
-        (box_w - 2, box_h - 2),
+        canvas,
+        (left + 1, top + 1),
+        (box_width - 2, box_height - 2),
         PAGE_BOX,
     );
     let mut palette = PAGE_PALETTE;
     if let Some(slot) = palette.get_mut(usize::from(background_index)) {
         *slot = PAGE_BOX;
     }
+    let margin = signed(PAGE_MARGIN);
     for row in 0..height {
-        let y = top + PAGE_MARGIN + row;
-        if y >= VIEW_HEIGHT {
-            break;
-        }
         for column in 0..width {
-            let x = left + PAGE_MARGIN + column;
-            if x >= VIEW_WIDTH {
-                break;
-            }
             let index = usize::from(indexed[row * width + column]) & 3;
-            frame[y * VIEW_WIDTH + x] = palette[index];
+            let at = (left + margin + signed(column), top + margin + signed(row));
+            canvas.set(at, palette[index]);
         }
     }
 }
@@ -208,52 +265,43 @@ pub fn decode_bmp(bytes: &[u8]) -> Option<Background> {
     })
 }
 
-/// Blits the visible window of `background` into a 256x224 frame.
-pub fn draw_background(frame: &mut [u32], background: &Background, camera: (usize, usize)) {
+/// Blits the visible window of `background` into the view.
+pub fn draw_background(canvas: &mut Canvas, background: &Background, camera: (i32, i32)) {
     for row in 0..VIEW_HEIGHT {
-        let source = camera.1 + row;
-        if source >= background.height {
-            break;
-        }
-        for column in 0..VIEW_WIDTH {
-            let across = camera.0 + column;
-            if across >= background.width {
-                break;
+        for column in 0..canvas.width {
+            let (x, y) = (signed(column), signed(row));
+            if let Some(pixel) = background.at(camera.0 + x, camera.1 + y) {
+                canvas.set((x, y), pixel);
             }
-            frame[row * VIEW_WIDTH + column] =
-                background.pixels[source * background.width + across];
         }
     }
 }
 
-/// Fills a rectangle, clipped to the frame.
-pub fn fill(frame: &mut [u32], at: (i32, i32), size: (i32, i32), colour: u32) {
+/// Fills a rectangle, clipped to the view.
+pub fn fill(canvas: &mut Canvas, at: (i32, i32), size: (i32, i32), colour: u32) {
     for row in 0..size.1 {
-        let Ok(y) = usize::try_from(at.1 + row) else {
-            continue;
-        };
-        if y >= VIEW_HEIGHT {
-            continue;
-        }
         for column in 0..size.0 {
-            let Ok(x) = usize::try_from(at.0 + column) else {
-                continue;
-            };
-            if x >= VIEW_WIDTH {
-                continue;
-            }
-            frame[y * VIEW_WIDTH + x] = colour;
+            canvas.set((at.0 + column, at.1 + row), colour);
         }
     }
 }
 
-/// Scales `frame` into `target` by the largest integer factor that fits.
+/// Window width that shows a `view_width` view at `height` without borders.
+#[must_use]
+pub fn fitted_width(view_width: usize, height: u32) -> u32 {
+    let across = u64::from(height) * u64::try_from(view_width).unwrap_or(u64::MAX)
+        / u64::try_from(VIEW_HEIGHT).unwrap_or(1);
+    u32::try_from(across).unwrap_or(u32::MAX)
+}
+
+/// Scales the view into `target` by the largest integer factor that fits.
 ///
 /// Nearest neighbour and integer only: a non-integer scale would resample
 /// pixels the renderer went to some trouble to reproduce exactly.
-pub fn present(frame: &[u32], target: &mut [u32], size: (usize, usize)) {
-    let scale = (size.0 / VIEW_WIDTH).min(size.1 / VIEW_HEIGHT).max(1);
-    let (drawn_width, drawn_height) = (VIEW_WIDTH * scale, VIEW_HEIGHT * scale);
+pub fn present(canvas: &Canvas, target: &mut [u32], size: (usize, usize)) {
+    let width = canvas.width;
+    let scale = (size.0 / width).min(size.1 / VIEW_HEIGHT).max(1);
+    let (drawn_width, drawn_height) = (width * scale, VIEW_HEIGHT * scale);
     let (left, top) = (
         size.0.saturating_sub(drawn_width) / 2,
         size.1.saturating_sub(drawn_height) / 2,
@@ -262,7 +310,7 @@ pub fn present(frame: &[u32], target: &mut [u32], size: (usize, usize)) {
     for row in 0..drawn_height.min(size.1) {
         let source = row / scale;
         for column in 0..drawn_width.min(size.0) {
-            let pixel = frame[source * VIEW_WIDTH + column / scale];
+            let pixel = canvas.pixels[source * width + column / scale];
             let index = (top + row) * size.0 + left + column;
             if let Some(slot) = target.get_mut(index) {
                 *slot = pixel;
@@ -275,74 +323,154 @@ pub fn present(frame: &[u32], target: &mut [u32], size: (usize, usize)) {
 mod tests {
     use super::*;
 
+    fn region(bounds: [u16; 4]) -> CameraRegion {
+        CameraRegion {
+            record_offset: 0,
+            bounds,
+            vertical_extent: 256,
+        }
+    }
+
+    fn filled(width: usize, colour: u32) -> Canvas {
+        let mut canvas = Canvas::new(width);
+        canvas.pixels.fill(colour);
+        canvas
+    }
+
+    #[test]
+    fn the_classic_camera_is_the_source_clamp() {
+        for bounds in [[0, 0, 1024, 1024], [256, 512, 512, 768], [0, 0, 256, 512]] {
+            let region = region(bounds);
+            for x in (0..1100).step_by(37) {
+                for y in (0..1100).step_by(41) {
+                    let [cx, cy] = region.settled_origin([x, y]);
+                    let expected = (i32::from(cx), i32::from(cy));
+                    assert_eq!(camera(&region, (x, y), CLASSIC_WIDTH), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn the_wide_camera_follows_wide_regions_and_centres_narrow_ones() {
+        let exterior = region([0, 0, 1024, 1024]);
+        assert_eq!(camera(&exterior, (504, 1000), WIDE_WIDTH), (304, 768));
+        assert_eq!(camera(&exterior, (10, 10), WIDE_WIDTH), (0, 0));
+        assert_eq!(camera(&exterior, (1020, 10), WIDE_WIDTH), (624, 0));
+        // A one-page room sits in the middle, 72 columns in from each side.
+        let room = region([256, 512, 512, 768]);
+        for player in [(260, 520), (500, 760)] {
+            assert_eq!(camera(&room, player, WIDE_WIDTH), (184, 512));
+        }
+        // Left of the layer's origin is fine: the camera is signed.
+        let first = region([0, 256, 256, 512]);
+        assert_eq!(camera(&first, (128, 300), WIDE_WIDTH), (-72, 256));
+    }
+
+    #[test]
+    fn everything_outside_the_region_is_blanked() {
+        let mut canvas = filled(WIDE_WIDTH, 0x00AB_CDEF);
+        mask_outside(&mut canvas, (-72, 256), [0, 256, 256, 512]);
+        for y in [0, VIEW_HEIGHT - 1] {
+            let row = &canvas.pixels[y * WIDE_WIDTH..(y + 1) * WIDE_WIDTH];
+            assert!(row[..72].iter().all(|pixel| *pixel == 0));
+            assert!(row[72..328].iter().all(|pixel| *pixel == 0x00AB_CDEF));
+            assert!(row[328..].iter().all(|pixel| *pixel == 0));
+        }
+        // Rows past the region's bottom go too; a classic view inside it is untouched.
+        let mut canvas = filled(CLASSIC_WIDTH, 1);
+        mask_outside(&mut canvas, (0, 400), [0, 256, 256, 512]);
+        let (inside, below) = canvas.pixels.split_at(112 * CLASSIC_WIDTH);
+        assert!(inside.iter().all(|pixel| *pixel == 1));
+        assert!(below.iter().all(|pixel| *pixel == 0));
+        let mut canvas = filled(CLASSIC_WIDTH, 1);
+        mask_outside(&mut canvas, (0, 256), [0, 256, 256, 512]);
+        assert!(canvas.pixels.iter().all(|pixel| *pixel == 1));
+    }
+
     #[test]
     fn a_page_box_goes_where_the_native_window_opens() {
         let dims = (224, 48);
+        let origin = |placement, y| page_origin(placement, dims, y, CLASSIC_WIDTH);
         // The standard window sits along the bottom, centred.
-        assert_eq!(page_origin(Placement::Bottom, dims, 30), (8, 224 - 64 - 8));
-        assert_eq!(page_origin(Placement::Bottom, dims, 200), (8, 224 - 64 - 8));
+        assert_eq!(origin(Placement::Bottom, 30), (8, 224 - 64 - 8));
+        assert_eq!(origin(Placement::Bottom, 200), (8, 224 - 64 - 8));
         // $DA keeps out of the player's half of the screen.
-        assert_eq!(
-            page_origin(Placement::AwayFromPlayer, dims, 111),
-            (8, 224 - 64 - 8)
-        );
-        assert_eq!(page_origin(Placement::AwayFromPlayer, dims, 112), (8, 8));
+        assert_eq!(origin(Placement::AwayFromPlayer, 111), (8, 224 - 64 - 8));
+        assert_eq!(origin(Placement::AwayFromPlayer, 112), (8, 8));
         // $C2 puts the content at its tile column and row.
         let tile = Placement::Tile { column: 3, row: 3 };
-        assert_eq!(page_origin(tile, (200, 48), 0), (24 - 8, 24 - 8));
         assert_eq!(
-            page_origin(Placement::Tile { column: 0, row: 0 }, dims, 0),
-            (0, 0)
+            page_origin(tile, (200, 48), 0, CLASSIC_WIDTH),
+            (24 - 8, 24 - 8)
         );
+        assert_eq!(origin(Placement::Tile { column: 0, row: 0 }, 0), (0, 0));
+    }
+
+    #[test]
+    fn wide_pages_stay_in_the_classic_area() {
+        let dims = (224, 48);
+        let bottom = page_origin(Placement::Bottom, dims, 30, WIDE_WIDTH);
+        assert_eq!(bottom, (72 + 8, 224 - 64 - 8));
+        let tile = Placement::Tile { column: 3, row: 3 };
+        assert_eq!(page_origin(tile, (200, 48), 0, WIDE_WIDTH), (72 + 16, 16));
     }
 
     #[test]
     fn presenting_uses_an_integer_scale_and_centres_the_image() {
-        let frame = vec![0x00FF_00FFu32; VIEW_WIDTH * VIEW_HEIGHT];
+        let canvas = filled(CLASSIC_WIDTH, 0x00FF_00FF);
         // A 3x window leaves a border, and the image sits inside it.
-        let size = (VIEW_WIDTH * 3 + 40, VIEW_HEIGHT * 3 + 20);
+        let size = (CLASSIC_WIDTH * 3 + 40, VIEW_HEIGHT * 3 + 20);
         let mut target = vec![0u32; size.0 * size.1];
-        present(&frame, &mut target, size);
+        present(&canvas, &mut target, size);
         let drawn = target.iter().filter(|pixel| **pixel != 0).count();
-        assert_eq!(
-            drawn,
-            VIEW_WIDTH * 3 * VIEW_HEIGHT * 3,
-            "exactly 3x, no more"
-        );
+        assert_eq!(drawn, CLASSIC_WIDTH * 3 * VIEW_HEIGHT * 3, "exactly 3x");
         // The corners are border, the middle is image.
         assert_eq!(target[0], 0);
         assert_eq!(target[size.1 / 2 * size.0 + size.0 / 2], 0x00FF_00FF);
     }
 
     #[test]
+    fn a_wide_view_fills_a_16_by_9_window_at_an_integer_scale() {
+        let canvas = filled(WIDE_WIDTH, 0x00FF_00FF);
+        let size = (1920, 1080);
+        let mut target = vec![0u32; size.0 * size.1];
+        present(&canvas, &mut target, size);
+        let drawn = target.iter().filter(|pixel| **pixel != 0).count();
+        assert_eq!(drawn, WIDE_WIDTH * 4 * VIEW_HEIGHT * 4);
+    }
+
+    #[test]
+    fn a_window_keeps_its_height_and_fits_the_view_across() {
+        assert_eq!(fitted_width(WIDE_WIDTH, 672), 1200);
+        assert_eq!(fitted_width(CLASSIC_WIDTH, 672), 768);
+        assert_eq!(fitted_width(WIDE_WIDTH, 1080), 1928);
+        assert_eq!(fitted_width(WIDE_WIDTH, u32::MAX), u32::MAX);
+    }
+
+    #[test]
     fn presenting_into_a_window_smaller_than_the_view_still_draws() {
-        let frame = vec![0x0012_3456u32; VIEW_WIDTH * VIEW_HEIGHT];
+        let canvas = filled(CLASSIC_WIDTH, 0x0012_3456);
         let size = (100, 80);
         let mut target = vec![0u32; size.0 * size.1];
-        present(&frame, &mut target, size);
+        present(&canvas, &mut target, size);
         assert!(target.contains(&0x0012_3456));
     }
 
     #[test]
-    fn filling_clips_to_the_frame_instead_of_panicking() {
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
-        fill(&mut frame, (-4, -4), (8, 8), 0x00AA_BBCC);
-        assert_eq!(frame[0], 0x00AA_BBCC);
+    fn filling_clips_to_the_view_instead_of_panicking() {
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
+        fill(&mut canvas, (-4, -4), (8, 8), 0x00AA_BBCC);
+        assert_eq!(canvas.pixels[0], 0x00AA_BBCC);
         // Entirely outside, in every direction.
-        fill(&mut frame, (-100, 0), (8, 8), 0x0011_2233);
-        fill(
-            &mut frame,
-            (i32::try_from(VIEW_WIDTH).unwrap() + 4, 0),
-            (8, 8),
-            0x0011_2233,
-        );
-        fill(
-            &mut frame,
-            (0, i32::try_from(VIEW_HEIGHT).unwrap() + 4),
-            (8, 8),
-            0x0011_2233,
-        );
-        assert!(!frame.contains(&0x0011_2233));
+        for at in [
+            (-100, 0),
+            (signed(CLASSIC_WIDTH) + 4, 0),
+            (0, signed(VIEW_HEIGHT) + 4),
+        ] {
+            fill(&mut canvas, at, (8, 8), 0x0011_2233);
+        }
+        assert!(!canvas.pixels.contains(&0x0011_2233));
     }
 
     #[test]
@@ -383,12 +511,16 @@ mod tests {
             height: 300,
             high: Vec::new(),
         };
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
         // A camera near the edge leaves the far side untouched rather than
-        // wrapping or reading out of bounds.
-        draw_background(&mut frame, &background, (200, 200));
-        assert_eq!(frame[0], 0x0000_0001);
-        assert_eq!(frame[VIEW_HEIGHT * VIEW_WIDTH - 1], 0);
+        // wrapping or reading out of bounds; so does one left of the origin.
+        draw_background(&mut canvas, &background, (200, 200));
+        assert_eq!(canvas.pixels[0], 0x0000_0001);
+        assert_eq!(canvas.pixels[VIEW_HEIGHT * CLASSIC_WIDTH - 1], 0);
+        let mut canvas = Canvas::new(WIDE_WIDTH);
+        draw_background(&mut canvas, &background, (-72, 0));
+        assert_eq!(canvas.pixels[71], 0);
+        assert_eq!(canvas.pixels[72], 0x0000_0001);
     }
 
     fn raster(width: usize, height: usize, offset: (i16, i16)) -> crysta_runtime::art::Raster {
@@ -408,21 +540,24 @@ mod tests {
             height: 512,
             high: Vec::new(),
         };
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
         // Origin (100, 100), offset (-8, -16), camera (50, 40): the top-left
         // pixel lands at view (42, 44).
         draw_sprite(
-            &mut frame,
+            &mut canvas,
             &background,
             (50, 40),
             &raster(16, 16, (-8, -16)),
             (100, 100),
         );
-        assert_eq!(frame[44 * VIEW_WIDTH + 42], 0x0012_3456);
-        assert_eq!(frame[43 * VIEW_WIDTH + 42], 0);
-        assert_eq!(frame[44 * VIEW_WIDTH + 41], 0);
-        assert_eq!(frame[(44 + 15) * VIEW_WIDTH + 42 + 15], 0x0012_3456);
-        assert_eq!(frame[(44 + 16) * VIEW_WIDTH + 42 + 16], 0);
+        assert_eq!(canvas.pixels[44 * CLASSIC_WIDTH + 42], 0x0012_3456);
+        assert_eq!(canvas.pixels[43 * CLASSIC_WIDTH + 42], 0);
+        assert_eq!(canvas.pixels[44 * CLASSIC_WIDTH + 41], 0);
+        assert_eq!(
+            canvas.pixels[(44 + 15) * CLASSIC_WIDTH + 42 + 15],
+            0x0012_3456
+        );
+        assert_eq!(canvas.pixels[(44 + 16) * CLASSIC_WIDTH + 42 + 16], 0);
     }
 
     #[test]
@@ -436,17 +571,17 @@ mod tests {
             height: 512,
             high,
         };
-        let mut frame = vec![0x00AB_CDEF; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut canvas = filled(CLASSIC_WIDTH, 0x00AB_CDEF);
         let mut sprite = raster(2, 1, (0, 0));
         sprite.pixels[1] = 0; // transparent
-        draw_sprite(&mut frame, &background, (0, 0), &sprite, (100, 100));
+        draw_sprite(&mut canvas, &background, (0, 0), &sprite, (100, 100));
         // Occluded: the background shows through.
-        assert_eq!(frame[100 * VIEW_WIDTH + 100], 0x00AB_CDEF);
+        assert_eq!(canvas.pixels[100 * CLASSIC_WIDTH + 100], 0x00AB_CDEF);
         // Transparent: untouched too.
-        assert_eq!(frame[100 * VIEW_WIDTH + 101], 0x00AB_CDEF);
+        assert_eq!(canvas.pixels[100 * CLASSIC_WIDTH + 101], 0x00AB_CDEF);
         // But the same sprite one pixel over draws.
-        draw_sprite(&mut frame, &background, (0, 0), &sprite, (101, 100));
-        assert_eq!(frame[100 * VIEW_WIDTH + 101], 0x0012_3456);
+        draw_sprite(&mut canvas, &background, (0, 0), &sprite, (101, 100));
+        assert_eq!(canvas.pixels[100 * CLASSIC_WIDTH + 101], 0x0012_3456);
     }
 
     #[test]
@@ -457,55 +592,62 @@ mod tests {
             height: 64,
             high: Vec::new(),
         };
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
         // Above and left of the world origin entirely.
         draw_sprite(
-            &mut frame,
+            &mut canvas,
             &background,
             (0, 0),
             &raster(8, 8, (-8, -8)),
             (0, 0),
         );
-        assert!(frame.iter().all(|pixel| *pixel == 0));
+        assert!(canvas.pixels.iter().all(|pixel| *pixel == 0));
         // Behind the camera.
         draw_sprite(
-            &mut frame,
+            &mut canvas,
             &background,
             (32, 32),
             &raster(8, 8, (0, 0)),
             (10, 10),
         );
-        assert!(frame.iter().all(|pixel| *pixel == 0));
+        assert!(canvas.pixels.iter().all(|pixel| *pixel == 0));
     }
 
     #[test]
     fn a_page_is_boxed_at_the_bottom_with_its_background_index_as_box_colour() {
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
         // A 4x2 page: indices 0..3 across the top row, all background below.
         let indexed = [0u8, 1, 2, 3, 3, 3, 3, 3];
-        let origin = page_origin(Placement::Bottom, (4, 2), 0);
-        draw_page(&mut frame, &indexed, (4, 2), 3, origin);
+        let origin = page_origin(Placement::Bottom, (4, 2), 0, CLASSIC_WIDTH);
+        draw_page(&mut canvas, &indexed, (4, 2), 3, origin);
         let box_width = 4 + 2 * PAGE_MARGIN;
         let box_height = 2 + 2 * PAGE_MARGIN;
-        let left = (VIEW_WIDTH - box_width) / 2;
+        let left = (CLASSIC_WIDTH - box_width) / 2;
         let top = VIEW_HEIGHT - box_height - PAGE_MARGIN;
         // Border corner, box interior, then the page's pixels.
-        assert_eq!(frame[top * VIEW_WIDTH + left], PAGE_BORDER);
-        assert_eq!(frame[(top + 1) * VIEW_WIDTH + left + 1], PAGE_BOX);
-        let row = (top + PAGE_MARGIN) * VIEW_WIDTH + left + PAGE_MARGIN;
-        assert_eq!(frame[row], PAGE_PALETTE[0]);
-        assert_eq!(frame[row + 1], PAGE_PALETTE[1]);
-        assert_eq!(frame[row + 2], PAGE_PALETTE[2]);
-        assert_eq!(frame[row + 3], PAGE_BOX, "the background index is the box");
+        assert_eq!(canvas.pixels[top * CLASSIC_WIDTH + left], PAGE_BORDER);
+        assert_eq!(
+            canvas.pixels[(top + 1) * CLASSIC_WIDTH + left + 1],
+            PAGE_BOX
+        );
+        let row = (top + PAGE_MARGIN) * CLASSIC_WIDTH + left + PAGE_MARGIN;
+        assert_eq!(canvas.pixels[row], PAGE_PALETTE[0]);
+        assert_eq!(canvas.pixels[row + 1], PAGE_PALETTE[1]);
+        assert_eq!(canvas.pixels[row + 2], PAGE_PALETTE[2]);
+        assert_eq!(
+            canvas.pixels[row + 3],
+            PAGE_BOX,
+            "the background index is the box"
+        );
         // Above the box nothing was touched.
-        assert_eq!(frame[(top - 1) * VIEW_WIDTH + left], 0);
+        assert_eq!(canvas.pixels[(top - 1) * CLASSIC_WIDTH + left], 0);
     }
 
     #[test]
     fn a_malformed_page_draws_nothing() {
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
-        draw_page(&mut frame, &[1, 1], (4, 2), 3, (8, 8));
-        draw_page(&mut frame, &[], (0, 0), 3, (8, 8));
-        assert!(frame.iter().all(|pixel| *pixel == 0));
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
+        draw_page(&mut canvas, &[1, 1], (4, 2), 3, (8, 8));
+        draw_page(&mut canvas, &[], (0, 0), 3, (8, 8));
+        assert!(canvas.pixels.iter().all(|pixel| *pixel == 0));
     }
 }

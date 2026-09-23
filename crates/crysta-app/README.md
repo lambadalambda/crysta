@@ -16,12 +16,24 @@ workspace so native platform dependencies do not change reference-producer pins.
 - **M:** pause/resume music (not gameplay).
 - **− / +** (also numpad): change volume by 10%, clamped to 0–100%. Starts at50%.
 - Escape: quit and stop audio.
+- **V:** switch between the classic 256x224 view and a 400x224 (about 16:9) view.
 
 Music pauses while the window is unfocused or suspended. Refocusing preserves
 an explicit M-key pause. Zero volume is mute: the music timeline continues;
 pause preserves the playback position. The title shows the music status.
 Use `--no-music` after the ROM path to avoid opening an audio device entirely.
 The existing `--screenshot <path> <script>` mode also does not initialize audio.
+
+## Views
+
+The classic view is the default. `--wide`, anywhere after the ROM path, starts
+in the wide view; it also works with `--screenshot`, for example
+`<rom> --wide --screenshot <path> <script>`. The camera stays inside
+the map's source camera region in both views. The wide view follows the player
+in regions wider than 400 pixels. A one-page room is centred, and everything
+outside its region is black, so no neighbouring room shows. Dialogue boxes stay
+in the classic area in the middle. The view is presentation only: the
+simulation, residents and timing do not change.
 
 ## Outdoor refusals and diagnostic logs
 

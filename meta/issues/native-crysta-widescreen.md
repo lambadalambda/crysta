@@ -37,3 +37,22 @@ should show more of the map to the sides, without stretching pixels.
   [enhanced and widescreen rendering](enhanced-widescreen-rendering.md), for
   the native Crysta app only. All residents already run whether on screen or
   not, so no spawn or culling change is needed here.
+
+## Result
+
+- `frame.rs` composes into a `Canvas` of runtime width (256 or 400). The
+  camera is signed. At 256 it is the source clamp, which a grid test proves
+  against `CameraRegion::settled_origin`. At 400 it follows inside wider
+  regions and centres narrower ones. `mask_outside` blanks everything outside
+  the region before dialogue is drawn. Pages keep to the centred classic area.
+- `--wide` selects the view for windowed and screenshot runs, and `V` toggles
+  it at runtime. The window keeps its height and fits its width
+  (`fitted_width`, tested) unless maximized. The session log header records `view_width`, and a toggle logs a
+  `view` host event.
+- Red: the new camera and mask tests failed on stubs. Green: 18 frame tests
+  and 64 app tests with the owned ROM, including wide `$0C` (`(-72,256)`,
+  blank sides) and wide exterior (`(304,768)`). Classic screenshots for three
+  scripts are byte-identical to the previous commit. Wide screenshots of `$0C`,
+  the exterior and an open dialogue were inspected. App Clippy is clean.
+- Not verified here: the interactive `V` toggle and window resize, because
+  this session has no display. Needs a check on the desktop.

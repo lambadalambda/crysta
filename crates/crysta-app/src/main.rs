@@ -18,7 +18,7 @@ use assets::text::{Acknowledgement, DialoguePage};
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::world::{Step, World};
-use frame::{VIEW_HEIGHT, VIEW_WIDTH};
+use frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use gilrs::{Axis, Button, Gilrs};
 use room_core::Direction;
 use std::collections::HashMap;
@@ -66,15 +66,24 @@ fn main() {
     // renderer can be inspected without a window.
     // The image is leaked once, so the world can borrow it for the run.
     let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
+    // `--wide` combines with either mode, so it is taken out first.
+    let mut rest: Vec<String> = arguments.collect();
+    let width = if rest.iter().any(|argument| argument == "--wide") {
+        WIDE_WIDTH
+    } else {
+        CLASSIC_WIDTH
+    };
+    rest.retain(|argument| argument != "--wide");
+    let mut arguments = rest.into_iter();
     let mode = arguments.next();
     if mode.as_deref() == Some("--screenshot") {
         let path = arguments.next().unwrap_or_else(|| "frame.ppm".into());
         let script = arguments.next().unwrap_or_default();
-        screenshot(&cartridge, image, &path, &script);
+        screenshot(&cartridge, image, (&path, &script), width);
         return;
     }
     if mode.as_deref().is_some_and(|mode| mode != "--no-music") {
-        eprintln!("unknown option; use --no-music or --screenshot <path> <script>");
+        eprintln!("unknown option; use --wide, --no-music or --screenshot <path> <script>");
         std::process::exit(2);
     }
     let music = if mode.is_none() {
@@ -95,22 +104,26 @@ fn main() {
     };
     let event_loop = EventLoop::new().expect("an event loop");
     event_loop.set_control_flow(ControlFlow::Wait);
-    let log = start_diagnostics(&cartridge, music.is_some());
-    let mut app = App::new(cartridge, image, music, log);
+    let log = start_diagnostics(&cartridge, music.is_some(), width);
+    let mut app = App::new(cartridge, image, music, log, width);
     if let Err(error) = event_loop.run_app(&mut app) {
         eprintln!("{error}");
         std::process::exit(1);
     }
 }
 
-fn start_diagnostics(cartridge: &rom::Rom, music: bool) -> Option<diagnostics::SessionLog> {
+fn start_diagnostics(
+    cartridge: &rom::Rom,
+    music: bool,
+    width: usize,
+) -> Option<diagnostics::SessionLog> {
     let executable_sha256 = std::env::current_exe()
         .ok()
         .and_then(|path| std::fs::read(path).ok())
         .map(|bytes| rom::digests(&bytes).sha256);
     let metadata = serde_json::json!({
         "app_version": env!("CARGO_PKG_VERSION"), "executable_sha256": executable_sha256,
-        "rom_sha256": cartridge.digests().sha256, "music_available": music,
+        "rom_sha256": cartridge.digests().sha256, "music_available": music, "view_width": width,
         "initial": {"map": START.0, "x": START.1, "y": START.2},
         "movement_policy": "interactive-refusal-reset-v1",
         "timing_policy": "ntsc-mean-fixed-step-v1",
@@ -150,7 +163,12 @@ fn start_music(cartridge: &rom::Rom) -> Result<music_output::Music, String> {
 /// The script is comma-separated: `down:400` walks 400 frames down, `wait:5`
 /// stands for 5, `talk` presses the interact button once, and `at:D:200:700`
 /// re-enters map `$000D` at (200,700) to look at a room directly.
-fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &str) {
+fn screenshot(
+    cartridge: &rom::Rom,
+    image: &'static [u8],
+    (path, script): (&str, &str),
+    width: usize,
+) {
     let mut session = Session::new(image);
     for step in script.split(',').filter(|step| !step.is_empty()) {
         if let Some(rest) = step.strip_prefix("at:") {
@@ -199,10 +217,10 @@ fn screenshot(cartridge: &rom::Rom, image: &'static [u8], path: &str, script: &s
         eprintln!("screenshot run stopped: {error}");
         std::process::exit(1);
     }
-    let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
-    let camera = session.compose(cartridge, &mut frame);
-    let mut out = format!("P6\n{VIEW_WIDTH} {VIEW_HEIGHT}\n255\n").into_bytes();
-    for pixel in &frame {
+    let mut canvas = Canvas::new(width);
+    let camera = session.compose(cartridge, &mut canvas);
+    let mut out = format!("P6\n{width} {VIEW_HEIGHT}\n255\n").into_bytes();
+    for pixel in &canvas.pixels {
         // Truncation is the point: the low byte of each channel.
         let channel = |shift: u32| u8::try_from((pixel >> shift) & 0xFF).unwrap_or(0);
         out.extend_from_slice(&[channel(16), channel(8), channel(0)]);
@@ -481,9 +499,10 @@ impl Session {
     /// Depth is world Y, ties broken by spawn order with later records first
     /// and the player last, which is what every frozen tie rank encodes. The
     /// count includes residents that draw nothing, which keeps the relative
-    /// order and only inflates the player's rank.
-    fn compose(&mut self, cartridge: &rom::Rom, frame: &mut [u32]) -> (usize, usize) {
-        frame.fill(0);
+    /// order and only inflates the player's rank. Whatever lies outside the
+    /// map's region is blanked before the dialogue goes on top.
+    fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
+        frame.pixels.fill(0);
         self.ensure_background(cartridge);
         self.ensure_art();
         let Session {
@@ -503,8 +522,8 @@ impl Session {
         let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
-        let [x, y] = background.region.settled_origin([position.0, position.1]);
-        let camera = (usize::from(x), usize::from(y));
+        let region = background.region;
+        let camera = frame::camera(&region, position, frame.width);
         let background = &background.frame;
         frame::draw_background(frame, background, camera);
         let count = residents.len();
@@ -521,10 +540,10 @@ impl Session {
                 continue;
             }
             let resident = &residents[index];
-            let placeholder = |frame: &mut [u32]| {
+            let placeholder = |frame: &mut Canvas| {
                 let (x, y) = (
-                    i32::from(resident.position.0) - i32::try_from(camera.0).unwrap_or(0),
-                    i32::from(resident.position.1) - i32::try_from(camera.1).unwrap_or(0),
+                    i32::from(resident.position.0) - camera.0,
+                    i32::from(resident.position.1) - camera.1,
                 );
                 frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
             };
@@ -558,11 +577,13 @@ impl Session {
                 }
             }
         }
+        frame::mask_outside(frame, camera, region.bounds);
         if let Some(open) = dialogue {
             let page = &open.pages[open.index];
             let dimensions = (usize::from(page.width()), usize::from(page.height()));
-            let player_screen_y = usize::from(position.1).saturating_sub(camera.1);
-            let origin = frame::page_origin(page.placement(), dimensions, player_screen_y);
+            let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
+            let origin =
+                frame::page_origin(page.placement(), dimensions, player_screen_y, frame.width);
             frame::draw_page(
                 frame,
                 page.indexed(),
@@ -585,7 +606,8 @@ struct App {
     pads: Option<Gilrs>,
     held: Option<Direction>,
     keys: Vec<Direction>,
-    frame: Vec<u32>,
+    /// Classic or wide; `V` switches between them.
+    frame: Canvas,
     /// Edge-triggered, so holding the button does not re-talk every frame.
     interaction: input::Interaction,
     started: std::time::Instant,
@@ -602,6 +624,7 @@ impl App {
         image: &'static [u8],
         music: Option<music_output::Music>,
         log: Option<diagnostics::SessionLog>,
+        width: usize,
     ) -> Self {
         Self {
             cartridge,
@@ -612,7 +635,7 @@ impl App {
             pads: Gilrs::new().ok(),
             held: None,
             keys: Vec::new(),
-            frame: vec![0; VIEW_WIDTH * VIEW_HEIGHT],
+            frame: Canvas::new(width),
             interaction: input::Interaction::default(),
             started: std::time::Instant::now(),
             clock: clock::Clock::new(std::time::Duration::ZERO),
@@ -660,10 +683,39 @@ impl App {
             let fault = self.state.as_ref().and_then(|state| state.fault.as_deref());
             let suffix =
                 fault.map_or_else(String::new, |error| format!(" | WORLD STOPPED: {error}"));
+            let view = if self.frame.width == WIDE_WIDTH {
+                "16:9"
+            } else {
+                "classic"
+            };
             window.set_title(&format!(
-                "Crysta — music {status} | M: pause, -/+: volume{suffix}"
+                "Crysta — music {status} | M: pause, -/+: volume | V: view {view}{suffix}"
             ));
         }
+    }
+
+    /// Switches between the classic and the wide view, keeping the window's
+    /// height and fitting its width unless the window is maximized.
+    fn toggle_view(&mut self) {
+        let width = if self.frame.width == WIDE_WIDTH {
+            CLASSIC_WIDTH
+        } else {
+            WIDE_WIDTH
+        };
+        self.frame = Canvas::new(width);
+        if let Some(window) = &self.window {
+            if !window.is_maximized() && window.fullscreen().is_none() {
+                let height = window.inner_size().height;
+                let across = frame::fitted_width(width, height);
+                let _ = window.request_inner_size(winit::dpi::PhysicalSize::new(across, height));
+            }
+            window.request_redraw();
+        }
+        self.record_diagnostic(
+            &serde_json::json!({"kind":"host", "event":"view", "width":width}),
+            true,
+        );
+        self.update_title();
     }
 
     fn session(&mut self) -> &mut Session {
@@ -679,7 +731,7 @@ impl ApplicationHandler for App {
         let attributes = Window::default_attributes()
             .with_title("Crysta")
             .with_inner_size(winit::dpi::LogicalSize::new(
-                u32::try_from(VIEW_WIDTH * 3).unwrap_or(768),
+                u32::try_from(self.frame.width * 3).unwrap_or(768),
                 u32::try_from(VIEW_HEIGHT * 3).unwrap_or(672),
             ));
         let window = Rc::new(event_loop.create_window(attributes).expect("a window"));
@@ -718,6 +770,10 @@ impl ApplicationHandler for App {
                     PhysicalKey::Code(KeyCode::ArrowLeft | KeyCode::KeyA) => Some(Direction::Left),
                     PhysicalKey::Code(KeyCode::ArrowRight | KeyCode::KeyD) => {
                         Some(Direction::Right)
+                    }
+                    PhysicalKey::Code(KeyCode::KeyV) if pressed => {
+                        self.toggle_view();
+                        None
                     }
                     PhysicalKey::Code(KeyCode::KeyM) if pressed => {
                         self.music_controls.toggle();
@@ -894,7 +950,7 @@ impl App {
             surface.resize(width, height).expect("resize");
             let mut buffer = surface.buffer_mut().expect("a buffer");
             frame::present(
-                frame,
+                &*frame,
                 &mut buffer,
                 (size.width as usize, size.height as usize),
             );
@@ -945,14 +1001,29 @@ mod session_tests {
         let rom = rom::Rom::load(&bytes).unwrap();
         let image = Box::leak(rom.image().to_vec().into_boxed_slice());
         let mut session = Session::new(image);
-        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
         // `$0C` is the second page of a layer it shares with `$0B` and `$0D`;
-        // the exterior's 1280-pixel sheet has a 1024-pixel region.
-        for (map, position, camera) in [(0xC, (136, 300), (0, 256)), (0xA, (504, 1000), (376, 768))]
-        {
+        // the exterior's 1280-pixel sheet has a 1024-pixel region. Wide, the
+        // room is centred between blank sides and the exterior shows more.
+        for (width, map, position, camera) in [
+            (CLASSIC_WIDTH, 0xC, (136, 300), (0, 256)),
+            (CLASSIC_WIDTH, 0xA, (504, 1000), (376, 768)),
+            (WIDE_WIDTH, 0xC, (136, 300), (-72, 256)),
+            (WIDE_WIDTH, 0xA, (504, 1000), (304, 768)),
+        ] {
+            let mut frame = Canvas::new(width);
             session.world = World::enter(image, map, position.0, position.1).unwrap();
             session.background_clock = background::VisitClock::new(map);
             assert_eq!(session.compose(&rom, &mut frame), camera, "map {map:#x}");
+            let (outside, inside): (Vec<_>, Vec<_>) = frame
+                .pixels
+                .chunks(width)
+                .flat_map(|row| row.iter().enumerate())
+                .partition(|(x, _)| {
+                    let side = (WIDE_WIDTH - CLASSIC_WIDTH) / 2;
+                    camera.0 < 0 && (*x < side || *x >= side + CLASSIC_WIDTH)
+                });
+            assert!(outside.iter().all(|(_, pixel)| **pixel == 0));
+            assert!(inside.iter().filter(|(_, pixel)| **pixel != 0).count() > inside.len() / 2);
         }
         for map in 0xA..=0x21 {
             assert!(background::load(&rom, map).is_ok(), "map {map:#x}");
@@ -1035,7 +1106,7 @@ mod session_tests {
         ));
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
-        let mut app = App::new(rom, image, None, Some(log));
+        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH);
         app.session().world = World::enter(image, 0xA, 360, 472).unwrap();
         for (direction, count) in [
             (Some(Direction::Right), 3),
@@ -1121,7 +1192,7 @@ mod session_tests {
         let root = std::env::temp_dir().join(format!("crysta-fatal-trace-{}", std::process::id()));
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
-        let mut app = App::new(rom, image, None, Some(log));
+        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH);
         app.session().world = World::enter(image, 0xB, position.0, position.1).unwrap();
         // Exercise trace precedence without needing a naturally coincident
         // refused movement + successful interaction at the same doorway.
