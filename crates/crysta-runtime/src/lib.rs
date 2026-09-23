@@ -39,6 +39,9 @@ pub struct MapRoom {
     /// The map's metatile attribute table (resource 3), 512 bytes, which a
     /// tile patch reads its collision attribute from.
     pub attributes: Vec<u8>,
+    /// Where the first layer comes from. Maps that share it keep each
+    /// other's tile patches: `$86:9145` skips the reload.
+    pub layer_source: usize,
 }
 
 impl MapRoom {
@@ -295,6 +298,7 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
         width,
         height,
         attributes: attributes.to_vec(),
+        layer_source: background.layer().source_range().start,
     })
 }
 

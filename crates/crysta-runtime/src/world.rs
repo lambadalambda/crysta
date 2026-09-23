@@ -438,6 +438,7 @@ impl<'a> World<'a> {
             self.scene = Some(Scene::Own(index));
         }
         self.apply_patches()?;
+        self.spawn_actors();
         let cells = blocking_cells(&self.residents, &self.actors);
         if cells != self.blocked {
             self.room = occupy_cells(self.base.clone(), &cells)?;
@@ -465,6 +466,30 @@ impl<'a> World<'a> {
         self.base = self.base.with_cells(cells)?;
         self.room = occupy_cells(self.base.clone(), &self.blocked)?;
         Ok(())
+    }
+
+    /// Adds the actors scripts spawned (`COP A2`); they run from next frame.
+    fn spawn_actors(&mut self) {
+        for (script, flags, position) in std::mem::take(&mut self.globals.spawns) {
+            let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
+            let mut actor = Actor::new(position, Some(runtime), 0, 1);
+            actor.set_map(self.map);
+            actor.hidden = flags & 0x8000 != 0;
+            self.residents.push(Resident {
+                position,
+                record: 0,
+                script: Some(runtime),
+                body: false,
+                initial: 0,
+                selector: 0,
+                hflip: false,
+                pose_age: 0,
+                walking: false,
+                descriptor: None,
+                hidden: actor.hidden,
+            });
+            self.actors.push(actor);
+        }
     }
 
     /// Cells scripts have patched in this map: column, row and tile.
@@ -538,6 +563,22 @@ impl<'a> World<'a> {
             .zip(&self.actors)
             .filter_map(|(resident, actor)| Some((resident.record, actor.frozen_at()?)))
             .collect()
+    }
+
+    /// Hits the resident spawned from `record`, as a thrown object would;
+    /// for hosts and tests. Returns whether it could be hit.
+    pub fn strike(&mut self, record: usize) -> bool {
+        self.residents
+            .iter()
+            .position(|resident| resident.record == record)
+            .is_some_and(|index| self.actors[index].strike())
+    }
+
+    /// Puts the player at a position in this map, standing; for hosts and
+    /// tests, like a debug warp. Scripts and patches stay as they are.
+    pub fn place(&mut self, x: u16, y: u16) {
+        self.walking = WalkingState::new(x, y);
+        self.arrival = None;
     }
 
     /// Sets an event flag as `COP 07` would; for hosts and tests.
@@ -813,6 +854,11 @@ impl<'a> World<'a> {
             self.base.room.passive_directional_type8_special_bit_clear(),
         )?;
         entered.globals.items.clone_from(&self.globals.items);
+        // The same first layer is not reloaded: its patches stay.
+        if entered.base.layer_source == self.base.layer_source {
+            entered.globals.patches.clone_from(&self.patched);
+            entered.apply_patches()?;
+        }
         Ok(entered)
     }
 }
@@ -851,12 +897,13 @@ fn blocking_cells(residents: &[Resident], actors: &[Actor]) -> Vec<(u16, u16)> {
         .iter()
         .zip(actors)
         .filter(|(resident, _)| !resident.hidden)
-        .filter_map(|(resident, actor)| {
-            if resident.body {
+        .flat_map(|(resident, actor)| {
+            let own = if resident.body {
                 Some(resident.collision_cell())
             } else {
                 actor.stamp()
-            }
+            };
+            own.into_iter().chain(actor.stamps().iter().copied())
         })
         .collect()
 }
@@ -1011,6 +1058,7 @@ mod tests {
             width: 8,
             height: 8,
             attributes: vec![0; 512],
+            layer_source: 0,
         };
         // Synthetic exit encoding only; no ROM fixture is used by shared tests.
         let mut bytes = vec![0; 0x188B9];

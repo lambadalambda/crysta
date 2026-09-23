@@ -41,6 +41,9 @@ pub struct Globals {
     /// Tile patches (`COP 44`) not yet written into the map: column, row,
     /// tile.
     pub patches: Vec<(u16, u16, u16)>,
+    /// Actors scripts spawned (`COP A2`), not yet in the map: script
+    /// (normalized), flags word (`+$04`; bit 15 hidden) and position.
+    pub spawns: Vec<(usize, u16, (u16, u16))>,
 }
 
 impl Default for Globals {
@@ -60,6 +63,7 @@ impl Globals {
             items: Vec::new(),
             counters: vec![0; 0x80],
             patches: Vec::new(),
+            spawns: Vec::new(),
         }
     }
 

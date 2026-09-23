@@ -92,6 +92,29 @@ const TILE_BRANCH: u8 = 0x42;
 /// word: the tile in bits 0-8, and in the high byte, shifted right twice, the
 /// frames to wait after.
 const PATCH: u8 = 0x44;
+/// Registers where a hit sends the script (`+$04 |= $0200`); `$80:9D25`.
+/// Operands: the hit target, then a long return address for `COP 66`.
+const HIT_TARGET: u8 = 0x65;
+/// Returns from a hit to `COP 65`'s return address; `$80:9D5A`.
+const HIT_RETURN: u8 = 0x66;
+/// Branches when a `COP 4B` counter holds a word; `$80:9713`. Operands: the
+/// counter, the word and the target.
+const COUNT_BRANCH: u8 = 0x4A;
+/// Marks, and unmarks, a further cell occupied; `$80:9327`/`935D`.
+/// Operands: a mode (0: offsets from the actor), then column and row.
+const STAMP: u8 = 0x3D;
+const UNSTAMP: u8 = 0x3E;
+/// Spawns an actor running a long script with a flags word; `$80:A71B`.
+const SPAWN: u8 = 0xA2;
+/// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
+const HIT_COOLDOWN: u16 = 16;
+/// Screen-only services: a palette-fade helper (`31` spawns it, `32` sets it),
+/// a sound (`37`) and a cosmetic helper (`6A`). Their one-byte or two-byte
+/// operands are stepped over; the effects are not drawn.
+const COSMETIC: [(u8, usize); 4] = [(0x31, 1), (0x32, 1), (0x37, 1), (0x6A, 2)];
+/// Waits for the palette fade helper (`$04B8 == $FFFF`), then three frames;
+/// `$80:918F`. With no helper, only the three frames.
+const FADE_WAIT: u8 = 0x33;
 /// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
 /// bit 15 it waits until the flag is set, with it until the flag is clear.
 const WAIT_FOR_FLAG: u8 = 0x05;
@@ -300,6 +323,12 @@ pub struct Actor {
     stamp: Option<(u16, u16)>,
     /// Where the script stopped at something the interpreter does not model.
     frozen_at: Option<usize>,
+    /// Further cells `COP 3D` marked.
+    stamps: Vec<(u16, u16)>,
+    /// `COP 65`'s hit target and return address, when the actor can be hit.
+    hit: Option<(usize, usize)>,
+    /// Frames until the actor can be hit again.
+    cooldown: u16,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -344,6 +373,9 @@ impl Actor {
             repeats: None,
             stamp: None,
             frozen_at: None,
+            stamps: Vec::new(),
+            hit: None,
+            cooldown: 0,
             lengths: vec![None; 256],
         }
     }
@@ -408,8 +440,34 @@ impl Actor {
         }
     }
 
+    /// Further cells `COP 3D` marked occupied.
+    #[must_use]
+    pub fn stamps(&self) -> &[(u16, u16)] {
+        &self.stamps
+    }
+
+    /// Whether a thrown object can hit the actor now (`COP 65`, cooldown).
+    #[must_use]
+    pub const fn hittable(&self) -> bool {
+        self.hit.is_some() && self.cooldown == 0
+    }
+
+    /// A hit (`$85:D5A0` then `$80:CA6D`): the script goes to `COP 65`'s
+    /// target, and the actor cannot be hit again for sixteen frames.
+    pub fn strike(&mut self) -> bool {
+        let Some((target, _)) = self.hit.filter(|_| self.cooldown == 0) else {
+            return false;
+        };
+        self.cooldown = HIT_COOLDOWN;
+        self.pc = target;
+        self.state = State::Running;
+        self.stream = None;
+        true
+    }
+
     /// Runs one frame.
     pub fn tick(&mut self, around: &mut Surroundings<'_>) {
+        self.cooldown = self.cooldown.saturating_sub(1);
         self.pose_age = self.pose_age.saturating_add(1);
         if matches!(self.state, State::Ordinary { ticks_left: 0, .. }) {
             self.walking = false;
@@ -462,6 +520,11 @@ impl Actor {
     #[must_use]
     pub const fn frozen_at(&self) -> Option<usize> {
         self.frozen_at
+    }
+
+    /// Sets the map `COP 0A`/`49` compare with.
+    pub(crate) fn set_map(&mut self, map: u16) {
+        self.map = map;
     }
 
     /// The cell `COP 3B` marked occupied, if one is.
@@ -644,6 +707,10 @@ impl Actor {
                         self.pc += 9;
                         continue;
                     }
+                    if let Some(next) = display_code(image, self.pc) {
+                        self.pc = next;
+                        continue;
+                    }
                     self.state = State::Frozen;
                     return Run::Yielded;
                 }
@@ -682,6 +749,8 @@ impl Actor {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
+            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | STAMP | UNSTAMP | SPAWN | FADE_WAIT | 0x31
+            | 0x32 | 0x37 | 0x6A => return self.door_service(service, operands, bank, around),
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
@@ -899,6 +968,89 @@ impl Actor {
         self.stream = Some((direction, 0, speed));
         self.stamp = None;
         self.pc = operands + 3;
+        true
+    }
+
+    /// Hits, counter branches, further stamps, spawns and the fade wait.
+    /// Returns whether execution continues this frame.
+    fn door_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            HIT_TARGET => {
+                let (Some(target), Some(resume)) = (
+                    cadence::word(image, operands),
+                    image.get(operands + 2..operands + 5).and_then(long),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.hit = Some((bank | usize::from(target), resume));
+                self.pc = operands + 5;
+            }
+            HIT_RETURN => {
+                let Some((_, resume)) = self.hit else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.pc = resume;
+            }
+            COUNT_BRANCH => {
+                let (Some(&counter), Some(word), Some(target)) = (
+                    image.get(operands),
+                    cadence::word(image, operands + 1),
+                    cadence::word(image, operands + 3),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if around.globals.counter(counter) == word {
+                    return self.jump(bank, target);
+                }
+                self.pc = operands + 5;
+            }
+            STAMP | UNSTAMP => {
+                let Some(&[0, dx, dy]) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let (column, row) = self.collision_cell();
+                let offset = |base: u16, by: u8| {
+                    base.wrapping_add_signed(i16::from(i8::from_ne_bytes([by])))
+                };
+                let cell = (offset(column, dx), offset(row, dy));
+                self.stamps.retain(|&stamped| stamped != cell);
+                if service == STAMP {
+                    self.stamps.push(cell);
+                }
+                self.pc = operands + 3;
+            }
+            SPAWN => {
+                let (Some(script), Some(flags)) = (
+                    image.get(operands..operands + 3).and_then(long),
+                    cadence::word(image, operands + 3),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.spawns.push((script, flags, self.position));
+                self.pc = operands + 5;
+            }
+            FADE_WAIT => return self.hold(operands, 3),
+            cosmetic => {
+                let Some(&(_, length)) = COSMETIC.iter().find(|&&(service, _)| service == cosmetic)
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.pc = operands + length;
+            }
+        }
         true
     }
 
@@ -1489,6 +1641,35 @@ fn answered(image: &[u8], pc: usize, wait: Wait, answer: u8) -> Option<usize> {
             (target >= 0x8000).then_some((table & 0xFF_0000) | usize::from(target))
         }
     }
+}
+
+/// The end of a run of inline native code that only touches the display:
+/// the PPU's registers (`$2100..$21FF`), their shadows (`$0468..$046B`), the
+/// actor's scratch word (`$7F:201C,X`) and the cosmetic helper's flag
+/// (`$7E:46E6`), through immediates, `SEP`/`REP` and `INC`/`DEC A`. Gameplay
+/// cannot see these writes, so the script goes on at the next `COP`.
+fn display_code(image: &[u8], mut at: usize) -> Option<usize> {
+    let start = at;
+    let mut widths = assets::cpu::Widths::native();
+    while *image.get(at)? != 0x02 {
+        let bytes = image.get(at..at + 4)?;
+        let absolute = u16::from_le_bytes([bytes[1], bytes[2]]);
+        let long = u32::from(absolute) | u32::from(bytes[3]) << 16;
+        let display = match bytes[0] {
+            0xE2 | 0xC2 | 0xA9 | 0x09 | 0x29 | 0x1A | 0x3A => true,
+            0x8D | 0x9C => {
+                (0x2100..=0x21FF).contains(&absolute) || (0x0468..=0x046B).contains(&absolute)
+            }
+            0xBF | 0x9F => long == 0x7F_201C,
+            0x8F => long == 0x7E_46E6,
+            _ => false,
+        };
+        if !display {
+            return None;
+        }
+        at = assets::cpu::step(image, at, &mut widths)?;
+    }
+    (at > start).then_some(at)
 }
 
 /// A long operand as a normalized ROM offset.

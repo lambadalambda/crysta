@@ -60,6 +60,19 @@ callback on a confirm press when nothing else owns the window.
 | `BD` | `$80:AAB3` | — | yields one frame |
 | `42` | `$80:9444` | dx, dy, tile, target | branches when the cell at the actor's cell plus (dx, dy) holds the tile |
 | `44` | `$80:949B` | dx, dy, word | patches that cell: tile in bits 0-8 under its attribute (`(attr & $7F) << 9`), then waits `high >> 2` frames |
+| `65` | `$80:9D25` | target, long return | the actor can be hit; a hit sends its script to the target, 16 frames' cooldown |
+| `66` | `$80:9D5A` | — | returns to `COP 65`'s return address |
+| `4A` | `$80:9713` | counter, word, target | branches when the `$0640` counter holds the word |
+| `3D` / `3E` | `$80:9327` / `935D` | mode, dx, dy | marks / unmarks a further cell (mode 0: offsets from the actor) |
+| `A2` | `$80:A71B` | long script, flags | spawns an actor running the script; flags bit 15 hides it |
+| `31` / `32` / `33` | `$80:9107` / `913C` / `918F` | 1 / 1 / — | palette-fade helper; not drawn, `33` keeps only its three-frame tail |
+| `37` / `6A` | `$80:91FC` / `9DD6` | 1 / 2 | sound, cosmetic helper; stepped over |
+
+Inline native code that writes only the display -- PPU registers, their
+shadows `$0468..$046B`, the actor's scratch `$7F:201C` and the helper flag
+`$7E:46E6` -- is stepped over; anything else still freezes the script.
+Tile patches survive a move between maps that share the first layer (`B`,
+`C`, `D`, `E`, `$20`), because `$86:9145` does not reload it.
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
 
 Leg vectors come from the common resource: `$60`/`$68`/`$69` step half a
@@ -104,6 +117,13 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   pages) with a 64-pixel walk left between the second and third, and choice
   1. Option 1: two pages, `$2E`, the walk back, the pad unlocked -- as the
   native journey (16749 -> 18416).
+
+- **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
+  the first patches the upper cell and shows one page; the second patches
+  both cells to the open stairs, marks them, sets `$292`, and the friends'
+  reaction runs through locals 2..9 (a spawned fade child sets 4 and 6)
+  before the door deletes itself and control returns. The screen fades are
+  not drawn, so the reaction is shorter than natively.
 
 ## Flag-gated geometry
 

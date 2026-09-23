@@ -35,6 +35,8 @@ fn frames_until(world: &mut World<'_>, limit: u32, done: impl Fn(&World<'_>) -> 
 }
 
 const ELLE: usize = 0x03_8D36;
+/// The blue door in C.
+const DOOR: usize = 0x03_8C32;
 
 #[test]
 fn elle_wakes_ark_then_walks_out() {
@@ -242,4 +244,75 @@ fn a_map_load_clears_local_flags_and_counters_and_keeps_items() {
         "global flags kept"
     );
     assert_eq!(local.items(), [0x7A, 0xA0], "items kept");
+}
+
+#[test]
+// `World::pad_locked` as a path is not general over the world's lifetime.
+#[allow(clippy::redundant_closure_for_method_calls)]
+fn two_hits_break_the_blue_door_and_open_the_stairs() {
+    // The door `$83:8C32` counts hits in `$0640`: the second patches the
+    // stair cells (11,21)/(11,20), sets `$292` at `$88:ABEE`, and the friends'
+    // reaction runs through locals 4..9 before control returns.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    let read_out = |world: &mut World<'_>| {
+        for _ in 0..3000 {
+            let reading = world.dialogue().is_some() || world.in_scene();
+            world
+                .update(None, if reading { A } else { Presses::default() })
+                .unwrap();
+            if !reading && !world.pad_locked() && world.dialogue().is_none() {
+                return;
+            }
+        }
+        panic!("the reaction never ended");
+    };
+    // Its script registers the hit (`COP 65`) after its opening pose.
+    for _ in 0..60 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert_eq!(
+        world
+            .frozen_scripts()
+            .iter()
+            .filter(|(r, _)| *r == DOOR)
+            .count(),
+        0
+    );
+    assert!(world.strike(DOOR), "the door takes hits");
+    frames_until(&mut world, 10, |world| world.pad_locked());
+    read_out(&mut world);
+    assert!(!flag(&world, 0x292));
+    // Sixteen frames later it can be hit again.
+    for _ in 0..16 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.strike(DOOR));
+    frames_until(&mut world, 10, |world| flag(world, 0x292));
+    read_out(&mut world);
+    assert!(
+        world.residents().iter().all(|r| r.record != DOOR),
+        "the door is gone"
+    );
+    let cell = |column: usize, row: usize| {
+        world.room().cells()[row * usize::from(world.dimensions().0) + column]
+    };
+    assert_eq!(cell(11, 21) & 0x1FF, 0xCB);
+    assert_eq!(cell(11, 20) & 0x1FF, 0xF6);
+    assert_ne!(cell(11, 21) >> 9, 14, "and not stamped any more");
+    assert!(flag(&world, 0x09), "the reaction reached its last local");
+    // B shares C's first layer, so the game does not reload it: the opened
+    // door stays open there (`$86:9145`).
+    world.place(136, 300);
+    world.update(None, Presses::default()).unwrap();
+    assert_eq!(world.map(), 0x000B);
+    assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
+    assert!(world.patched_cells().contains(&(11, 20, 0xF6)));
 }
