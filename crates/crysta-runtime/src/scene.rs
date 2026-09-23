@@ -35,6 +35,11 @@ pub struct Globals {
     /// `$0454`: the pad buttons held this frame, as the SNES pad word; only
     /// the directions are fed.
     pub pad: u16,
+    /// `$097C & $0810`: the player is in a forced action, such as a recoil,
+    /// which `COP DF` waits out.
+    pub player_action: bool,
+    /// A map transfer `COP 14` queued: map and player position.
+    pub transfer: Option<(u16, u16, u16)>,
     /// Items scripts have given (`COP 54`), in order. The inventory's slots
     /// and limits (`$7F:8000`) are not modelled.
     pub items: Vec<u8>,
@@ -64,6 +69,8 @@ impl Globals {
             dialogue: Dialogue::default(),
             input_mask: 0,
             pad: 0,
+            player_action: false,
+            transfer: None,
             items: Vec::new(),
             counters: vec![0; 0x80],
             patches: Vec::new(),

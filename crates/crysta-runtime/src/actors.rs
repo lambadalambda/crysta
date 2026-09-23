@@ -140,10 +140,43 @@ const UNSTAMP: u8 = 0x3E;
 const SPAWN: u8 = 0xA2;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
-/// Screen-only services: a palette-fade helper (`31` spawns it, `32` sets it),
-/// a sound (`37`) and a cosmetic helper (`6A`). Their one-byte or two-byte
-/// operands are stepped over; the effects are not drawn.
-const COSMETIC: [(u8, usize); 4] = [(0x31, 1), (0x32, 1), (0x37, 1), (0x6A, 2)];
+/// Services without a modelled effect: a palette-fade helper (`31` spawns
+/// it, `32` sets it), sounds (`37`, `76` queues at `$04D6`), the music word
+/// (`38`, `$04B6`), a cosmetic helper (`6A`) and the hit profile (`D9`,
+/// `$7F:1022` from `$8D:BDFA`). Their operands are stepped over.
+const COSMETIC: [(u8, usize); 7] = [
+    (0x31, 1),
+    (0x32, 1),
+    (0x37, 1),
+    (0x38, 2),
+    (0x6A, 2),
+    (0x76, 2),
+    (0xD9, 1),
+];
+/// Branches on the player inside a rectangle of cells around the actor;
+/// `$80:87C2`. Operands: facing, four signed cell offsets, target.
+const NEAR_BRANCH: u8 = 0x0D;
+/// Takes the player's script once no forced action runs (`$097C & $0810`);
+/// `$80:B827`. Operand: the long script.
+const TAKE_PLAYER: u8 = 0xDF;
+/// Queues a map transfer: map, mode, selector, x, y; `$80:8A23`.
+const TRANSFER: u8 = 0x14;
+/// Inline native code that registers the contact callback: `LDA #target;
+/// STA $7F:1010,X`, with the target's two bytes as wildcards.
+const CONTACT: [Option<u8>; 7] = [
+    Some(0xA9),
+    None,
+    None,
+    Some(0x9F),
+    Some(0x10),
+    Some(0x10),
+    Some(0x7F),
+];
+/// Inline native code that makes the player immune to damage (`+$06 |=
+/// $20` through `$0DEA`); the runtime has no damage.
+const NO_DAMAGE: [u8; 12] = [
+    0xAC, 0xEA, 0x0D, 0xB9, 0x06, 0x00, 0x09, 0x20, 0x00, 0x99, 0x06, 0x00,
+];
 /// Waits for the palette fade helper (`$04B8 == $FFFF`), then three frames;
 /// `$80:918F`. With no helper, only the three frames.
 const FADE_WAIT: u8 = 0x33;
@@ -153,8 +186,11 @@ const WAIT_FOR_FLAG: u8 = 0x05;
 /// Inline native code that hides the actor: `LDA $0004,X; ORA #$8000;
 /// STA $0004,X`. Entity `+$04` bit 15 keeps it out of the draw list
 /// (`$80:EB68`) and stops its animation and movement; its script runs on.
+/// One of the `+$04` writes [`Actor::native_idiom`] reads.
+#[cfg(test)]
 const HIDE: [u8; 9] = [0xBD, 0x04, 0x00, 0x09, 0x00, 0x80, 0x9D, 0x04, 0x00];
 /// Inline native code that shows it again: `AND #$7FFF`.
+#[cfg(test)]
 const SHOW: [u8; 9] = [0xBD, 0x04, 0x00, 0x29, 0xFF, 0x7F, 0x9D, 0x04, 0x00];
 /// Entity `+$06` bit that lets the player interact from any side.
 const INTERACT_ANY_SIDE: u16 = 0x0200;
@@ -321,6 +357,12 @@ pub struct Actor {
     pub hidden: bool,
     /// Whether the actor has ever moved.
     walked: bool,
+    /// The contact callback (`$7F:1010`).
+    contact: Option<usize>,
+    /// `+$04` bit `$0200`: the actor takes contact. Set at spawn, as the
+    /// box's `$5220` is natively before any script runs; how the loader
+    /// derives `+$04` is not traced.
+    touchable: bool,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -391,6 +433,8 @@ impl Actor {
             walking: false,
             hidden: false,
             walked: false,
+            contact: None,
+            touchable: true,
             pc,
             state,
             // A zero seed would stay zero.
@@ -581,6 +625,58 @@ impl Actor {
         self.map = map;
     }
 
+    /// The contact callback, while armed.
+    #[must_use]
+    pub fn contact(&self) -> Option<usize> {
+        self.contact.filter(|_| self.touchable && !self.hidden)
+    }
+
+    /// Runs the contact callback as the scheduler installs it (`$80:CAD5`),
+    /// as a subroutine like an interaction callback.
+    pub fn run_contact(&mut self, around: &mut Surroundings<'_>) -> Option<(usize, Wait)> {
+        let pc = self.contact()?;
+        self.enter_callback(pc, around)
+    }
+
+    /// Inline native code the runtime recognises: where it goes on, if the
+    /// code at the script position is one.
+    ///
+    /// - `LDA $0004,X; ORA/AND #imm; STA $0004,X` on the bits modelled:
+    ///   bit 15 hides the actor, bit 9 (`$0200`) arms its contact.
+    /// - [`CONTACT`] registers the contact callback.
+    /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`] and [`display_code`].
+    fn native_idiom(&mut self, image: &[u8], bank: usize) -> Option<usize> {
+        const MODELLED: u16 = 0x8000 | 0x0200;
+        let at = self.pc;
+        if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
+            let value = u16::from_le_bytes([low, high]);
+            let (set, cleared) = match op {
+                0x09 if value & !MODELLED == 0 => (value, 0),
+                0x29 if !value & !MODELLED == 0 => (0, !value),
+                _ => return None,
+            };
+            self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
+            self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
+            return Some(at + 9);
+        }
+        let code = image.get(at..at + CONTACT.len())?;
+        if CONTACT
+            .iter()
+            .zip(code)
+            .all(|(expected, byte)| expected.is_none_or(|expected| expected == *byte))
+        {
+            // The store alone: `$0200` comes with the entity. A zero target
+            // removes the callback.
+            let target = u16::from_le_bytes([code[1], code[2]]);
+            self.contact = (target != 0).then_some(bank | usize::from(target));
+            return Some(at + CONTACT.len());
+        }
+        if image.get(at..at + NO_DAMAGE.len()) == Some(&NO_DAMAGE) {
+            return Some(at + NO_DAMAGE.len());
+        }
+        player_pose_mismatch(image, at).or_else(|| display_code(image, at))
+    }
+
     /// The actor with its cell marked, as `COP 3B` would; for tests.
     #[cfg(test)]
     pub(crate) fn marked(mut self) -> Self {
@@ -762,17 +858,7 @@ impl Actor {
                     continue;
                 }
                 _ => {
-                    let native = image.get(self.pc..self.pc + 9);
-                    if native == Some(&HIDE) || native == Some(&SHOW) {
-                        self.hidden = native == Some(&HIDE);
-                        self.pc += 9;
-                        continue;
-                    }
-                    if let Some(next) = player_pose_mismatch(image, self.pc) {
-                        self.pc = next;
-                        continue;
-                    }
-                    if let Some(next) = display_code(image, self.pc) {
+                    if let Some(next) = self.native_idiom(image, bank) {
                         self.pc = next;
                         continue;
                     }
@@ -815,7 +901,7 @@ impl Actor {
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x6A => {
+            | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x38 | 0x6A | 0x76 | 0xD9 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -841,38 +927,10 @@ impl Actor {
             }
             WAIT => return self.wait_for_pose(operands),
             WAIT_STEP => return self.wait_step(operands),
-            RANDOM_STEP => {
-                let Some(rect) = image.get(operands..operands + 4) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                let qualified = self
-                    .cadence
-                    .filter(|_| image.get(operands + 4..operands + 6) == Some(&[2, WAIT_STEP]));
-                self.pc = operands + 4;
-                let moving = self.random_step([rect[0], rect[1], rect[2], rect[3]], around);
-                if let Some(cadence) = qualified {
-                    // COP8F resolves this very action; it is not an extra wait.
-                    self.pc += 2;
-                    self.pose_age = 0;
-                    self.walking = moving;
-                    let ticks = if moving {
-                        cadence.walk(self.facing)
-                    } else {
-                        cadence.idle
-                    };
-                    self.state = State::Ordinary {
-                        direction: moving.then_some(self.facing),
-                        ticks,
-                        ticks_left: ticks,
-                        destination: self.destination(),
-                    };
-                    self.tick_ordinary();
-                    return false;
-                }
-                return !moving;
+            RANDOM_STEP => return self.random_step_service(operands, around),
+            BRANCH_ON_PLAYER_NEAR | NEAR_BRANCH | TAKE_PLAYER | TRANSFER => {
+                return self.player_service(service, operands, bank, around)
             }
-            BRANCH_ON_PLAYER_NEAR => return self.branch_near_player(operands, bank, around),
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
@@ -1574,6 +1632,116 @@ impl Actor {
             return self.jump(bank, target);
         }
         self.pc = operands + 5;
+        true
+    }
+
+    /// `COP 26` with its following `COP 8F`: one step inside a rectangle,
+    /// at the derived cadence when there is one. Returns whether execution
+    /// continues this frame.
+    fn random_step_service(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        let image = around.image;
+        let Some(rect) = image.get(operands..operands + 4) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let qualified = self
+            .cadence
+            .filter(|_| image.get(operands + 4..operands + 6) == Some(&[2, WAIT_STEP]));
+        self.pc = operands + 4;
+        let moving = self.random_step([rect[0], rect[1], rect[2], rect[3]], around);
+        if let Some(cadence) = qualified {
+            // COP8F resolves this very action; it is not an extra wait.
+            self.pc += 2;
+            self.pose_age = 0;
+            self.walking = moving;
+            let ticks = if moving {
+                cadence.walk(self.facing)
+            } else {
+                cadence.idle
+            };
+            self.state = State::Ordinary {
+                direction: moving.then_some(self.facing),
+                ticks,
+                ticks_left: ticks,
+                destination: self.destination(),
+            };
+            self.tick_ordinary();
+            return false;
+        }
+        !moving
+    }
+
+    /// `COP 0F`, `0D`, `DF` and `14`: the player's position, script and map.
+    /// Returns whether execution continues this frame.
+    fn player_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            BRANCH_ON_PLAYER_NEAR => return self.branch_near_player(operands, bank, around),
+            NEAR_BRANCH => return self.branch_in_cells(operands, bank, around),
+            TAKE_PLAYER => {
+                if around.globals.player_action {
+                    // `$80:B87B` retries the COP next frame.
+                    return false;
+                }
+                // The player's standing script it installs is the host's
+                // standing player; the pad stays masked as the script set it.
+                self.pc = operands + 3;
+            }
+            TRANSFER => {
+                let (Some(map), Some(x), Some(y)) = (
+                    cadence::word(image, operands),
+                    cadence::word(image, operands + 4),
+                    cadence::word(image, operands + 6),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                // The loader places the player at the queued position plus
+                // (8,16); mode and selector pick fades not drawn here.
+                around.globals.transfer = Some((map, x + 8, y + 16));
+                self.pc = operands + 8;
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        }
+        true
+    }
+
+    /// `COP 0D`: branches on the player inside a rectangle of cells around
+    /// the actor, as `COP 0F` does on a point: a jump when inside differs from
+    /// bit 7 of the facing byte. The corners are the actor's position plus
+    /// signed cells (`$80:BC2F`), less eight on Y, against `$0966`/`$0968`,
+    /// inclusive; negative near corners clamp to 0. Returns whether execution
+    /// continues this frame.
+    fn branch_in_cells(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
+        let Some(bytes) = around.image.get(operands..operands + 7) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let id = bytes[0];
+        let corner = |base: u16, byte: u8, less: i32| {
+            i32::from(base) + i32::from(i8::from_ne_bytes([byte])) * 16 - less
+        };
+        let (x, y) = self.position;
+        // Only the near corners clamp (`BPL` at `$80:87DF` / `87F6`).
+        let (left, top) = (corner(x, bytes[1], 0).max(0), corner(y, bytes[2], 8).max(0));
+        let (right, bottom) = (corner(x, bytes[3], 0), corner(y, bytes[4], 8));
+        let (px, py) = (i32::from(around.player.0), i32::from(around.player.1) - 8);
+        let inside = (id & 0x7F == 0x7F || id & 0x7F == around.facing as u8)
+            && (left..=right).contains(&px)
+            && (top..=bottom).contains(&py);
+        if inside != (id & 0x80 != 0) {
+            return self.jump(bank, u16::from_le_bytes([bytes[5], bytes[6]]));
+        }
+        self.pc = operands + 7;
         true
     }
 
@@ -2516,6 +2684,129 @@ mod script_service_tests {
             assert_eq!(held.state, state);
         }
         assert!(actor.strike());
+    }
+
+    fn tick_at(actor: &mut Actor, image: &[u8], globals: &mut Globals, player: (u16, u16)) {
+        actor.tick(&mut Surroundings {
+            image,
+            globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player,
+            facing: Direction::Down,
+        });
+    }
+
+    #[test]
+    fn a_contact_callback_registers_natively_and_disarms_itself() {
+        // LDA #$8010; STA $7F:1010,X; yield. $8010: COP07 $8001; clear
+        // +$04 bit $0200; RTL.
+        let mut code = vec![0xA9, 0x10, 0x80, 0x9F, 0x10, 0x10, 0x7F, 2, 0xBD];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x07, 0x01, 0x80]);
+        code.extend_from_slice(&[0xBD, 0x04, 0x00, 0x29, 0xFF, 0xFD, 0x9D, 0x04, 0x00, 0x6B]);
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(actor.contact(), Some(0x08_8010));
+        let mut around = Surroundings {
+            image: &image,
+            globals: &mut globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        };
+        assert_eq!(actor.run_contact(&mut around), None);
+        assert_eq!(globals.events[0] & 2, 2, "local 1");
+        assert_eq!(actor.contact(), None, "category $0200 cleared");
+        // A zero target removes the callback.
+        let (image, mut actor) = actor_running(&[0xA9, 0, 0, 0x9F, 0x10, 0x10, 0x7F, 2, 0xBD]);
+        actor.contact = Some(0x08_8010);
+        tick(&mut actor, &image);
+        assert_eq!(actor.contact(), None);
+        assert_eq!(actor.frozen_at(), None);
+    }
+
+    #[test]
+    fn cop_0d_tests_the_player_in_cells_around_the_actor() {
+        // COP0D any facing, (-1,-1)..(1,1), else $8020; pose 7. $8020: pose 9.
+        let mut code = vec![
+            2, 0x0D, 0xFF, 0xFF, 0xFF, 0x01, 0x01, 0x20, 0x80, 2, 0x80, 7, 2, 0xBD,
+        ];
+        code.resize(0x20, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        // The box at (136,384): raw X 120..152, raw Y 368..400.
+        for (player, selector) in [
+            ((136, 368), 7),
+            ((120, 400), 7),
+            ((152, 368), 7),
+            ((136, 367), 9),
+            ((153, 380), 9),
+            ((136, 401), 9),
+        ] {
+            let (image, mut actor) = actor_running(&code);
+            actor.position = (136, 384);
+            tick_at(
+                &mut actor,
+                &image,
+                &mut Globals::with_events(vec![0; 512]),
+                player,
+            );
+            assert_eq!(actor.selector, selector, "{player:?}");
+        }
+        // A facing that is not the player's fails; with bit 7, a failure
+        // jumps.
+        code[2] = 0x81;
+        let (image, mut actor) = actor_running(&code);
+        actor.position = (136, 384);
+        tick_at(
+            &mut actor,
+            &image,
+            &mut Globals::with_events(vec![0; 512]),
+            (136, 380),
+        );
+        assert_eq!(actor.selector, 9);
+    }
+
+    #[test]
+    fn cop_df_waits_for_the_player_to_finish_a_forced_action() {
+        let code = [2, 0xDF, 0xA6, 0x8E, 0x88, 2, 0x80, 7, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        globals.player_action = true;
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(actor.selector, 0, "retries while $097C & $0810");
+        globals.player_action = false;
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(actor.selector, 7);
+    }
+
+    #[test]
+    fn cop_14_queues_a_transfer_at_its_position_plus_8_16() {
+        let code = [
+            2, 0x14, 0x21, 0, 7, 1, 0x80, 0, 0x60, 1, 2, 0x80, 7, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.transfer, Some((0x21, 136, 368)));
+        assert_eq!(actor.selector, 7, "the script goes on");
+    }
+
+    #[test]
+    fn the_box_steps_over_its_hit_profile_sounds_and_the_players_damage_bit() {
+        let code = [
+            2, 0xD9, 0x01, 0xAC, 0xEA, 0x0D, 0xB9, 0x06, 0x00, 0x09, 0x20, 0x00, 0x99, 0x06, 0x00,
+            2, 0x76, 0x32, 0xE7, 2, 0x38, 0x37, 0x37, 2, 0x80, 7, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!((actor.frozen_at(), actor.selector), (None, 7));
     }
 
     #[test]

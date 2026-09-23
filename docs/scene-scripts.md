@@ -43,6 +43,9 @@ callback on a confirm press when nothing else owns the window.
 | `21` | `$80:8CC8` | callback | registers the interaction callback (0 removes it) |
 | `29` / `2A` | `$80:8FE6` / `8FF5` | mask | unlocks / locks pad buttons |
 | `2F` | `$80:90C0` | mask, target | goes on while a mask button is held (`$0454`), else jumps |
+| `0D` | `$80:87C2` | facing, 4 cell offsets, target | as `0F`, on the player inside a rectangle of cells around the actor (raw X, raw Y-8, inclusive) |
+| `DF` | `$80:B827` | long script | retries while the player is in a forced action (`$097C & $0810`, the recoil), then takes the player's script; the host player stands |
+| `14` | `$80:8A23` | map, mode, selector, x, y | queues a transfer; the world loads it at the frame's end at (x+8, y+16), keeping the pad mask |
 | `23` / `24` | `$80:8D1E` / `8D0B` | (pose,) target | faces a facing player, takes interaction, jumps; otherwise drops interaction |
 | `C0` | `$80:AAFB` | long target | from a callback, redirects the resident's own script |
 | `06` | `$80:864C` | long target | long jump |
@@ -69,6 +72,7 @@ callback on a confirm press when nothing else owns the window.
 | `31` / `32` / `33` | `$80:9107` / `913C` / `918F` | 1 / 1 / — | palette-fade helper; not drawn, `33` keeps only its three-frame tail |
 | `37` / `6A` | `$80:91FC` / `9DD6` | 1 / 2 | sound, cosmetic helper; stepped over |
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
+| `38` / `76` / `D9` | `$80:9210` / `A127` / `B501` | 2 / 2 / 1 | music word, sound queue, hit profile; stepped over |
 
 Inline native code that writes only the display -- PPU registers, their
 shadows `$0468..$046B`, the actor's scratch `$7F:201C` and the helper flag
@@ -122,6 +126,16 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   1. Option 1: two pages, `$2E`, the walk back, the pad unlocked -- as the
   native journey (16749 -> 18416).
 
+- **The box, map `$21`** (`$83:928F`, `$88:ACFA`, controller `FE` `$88:AD89`):
+  the controller asks for help on entry. The box registers a contact
+  callback natively (`LDA #$AD69; STA $7F:1010,X`). Walking into it runs the
+  callback a frame later -- local 1, contact disarmed (`+$04 & ~$0200`), cell
+  marked -- and recoils Ark away: ten pixels, sixteen frames at rest, one
+  pixel. The controller's warning sets local 2; then `COP 0D`'s gate (raw X
+  120..152, Y 368..400) takes the next approach, `COP DF` waits out the
+  recoil, `$22` is set and `COP 14` reloads `$21` at (136,368). The native
+  route's presses reproduce each step (26805 contact, 26832 rest, the
+  opening at (136,368)).
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'

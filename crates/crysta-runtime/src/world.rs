@@ -19,6 +19,7 @@ use room_core::{
 };
 use std::fmt;
 
+mod contact;
 mod pots;
 pub use pots::{CarriedPot, LIFTED_TILE};
 
@@ -53,6 +54,10 @@ pub struct World<'a> {
     spawn_events: Vec<u8>,
     /// The cellar's pots, when this map has them.
     pots: Option<pots::Pots>,
+    /// The actor whose contact callback runs next frame.
+    touched: Option<usize>,
+    /// The player's recoil from a contact.
+    recoil: Option<contact::Recoil>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -255,6 +260,8 @@ impl<'a> World<'a> {
             scene: None,
             patched: Vec::new(),
             pots: None,
+            touched: None,
+            recoil: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -610,6 +617,19 @@ impl<'a> World<'a> {
         direction: Option<Direction>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
+        let steps = self.frame(direction, presses)?;
+        // A transfer a script queued this frame loads at its end.
+        Ok(match self.follow_transfer()? {
+            Some(entered) => (entered, None),
+            None => steps,
+        })
+    }
+
+    fn frame(
+        &mut self,
+        direction: Option<Direction>,
+        presses: Presses,
+    ) -> Result<(Step, Option<Step>), WorldError> {
         self.globals.pad = direction.map_or(0, |direction| match direction {
             Direction::Right => 0x0100,
             Direction::Left => 0x0200,
@@ -620,6 +640,10 @@ impl<'a> World<'a> {
             self.answer_scene(presses);
             self.apply_patches()?;
             return Ok((Step::Stayed, None));
+        }
+        if let Some(step) = self.contact_frame()? {
+            self.apply_patches()?;
+            return Ok((step, None));
         }
         let busy = self.globals.dialogue.busy();
         self.globals.dialogue.press(presses);
@@ -632,11 +656,16 @@ impl<'a> World<'a> {
         }
         let step = self.step_interactive(direction)?;
         let free = !busy && self.scene.is_none() && !self.globals.dialogue.busy();
-        if presses.confirm && free && !self.talk() {
-            return Ok((step, Some(self.interact_checked()?)));
+        let opened = if presses.confirm && free && !self.talk() {
+            Some(self.interact_checked()?)
+        } else {
+            None
+        };
+        if !matches!(step, Step::Entered { .. }) && !matches!(opened, Some(Step::Entered { .. })) {
+            self.touch();
         }
         self.apply_patches()?;
-        Ok((step, None))
+        Ok((step, opened))
     }
 
     /// Residents whose scripts stopped at something the interpreter does not
@@ -1193,6 +1222,8 @@ mod tests {
             scene: None,
             patched: Vec::new(),
             pots: None,
+            touched: None,
+            recoil: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

@@ -34,8 +34,9 @@ Scenes move Ark and residents, run on map entry (C's changed entry, the town con
 - The friends' scene plays from the ROM with real presses and matches the
   native journey: placement, `$27`, about 41 frames to the first page, six
   pages, a 64-frame walk, choice, two pages, `$2E`, the walk back, unlock.
-- Remaining here: the town controller scene (`$3C`) and `COP 14` map
-  transfers, which come later on the path. Also the refusal branch (`$2F`)
+- Remaining here: the town controller scene (`$3C`), which comes later on
+  the path. `COP 14` transfers run since the cellar box (a same-map
+  reload). Also the refusal branch (`$2F`)
   needs text command `$CB`.
 - Independent review approved (24-map trace comparison: no new freezes;
   `$1F`'s `$83:921B` now idles in a `BD` loop with a live callback, and

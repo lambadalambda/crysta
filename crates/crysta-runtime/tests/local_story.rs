@@ -545,6 +545,70 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
 }
 
 #[test]
+fn the_box_warns_on_contact_then_opens_for_the_next_approach() {
+    // `$83:928F` with the native route's presses from `21-toward-box`
+    // (`tools/pandora-qualification/route.jsonl`): Down into the box runs its
+    // contact callback a frame later (local 1) and recoils Ark north, as
+    // natively 26805 -> 26832; the warning sets local 2; the next approach
+    // inside the gate sets `$22` and `COP 14` reloads `$21` at (136,368).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x0021, 136, 128, after_the_door()).unwrap();
+    assert_eq!(read_out(&mut world), 1, "the voice asks for help");
+    replay(&mut world, &[(0, 150), (5, 180)]);
+    assert_eq!(world.position(), (136, 351), "21-near-box");
+    let mut trail = Vec::new();
+    for _ in 0..25 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        trail.push((world.position().1, flag(&world, 0x01)));
+    }
+    let contact = trail.iter().position(|&(_, local)| local).expect("contact");
+    assert_eq!(
+        trail[contact - 1..=contact],
+        [(370, false), (369, true)],
+        "contact at 370, callback and recoil the next frame"
+    );
+    // Nine more single pixels, sixteen frames at rest, the last pixel, while
+    // Down stays held (native 26806 -> 26832).
+    let recoil: Vec<u16> = trail[contact..].iter().map(|&(y, _)| y).collect();
+    let mut expected: Vec<u16> = (360..=369).rev().collect();
+    expected.resize(recoil.len(), 360);
+    assert_eq!(recoil, expected);
+    replay(&mut world, &[(5, 180)]);
+    assert_eq!(world.position(), (136, 359), "21-box-contact-rest");
+    // Down while the warning is pending does not move Ark.
+    replay(&mut world, &[(0, 120)]);
+    assert_eq!(world.position(), (136, 359));
+    assert!(world.dialogue().is_some(), "the warning");
+    replay(
+        &mut world,
+        &[(4, 1), (5, 180), (4, 1), (5, 180), (4, 1), (5, 360)],
+    );
+    assert!(flag(&world, 0x02) && !flag(&world, 0x22));
+    assert_eq!(world.position(), (136, 359), "outside the gate");
+    let mut opened = None;
+    for frame in 0..315 {
+        let pad = if frame < 15 {
+            Some(Direction::Down)
+        } else {
+            None
+        };
+        world.update(pad, Presses::default()).unwrap();
+        if opened.is_none() && flag(&world, 0x22) {
+            opened = Some(world.position());
+        }
+    }
+    assert_eq!(opened, Some((136, 368)), "opened inside the gate");
+    assert_eq!((world.map(), world.position()), (0x0021, (136, 368)));
+    assert!(!flag(&world, 0x01), "reloaded: locals cleared");
+    assert!(world.pad_locked(), "the mask survives the reload");
+}
+
+#[test]
 fn a_fresh_load_of_c_after_the_door_opens_the_stairs() {
     // `$8D:8FB4` applies `$96:CD9D`'s `$292` entries on every load of C, as
     // natively on the return from the box (`return-C-left`: `$1CF6`/`$3ACB`).
