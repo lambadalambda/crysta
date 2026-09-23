@@ -13,8 +13,8 @@ use crate::graphics::Bgr555;
 use crate::maps::actors::SpawnList;
 use crate::maps::scripts::{self, Command, Limits, ResourceKind};
 
-/// Maps whose world layer is qualified.
-const WORLD_MAPS: [u16; 1] = [0x0003];
+/// Maps whose world layer is qualified: the underworld.
+pub const WORLD_MAPS: [u16; 1] = [0x0003];
 /// Metatiles: 256 of four character numbers.
 const METATILES: usize = 256 * 4;
 /// Characters: 256 of 8x8 palette indices.

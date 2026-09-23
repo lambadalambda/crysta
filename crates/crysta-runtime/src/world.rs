@@ -6,9 +6,10 @@
 //! player through measured initialized-to-free arrival profiles.
 
 use crate::actors::{Actor, Surroundings, Wait};
+use crate::plane::Plane;
 use crate::residents::{residents, Resident};
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
-use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
+use crate::{admitted, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::flag_patches::{self, Patch};
@@ -55,6 +56,8 @@ pub struct World<'a> {
     spawn_events: Vec<u8>,
     /// The cellar's pots, when this map has them.
     pots: Option<pots::Pots>,
+    /// The world map's plane the player walks, on a world map.
+    plane: Option<Plane>,
     /// The actor whose contact callback runs next frame.
     touched: Option<usize>,
     /// The player's recoil from a contact.
@@ -263,6 +266,7 @@ impl<'a> World<'a> {
             scene: None,
             patched: Vec::new(),
             pots: None,
+            plane: None,
             touched: None,
             recoil: None,
             opening: None,
@@ -354,6 +358,29 @@ impl<'a> World<'a> {
             return Ok(Step::Stayed);
         }
         let before = self.position();
+        if let Some(plane) = &mut self.plane {
+            if let Some(direction) = direction.filter(|_| !plane.busy()) {
+                self.facing = direction;
+            }
+            let (x, y) = plane.tick(before, direction);
+            let settled = !plane.busy();
+            self.walking = WalkingState::new(x, y);
+            self.animation
+                .advance((before != (x, y)).then_some(self.facing));
+            // Exits fire from a settled cell, as on the room walker; arriving
+            // on one disarms it until the player steps clear.
+            if settled {
+                if let Some(step) = self.take_exit()? {
+                    return Ok(step);
+                }
+            }
+            self.run_actors()?;
+            return Ok(if (x, y) == before {
+                Step::Stayed
+            } else {
+                Step::Walked
+            });
+        }
         if let Some(mut arrival) = self.arrival {
             arrival.advance();
             let (x, y) = arrival.position();
@@ -506,6 +533,16 @@ impl<'a> World<'a> {
     fn finish_load(&mut self) -> Result<(), WorldError> {
         self.apply_load_patches()?;
         self.pots = pots::Pots::at_entry(self.map, self.base.room.cells());
+        self.plane = WORLD_MAPS.contains(&self.map).then(|| {
+            let cells = self
+                .base
+                .room
+                .cells()
+                .iter()
+                .map(|&word| (word & 0xFF) as u8)
+                .collect();
+            Plane::new(cells, self.base.width, self.base.height)
+        });
         Ok(())
     }
 
@@ -664,7 +701,11 @@ impl<'a> World<'a> {
             return Ok((step, None));
         }
         let step = self.step_interactive(direction)?;
-        let free = !busy && self.scene.is_none() && !self.globals.dialogue.busy();
+        // On the plane, not while arriving or mid-step.
+        let free = !busy
+            && self.scene.is_none()
+            && !self.globals.dialogue.busy()
+            && !self.plane.as_ref().is_some_and(Plane::busy);
         let opened = if presses.confirm && free && !self.talk() && !self.open_door() {
             Some(self.interact_checked()?)
         } else {
@@ -971,7 +1012,7 @@ impl<'a> World<'a> {
         let Ok(destination) = record.direct_destination() else {
             return Ok(None);
         };
-        if !MAPS.contains(&destination) {
+        if !admitted(destination) {
             return Ok(None);
         }
         let (x, y) = match arrival {
@@ -984,6 +1025,12 @@ impl<'a> World<'a> {
             None if matches!(record.selector(), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)
+            }
+            // A world map spawns the player 8 to the right of the anchor;
+            // the plane's arrival walk takes it the rest of the way.
+            None if WORLD_MAPS.contains(&destination) => {
+                let (x, y) = record.destination_position();
+                (x + 8, y)
             }
             None => record.destination_position(),
         };
@@ -1242,6 +1289,7 @@ mod tests {
             scene: None,
             patched: Vec::new(),
             pots: None,
+            plane: None,
             touched: None,
             recoil: None,
             opening: None,

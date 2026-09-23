@@ -18,6 +18,7 @@ use std::fmt;
 
 pub mod actors;
 pub mod art;
+pub mod plane;
 pub mod residents;
 pub mod scene;
 pub mod world;
@@ -27,10 +28,14 @@ pub const MAPS: std::ops::RangeInclusive<u16> = 0x000A..=0x0021;
 /// The tour inside Pandora's Box, reached by script transfers from `$21`.
 pub const BOX_MAPS: std::ops::RangeInclusive<u16> = 0x0041..=0x0044;
 
-/// Whether a map loads in the runtime: the slice and the box's tour.
+/// The world maps the slice reaches: the underworld, from the south gate.
+pub use assets::maps::visual::world::WORLD_MAPS;
+
+/// Whether a map loads in the runtime: the slice, the box's tour and the
+/// underworld.
 #[must_use]
 pub fn admitted(map: u16) -> bool {
-    MAPS.contains(&map) || BOX_MAPS.contains(&map)
+    MAPS.contains(&map) || BOX_MAPS.contains(&map) || WORLD_MAPS.contains(&map)
 }
 
 /// A map built into a walkable room.
@@ -281,6 +286,9 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
     if !admitted(map) {
         return Err(RoomError::OutsideSlice { map });
     }
+    if WORLD_MAPS.contains(&map) {
+        return world_room(image, map);
+    }
     // The tour maps' full attributed sheet becomes their collision grid. The
     // Pandora compile does not admit it as a movement halo by itself; the
     // native tour witnesses (`pandora-left-rest`, `pandora-up-rest`) are what
@@ -338,6 +346,32 @@ pub fn room_candidate(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
         .room
         .with_passive_directional_type8_special_bit_clear();
     Ok(built)
+}
+
+/// A world map's room: its byte layer, bytes of `$A0` or more solid, for
+/// the parts of the world that read cells. The player walks the plane
+/// ([`plane::Plane`]), not this room.
+fn world_room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
+    let world = assets::maps::visual::world::WorldMap::from_rom(image, map)
+        .map_err(|source| RoomError::Background { map, source })?;
+    let cells = world
+        .cells()
+        .iter()
+        .map(|&byte| u16::from(byte) | if byte >= 0xA0 { 14 << 9 } else { 0 })
+        .collect();
+    let width = u16::try_from(world.width()).unwrap_or(u16::MAX);
+    let height = u16::try_from(world.height()).unwrap_or(u16::MAX);
+    let room =
+        Room::new(width, height, cells).map_err(|source| RoomError::Refused { map, source })?;
+    Ok(MapRoom {
+        room,
+        map,
+        width,
+        height,
+        attributes: vec![0; 512],
+        // No first layer to share with a room.
+        layer_source: usize::MAX,
+    })
 }
 
 /// Up-only open stair cells (`MaterialAlias::StairOpen29`).

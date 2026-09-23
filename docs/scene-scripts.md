@@ -179,6 +179,11 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   town the compact actor `$88:84EF` (`COP 09 $1296 $003C`) holds Ark, speaks
   and sets `$3C`. Door arrivals still use the raw placement: in D Ark stands
   8 pixels left of the native x.
+- **The underworld, `$03`**: a Mode 7 world map. Its byte layer comes from
+  the `$F0` spawn record; the player walks it on a plane (16-pixel steps at
+  2 a frame, the next cell blocked at `$A0`+, a one-sided slide, wrapping at
+  1024). The south gate's cells open with `$296` (flag table `$96:CE65`);
+  the gate lands at raw + (8,0) and the player walks in 16 pixels.
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'

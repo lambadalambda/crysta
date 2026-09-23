@@ -965,3 +965,40 @@ fn the_town_scene_sets_3c_after_the_elders_mission() {
     assert!(flag(&world, 0x3C));
     assert!(!world.pad_locked());
 }
+
+#[test]
+fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
+    // After the mission the flag table opens the south gate (`$96:CE65`,
+    // `$296`); exit `$818DB3` leads to `$03` (raw (528,528)), where the
+    // world player walks in to (536,544) and then steps cell by cell.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    // Before the Elder's answer the gate's cells stay walls.
+    let mut closed = World::enter_with_events(image, 0x000A, 504, 868, after_the_return()).unwrap();
+    replay(&mut closed, &[(0, 300)]);
+    assert_eq!(closed.map(), 0x000A, "closed before `$296`");
+    let mut events = after_the_return();
+    for set in [0x21, 0x296, 0x3C] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000A, 504, 868, events).unwrap();
+    for _ in 0..300 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        if world.map() == 0x0003 {
+            break;
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x0003, (536, 528)));
+    replay(&mut world, &[(5, 16)]);
+    assert_eq!(world.position(), (536, 544), "underworld-arrival");
+    // Crysta's rectangle on the plane leads back into the town.
+    let mut back = world.clone();
+    replay(&mut back, &[(1, 20)]);
+    assert_eq!(back.map(), 0x000A, "back into Crysta");
+    replay(&mut world, &[(0, 160), (5, 12)]);
+    assert_eq!(world.position(), (536, 752), "underworld-south");
+}
