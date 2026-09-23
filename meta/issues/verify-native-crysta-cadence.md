@@ -5,6 +5,10 @@
 The user confirmed the tree/river fixes work, but reports NPC movement appears
 too fast and asks what movement/animation speed should actually be.
 
+## Dependencies
+
+- [Native macOS window, renderer and gamepad for the Crysta slice](crysta-native-shell.md)
+
 ## Requirements
 
 - Separate host simulation updates per real second from NPC movement/animation

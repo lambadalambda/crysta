@@ -4,6 +4,10 @@
 
 The user reports trees do not look fully correct, possibly a transparency issue.
 
+## Dependencies
+
+- [Native macOS window, renderer and gamepad for the Crysta slice](crysta-native-shell.md)
+
 ## Requirements
 
 - Identify the source-backed layer/transparency behavior at exterior tree pixels; correct only the demonstrated native rendering gap.

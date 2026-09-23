@@ -4,6 +4,10 @@
 
 The user reports the exterior river does not flow. The native host currently caches a static background per map.
 
+## Dependencies
+
+- [Native macOS window, renderer and gamepad for the Crysta slice](crysta-native-shell.md)
+
 ## Requirements
 
 - Identify the original exterior background animation data and timing; add bounded native playback without fabricated animation or changes to gameplay cadence.
