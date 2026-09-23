@@ -67,6 +67,15 @@ struct Patches {
     drawn: Vec<(u16, u16, u16)>,
 }
 
+impl Patches {
+    fn scene(&mut self, image: &[u8], map: u16) -> Option<&StaticBackground> {
+        if self.scene.is_none() {
+            self.scene = StaticBackground::from_rom(image, map).ok();
+        }
+        self.scene.as_ref()
+    }
+}
+
 /// Static pixels with an optional, bounded map-A animation overlay.
 pub struct CachedBackground {
     pub frame: crate::frame::Background,
@@ -83,9 +92,7 @@ impl CachedBackground {
         if self.patches.drawn == patched {
             return;
         }
-        if self.patches.scene.is_none() {
-            self.patches.scene = StaticBackground::from_rom(image, map).ok();
-        }
+        self.patches.scene(image, map);
         let Some(scene) = &self.patches.scene else {
             return;
         };
@@ -112,6 +119,37 @@ impl CachedBackground {
             draw_metatile(scene, &mut self.frame, at, tile, backdrop);
         }
         self.patches.drawn = patched.to_vec();
+    }
+
+    /// A lifted object's metatile as a sprite standing on its bottom centre,
+    /// cut out of the floor it leaves (`floor`): a stand-in for a pot until
+    /// its own sprite (`COP D8 $A2C000`) is decoded.
+    pub fn lifted_raster(
+        &mut self,
+        image: &[u8],
+        map: u16,
+        (tile, floor): (u16, u16),
+    ) -> Option<crysta_runtime::art::Raster> {
+        let scene = self.patches.scene(image, map)?;
+        let under = metatile_pixels(scene, floor)?;
+        let pixels = metatile_pixels(scene, tile)?
+            .into_iter()
+            .zip(under)
+            .enumerate()
+            .map(|(at, ((index, _), (floor, _)))| {
+                if index == floor {
+                    0
+                } else {
+                    0xFF00_0000 | static_rgb(index, scene, (at % 16, at / 16))
+                }
+            })
+            .collect();
+        Some(crysta_runtime::art::Raster {
+            width: 16,
+            height: 16,
+            offset: (-8, -16),
+            pixels,
+        })
     }
 
     pub fn update(&mut self, age: u64) {
@@ -232,38 +270,49 @@ fn draw_metatile(
     tile: u16,
     backdrop: Option<u32>,
 ) {
-    let Some(words) = scene.metatiles().get(usize::from(tile)) else {
-        return;
-    };
     if (column + 1) * 16 > frame.width {
         return;
     }
-    for y in 0..16 {
-        for x in 0..16 {
-            let (world_x, world_y) = (column * 16 + x, row * 16 + y);
-            let (index, high) = match graphics::sample_metatile(words, scene.tiles(), x, y) {
+    let Some(pixels) = metatile_pixels(scene, tile) else {
+        return;
+    };
+    for (at, (index, high)) in pixels.into_iter().enumerate() {
+        let (world_x, world_y) = (column * 16 + at % 16, row * 16 + at / 16);
+        let color = match (index, backdrop) {
+            (0, Some(backdrop)) => backdrop,
+            _ => static_rgb(index, scene, (world_x, world_y)),
+        };
+        let offset = world_y * frame.width + world_x;
+        if let Some(pixel) = frame.pixels.get_mut(offset) {
+            *pixel = color;
+        }
+        if let Some(bit) = frame.high.get_mut(offset) {
+            *bit = high;
+        }
+    }
+}
+
+/// A metatile's 16×16 pixels, row-major: palette index (0 transparent) and
+/// priority. `None` when it does not decode.
+fn metatile_pixels(scene: &StaticBackground, tile: u16) -> Option<Vec<(u8, bool)>> {
+    let words = scene.metatiles().get(usize::from(tile))?;
+    (0..256)
+        .map(
+            |at| match graphics::sample_metatile(words, scene.tiles(), at % 16, at / 16) {
                 Ok(IndexedPixel::Opaque {
                     palette_index,
                     priority,
-                }) => (palette_index, priority),
-                Ok(IndexedPixel::Transparent) => (0, false),
-                Err(_) => return,
-            };
-            let color = if let (0, Some(backdrop)) = (index, backdrop) {
-                backdrop
-            } else {
-                let [r, g, b] = map_inspector::static_pixel_rgb(index, scene, world_x, world_y);
-                u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
-            };
-            let offset = world_y * frame.width + world_x;
-            if let Some(pixel) = frame.pixels.get_mut(offset) {
-                *pixel = color;
-            }
-            if let Some(bit) = frame.high.get_mut(offset) {
-                *bit = high;
-            }
-        }
-    }
+                }) => Some((palette_index, priority)),
+                Ok(IndexedPixel::Transparent) => Some((0, false)),
+                Err(_) => None,
+            },
+        )
+        .collect()
+}
+
+fn static_rgb(index: u8, scene: &StaticBackground, at: (usize, usize)) -> u32 {
+    let [r, g, b] = map_inspector::static_pixel_rgb(index, scene, at.0, at.1);
+    u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
 }
 
 fn rgb(color: Bgr555) -> u32 {
@@ -423,5 +472,29 @@ mod patch_tests {
         assert_ne!(cell(&cached), before);
         cached.apply_patches(rom.image(), 0xC, &[]);
         assert_eq!(cell(&cached), before, "restored when the patch is gone");
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn a_pot_tile_is_a_sprite_standing_on_its_bottom_centre() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let mut cached = super::load(&rom, 0xC).unwrap();
+        let pot = cached
+            .lifted_raster(rom.image(), 0xC, (0xFA, 0xF8))
+            .unwrap();
+        assert_eq!((pot.width, pot.height, pot.offset), (16, 16, (-8, -16)));
+        assert!(pot.is_visible());
+        assert!(
+            pot.pixels.iter().any(|pixel| pixel >> 24 == 0),
+            "the floor is cut out"
+        );
+        // The pot's own cell at (3,21) in the static background.
+        let frame = &cached.frame;
+        let (x, y) = (3 * 16 + 8, 21 * 16 + 8);
+        assert_eq!(
+            pot.pixels[8 * 16 + 8] & 0x00FF_FFFF,
+            frame.pixels[y * frame.width + x]
+        );
     }
 }

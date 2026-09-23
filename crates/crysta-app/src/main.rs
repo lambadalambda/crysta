@@ -14,10 +14,10 @@ mod music_controls;
 mod music_data;
 mod music_output;
 
-use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
+use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder, Raster};
 use crysta_runtime::residents::Conversation;
 use crysta_runtime::scene::Presses;
-use crysta_runtime::world::{Step, World};
+use crysta_runtime::world::{Step, World, LIFTED_TILE};
 use frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use gilrs::{Axis, Button, Gilrs};
 use room_core::Direction;
@@ -470,10 +470,29 @@ impl Session {
     /// count includes residents that draw nothing, which keeps the relative
     /// order and only inflates the player's rank. Whatever lies outside the
     /// map's region is blanked before the dialogue goes on top.
+    /// The pot Ark carries or threw, and where it is drawn: over Ark's head,
+    /// then along its flight at the same height. A presentation choice until
+    /// the pot's own sprite is decoded.
+    fn pot_sprite(&mut self, cartridge: &rom::Rom) -> Option<((u16, u16), Raster)> {
+        let pot = self.world.pot()?;
+        let map = self.world.map();
+        let raster = self.backgrounds.get_mut(&map)?.lifted_raster(
+            cartridge.image(),
+            map,
+            (pot.tile, LIFTED_TILE),
+        )?;
+        let (x, y) = self.world.position();
+        let at = pot
+            .flight
+            .map_or((x, y.saturating_sub(20)), |(x, y)| (x, y.saturating_sub(9)));
+        Some((at, raster))
+    }
+
     fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
         frame.pixels.fill(0);
         self.ensure_background(cartridge);
         self.ensure_art();
+        let pot = self.pot_sprite(cartridge);
         let Session {
             world,
             backgrounds,
@@ -547,6 +566,9 @@ impl Session {
                     placeholder(frame);
                 }
             }
+        }
+        if let Some((at, raster)) = pot {
+            frame::draw_sprite(frame, background, camera, &raster, at);
         }
         frame::mask_outside(frame, camera, region.bounds);
         if let Some(view) = world.dialogue() {
