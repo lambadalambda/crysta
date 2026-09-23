@@ -116,3 +116,4 @@
 - [x] [Select music per map load](issues/music-per-map.md)
 - [x] [Change music in scenes](issues/music-in-scenes.md)
 - [x] [Play sound effects](issues/sound-effects.md)
+- [x] [Show Ark's lift, carry and throw poses](issues/ark-pot-poses.md)

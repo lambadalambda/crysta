@@ -17,3 +17,11 @@ Lifting a pot plays no lift animation, and while carrying Ark keeps his ordinary
 
 - Reported by the user while playing the slice (2026-09-23).
 - Parent: [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
+## Resolution
+
+- `World::carry` gives the component's phase as a carry motion, facing and
+  tick; the app draws `PandoraSprites::carry_pose`'s Ark and pot lists
+  (lift and throw once, holding looping) and the flight list `$3C`.
+- Tests pin the motion sequence of the native MISS segment (23 lift
+  frames, 32 throw frames) and that every pose rasterizes.

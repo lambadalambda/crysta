@@ -48,6 +48,5 @@
 - [ ] [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [ ] [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
 - [ ] [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
-- [ ] [Show Ark's lift, carry and throw poses](issues/ark-pot-poses.md)
 - [ ] [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
 - [ ] [Animate door and stair transitions](issues/door-and-stair-transitions.md)
