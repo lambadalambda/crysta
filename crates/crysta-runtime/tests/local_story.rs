@@ -1026,3 +1026,67 @@ fn every_arch_in_the_hall_leaves_ark_free_in_its_room() {
         assert_ne!(world.position(), before, "walks into {map:#06x}");
     }
 }
+
+#[test]
+// `World::pad_locked` as a path is not general over the world's lifetime.
+#[allow(clippy::redundant_closure_for_method_calls)]
+fn the_friend_steps_aside_after_the_door_breaks_and_a_press_waits_for_it() {
+    // `$88:9C16`: after the reaction's last page he walks left to (120,416),
+    // `$88:9C21` unlocks the pad, and he walks down to (120,512) and leaves.
+    // While the reaction holds the pad, A does not take the opened stairs.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 368, events).unwrap();
+    world.face(Direction::Up);
+    for _ in 0..60 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    let friend = |world: &World<'_>| {
+        world
+            .residents()
+            .iter()
+            .find(|r| r.record == 0x03_8C1E)
+            .map(|r| r.position)
+    };
+    assert!(world.strike(DOOR));
+    frames_until(&mut world, 10, |world| world.pad_locked());
+    read_out(&mut world);
+    for _ in 0..16 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.strike(DOOR));
+    let mut path = Vec::new();
+    for _ in 0..3000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        // A pressed on every frame the reaction holds the pad: it must not
+        // take the stairs then. Once the pad is free a press may.
+        let held = world.pad_locked();
+        world
+            .update(
+                None,
+                if reading || held {
+                    A
+                } else {
+                    Presses::default()
+                },
+            )
+            .unwrap();
+        assert_eq!(world.map(), 0x000C, "still in C");
+        let at = friend(&world);
+        if path.last() != Some(&at) {
+            path.push(at);
+        }
+        if !reading && at.is_none() {
+            break;
+        }
+    }
+    assert!(path.contains(&Some((120, 416))), "stepped aside");
+    assert!(path.contains(&Some((120, 512))), "walked down");
+    assert_eq!(path.last(), Some(&None), "and left");
+}

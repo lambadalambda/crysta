@@ -706,7 +706,10 @@ impl<'a> World<'a> {
             && self.scene.is_none()
             && !self.globals.dialogue.busy()
             && !self.plane.as_ref().is_some_and(Plane::busy);
-        let opened = if presses.confirm && free && !self.talk() && !self.open_door() {
+        // A talks while a script holds the pad (`$FF50` leaves A free), but
+        // doors and the host doorway action wait: a reaction's lock keeps
+        // Ark where he is, as natively.
+        let opened = if presses.confirm && free && !self.talk() && !locked && !self.open_door() {
             Some(self.interact_checked()?)
         } else {
             None

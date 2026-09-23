@@ -112,3 +112,4 @@
 - [x] [Open the box in the cellar](issues/cellar-box-sequence.md)
 - [x] [Play the tour inside the box and take the spear](issues/box-tour-and-spear.md)
 - [x] [Let Ark walk in the box's rooms after an arch](issues/box-rooms-hang.md)
+- [x] [Let the friend at the blue door step aside](issues/blue-door-friend-steps-aside.md)
