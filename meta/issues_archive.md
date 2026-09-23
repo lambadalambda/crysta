@@ -97,3 +97,4 @@
 - [x] [Clip the native Crysta camera to the source map region](issues/clip-native-crysta-camera.md)
 - [x] [Add a 16:9 view to the native Crysta app](issues/native-crysta-widescreen.md)
 - [x] [Clip dialogue pages to their box](issues/clip-wide-dialogue-pages.md)
+- [x] [Name the river test's inputs when they are missing](issues/name-river-test-inputs.md)

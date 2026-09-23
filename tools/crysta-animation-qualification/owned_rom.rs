@@ -8,9 +8,13 @@ use std::{fs, path::PathBuf};
 
 #[test]
 #[allow(clippy::too_many_lines)] // one opt-in source -> render -> native comparison
-#[ignore = "requires authenticated owned ROM and retained native snapshots; see qualification README"]
+#[ignore = "requires CRYSTA_ANIMATION_ROM and CRYSTA_ANIMATION_CAPTURES; see qualification README"]
 fn owned_rom_river_cycle_and_native_membership() {
-    let bytes = fs::read(std::env::var("CRYSTA_ANIMATION_ROM").unwrap()).unwrap();
+    let bytes = fs::read(
+        std::env::var("CRYSTA_ANIMATION_ROM")
+            .expect("set CRYSTA_ANIMATION_ROM to the owned Japanese ROM"),
+    )
+    .expect("read CRYSTA_ANIMATION_ROM");
     let rom = rom::Rom::load(&bytes).unwrap();
     assert_eq!(rom.revision(), rom::Revision::Japan);
     let image = rom.image();
@@ -92,7 +96,10 @@ fn owned_rom_river_cycle_and_native_membership() {
         used[0], used[1], used[2], used[3]
     );
 
-    let root = PathBuf::from(std::env::var("CRYSTA_ANIMATION_CAPTURES").unwrap());
+    let root = PathBuf::from(
+        std::env::var("CRYSTA_ANIMATION_CAPTURES")
+            .expect("set CRYSTA_ANIMATION_CAPTURES to the retained journey captures (see README)"),
+    );
     for label in [
         "town-west-rest",
         "town-north-rest",

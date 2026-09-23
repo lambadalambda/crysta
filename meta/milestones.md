@@ -148,7 +148,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
-- [Name the river test's inputs when they are missing](issues/name-river-test-inputs.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
