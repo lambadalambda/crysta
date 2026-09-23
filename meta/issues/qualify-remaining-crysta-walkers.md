@@ -42,6 +42,7 @@ still use the approximate eight-tick, two-pixel projection.
 
 - [Witness a class-2 Crysta walker natively](witness-class-two-walker.md)
 - [Derive each walker's step and idle timing from source](derive-walker-cadence-from-source.md)
+- [Execute counted loops, timed waits and the map branch in resident scripts](execute-script-loops-and-waits.md)
 
 ## Findings
 
