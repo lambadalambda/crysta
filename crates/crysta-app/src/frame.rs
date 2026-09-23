@@ -208,23 +208,6 @@ pub fn decode_bmp(bytes: &[u8]) -> Option<Background> {
     })
 }
 
-/// Top-left of the view that keeps `(x, y)` centred without leaving the map.
-///
-/// A map smaller than the view is pinned at zero rather than centred, so the
-/// camera never reports a negative origin.
-#[must_use]
-pub fn camera(position: (u16, u16), map: (usize, usize)) -> (usize, usize) {
-    let centre = |value: u16, view: usize, extent: usize| {
-        let half = view / 2;
-        let wanted = usize::from(value).saturating_sub(half);
-        wanted.min(extent.saturating_sub(view))
-    };
-    (
-        centre(position.0, VIEW_WIDTH, map.0),
-        centre(position.1, VIEW_HEIGHT, map.1),
-    )
-}
-
 /// Blits the visible window of `background` into a 256x224 frame.
 pub fn draw_background(frame: &mut [u32], background: &Background, camera: (usize, usize)) {
     for row in 0..VIEW_HEIGHT {
@@ -299,30 +282,18 @@ mod tests {
         assert_eq!(page_origin(Placement::Bottom, dims, 30), (8, 224 - 64 - 8));
         assert_eq!(page_origin(Placement::Bottom, dims, 200), (8, 224 - 64 - 8));
         // $DA keeps out of the player's half of the screen.
-        assert_eq!(page_origin(Placement::AwayFromPlayer, dims, 111), (8, 224 - 64 - 8));
+        assert_eq!(
+            page_origin(Placement::AwayFromPlayer, dims, 111),
+            (8, 224 - 64 - 8)
+        );
         assert_eq!(page_origin(Placement::AwayFromPlayer, dims, 112), (8, 8));
         // $C2 puts the content at its tile column and row.
         let tile = Placement::Tile { column: 3, row: 3 };
         assert_eq!(page_origin(tile, (200, 48), 0), (24 - 8, 24 - 8));
-        assert_eq!(page_origin(Placement::Tile { column: 0, row: 0 }, dims, 0), (0, 0));
-    }
-
-    #[test]
-    fn the_camera_centres_the_player_and_stops_at_the_edges() {
-        let map = (1024, 1280);
-        // Centred well inside the map.
-        assert_eq!(camera((512, 640), map), (512 - 128, 640 - 112));
-        // Clamped at the top-left rather than going negative.
-        assert_eq!(camera((0, 0), map), (0, 0));
-        assert_eq!(camera((10, 10), map), (0, 0));
-        // Clamped at the bottom-right rather than running past the map.
-        assert_eq!(camera((5000, 5000), map), (1024 - 256, 1280 - 224));
-    }
-
-    #[test]
-    fn a_map_smaller_than_the_view_pins_the_camera_at_zero() {
-        assert_eq!(camera((8, 8), (128, 64)), (0, 0));
-        assert_eq!(camera((500, 500), (128, 64)), (0, 0));
+        assert_eq!(
+            page_origin(Placement::Tile { column: 0, row: 0 }, dims, 0),
+            (0, 0)
+        );
     }
 
     #[test]

@@ -94,3 +94,4 @@
 - [x] [Correct native Crysta tree compositing](issues/fix-crysta-tree-compositing.md)
 - [x] [Animate the river in native Crysta](issues/animate-native-crysta-river.md)
 - [x] [Verify native Crysta movement and animation cadence](issues/verify-native-crysta-cadence.md)
+- [x] [Clip the native Crysta camera to the source map region](issues/clip-native-crysta-camera.md)

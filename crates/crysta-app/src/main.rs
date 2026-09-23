@@ -503,8 +503,9 @@ impl Session {
         let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
+        let [x, y] = background.region.settled_origin([position.0, position.1]);
+        let camera = (usize::from(x), usize::from(y));
         let background = &background.frame;
-        let camera = frame::camera(position, (background.width, background.height));
         frame::draw_background(frame, background, camera);
         let count = residents.len();
         let mut order: Vec<(u16, usize, usize)> = residents
@@ -935,6 +936,27 @@ mod session_tests {
         assert_eq!(session.world.position(), (640, 400));
         assert!(changed, "the river must flow while Ark stands still");
         assert_eq!(session.background_clock.tick(), 32);
+    }
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn the_camera_stays_in_the_map_region_not_the_shared_layer() {
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let image = Box::leak(rom.image().to_vec().into_boxed_slice());
+        let mut session = Session::new(image);
+        let mut frame = vec![0u32; VIEW_WIDTH * VIEW_HEIGHT];
+        // `$0C` is the second page of a layer it shares with `$0B` and `$0D`;
+        // the exterior's 1280-pixel sheet has a 1024-pixel region.
+        for (map, position, camera) in [(0xC, (136, 300), (0, 256)), (0xA, (504, 1000), (376, 768))]
+        {
+            session.world = World::enter(image, map, position.0, position.1).unwrap();
+            session.background_clock = background::VisitClock::new(map);
+            assert_eq!(session.compose(&rom, &mut frame), camera, "map {map:#x}");
+        }
+        for map in 0xA..=0x21 {
+            assert!(background::load(&rom, map).is_ok(), "map {map:#x}");
+        }
     }
 
     #[test]

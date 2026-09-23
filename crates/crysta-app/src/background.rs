@@ -1,6 +1,8 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
-use assets::maps::visual::{crysta_animation::CrystaAnimation, StaticBackground};
+use assets::maps::visual::{
+    camera::CameraRegion, crysta_animation::CrystaAnimation, StaticBackground,
+};
 
 /// Presentation age since entry, advanced by host simulation updates, not redraws.
 pub struct VisitClock {
@@ -28,10 +30,16 @@ impl VisitClock {
 
 /// Load the static baseline without changing the inspector's export policy.
 pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
+    let region =
+        CameraRegion::from_rom(cartridge.image(), map).map_err(|error| error.to_string())?;
     let rendered = map_inspector::render_static_background(cartridge, map)
         .map_err(|error| error.to_string())?;
     let mut background =
         crate::frame::decode_bmp(&rendered.bitmap).ok_or("invalid static background bitmap")?;
+    let [_, _, right, bottom] = region.bounds;
+    if usize::from(right) > background.width || usize::from(bottom) > background.height {
+        return Err("camera region outside the decoded layer".into());
+    }
     background.high = rendered.priorities.iter().map(|bit| *bit != 0).collect();
     let animation = if map == 0xA {
         let scene = StaticBackground::from_rom(cartridge.image(), map)
@@ -44,6 +52,7 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
     };
     Ok(CachedBackground {
         frame: background,
+        region,
         animation,
     })
 }
@@ -51,6 +60,8 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
 /// Static pixels with an optional, bounded map-A animation overlay.
 pub struct CachedBackground {
     pub frame: crate::frame::Background,
+    /// The part of the shared layer this map's camera may show.
+    pub region: CameraRegion,
     animation: Option<AnimatedExterior>,
 }
 

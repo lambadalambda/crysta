@@ -123,9 +123,9 @@ resident with their art status and what talking to them yields.
   hands the text service an address holding native code; see
   [the refused text controls](crysta-refused-text-controls.md). The eight
   others that showed nothing were window controls, now admitted and drawn.
-- **The camera shows past the map's own region.** Several maps share one
-  layer, so the window can include part of a neighbouring room. Clipping
-  needs the per-map region.
+- ~~The camera shows past the map's own region.~~ Fixed: the camera clamps
+  to the source region; see
+  [the camera region](clip-native-crysta-camera.md).
 - **Walkers do not greet the player on approach.** `COP 2E` tests a bit of
   the held-button word `$0454`, and the runtime hands actors no buttons.
   Walkers do stop and face a player who faces them, as `COP 23` has them do;
