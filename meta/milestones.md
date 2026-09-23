@@ -149,7 +149,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [Play the Crysta story from the wake-up scene to the world map](issues/play-crysta-story.md)
-- [Apply flag-gated doors, blockers and tile patches](issues/flag-gated-geometry.md)
 - [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
 - [Lift and throw pots to break the blue door](issues/pot-throw-door.md)
 - [Open the box in the cellar](issues/cellar-box-sequence.md)

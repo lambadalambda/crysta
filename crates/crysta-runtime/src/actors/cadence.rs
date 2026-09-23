@@ -200,10 +200,9 @@ pub(super) fn word(bytes: &[u8], at: usize) -> Option<u16> {
 /// COP65's callback is installed but never run here, as for every callback.
 pub(super) fn benign_skipped_service(image: &[u8], pc: usize) -> bool {
     match image.get(pc..pc + 3) {
-        // Interaction, occupancy, the collision callback, which sets +$04
-        // bit $0200 only, and the re-entry record at `$0600..$060F`
-        // (`$80:8B35`).
-        Some(&[2, 0x19 | 0x21 | 0x3B | 0x65, _]) => true,
+        // Interaction, the collision callback, which sets +$04 bit $0200
+        // only, and the re-entry record at `$0600..$060F` (`$80:8B35`).
+        Some(&[2, 0x19 | 0x21 | 0x65, _]) => true,
         // +$08 = (+$08 & $F1FF) | operand << 8: below $40 the flip bit stays.
         Some(&[2, 0xBB, operand]) => operand < 0x40,
         _ => false,
@@ -260,7 +259,6 @@ mod tests {
     #[test]
     fn skipped_services_are_allowed_by_what_their_handlers_write() {
         for (bytes, allowed) in [
-            ([2, 0x3B, 0], true),
             ([2, 0x21, 0x94], true),
             ([2, 0x65, 0x24], true),
             ([2, 0x19, 0x0F], true),

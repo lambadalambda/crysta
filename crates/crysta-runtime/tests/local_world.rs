@@ -378,8 +378,24 @@ fn assert_same_arrival(actual: &World<'_>, expected: &World<'_>) {
     assert_eq!(actual.room(), expected.room());
 }
 
+/// Flags after the Elder's first request: D's gate is gone.
+fn after_elder() -> Vec<u8> {
+    let mut flags = crysta_runtime::world::new_game_flags();
+    flags[0x26 / 8] |= 1 << (0x26 % 8);
+    flags
+}
+
 fn reachable_maps(image: &[u8], start: u16, x: u16, y: u16) -> BTreeSet<u16> {
-    let origin = World::enter(image, start, x, y).expect("the start must build");
+    reachable_maps_with(image, start, (x, y), after_elder())
+}
+
+fn reachable_maps_with(
+    image: &[u8],
+    start: u16,
+    (x, y): (u16, u16),
+    flags: Vec<u8>,
+) -> BTreeSet<u16> {
+    let origin = World::enter_with_events(image, start, x, y, flags).expect("the start must build");
     let found = discover(origin.clone(), None);
     assert!(!found.truncated, "discovery exceeded its cell budget");
     for (index, arrival) in found.arrivals.values() {
@@ -400,6 +416,22 @@ fn the_player_can_walk_out_of_the_opening_house() {
         reached.len() > 1,
         "the player never left map $000B, reaching only {reached:?}"
     );
+}
+
+#[test]
+fn before_the_elder_the_gate_keeps_the_player_in_the_house() {
+    // D's hidden gate `$83:8CC8` stamps the exit cell (7,44) with COP 3B
+    // while `$26` is clear, and deletes itself once it is set.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let reached = reachable_maps_with(
+        cartridge.image(),
+        0x000B,
+        (120, 112),
+        crysta_runtime::world::new_game_flags(),
+    );
+    assert_eq!(reached, (0x000B..=0x0011).collect());
 }
 
 #[test]
@@ -846,14 +878,7 @@ fn candidate_routes_replay_from_the_opening_house_and_return_from_reached_states
         return;
     };
     let image = cartridge.image();
-    let origin = World::enter_candidate(
-        image,
-        0xB,
-        120,
-        112,
-        crysta_runtime::world::new_game_flags(),
-    )
-    .unwrap();
+    let origin = World::enter_candidate(image, 0xB, 120, 112, after_elder()).unwrap();
     let found = discover(origin.clone(), None);
     assert!(!found.truncated);
     eprintln!(

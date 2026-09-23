@@ -120,3 +120,25 @@ fn the_box_rooms_figure_stays_hidden_until_its_flag() {
     // A body's cell is written solid (attribute 14); this one stays floor.
     assert_ne!(cell >> 9, 14, "a hidden body does not occupy its cell");
 }
+
+#[test]
+fn d_gate_holds_the_house_door_until_the_elder_has_spoken() {
+    // Facing the exit from (120,704): refused while the gate's COP 3B stamp
+    // stands, open once `$26` deletes the gate on entry.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut after = crysta_runtime::world::new_game_flags();
+    after[0x26 / 8] |= 1 << (0x26 % 8);
+    for (flags, opens) in [
+        (crysta_runtime::world::new_game_flags(), false),
+        (after, true),
+    ] {
+        let mut world = World::enter_with_events(image, 0x000D, 120, 704, flags).unwrap();
+        world.update(None, Presses::default()).unwrap();
+        world.face(Direction::Down);
+        let step = world.interact_checked().unwrap();
+        assert_eq!(world.map() == 0x000A, opens, "{step:?}");
+    }
+}

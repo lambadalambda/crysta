@@ -68,6 +68,8 @@ const WALK_TO_ROW: u8 = 0x3A;
 const WALK_TO_COLUMN: u8 = 0x39;
 /// Unlinks the actor; `$80:A876`.
 const DELETE: u8 = 0xA7;
+/// Marks the actor's cell occupied in the collision grid (`$80:BE8E`).
+const OCCUPY: u8 = 0x3B;
 /// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
 /// bit 15 it waits until the flag is set, with it until the flag is clear.
 const WAIT_FOR_FLAG: u8 = 0x05;
@@ -264,6 +266,9 @@ pub struct Actor {
     /// A scripted leg's direction and frames applied, moving the actor
     /// through the next pose wait at the class-0 stream's 1, 0, 1, ...
     stream: Option<(Direction, u16)>,
+    /// The cell `COP 3B` marked occupied; a scripted leg clears it
+    /// (`$80:BF0E`). Nothing else does, as natively.
+    stamp: Option<(u16, u16)>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -304,6 +309,7 @@ impl Actor {
             continuation: None,
             outer: None,
             stream: None,
+            stamp: None,
             lengths: vec![None; 256],
         }
     }
@@ -409,6 +415,12 @@ impl Actor {
                 self.run(around);
             }
         }
+    }
+
+    /// The cell `COP 3B` marked occupied, if one is.
+    #[must_use]
+    pub const fn stamp(&self) -> Option<(u16, u16)> {
+        self.stamp
     }
 
     /// The wait a blocking service left the actor's own script in, if any.
@@ -616,7 +628,7 @@ impl Actor {
                 return self.text_service(service, operands, bank, around)
             }
             WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT | LONG_JUMP
-            | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG => {
+            | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG | OCCUPY => {
                 return self.script_service(service, operands, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -809,6 +821,7 @@ impl Actor {
         self.set_pose(pose & 0x7F, direction == Direction::Left);
         self.pose_age = 0;
         self.stream = Some((direction, 0));
+        self.stamp = None;
         self.pc = operands + 3;
         true
     }
@@ -886,6 +899,10 @@ impl Actor {
             DELETE => {
                 self.state = State::Gone;
                 return false;
+            }
+            OCCUPY => {
+                self.stamp = Some(self.collision_cell());
+                self.pc = operands;
             }
             WAIT_FOR_FLAG => {
                 let Some(word) = cadence::word(image, operands) else {
@@ -2353,6 +2370,15 @@ mod scripted_leg_tests {
             true,
         );
         assert_eq!(posed.selector, 9);
+    }
+
+    #[test]
+    fn cop_3b_stamps_the_cell_and_a_leg_lifts_it() {
+        // At (56,64) the collision cell is (3,3).
+        let stamped = leg(&[2, 0x3B, 2, 0xBC, 0x6B], true);
+        assert_eq!(stamped.stamp(), Some((3, 3)));
+        let walking = leg(&[2, 0x3B, 2, 0x3A, 3, 0x68, 6, 2, 0x8E], true);
+        assert_eq!(walking.stamp(), None);
     }
 
     #[test]

@@ -197,7 +197,7 @@ impl<'a> World<'a> {
     ) -> Result<Self, WorldError> {
         let present = residents(image, map, EventFlags::Bitmap(&events))
             .map_err(|source| WorldError::Residents { map, source })?;
-        let actors = present
+        let actors: Vec<Actor> = present
             .iter()
             .enumerate()
             .map(|(index, resident)| {
@@ -212,8 +212,8 @@ impl<'a> World<'a> {
         } else {
             room(image, map)?
         };
-        let blocked = body_cells(&present);
-        let built = occupy(base.clone(), &bodies(&present))?;
+        let blocked = blocking_cells(&present, &actors);
+        let built = occupy_cells(base.clone(), &blocked)?;
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -434,9 +434,9 @@ impl<'a> World<'a> {
         {
             self.scene = Some(Scene::Own(index));
         }
-        let cells = body_cells(&self.residents);
+        let cells = blocking_cells(&self.residents, &self.actors);
         if cells != self.blocked {
-            self.room = occupy(self.base.clone(), &bodies(&self.residents))?;
+            self.room = occupy_cells(self.base.clone(), &cells)?;
             self.blocked = cells;
         }
         Ok(())
@@ -671,6 +671,14 @@ impl<'a> World<'a> {
         }) else {
             return Ok(Step::Stayed);
         };
+        // An occupied doorway stays shut: D's hidden gate stamps the house
+        // exit until `$26`. Only a blocked cell of the doorway itself counts.
+        let (left, top) = (u16::from(record.x()), u16::from(record.y()));
+        let in_doorway = (left..left + u16::from(record.width())).contains(&faced.0)
+            && (top..top + u16::from(record.height())).contains(&faced.1);
+        if in_doorway && self.blocked.contains(&faced) {
+            return Ok(Step::Stayed);
+        }
         let Some(entered) = self.enter_exit(record)? else {
             return Ok(Step::Stayed);
         };
@@ -780,21 +788,21 @@ fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, W
     Ok(Some(Arrival::new(route)))
 }
 
-/// The residents that are bodies.
-fn bodies(present: &[Resident]) -> Vec<Resident> {
-    present
+/// Cells that block the player: where each visible body stands, and the
+/// cell each visible actor without art marked with `COP 3B` -- D's hidden
+/// gate (`$88:A9B4`), which holds the house exit until `$26`.
+fn blocking_cells(residents: &[Resident], actors: &[Actor]) -> Vec<(u16, u16)> {
+    residents
         .iter()
-        .filter(|resident| resident.body && !resident.hidden)
-        .cloned()
-        .collect()
-}
-
-/// The collision cells the bodies stand on, in roster order.
-fn body_cells(present: &[Resident]) -> Vec<(u16, u16)> {
-    present
-        .iter()
-        .filter(|resident| resident.body && !resident.hidden)
-        .map(Resident::collision_cell)
+        .zip(actors)
+        .filter(|(resident, _)| !resident.hidden)
+        .filter_map(|(resident, actor)| {
+            if resident.body {
+                Some(resident.collision_cell())
+            } else {
+                actor.stamp()
+            }
+        })
         .collect()
 }
 
@@ -855,9 +863,14 @@ fn occupied_by_others(
 ) -> Vec<(u16, u16)> {
     let mut occupied = vec![(x.saturating_sub(8) / 16, y.saturating_sub(16) / 16)];
     for (other, actor) in actors.iter().enumerate() {
-        if other != index && residents[other].body && !actor.hidden {
+        if other == index || actor.hidden {
+            continue;
+        }
+        if residents[other].body {
             occupied.push(actor.collision_cell());
             occupied.extend(actor.destination());
+        } else {
+            occupied.extend(actor.stamp());
         }
     }
     occupied
@@ -897,12 +910,17 @@ pub fn new_game_flags() -> Vec<u8> {
 /// # Errors
 /// As [`World::enter`].
 pub fn occupy(built: MapRoom, present: &[Resident]) -> Result<MapRoom, WorldError> {
-    if present.is_empty() {
+    let cells: Vec<_> = present.iter().map(Resident::collision_cell).collect();
+    occupy_cells(built, &cells)
+}
+
+/// [`occupy`] for any set of cells.
+fn occupy_cells(built: MapRoom, blocked: &[(u16, u16)]) -> Result<MapRoom, WorldError> {
+    if blocked.is_empty() {
         return Ok(built);
     }
     let mut cells = built.room.cells().to_vec();
-    for resident in present {
-        let (column, row) = resident.collision_cell();
+    for &(column, row) in blocked {
         if column >= built.width || row >= built.height {
             continue;
         }
@@ -1173,7 +1191,7 @@ mod tests {
         world.base.room = Room::new(8, 8, cells).unwrap();
         world.residents = vec![resident()];
         world.actors = vec![Actor::new((24, 32), None, 0, 0)];
-        world.blocked = body_cells(&world.residents);
+        world.blocked = blocking_cells(&world.residents, &world.actors);
         world.room = occupy(world.base.clone(), &world.residents).unwrap();
         for _ in 0..2 {
             assert_eq!(
@@ -1287,7 +1305,7 @@ mod tests {
             world.arrival = Some(Arrival::new(route));
             world.residents = vec![resident()];
             world.actors = vec![Actor::new((24, 32), None, 0, 0)];
-            world.blocked = body_cells(&world.residents);
+            world.blocked = blocking_cells(&world.residents, &world.actors);
             let mut strict = world.clone();
             for frame in 0..100 {
                 if world.arrival().is_none() {

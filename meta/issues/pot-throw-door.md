@@ -12,6 +12,7 @@ The blue door in C breaks after two pot hits, counted by controller `$838C32` in
 
 - Lift, carry and throw a pot with the player's inputs, from source.
 - Door hit detection, counter, `$292`, stair patch and the reaction scene.
+- The blue door and stairs metatile/collision patches (from the geometry issue).
 
 ## Acceptance Criteria
 

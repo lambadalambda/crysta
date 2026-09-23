@@ -52,6 +52,7 @@ callback on a confirm press when nothing else owns the window.
 | `A7` | `$80:A876` | — | deletes the actor |
 | `19` | `$80:8B35` | 14 bytes | writes the re-entry record `$0600..$060F`; stepped over |
 | `05` | `$80:862E` | flag word | yields on itself until the flag is set (bit 15 clear) or clear (bit 15 set) |
+| `3B` | `$80:9301` | — | marks the actor's cell occupied (`$80:BE8E`); a scripted leg lifts it (`$80:BF0E`) |
 
 Scripts also hide and show their actor with inline native code on entity
 `+$04` bit 15 (`LDA $0004,X; ORA #$8000` / `AND #$7FFF; STA $0004,X`, about
@@ -81,6 +82,16 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   first two ending `$D5 $D4`), sets `$20`, walks four legs to the door
   (unlocking the pad 320 frames after `$20`, as natively at 5903 → 6223) and
   deletes herself.
+
+## Flag-gated geometry
+
+D's hidden gate `$83:8CC8` (`$88:A9B4`: `COP 48 $8026`, `COP 3B`, `COP BC`,
+`RTL`) stamps the house exit cell `(7,44)` while `$26` is clear and deletes
+itself once it is set. It is load-time only, as natively: setting `$26`
+while D is loaded does not lift the stamp. The runtime blocks the player on
+every visible body's cell and on each artless actor's `COP 3B` stamp, and
+the host doorway action refuses a blocked cell. Before the Elder the player
+reaches only the house (`$0B`–`$11`); after him the slice is as before.
 
 ## Open
 
