@@ -138,8 +138,22 @@ while D is loaded does not lift the stamp. The runtime blocks the player on
 the cells visible actors mark (`COP 3B`/`3D`), as natively, and on the cells
 of bodies that have walked or whose script froze before it could mark. A
 standing body whose script marks nothing, as C's blue door, leaves its cell
-alone. The host doorway action refuses a blocked cell. Before the Elder the player
-reaches only the house (`$0B`–`$11`); after him the slice is as before.
+alone. The host doorway action refuses a blocked cell, and one whose exit
+cell holds a closed door (collision type 5, C's blue door on its stairs).
+Before the Elder the player reaches the house (`$0B`–`$11`) but for E,
+below the blue door; after him the slice is as before.
+
+Spawn lists also hold `FE` records: script-only controllers at (8,0) with
+their script at bytes 2..4 (`docs/house-scene.md`); the runtime runs them.
+The `FD` record with `$84:A129` is the player's own and is skipped. Stairs
+(selector 14) settle at the raw anchor plus (8,16).
+
+Every map load also applies the flag-gated patch table `$96:CD9D`
+(`$8D:8FB4`): each flag from `$280` owns one primary entry (a tile at a
+cell, or a block copy within the grid) plus continuations, applied when the
+flag is set and the entry names the map. `$292`'s two entries reopen C's
+stairs whenever the shared layer is decoded again, as natively on the
+return from the box. Second-layer entries are not applied.
 
 ## Open
 

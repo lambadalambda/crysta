@@ -466,3 +466,102 @@ fn a_carried_pot_is_shown_in_hand_then_in_flight() {
     replay(&mut world, &[(4, 1), (5, 19)]);
     assert_eq!(world.pot().and_then(|pot| pot.flight), Some((184, 357)));
 }
+
+/// The story flags after the blue door (`$292`).
+fn after_the_door() -> Vec<u8> {
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E, 0x292] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    events
+}
+
+/// Acknowledges pages until the pad unlocks and nothing is on the window.
+fn read_out(world: &mut World<'_>) -> u32 {
+    let mut pages = 0;
+    for _ in 0..3000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        pages += u32::from(reading);
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if !reading && !world.pad_locked() && world.dialogue().is_none() {
+            return pages;
+        }
+    }
+    panic!("never released");
+}
+
+#[test]
+// `World::pad_locked` as a path is not general over the world's lifetime.
+#[allow(clippy::redundant_closure_for_method_calls)]
+fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
+    // Selector-14 stairs settle at the raw anchor plus (8,16), as natively:
+    // E (152,880), $20 (408,880), $21 (136,128).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    for _ in 0..60 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    for _ in 0..2 {
+        assert!(world.strike(DOOR));
+        frames_until(&mut world, 10, |world| world.pad_locked());
+        read_out(&mut world);
+    }
+    let mut landings = Vec::new();
+    for (column, map) in [(None, 0x000E), (Some(104), 0x0020), (Some(360), 0x0021)] {
+        if let Some(column) = column {
+            while world.position().0 > column {
+                world
+                    .update(Some(Direction::Left), Presses::default())
+                    .unwrap();
+            }
+        }
+        for _ in 0..200 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+            if world.map() == map {
+                break;
+            }
+        }
+        landings.push((world.map(), world.position()));
+    }
+    assert_eq!(
+        landings,
+        [
+            (0x000E, (152, 880)),
+            (0x0020, (408, 880)),
+            (0x0021, (136, 128))
+        ]
+    );
+}
+
+#[test]
+fn a_fresh_load_of_c_after_the_door_opens_the_stairs() {
+    // `$8D:8FB4` applies `$96:CD9D`'s `$292` entries on every load of C, as
+    // natively on the return from the box (`return-C-left`: `$1CF6`/`$3ACB`).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, after_the_door()).unwrap();
+    assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
+    assert!(world.patched_cells().contains(&(11, 20, 0xF6)));
+    for _ in 0..200 {
+        world
+            .update(Some(Direction::Up), Presses::default())
+            .unwrap();
+        if world.map() == 0x000E {
+            break;
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x000E, (152, 880)));
+}

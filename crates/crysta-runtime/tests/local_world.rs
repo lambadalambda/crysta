@@ -421,7 +421,8 @@ fn the_player_can_walk_out_of_the_opening_house() {
 #[test]
 fn before_the_elder_the_gate_keeps_the_player_in_the_house() {
     // D's hidden gate `$83:8CC8` stamps the exit cell (7,44) with COP 3B
-    // while `$26` is clear, and deletes itself once it is set.
+    // while `$26` is clear, and deletes itself once it is set. E lies below
+    // C's closed blue door.
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -431,7 +432,10 @@ fn before_the_elder_the_gate_keeps_the_player_in_the_house() {
         (120, 112),
         crysta_runtime::world::new_game_flags(),
     );
-    assert_eq!(reached, (0x000B..=0x0011).collect());
+    assert_eq!(
+        reached,
+        (0x000B..=0x0011).filter(|map| *map != 0x000E).collect()
+    );
 }
 
 #[test]
@@ -445,14 +449,14 @@ fn walking_and_doorways_connect_most_of_the_slice() {
         reached.contains(&0x000A),
         "the town was not reached: {reached:?}"
     );
-    // 19 of the 24 are reachable by walking and opening doorways. The five that
+    // 18 of the 24 are reachable by walking and opening doorways. The six that
     // are not are recorded rather than rounded away: $1A, $1B and $1C are
-    // southern town houses, and $20 and $21 are the cellar and Pandora's Box,
-    // which the route reaches through progression rather than geometry.
+    // southern town houses, and E, $20 and $21 lie below C's blue door, which
+    // opens through progression rather than geometry.
     let missing: Vec<_> = MAPS.filter(|map| !reached.contains(map)).collect();
     assert_eq!(
         missing,
-        vec![0x001A, 0x001B, 0x001C, 0x0020, 0x0021],
+        vec![0x000E, 0x001A, 0x001B, 0x001C, 0x0020, 0x0021],
         "reachability changed; reached {reached:?}"
     );
 }
@@ -948,10 +952,11 @@ fn candidate_routes_replay_from_the_opening_house_and_return_from_reached_states
         transition_actions.iter().all(|count| *count > 0),
         "exercise walking and interaction transitions"
     );
+    // All but E, $20 and $21, below C's blue door.
     assert_eq!(
         found.arrivals.len(),
-        24,
-        "every map has a checked outbound route"
+        21,
+        "every map above the blue door has a checked outbound route"
     );
     let missing_returns: Vec<_> = found
         .arrivals

@@ -11,6 +11,7 @@ use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
 use crate::{room, room_candidate, MapRoom, RoomError, MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
+use assets::maps::flag_patches::{self, Patch};
 use assets::maps::scripts::EventFlags;
 use room_core::arrival::{Arrival, ReturnRoute};
 use room_core::{
@@ -93,6 +94,11 @@ pub enum WorldError {
     },
     /// The pot component refused even a neutral frame.
     Pot(room_core::pots::Error),
+    /// The flag-gated load patch table did not decode.
+    LoadPatches {
+        /// Map being loaded.
+        map: u16,
+    },
 }
 
 impl From<RoomError> for WorldError {
@@ -112,6 +118,7 @@ impl fmt::Display for WorldError {
             Self::Residents { map, source } => write!(f, "map {map:#06x} residents: {source}"),
             Self::Exits { map, source } => write!(f, "map {map:#06x} exits: {source}"),
             Self::Pot(source) => write!(f, "{source}"),
+            Self::LoadPatches { map } => write!(f, "map {map:#06x}: load patch table"),
         }
     }
 }
@@ -119,7 +126,7 @@ impl fmt::Display for WorldError {
 impl std::error::Error for WorldError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
-            Self::Arrival { .. } => None,
+            Self::Arrival { .. } | Self::LoadPatches { .. } => None,
             Self::Room(source) => Some(source),
             Self::Residents { source, .. } => Some(source),
             Self::Exits { source, .. } => Some(source),
@@ -171,7 +178,9 @@ impl<'a> World<'a> {
         y: u16,
         events: Vec<u8>,
     ) -> Result<Self, WorldError> {
-        Self::enter_with_policy(image, map, x, y, events, false)
+        let mut world = Self::enter_with_policy(image, map, x, y, events, false)?;
+        world.finish_load()?;
+        Ok(world)
     }
 
     /// Enters with the opt-in passive directional candidate (`$097C & 4 == 0`).
@@ -195,7 +204,9 @@ impl<'a> World<'a> {
         y: u16,
         events: Vec<u8>,
     ) -> Result<Self, WorldError> {
-        Self::enter_with_policy(image, map, x, y, events, true)
+        let mut world = Self::enter_with_policy(image, map, x, y, events, true)?;
+        world.finish_load()?;
+        Ok(world)
     }
 
     fn enter_with_policy(
@@ -225,7 +236,6 @@ impl<'a> World<'a> {
         };
         let blocked = blocking_cells(&present, &actors);
         let built = occupy_cells(base.clone(), &blocked)?;
-        let cellar = pots::Pots::at_entry(map, base.room.cells());
         // Every map in the slice has a list that decodes; a malformed one is a
         // refusal rather than a map the player silently cannot leave.
         let exits =
@@ -244,7 +254,7 @@ impl<'a> World<'a> {
             globals: Globals::with_events(events),
             scene: None,
             patched: Vec::new(),
-            pots: cellar,
+            pots: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -479,6 +489,56 @@ impl<'a> World<'a> {
         Ok(())
     }
 
+    /// The end of a map load (`$8D:8C0C`): the flag-gated tile patches
+    /// ([`assets::maps::flag_patches`]) go on the grid as it stands, then the
+    /// pots are found.
+    fn finish_load(&mut self) -> Result<(), WorldError> {
+        self.apply_load_patches()?;
+        self.pots = pots::Pots::at_entry(self.map, self.base.room.cells());
+        Ok(())
+    }
+
+    /// Applies the load's flag-gated patches on the first layer, in order: a
+    /// block copy reads the grid as the entries before it left it, word by
+    /// word. The second layer's are left out: only the first layer's
+    /// collision is modelled.
+    fn apply_load_patches(&mut self) -> Result<(), WorldError> {
+        let events = &self.globals.events;
+        let flag = |flag: u16| EventFlags::Bitmap(events).get(flag) == Some(true);
+        let patches = flag_patches::for_map(self.image, self.map, flag)
+            .ok_or(WorldError::LoadPatches { map: self.map })?;
+        let (width, height) = (self.base.width, self.base.height);
+        for patch in patches.iter().filter(|patch| !patch.second_layer) {
+            match patch.patch {
+                Patch::Tile { cell, tile } => {
+                    self.globals
+                        .patches
+                        .push((cell.0.into(), cell.1.into(), tile));
+                }
+                Patch::Copy { from, size, to } => {
+                    for dy in 0..u16::from(size.1) {
+                        for dx in 0..u16::from(size.0) {
+                            let (column, row) = (u16::from(from.0) + dx, u16::from(from.1) + dy);
+                            if column >= width || row >= height {
+                                continue;
+                            }
+                            let word = self.base.room.cells()
+                                [usize::from(row) * usize::from(width) + usize::from(column)];
+                            self.globals.patches.push((
+                                u16::from(to.0) + dx,
+                                u16::from(to.1) + dy,
+                                word & 0x1FF,
+                            ));
+                            // Each word lands before the next is read.
+                            self.apply_patches()?;
+                        }
+                    }
+                }
+            }
+        }
+        self.apply_patches()
+    }
+
     /// Adds the actors scripts spawned (`COP A2`); they run from next frame.
     fn spawn_actors(&mut self) {
         for (script, flags, position) in std::mem::take(&mut self.globals.spawns) {
@@ -503,7 +563,9 @@ impl<'a> World<'a> {
         }
     }
 
-    /// Cells scripts have patched in this map: column, row and tile.
+    /// Cells patched in this map, by scripts and by the load's flag table,
+    /// with those carried from the maps before on the same layer: column,
+    /// row and tile.
     #[must_use]
     pub fn patched_cells(&self) -> &[(u16, u16, u16)] {
         &self.patched
@@ -792,6 +854,17 @@ impl<'a> World<'a> {
         if in_doorway && self.blocked.contains(&faced) {
             return Ok(Step::Stayed);
         }
+        // Nor does a closed door open by hand.
+        let cell = usize::from(top) * usize::from(self.base.width) + usize::from(left);
+        if self
+            .base
+            .room
+            .cells()
+            .get(cell)
+            .is_some_and(|word| word >> 9 & 31 == CLOSED_DOOR)
+        {
+            return Ok(Step::Stayed);
+        }
         let Some(entered) = self.enter_exit(record)? else {
             return Ok(Step::Stayed);
         };
@@ -857,7 +930,16 @@ impl<'a> World<'a> {
         if !MAPS.contains(&destination) {
             return Ok(None);
         }
-        let (x, y) = arrival.map_or(record.destination_position(), Arrival::position);
+        let (x, y) = match arrival {
+            Some(arrival) => arrival.position(),
+            // Stairs settle at the raw anchor plus (8,16): `$8D:89BD`'s
+            // selector adjustment, then the stair walk back by the same.
+            None if record.selector() == STAIRS => {
+                let (x, y) = record.destination_position();
+                (x + 8, y + 16)
+            }
+            None => record.destination_position(),
+        };
         let mut entered = self.enter_destination(destination, x, y)?;
         entered.arrival = arrival;
         Ok(Some(entered))
@@ -877,16 +959,22 @@ impl<'a> World<'a> {
             self.base.room.passive_directional_type8_special_bit_clear(),
         )?;
         entered.globals.items.clone_from(&self.globals.items);
-        // The same first layer is not reloaded: its patches stay.
+        // The same first layer is not reloaded: its patches stay, and the
+        // load's own patches go on top.
         if entered.base.layer_source == self.base.layer_source {
             entered.globals.patches.clone_from(&self.patched);
             entered.apply_patches()?;
-            // Lifted pots stay lifted.
-            entered.pots = pots::Pots::at_entry(map, entered.base.room.cells());
         }
+        entered.finish_load()?;
         Ok(entered)
     }
 }
+
+/// The stair transfer selector (decimal 14).
+const STAIRS: u8 = 14;
+/// A closed door's collision type: C's blue door stands on its stairs with
+/// it (`$0B81`) until it breaks.
+const CLOSED_DOOR: u16 = 5;
 
 /// Only these two record/state witnesses have measured arrival profiles.
 /// Other edges retain the legacy raw host transfer, not selector qualification.
