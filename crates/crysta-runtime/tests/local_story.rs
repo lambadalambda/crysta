@@ -1002,3 +1002,27 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
     replay(&mut world, &[(0, 160), (5, 12)]);
     assert_eq!(world.position(), (536, 752), "underworld-south");
 }
+
+#[test]
+fn every_arch_in_the_hall_leaves_ark_free_in_its_room() {
+    // Each arch locks the pad (`COP 2A $F0FF`) before its `COP 14`; the
+    // load clears it, as natively (`$045E` is 0 in `$42` after the door).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    for (x, map) in [(72, 0x0042), (136, 0x0044), (200, 0x0043)] {
+        let mut world = World::enter_with_events(image, 0x0041, x, 80, events.clone()).unwrap();
+        world.face(Direction::Up);
+        replay(&mut world, &[(4, 1), (5, 120)]);
+        assert_eq!(world.map(), map);
+        assert!(!world.pad_locked(), "free in {map:#06x}");
+        let before = world.position();
+        replay(&mut world, &[(1, 30)]);
+        assert_ne!(world.position(), before, "walks into {map:#06x}");
+    }
+}
