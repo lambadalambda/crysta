@@ -153,19 +153,21 @@ const SPAWN: u8 = 0xA2;
 const SPAWN_LINKED: u8 = 0x99;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
-/// Services without a modelled effect: a palette-fade helper (`31` spawns
-/// it, `32` sets it), sounds (`37`, `76` queues at `$04D6`), the music word
-/// (`38`, `$04B6`), a cosmetic helper (`6A`) and the hit profile (`D9`,
-/// `$7F:1022` from `$8D:BDFA`). Their operands are stepped over.
-const COSMETIC: [(u8, usize); 7] = [
-    (0x31, 1),
-    (0x32, 1),
-    (0x37, 1),
-    (0x38, 2),
-    (0x6A, 2),
-    (0x76, 2),
-    (0xD9, 1),
-];
+/// Services without a modelled effect: a cosmetic helper (`6A`), PPU
+/// register writes (`76`) and the hit profile (`D9`, `$7F:1022` from
+/// `$8D:BDFA`). Their operands are stepped over.
+const COSMETIC: [(u8, usize); 3] = [(0x6A, 2), (0x76, 2), (0xD9, 1)];
+/// Music: play a track (`$80:90D4`), fade out and play one (`$80:9107`),
+/// play a selection or the map's (`$80:913C`) -- each through a worker
+/// actor the runtime does not need ([`crate::audio`]).
+const PLAY_TRACK: u8 = 0x30;
+const FADE_TO_TRACK: u8 = 0x31;
+const PLAY_SELECTION: u8 = 0x32;
+/// Sound effects: port 3 (`$80:91E8`, `$04B7`), port 2 (`$80:91FC`,
+/// `$04B6`), both (`$80:9210`).
+const SOUND_PORT3: u8 = 0x36;
+const SOUND_PORT2: u8 = 0x37;
+const SOUND_WORD: u8 = 0x38;
 /// Branches on the player inside a rectangle of cells around the actor;
 /// `$80:87C2`. Operands: facing, four signed cell offsets, target.
 const NEAR_BRANCH: u8 = 0x0D;
@@ -200,9 +202,9 @@ const CONTACT: [Option<u8>; 7] = [
 const NO_DAMAGE: [u8; 12] = [
     0xAC, 0xEA, 0x0D, 0xB9, 0x06, 0x00, 0x09, 0x20, 0x00, 0x99, 0x06, 0x00,
 ];
-/// Waits for the palette fade helper (`$04B8 == $FFFF`), then three frames;
-/// `$80:918F`. With no helper, only the three frames.
-const FADE_WAIT: u8 = 0x33;
+/// Waits for a track to load (`$04B8 == $FFFF`), then three frames;
+/// `$80:918F`. The host loads tracks on its own; only the three frames.
+const MUSIC_WAIT: u8 = 0x33;
 /// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
 /// bit 15 it waits until the flag is set, with it until the flag is clear.
 const WAIT_FOR_FLAG: u8 = 0x05;
@@ -956,6 +958,8 @@ impl Actor {
                 return self.script_service(service, operands, around)
             }
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
+            PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
+            | SOUND_WORD => return self.audio_service(service, operands, around),
             CALL => {
                 let Some(target) = image.get(operands..operands + 3).and_then(long) else {
                     self.state = State::Frozen;
@@ -971,7 +975,7 @@ impl Actor {
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | SPAWN_LINKED | FADE_WAIT | 0x31 | 0x32 | 0x37 | 0x38 | 0x6A | 0x76 | 0xD9 => {
+            | SPAWN_LINKED | MUSIC_WAIT | 0x6A | 0x76 | 0xD9 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -1258,7 +1262,7 @@ impl Actor {
                 around.globals.spawns.push((script, flags, self.position));
                 self.pc = operands + 5;
             }
-            FADE_WAIT => return self.hold(operands, 3),
+            MUSIC_WAIT => return self.hold(operands, 3),
             cosmetic => {
                 let Some(&(_, length)) = COSMETIC.iter().find(|&&(service, _)| service == cosmetic)
                 else {
@@ -1766,7 +1770,13 @@ impl Actor {
                 self.pc = operands + 3;
             }
             GRANT_ITEM => {
-                let Some(&item) = image.get(operands) else {
+                // The word is the presentation's length in frames, the
+                // fourth operand its fanfare (`$80:9A5B`).
+                let (Some(&item), Some(frames), Some(&track)) = (
+                    image.get(operands),
+                    cadence::word(image, operands + 1),
+                    image.get(operands + 3),
+                ) else {
                     self.state = State::Frozen;
                     return false;
                 };
@@ -1775,6 +1785,7 @@ impl Actor {
                 if !around.globals.items.contains(&item) {
                     around.globals.items.push(item);
                 }
+                around.globals.audio.fanfare(track, frames);
                 self.pc = operands + 4;
             }
             _ => {
@@ -1782,6 +1793,32 @@ impl Actor {
                 return false;
             }
         }
+        true
+    }
+
+    /// Music and sound effect services ([`crate::audio`]). Returns whether
+    /// execution continues this frame.
+    fn audio_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let length = if service == SOUND_WORD { 2 } else { 1 };
+        let Some(bytes) = around.image.get(operands..operands + length) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let audio = &mut around.globals.audio;
+        match service {
+            PLAY_TRACK => audio.play(bytes[0], false),
+            FADE_TO_TRACK => audio.play(bytes[0], true),
+            PLAY_SELECTION => audio.select(bytes[0]),
+            SOUND_PORT3 => audio.sound_port3(bytes[0]),
+            SOUND_PORT2 => audio.sound_port2(bytes[0]),
+            _ => audio.sound_word(u16::from_le_bytes([bytes[0], bytes[1]])),
+        }
+        self.pc = operands + length;
         true
     }
 
@@ -3473,6 +3510,43 @@ mod scene_service_tests {
         assert_eq!(globals.counter(2), 0x9999);
         // Bit 6's subtraction is refused rather than guessed.
         assert!(!globals.count(0x40, 1));
+    }
+
+    #[test]
+    fn music_and_sound_services_cue_the_driver() {
+        use crate::audio::Cue;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        globals.audio.load_map(Some(0x1B));
+        globals.audio.take();
+        // COP 31 01, 30 34, 32 FF, 32 05, 60 (item, word, fanfare), then the
+        // latch: 37 1A, 36 13, and 38 $3737 overwrites both.
+        let (_, actor) = run(
+            &[(
+                0,
+                &[
+                    2, 0x31, 0x01, 2, 0x30, 0x34, 2, 0x32, 0xFF, 2, 0x32, 0x05, 2, 0x60, 0x81,
+                    0xA4, 0x01, 0x35, 2, 0x37, 0x1A, 2, 0x36, 0x13, 2, 0x8E,
+                ],
+            )],
+            &mut globals,
+        );
+        assert_ne!(actor.state, State::Frozen);
+        globals.audio.flush();
+        let track = |track, fade| Cue::Track { track, fade };
+        assert_eq!(
+            globals.audio.take(),
+            [
+                track(0x01, true),
+                track(0x34, false),
+                track(0x1C, false),
+                track(0x06, false),
+                track(0x35, false),
+                Cue::Sound(0x131A),
+            ]
+        );
+        run(&[(0, &[2, 0x38, 0x37, 0x37, 2, 0x8E])], &mut globals);
+        globals.audio.flush();
+        assert_eq!(globals.audio.take(), [Cue::Sound(0x3737)]);
     }
 
     #[test]

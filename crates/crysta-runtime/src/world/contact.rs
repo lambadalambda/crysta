@@ -137,7 +137,7 @@ impl World<'_> {
         let Some((map, x, y)) = self.globals.transfer.take() else {
             return Ok(None);
         };
-        let mut entered = self.enter_destination(map, x, y)?;
+        let mut entered = self.enter_destination(map, x, y, self.globals.audio.clone())?;
         entered.face(self.facing);
         let from = self.map;
         *self = entered;

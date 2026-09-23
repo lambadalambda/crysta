@@ -55,6 +55,8 @@ pub struct Globals {
     /// Actors scripts spawned (`COP A2`), not yet in the map: script
     /// (normalized), flags word (`+$04`; bit 15 hidden) and position.
     pub spawns: Vec<(usize, u16, (u16, u16))>,
+    /// Music and sound effect requests ([`crate::audio`]).
+    pub audio: crate::audio::Audio,
 }
 
 impl Default for Globals {
@@ -79,6 +81,7 @@ impl Globals {
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),
+            audio: crate::audio::Audio::default(),
         }
     }
 

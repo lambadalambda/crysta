@@ -7,10 +7,11 @@
 //! above), waits 8, patches it open (`$F7`, `$F6`), and releases the player
 //! once the last patch's 8-frame delay has passed (`TRB $097C`).
 //!
-//! Not modelled: the player's poses (`COP CB`), the sound (`COP 37`), the
-//! `$7F:1020` writes, and `$87:C7F1`'s other branch, which with `$04F6`
-//! nonzero wants the raw word `$00F3` (every door found is `$1CF3`; what
-//! sets `$04F6` is not traced).
+//! The sound (`COP 37 1A`, `$87:97EC`) goes with the first patch.
+//!
+//! Not modelled: the player's poses (`COP CB`), the `$7F:1020` writes, and
+//! `$87:C7F1`'s other branch, which with `$04F6` nonzero wants the raw word
+//! `$00F3` (every door found is `$1CF3`; what sets `$04F6` is not traced).
 
 use super::{World, WorldError};
 use room_core::Direction;
@@ -21,6 +22,8 @@ pub(super) const CLOSED_LOWER: u16 = 0xF3;
 /// Frames after the press at which the door script patches: (frame, lower
 /// tile, upper tile).
 const PATCHES: [(u16, u16, u16); 2] = [(12, 0xF5, 0xF4), (20, 0xF7, 0xF6)];
+/// Port 2's sound of a door opening.
+const OPEN_SOUND: u8 = 0x1A;
 /// The frame the player is released on.
 const RELEASE: u16 = 28;
 
@@ -93,6 +96,12 @@ impl World<'_> {
             return Ok(());
         };
         let (patches, free) = opening.tick();
+        if patches
+            .first()
+            .is_some_and(|&(_, _, tile)| tile == PATCHES[0].1)
+        {
+            self.globals.audio.sound_port2(OPEN_SOUND);
+        }
         self.globals.patches.extend(patches);
         self.opening = (!free).then_some(opening);
         self.apply_patches()?;

@@ -57,7 +57,7 @@ callback on a confirm press when nothing else owns the window.
 | `BC` | `$80:AAA5` | — | stores the next command as the continuation `RTL` resumes at |
 | `48` | `$80:96CB` | flag word | deletes the actor when the flag is set (bit 15) or clear |
 | `54` | `$80:99EB` | item, target | gives the item (target taken when full; not modelled) |
-| `60` | `$80:9A04` | item, pose word, sound id | grants the item (once per kind here) with its presentation, which is not drawn |
+| `60` | `$80:9A04` | item, frames, track | grants the item (once per kind here) with its presentation, which is not drawn; plays the track as a fanfare, then the map's again after the frames (`$84:BF0A`) |
 | `3A` / `39` | `$80:929C` / `921F` | pose, vector, row / column | starts a scripted leg; the next `COP 8E` moves the actor at the class-0 stream, or skips the leg's loop at the target |
 | `A7` | `$80:A876` | — | deletes the actor |
 | `19` | `$80:8B35` | 14 bytes | writes the re-entry record `$0600..$060F`; stepped over |
@@ -75,10 +75,12 @@ callback on a confirm press when nothing else owns the window.
 | `4A` | `$80:9713` | counter, word, target | branches when the `$0640` counter holds the word; counter bit 7: exceeds it, bit 6: is below it |
 | `3D` / `3E` | `$80:9327` / `935D` | mode, dx, dy | marks / unmarks a further cell (mode 0: offsets from the actor) |
 | `A2` | `$80:A71B` | long script, flags | spawns an actor running the script; flags bit 15 hides it |
-| `31` / `32` / `33` | `$80:9107` / `913C` / `918F` | 1 / 1 / — | palette-fade helper; not drawn, `33` keeps only its three-frame tail |
-| `37` / `6A` | `$80:91FC` / `9DD6` | 1 / 2 | sound, cosmetic helper; stepped over |
+| `30` / `31` / `32` | `$80:90D4` / `9107` / `913C` | track / track / selection | play a track; fade out, then play one; play a selection, `FF` the map's (`crysta_runtime::audio`) |
+| `33` | `$80:918F` | — | waits for the track's load; the host loads on its own, so only the three-frame tail |
+| `36` / `37` / `38` | `$80:91E8` / `91FC` / `9210` | 1 / 1 / 2 | sound effect on port 3 (`$04B7`), port 2 (`$04B6`), both |
+| `6A` | `$80:9DD6` | 2 | cosmetic helper; stepped over |
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
-| `38` / `76` / `D9` | `$80:9210` / `A127` / `B501` | 2 / 2 / 1 | music word, sound queue, hit profile; stepped over |
+| `76` / `D9` | `$80:A127` / `B501` | 2 / 1 | PPU register writes, hit profile; stepped over |
 
 Inline native code that writes only the display -- PPU registers, their
 shadows `$0468..$046B`, the actor's scratch `$7F:201C` and the helper flag

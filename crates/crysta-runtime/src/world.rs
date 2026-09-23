@@ -6,6 +6,7 @@
 //! player through measured initialized-to-free arrival profiles.
 
 use crate::actors::{Actor, Surroundings, Wait};
+use crate::audio::{map_selection, Audio, Cue};
 use crate::plane::Plane;
 use crate::residents::{residents, Resident};
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
@@ -528,10 +529,12 @@ impl<'a> World<'a> {
     }
 
     /// The end of a map load (`$8D:8C0C`): the flag-gated tile patches
-    /// ([`assets::maps::flag_patches`]) go on the grid as it stands, then the
-    /// pots are found.
+    /// ([`assets::maps::flag_patches`]) go on the grid as it stands, the
+    /// loading script's music is selected, then the pots are found.
     fn finish_load(&mut self) -> Result<(), WorldError> {
         self.apply_load_patches()?;
+        let selection = map_selection(self.image, self.map, &self.globals.events);
+        self.globals.audio.load_map(selection);
         self.pots = pots::Pots::at_entry(self.map, self.base.room.cells());
         self.plane = WORLD_MAPS.contains(&self.map).then(|| {
             let cells = self
@@ -660,10 +663,12 @@ impl<'a> World<'a> {
     ) -> Result<(Step, Option<Step>), WorldError> {
         let steps = self.frame(direction, presses)?;
         // A transfer a script queued this frame loads at its end.
-        Ok(match self.follow_transfer()? {
+        let steps = match self.follow_transfer()? {
             Some(entered) => (entered, None),
             None => steps,
-        })
+        };
+        self.globals.audio.end_frame();
+        Ok(steps)
     }
 
     fn frame(
@@ -719,6 +724,11 @@ impl<'a> World<'a> {
         }
         self.apply_patches()?;
         Ok((step, opened))
+    }
+
+    /// The music and sound effect requests made since the last call.
+    pub fn take_cues(&mut self) -> Vec<Cue> {
+        self.globals.audio.take()
     }
 
     /// Residents whose scripts stopped at something the interpreter does not
@@ -1037,14 +1047,29 @@ impl<'a> World<'a> {
             }
             None => record.destination_position(),
         };
-        let mut entered = self.enter_destination(destination, x, y)?;
+        // Leaving plays the exit's sound before the load (`$8D:8872`);
+        // landing on stairs plays their step (`COP 36 17`, `$84:BA19`) as
+        // the arrival walk, which is not modelled, crosses them.
+        let mut audio = self.globals.audio.clone();
+        audio.sound_port3(EXIT_SOUND);
+        audio.flush();
+        if matches!(record.selector(), STAIRS | STAIRS_UP) {
+            audio.sound_port3(STAIR_SOUND);
+        }
+        let mut entered = self.enter_destination(destination, x, y, audio)?;
         entered.arrival = arrival;
         Ok(Some(entered))
     }
 
     /// Loads the next map. `$8D:8AED` clears the map-local flags (0..31)
     /// and counters first; the other flags and the items carry over.
-    fn enter_destination(&self, map: u16, x: u16, y: u16) -> Result<Self, WorldError> {
+    fn enter_destination(
+        &self,
+        map: u16,
+        x: u16,
+        y: u16,
+        audio: Audio,
+    ) -> Result<Self, WorldError> {
         let mut events = self.globals.events.clone();
         events[..4].fill(0);
         let mut entered = Self::enter_with_policy(
@@ -1057,6 +1082,7 @@ impl<'a> World<'a> {
         )?;
         entered.globals.items.clone_from(&self.globals.items);
         entered.globals.scratch.clone_from(&self.globals.scratch);
+        entered.globals.audio = audio;
         // The same first layer is not reloaded: its patches stay, and the
         // load's own patches go on top.
         if entered.base.layer_source == self.base.layer_source {
@@ -1068,6 +1094,9 @@ impl<'a> World<'a> {
     }
 }
 
+/// Port 3's sounds for leaving a map, and for a stair step.
+const EXIT_SOUND: u8 = 0x4D;
+const STAIR_SOUND: u8 = 0x17;
 /// The stair transfer selectors (decimal): 14 down, 13 back up.
 const STAIRS: u8 = 14;
 const STAIRS_UP: u8 = 13;

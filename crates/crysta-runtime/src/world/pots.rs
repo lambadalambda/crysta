@@ -8,7 +8,8 @@
 
 use super::{Step, World, WorldError};
 use crate::actors::Actor;
-use room_core::pots::{Admission, Input, Phase, PotState, SourceObject};
+use crate::audio::Audio;
+use room_core::pots::{Admission, Input, Output, Phase, PotState, SourceObject};
 use room_core::{AnimationState, Direction, Room};
 
 /// The map whose pots the component is qualified for.
@@ -19,6 +20,11 @@ const POT_WORDS: [u16; 2] = [0x18FA, 0x18FB];
 pub const LIFTED_TILE: u16 = 0x00F8;
 /// The carry record `$0988` names for an `$FA` pot; `$FB` has `$098F`.
 const FA_SLOT: u16 = 0x098A;
+/// Port 3's sounds: the lift (`$84:BE6D`), the break (`$84:C6E5`), and
+/// the door's hit after it (`$84:C7A9`).
+const LIFT_SOUND: u8 = 0x11;
+const BREAK_SOUND: u8 = 0x12;
+const HIT_SOUND: u8 = 0x13;
 
 /// The pots of a room visit.
 #[derive(Clone)]
@@ -35,6 +41,8 @@ pub(super) struct Pots {
     /// The collision a throw started with; the door patches may not change
     /// its lane (`docs/pandora-pots.md`).
     throw_room: Option<Room>,
+    /// Whether the pot in flight has hit the door.
+    hit: bool,
 }
 
 impl Pots {
@@ -58,6 +66,7 @@ impl Pots {
             owned: false,
             collision: None,
             throw_room: None,
+            hit: false,
         })
     }
 }
@@ -168,6 +177,7 @@ impl World<'_> {
                 _ => Ok(None),
             };
         };
+        let flying = pots.state.and_then(|state| state.flight()).is_some();
         let phase = state.phase();
         pots.throw_room = match (phase, pots.throw_room.take()) {
             (Phase::Throwing, Some(room)) => Some(room),
@@ -184,6 +194,8 @@ impl World<'_> {
         } else if output.movement.is_some() {
             self.animation.advance(self.walking.active_direction());
         }
+        let broke = flying && state.flight().is_none();
+        sounds(&mut self.globals.audio, &mut pots.hit, &output, broke);
         if let Some(object) = output.consumed_cell {
             let width = self.base.width;
             self.globals.patches.push((
@@ -240,5 +252,22 @@ impl World<'_> {
         let room = self.room.with_cells(cells)?.room;
         pots.collision = Some((live.to_vec(), room));
         Ok(())
+    }
+}
+
+/// A step's sounds: the lift, and at the break the break and, when the pot
+/// hit the door, the door's hit -- natively four frames later, here next in
+/// line.
+fn sounds(audio: &mut Audio, hit: &mut bool, output: &Output, broke: bool) {
+    if output.consumed_cell.is_some() {
+        audio.sound_port3(LIFT_SOUND);
+    }
+    *hit |= output.door_hit;
+    if broke {
+        audio.sound_port3(BREAK_SOUND);
+        if std::mem::take(hit) {
+            audio.flush();
+            audio.sound_port3(HIT_SOUND);
+        }
     }
 }

@@ -1,5 +1,6 @@
 //! The Crysta story slice, played through the world with real presses and
 //! compared against the native input-only route.
+use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use rom::{Revision, Rom};
@@ -34,6 +35,19 @@ fn frames_until(world: &mut World<'_>, limit: u32, done: impl Fn(&World<'_>) -> 
     panic!("not within {limit} frames");
 }
 
+/// The tracks and the sound latch words the world asked for since the last
+/// call.
+fn cues(world: &mut World<'_>) -> (Vec<u8>, Vec<u16>) {
+    let (mut tracks, mut sounds) = (Vec::new(), Vec::new());
+    for cue in world.take_cues() {
+        match cue {
+            Cue::Track { track, .. } => tracks.push(track),
+            Cue::Sound(latch) => sounds.push(latch),
+        }
+    }
+    (tracks, sounds)
+}
+
 const ELLE: usize = 0x03_8D36;
 /// The blue door in C.
 const DOOR: usize = 0x03_8C32;
@@ -46,6 +60,7 @@ fn elle_wakes_ark_then_walks_out() {
     let image = cartridge.image();
     let mut world = World::enter_with_events(image, 0x000F, 304, 112, fresh_game_flags()).unwrap();
     let elle = |world: &World<'_>| world.residents().iter().find(|r| r.record == ELLE).cloned();
+    assert_eq!(cues(&mut world), (vec![4], vec![]), "selection 3");
     let at_start = elle(&world).expect("Elle is in the bedroom before the intro");
     assert!(at_start.body, "and drawn");
     assert_eq!(at_start.position, (328, 112));
@@ -413,7 +428,10 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
         replay(world, runs);
     };
 
+    cues(&mut world);
     segment(&mut world, (104, 352, Direction::Left), MISS);
+    // The lift, then the break (native `pot-first-held`, `door-hit1`).
+    assert_eq!(cues(&mut world), (vec![], vec![0x1100, 0x1200]));
     assert_eq!(world.position(), (136, 368));
     assert!(world.patched_cells().contains(&(5, 21, 0xF8)), "lifted");
     assert!(world.pot().is_none(), "broken");
@@ -432,10 +450,19 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
     );
     read_out(&mut world);
     assert!(!flag(&world, 0x292));
+    // And the door's hit after the break (`door-real-hit1`).
+    assert_eq!(cues(&mut world).1, [0x1100, 0x1200, 0x1300]);
 
     segment(&mut world, (88, 352, Direction::Left), FB_HIT);
     assert!(flag(&world, 0x292), "the second hit");
     read_out(&mut world);
+    // The door opens (`COP 37 1A`); the friends' reaction fades to track 1
+    // (`COP 31 01`) and goes back to the map's (`COP 32 FF`).
+    let (tracks, sounds) = cues(&mut world);
+    assert_eq!(tracks, [1, 4]);
+    for sound in [0x1100, 0x1200, 0x1300, 0x001A] {
+        assert!(sounds.contains(&sound), "{sounds:x?}");
+    }
     assert!(world.patched_cells().contains(&(11, 21, 0xCB)));
 }
 
@@ -515,7 +542,9 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
         frames_until(&mut world, 10, |world| world.pad_locked());
         read_out(&mut world);
     }
+    cues(&mut world);
     let mut landings = Vec::new();
+    let mut heard = Vec::new();
     for (column, map) in [(None, 0x000E), (Some(104), 0x0020), (Some(360), 0x0021)] {
         if let Some(column) = column {
             while world.position().0 > column {
@@ -533,7 +562,17 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
             }
         }
         landings.push((world.map(), world.position()));
+        heard.push(cues(&mut world));
     }
+    // Selection 5 from E on; leaving plays `$4D`, landing on stairs `$17`.
+    assert_eq!(
+        heard,
+        [
+            (vec![6], vec![0x4D00, 0x1700]),
+            (vec![], vec![0x4D00, 0x1700]),
+            (vec![], vec![0x4D00, 0x1700])
+        ]
+    );
     assert_eq!(
         landings,
         [
@@ -603,6 +642,8 @@ fn the_box_warns_on_contact_then_opens_for_the_next_approach() {
         }
     }
     assert_eq!(opened, Some((136, 368)), "opened inside the gate");
+    // The frozen scene's `COP 38 $3737` (native `21-opening`).
+    assert!(cues(&mut world).1.contains(&0x3737));
     assert_eq!((world.map(), world.position()), (0x0021, (136, 368)));
     assert!(!flag(&world, 0x01), "reloaded: locals cleared");
     assert!(world.pad_locked(), "the mask survives the reload");
@@ -642,6 +683,7 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     let mut events = after_the_door();
     events[0x22 / 8] |= 1 << (0x22 % 8);
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
+    cues(&mut world);
     let mut reading_frames = 0;
     for _ in 0..2000 {
         let reading = world.dialogue().is_some() || world.in_scene();
@@ -655,6 +697,8 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     }
     assert_eq!((world.map(), world.position()), (0x0041, (136, 208)));
     assert_eq!(reading_frames, 14, "one A per page over the four requests");
+    // The box plays `$31` (`COP 30 31`, `$88:AE70`); `$41` selects `$1B`.
+    assert_eq!(cues(&mut world).0, [0x31, 0x1C]);
 }
 
 #[test]
@@ -748,12 +792,14 @@ fn a_door_opens_only_from_a_cell_aligned_position() {
     for (y, opens) in [(352, true), (356, false)] {
         let mut world = World::enter_with_events(image, 0x000C, 136, y, after_the_door()).unwrap();
         world.face(Direction::Up);
+        cues(&mut world);
         replay(&mut world, &[(4, 1), (5, 30)]);
         assert_eq!(
             world.patched_cells().contains(&(8, 20, 0xF7)),
             opens,
             "y {y}"
         );
+        assert_eq!(cues(&mut world).1 == [0x001A], opens, "`COP 37 1A`");
     }
 }
 
@@ -772,6 +818,7 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
         events[set / 8] |= 1 << (set % 8);
     }
     let mut world = World::enter_with_events(image, 0x0042, 136, 464, events).unwrap();
+    cues(&mut world);
     for (pad, frames) in [(2, 44), (1, 60), (2, 32), (1, 32), (3, 20), (1, 20)] {
         replay(&mut world, &[(pad, frames), (5, 12)]);
     }
@@ -803,6 +850,11 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
         }
     }
     assert_eq!(world.items(), [0x81], "the Crystal Spear");
+    // The fanfare (`COP 60`'s `$34`), the map's music again 420 frames
+    // later (`$84:BF0A`) -- entered here directly, `$42` selects nothing,
+    // so selection 0's track stands for `$41`'s -- and `$21`'s selection 5
+    // on the way back.
+    assert_eq!(cues(&mut world).0, [0x34, 0x01, 0x06]);
     assert_eq!((world.map(), world.position()), (0x0021, (136, 368)));
 }
 
@@ -984,6 +1036,7 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
         events[set / 8] |= 1 << (set % 8);
     }
     let mut world = World::enter_with_events(image, 0x000A, 504, 868, events).unwrap();
+    assert_eq!(cues(&mut world).0, [6], "the town after `$23`");
     for _ in 0..300 {
         world
             .update(Some(Direction::Down), Presses::default())
@@ -993,6 +1046,8 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
         }
     }
     assert_eq!((world.map(), world.position()), (0x0003, (536, 528)));
+    // The underworld selects 1.
+    assert_eq!(cues(&mut world), (vec![2], vec![0x4D00]));
     replay(&mut world, &[(5, 16)]);
     assert_eq!(world.position(), (536, 544), "underworld-arrival");
     // Crysta's rectangle on the plane leads back into the town.
