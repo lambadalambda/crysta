@@ -43,3 +43,5 @@
 - [ ] [Qualify native horizontal first8 dispatch](issues/qualify-horizontal-first8.md)
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
+- [ ] [Clip dialogue pages to their box](issues/clip-wide-dialogue-pages.md)
+- [ ] [Name the river test's inputs when they are missing](issues/name-river-test-inputs.md)
