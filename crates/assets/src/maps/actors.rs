@@ -119,7 +119,12 @@ impl SpawnRecord {
     /// Returns `None` when the field is not a ROM-backed address.
     #[must_use]
     pub fn script(&self) -> Option<u32> {
-        let field = self.bytes.get(4..7)?;
+        // An `FE` controller has no position bytes: its pointer is bytes 2..4.
+        let field = if self.opcode == 0xFE {
+            self.bytes.get(2..5)?
+        } else {
+            self.bytes.get(4..7)?
+        };
         let pointer =
             u32::from(field[0]) | (u32::from(field[1]) << 8) | (u32::from(field[2]) << 16);
         // A linear add, where the CPU would wrap within the bank. The two
@@ -248,6 +253,15 @@ impl SpawnList {
                     opcode,
                     tile_x: bytes[1],
                     tile_y: bytes[2],
+                    bytes: bytes.to_vec(),
+                    offset: cursor,
+                }),
+                // A script-only controller: implicit descriptor, spawned at
+                // (8,0) (`docs/house-scene.md`).
+                0xFE => records.push(SpawnRecord {
+                    opcode,
+                    tile_x: 0,
+                    tile_y: 0,
                     bytes: bytes.to_vec(),
                     offset: cursor,
                 }),

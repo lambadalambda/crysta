@@ -96,6 +96,10 @@ pub enum Conversation {
     },
 }
 
+/// The player's own `FD` record (`$84:A129`, entry `$84:A12E`): the host
+/// owns the player (`docs/house-scene.md`).
+const PLAYER: u32 = 0x84_A12E;
+
 /// Residents a map installs for a given event-flag state.
 ///
 /// The spawn list's own `$FA` conditions choose which records are installed.
@@ -137,7 +141,7 @@ pub fn residents(
                 hidden: false,
             }
         })
-        .filter(|resident| !despawns(image, resident, events))
+        .filter(|resident| resident.script != Some(PLAYER) && !despawns(image, resident, events))
         .collect())
 }
 

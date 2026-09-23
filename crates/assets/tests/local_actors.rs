@@ -668,3 +668,25 @@ fn a_chained_branch_carries_a_target_and_a_negated_word_ends_the_chain() {
         "the BRA back to the wait"
     );
 }
+
+#[test]
+fn map_0021_resolves_its_fe_entry_controller() {
+    // `docs/house-scene.md`: `$8392AD` FE, `$88AD84` -> `$88AD89`, at (8,0).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let flags = new_game_flags();
+    let active = SpawnList::resolve(
+        cartridge.image(),
+        0x0021,
+        assets::maps::scripts::EventFlags::Bitmap(&flags),
+    )
+    .unwrap();
+    let controller = active
+        .iter()
+        .find(|record| record.offset() == 0x03_92AD)
+        .expect("the FE record");
+    assert_eq!(controller.opcode(), 0xFE);
+    assert_eq!(controller.origin(), (8, 0));
+    assert_eq!(controller.script(), Some(0x88_AD89));
+}
