@@ -214,6 +214,14 @@ impl HouseDialogue {
             .find(|(source, _)| *source == text_source)
             .map(|(_, pages)| pages.as_slice())
     }
+    /// Decodes one admitted choice catalog directly from the ROM, for a
+    /// script's `COP 1A`.
+    ///
+    /// # Errors
+    /// Rejects catalogs other than 0 and 1 and malformed records.
+    pub fn choice_at(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError> {
+        decode_choice(image, catalog)
+    }
     /// Native event-level choice catalog; no event flags or branches are executed.
     #[must_use]
     pub fn choice(&self, catalog: u8) -> Option<&DialogueChoice> {
