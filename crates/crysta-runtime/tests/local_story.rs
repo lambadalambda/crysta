@@ -119,7 +119,7 @@ fn the_box_rooms_figure_stays_hidden_until_its_flag() {
     let (column, row) = figure.collision_cell();
     let cell = world.room().cells()
         [usize::from(row) * usize::from(world.dimensions().0) + usize::from(column)];
-    // A body's cell is written solid (attribute 14); this one stays floor.
+    // A marked cell is written solid (attribute 14); this one stays floor.
     assert_ne!(cell >> 9, 14, "a hidden body does not occupy its cell");
 }
 

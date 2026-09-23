@@ -549,13 +549,14 @@ fn walking_is_still_bounded_by_collision() {
 #[test]
 fn a_resident_who_is_a_body_stops_the_player() {
     // Occupancy blocks the collision cell, one row above the visual one,
-    // because movement samples at (x - 8, y - 16). It is applied on entry to
-    // residents that decode to a body, and to nobody else.
+    // because movement samples at (x - 8, y - 16). As natively, it is the
+    // cell the resident's script marks (`COP 3B`) in its first frame.
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
     let mut world = World::enter(image, 0x000B, 120, 112 + 16).unwrap();
+    world.step(None);
     let resident = world
         .residents()
         .iter()

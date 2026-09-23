@@ -318,6 +318,8 @@ pub struct Actor {
     pub walking: bool,
     /// Entity `+$04` bit 15: not drawn, not animated, not moved.
     pub hidden: bool,
+    /// Whether the actor has ever moved.
+    walked: bool,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -387,6 +389,7 @@ impl Actor {
             pose_age: 0,
             walking: false,
             hidden: false,
+            walked: false,
             pc,
             state,
             // A zero seed would stay zero.
@@ -498,6 +501,21 @@ impl Actor {
 
     /// Runs one frame.
     pub fn tick(&mut self, around: &mut Surroundings<'_>) {
+        let start = self.position;
+        self.frame(around);
+        self.walked |= self.walking || self.position != start;
+    }
+
+    /// Whether a body holds its own cell without a mark: a walker, whose
+    /// steps the runtime does not mark, or one whose script froze before it
+    /// could mark. A body whose script runs and marks nothing -- C's blue
+    /// door -- leaves its cell alone, as natively.
+    #[must_use]
+    pub const fn holds_its_cell(&self) -> bool {
+        self.walked || self.frozen_at.is_some()
+    }
+
+    fn frame(&mut self, around: &mut Surroundings<'_>) {
         self.cooldown = self.cooldown.saturating_sub(1);
         self.pose_age = self.pose_age.saturating_add(1);
         if matches!(self.state, State::Ordinary { ticks_left: 0, .. }) {
@@ -556,6 +574,13 @@ impl Actor {
     /// Sets the map `COP 0A`/`49` compare with.
     pub(crate) fn set_map(&mut self, map: u16) {
         self.map = map;
+    }
+
+    /// The actor with its cell marked, as `COP 3B` would; for tests.
+    #[cfg(test)]
+    pub(crate) fn marked(mut self) -> Self {
+        self.stamp = Some(self.collision_cell());
+        self
     }
 
     /// The cell `COP 3B` marked occupied, if one is.

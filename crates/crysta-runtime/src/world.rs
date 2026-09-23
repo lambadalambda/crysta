@@ -23,9 +23,9 @@ use std::fmt;
 pub struct World<'a> {
     image: &'a [u8],
     map: u16,
-    /// The map's room with the bodies present blocked in.
+    /// The map's room with the cells scripts marked blocked in.
     room: MapRoom,
-    /// The map's room as built, before any body is blocked in.
+    /// The map's room as built, before any cell is marked.
     base: MapRoom,
     exits: ExitList,
     walking: WalkingState,
@@ -36,7 +36,7 @@ pub struct World<'a> {
     residents: Vec<Resident>,
     /// The running script of each resident, aligned with `residents`.
     actors: Vec<Actor>,
-    /// Collision cells the bodies blocked when `room` was last rebuilt.
+    /// Collision cells marked when `room` was last rebuilt.
     blocked: Vec<(u16, u16)>,
     /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
     globals: Globals,
@@ -390,9 +390,9 @@ impl<'a> World<'a> {
     /// Runs every resident's script for one frame and moves bodies.
     ///
     /// Each actor sees the player's cell and every other body's cell and
-    /// destination as occupied, so nobody steps onto anybody. When a body's
+    /// destination as occupied, so nobody steps onto anybody. When a marked
     /// cell changes, the room is rebuilt from the base with the new cells
-    /// blocked, so the player is stopped by residents wherever they are.
+    /// blocked.
     fn run_actors(&mut self) -> Result<(), WorldError> {
         let (x, y) = self.position();
         for index in 0..self.actors.len() {
@@ -895,16 +895,18 @@ fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, W
     Ok(Some(Arrival::new(route)))
 }
 
-/// Cells that block the player: where each visible body stands, and the
-/// cell each visible actor without art marked with `COP 3B` -- D's hidden
-/// gate (`$88:A9B4`), which holds the house exit until `$26`.
+/// Cells that block the player: those visible actors' scripts marked
+/// (`COP 3B`, `COP 3D`), as natively (`$80:BE8E`), and the cells of bodies
+/// that [hold them](Actor::holds_its_cell) unmarked. C's blue door stands on
+/// its closed-door cell unmarked, which the pots' throw lane needs
+/// (`docs/pandora-pots.md`).
 fn blocking_cells(residents: &[Resident], actors: &[Actor]) -> Vec<(u16, u16)> {
     residents
         .iter()
         .zip(actors)
         .filter(|(resident, _)| !resident.hidden)
         .flat_map(|(resident, actor)| {
-            let own = if resident.body {
+            let own = if resident.body && actor.holds_its_cell() {
                 Some(resident.collision_cell())
             } else {
                 actor.stamp()
@@ -962,7 +964,8 @@ fn surroundings<'s>(
 }
 
 /// Cells one actor must not step into: the player's and every other body's,
-/// where it stands and where it is stepping.
+/// where it stands and where it is stepping. Wider than what blocks the
+/// player ([`blocking_cells`]): walkers keep clear of every body.
 fn occupied_by_others(
     actors: &[Actor],
     residents: &[Resident],
@@ -1007,17 +1010,15 @@ pub fn new_game_flags() -> Vec<u8> {
 
 /// Rebuilds a room with each resident's cell made solid.
 ///
-/// Applied by [`World::enter`] to residents that are bodies, and only those:
-/// a spawn list holds more than people, and making every record solid takes
-/// reachability from 19 maps to 2, because script-only records sit on the
-/// cells doorway approaches need. A record that decodes to art is a body.
+/// The world blocks the cells scripts mark instead ([`blocking_cells`]).
 ///
 /// The cell blocked is [`Resident::collision_cell`], not the visual one:
 /// movement samples at `(x - 8, y - 16)`.
 ///
 /// # Errors
 /// As [`World::enter`].
-pub fn occupy(built: MapRoom, present: &[Resident]) -> Result<MapRoom, WorldError> {
+#[cfg(test)]
+fn occupy(built: MapRoom, present: &[Resident]) -> Result<MapRoom, WorldError> {
     let cells: Vec<_> = present.iter().map(Resident::collision_cell).collect();
     occupy_cells(built, &cells)
 }
@@ -1274,7 +1275,7 @@ mod tests {
         // Invalid base metadata forces the rebuild to fail, not the walking step.
         world.base.width = 0;
         world.residents = vec![resident()];
-        world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+        world.actors = vec![Actor::new((24, 32), None, 0, 0).marked()];
         assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
     }
 
@@ -1288,7 +1289,7 @@ mod tests {
         }
         world.base.room = Room::new(8, 8, cells).unwrap();
         world.residents = vec![resident()];
-        world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+        world.actors = vec![Actor::new((24, 32), None, 0, 0).marked()];
         world.blocked = blocking_cells(&world.residents, &world.actors);
         world.room = occupy(world.base.clone(), &world.residents).unwrap();
         for _ in 0..2 {
@@ -1402,7 +1403,7 @@ mod tests {
             let mut world = synthetic_world();
             world.arrival = Some(Arrival::new(route));
             world.residents = vec![resident()];
-            world.actors = vec![Actor::new((24, 32), None, 0, 0)];
+            world.actors = vec![Actor::new((24, 32), None, 0, 0).marked()];
             world.blocked = blocking_cells(&world.residents, &world.actors);
             let mut strict = world.clone();
             for frame in 0..100 {

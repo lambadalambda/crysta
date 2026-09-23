@@ -135,8 +135,10 @@ D's hidden gate `$83:8CC8` (`$88:A9B4`: `COP 48 $8026`, `COP 3B`, `COP BC`,
 `RTL`) stamps the house exit cell `(7,44)` while `$26` is clear and deletes
 itself once it is set. It is load-time only, as natively: setting `$26`
 while D is loaded does not lift the stamp. The runtime blocks the player on
-every visible body's cell and on each artless actor's `COP 3B` stamp, and
-the host doorway action refuses a blocked cell. Before the Elder the player
+the cells visible actors mark (`COP 3B`/`3D`), as natively, and on the cells
+of bodies that have walked or whose script froze before it could mark. A
+standing body whose script marks nothing, as C's blue door, leaves its cell
+alone. The host doorway action refuses a blocked cell. Before the Elder the player
 reaches only the house (`$0B`–`$11`); after him the slice is as before.
 
 ## Open
