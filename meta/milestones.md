@@ -148,6 +148,16 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Native macOS window, renderer and gamepad for the Crysta slice](issues/crysta-native-shell.md)
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
+- [Play the Crysta story from the wake-up scene to the world map](issues/play-crysta-story.md)
+- [Run scene dialogue, choices and flags from scripts](issues/script-dialogue-choices.md)
+- [Play Elle's wake-up scene](issues/bedroom-wake-up-scene.md)
+- [Apply flag-gated doors, blockers and tile patches](issues/flag-gated-geometry.md)
+- [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
+- [Lift and throw pots to break the blue door](issues/pot-throw-door.md)
+- [Open the box in the cellar](issues/cellar-box-sequence.md)
+- [Play the tour inside the box and take the spear](issues/box-tour-and-spear.md)
+- [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
+- [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
