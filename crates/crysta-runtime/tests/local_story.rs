@@ -893,3 +893,74 @@ fn the_stairs_lead_back_up_from_the_box_room_to_c() {
         ]
     );
 }
+
+/// The story flags after the frozen return.
+fn after_the_return() -> Vec<u8> {
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244, 0x240, 0x241, 0x242, 0xFE, 0x23] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    events
+}
+
+#[test]
+fn the_elder_at_ds_door_sends_ark_out_with_21_and_296() {
+    // From C down into D (native `return-C-exit`), down to the Elder
+    // (`elder-approach`); talking at (x,704) sets `$21`, and after his pages
+    // and the answer `$296`. Ark then leaves D down into the town.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x000C, 184, 368, after_the_return()).unwrap();
+    replay(&mut world, &[(0, 34), (5, 12), (2, 44), (5, 12)]);
+    for _ in 0..120 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        if world.map() == 0x000D {
+            break;
+        }
+    }
+    assert_eq!(world.map(), 0x000D);
+    for _ in 0..300 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        if world.position().1 >= 704 {
+            break;
+        }
+    }
+    world.update(None, A).unwrap();
+    read_out(&mut world);
+    assert!(flag(&world, 0x21) && flag(&world, 0x296));
+    for _ in 0..120 {
+        world
+            .update(Some(Direction::Down), Presses::default())
+            .unwrap();
+        if world.map() == 0x000A {
+            break;
+        }
+    }
+    assert_eq!(world.map(), 0x000A, "out into the town");
+}
+
+#[test]
+fn the_town_scene_sets_3c_after_the_elders_mission() {
+    // The compact actor `$88:84EF` waits for `$296` without `$3C`, then
+    // locks the pad, speaks, sets `$3C` (`$88:8538`) and unlocks.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_return();
+    for set in [0x21, 0x296] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000A, 496, 752, events).unwrap();
+    world.update(None, Presses::default()).unwrap();
+    assert!(world.pad_locked(), "the scene holds Ark");
+    assert!(read_out(&mut world) > 0);
+    assert!(flag(&world, 0x3C));
+    assert!(!world.pad_locked());
+}

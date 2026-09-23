@@ -174,6 +174,11 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   `$FE` and `$23`, the pad unlocks and the guide leaves. The scene's player
   scripts (`COP DF`, `COP 84` streams) are not modelled: Ark stays at
   (136,368), natively (136,464). The whitening's six particles stay frozen.
+- **The Elder at D's door and the town scene**: after the return, talking to
+  the Elder at the door sets `$21`, and his pages and answer `$296`; in the
+  town the compact actor `$88:84EF` (`COP 09 $1296 $003C`) holds Ark, speaks
+  and sets `$3C`. Door arrivals still use the raw placement: in D Ark stands
+  8 pixels left of the native x.
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'
@@ -197,6 +202,9 @@ below the blue door; after him the slice is as before.
 
 Spawn lists also hold `FE` records: script-only controllers at (8,0) with
 their script at bytes 2..4 (`docs/house-scene.md`); the runtime runs them.
+`FB` compact actors run too (script at bytes 2..4, a three-byte header),
+except the engine's tile and palette animation services at `$87:98C2` and
+`$87:98EB`, which are display work.
 The `FD` record with `$84:A129` is the player's own and is skipped. Stairs
 (selector 14) settle at the raw anchor plus (8,16), and so do the stairs back
 up (selector 13), as natively into E and C (into `$20` natively (8,8)).
