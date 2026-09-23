@@ -43,3 +43,5 @@
 - [ ] [Qualify native horizontal first8 dispatch](issues/qualify-horizontal-first8.md)
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
+- [ ] [Clip the native Crysta camera to the source map region](issues/clip-native-crysta-camera.md)
+- [ ] [Add a 16:9 view to the native Crysta app](issues/native-crysta-widescreen.md)
