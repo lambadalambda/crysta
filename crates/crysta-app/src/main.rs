@@ -1312,6 +1312,13 @@ mod session_tests {
         session.fault = None;
         app.interaction.keyboard(true);
         app.advance();
+        // The doorway walks Ark out first; the load at its end fails.
+        for _ in 0..20 {
+            if app.session().fault.is_some() {
+                break;
+            }
+            app.advance();
+        }
         assert!(app.session().fault.is_some());
         let tick = app.session().tick;
         let background_tick = app.session().background_clock.tick();
