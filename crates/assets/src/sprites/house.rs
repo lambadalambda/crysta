@@ -6,7 +6,7 @@ use crate::{
     graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp},
     maps::{
         actor_script::{self, ScriptError},
-        actors::SpawnRecord,
+        actors::{parsed_before, SpawnRecord},
         scripts::EventFlags,
     },
 };
@@ -234,30 +234,26 @@ impl HouseActor {
     ///
     /// The list is decoded as a whole because a record may lean on the one
     /// before it: a descriptor of `$000000` reuses its resource, and graphics
-    /// of `$FFFF` reuse its graphics. The native loader always has that
-    /// predecessor; this one may have refused it, and then the reuse is
-    /// refused too rather than handed the last body that happened to decode.
-    /// Whether a `$00` or `$FD` record moves the native predecessor is not
-    /// established; here they do not. A `$00` record carries a descriptor
-    /// too, but every one in the slice has a movement-resource mode outside
-    /// the qualified set, so following it gains nothing and poisons three
-    /// more reuses.
+    /// of `$FFFF` reuse its graphics. That predecessor is the last record to
+    /// parse a descriptor, [`parsed_before`]: a `$00` record counts, a `$FD`
+    /// does not. `records` should be in executed order
+    /// ([`SpawnList::resolve`](crate::maps::actors::SpawnList::resolve)). The
+    /// native loader always has that predecessor; this one may have refused
+    /// it, including every `$00` record, and then the reuse is refused too
+    /// rather than handed the last body that happened to decode.
     pub fn from_records(
         image: &[u8],
         map: u16,
         records: &[SpawnRecord],
         mut pose: impl FnMut(&SpawnRecord) -> ResidentPose,
     ) -> Vec<Result<Self, RecordRefusal>> {
-        // Index in `out` of the last descriptor-bearing record, which is the
-        // predecessor a reuse reaches for, decoded or not.
-        let mut previous: Option<usize> = None;
         let mut out: Vec<Result<Self, RecordRefusal>> = Vec::with_capacity(records.len());
-        for record in records {
+        for (index, record) in records.iter().enumerate() {
             if record.opcode() != 1 || record.bytes().len() != 10 {
                 out.push(Err(RecordRefusal::NoDescriptor));
                 continue;
             }
-            let prior = previous.map(|index| out[index].as_ref());
+            let prior = parsed_before(records, index).map(|at| out[at].as_ref());
             let result = match prior {
                 Some(Err(_)) if reuses_predecessor(image, record.bytes()) => {
                     Err(RecordRefusal::PredecessorRefused)
@@ -267,7 +263,6 @@ impl HouseActor {
                         .map_err(RecordRefusal::Invalid)
                 }
             };
-            previous = Some(out.len());
             out.push(result);
         }
         out

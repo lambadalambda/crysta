@@ -216,9 +216,9 @@ impl Actor {
         let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
         actor.map = map;
         actor.cadence = resident
-            .body
-            .then(|| cadence::derive(image, map, resident.record).ok())
-            .flatten();
+            .descriptor
+            .filter(|_| resident.body)
+            .and_then(|descriptor| cadence::derive(image, descriptor).ok());
         actor
     }
 

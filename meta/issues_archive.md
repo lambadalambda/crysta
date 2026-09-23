@@ -103,3 +103,4 @@
 - [x] [Execute counted loops, timed waits and the map branch in resident scripts](issues/execute-script-loops-and-waits.md)
 - [x] [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)
 - [x] [Fix stale evidence paths in the cadence tool README](issues/fix-cadence-tool-readme-paths.md)
+- [x] [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)

@@ -312,24 +312,27 @@ impl Body {
 
 /// Bodies for each resident of a map, aligned with `present`.
 ///
-/// Records are decoded in spawn-list order, present or not, because a record
-/// may reuse the resource or graphics of the record before it; the loader
-/// owns that chain and refuses a reuse whose predecessor it refused.
+/// Records are decoded in the order the stream executed them under the
+/// flags at map entry, `spawned`, because a record may reuse the resource or
+/// graphics of the record parsed before it; the loader owns that chain and
+/// refuses a reuse whose predecessor it refused. Poses follow `events`, the
+/// flags now, which a conversation may have changed since.
 #[must_use]
 pub fn residents_art(
     image: &[u8],
     map: u16,
     present: &[Resident],
+    spawned: EventFlags<'_>,
     events: EventFlags<'_>,
 ) -> Vec<Result<Body, Placeholder>> {
-    let Ok(list) = SpawnList::from_rom(image, map) else {
+    let Ok(list) = SpawnList::resolve(image, map, spawned) else {
         return present
             .iter()
             .map(|_| Err(Placeholder::Refused("spawn list refused".into())))
             .collect();
     };
     let mut decoded: Vec<Option<Result<HouseActor, RecordRefusal>>> =
-        HouseActor::from_records(image, map, list.records(), |record| {
+        HouseActor::from_records(image, map, &list, |record| {
             ResidentPose::from_script(image, record, events).unwrap_or_default()
         })
         .into_iter()
@@ -339,7 +342,6 @@ pub fn residents_art(
         .iter()
         .map(|resident| {
             let found = list
-                .records()
                 .iter()
                 .position(|record| record.offset() == resident.record)
                 .and_then(|index| decoded[index].take());

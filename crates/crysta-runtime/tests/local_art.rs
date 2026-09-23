@@ -99,7 +99,13 @@ fn the_documented_resident_has_art_and_the_slice_mostly_does() {
     let image = cartridge.image();
     let flags = new_game();
     let present = residents(image, 0x000B, EventFlags::Bitmap(&flags)).unwrap();
-    let art = residents_art(image, 0x000B, &present, EventFlags::Bitmap(&flags));
+    let art = residents_art(
+        image,
+        0x000B,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
     let index = present
         .iter()
         .position(|resident| resident.position == (120, 112))
@@ -117,7 +123,13 @@ fn the_documented_resident_has_art_and_the_slice_mostly_does() {
     let (mut drawn, mut invisible, mut placeholders, mut total) = (0, 0, 0, 0);
     for map in MAPS {
         let present = residents(image, map, EventFlags::Bitmap(&flags)).unwrap_or_default();
-        for entry in residents_art(image, map, &present, EventFlags::Bitmap(&flags)) {
+        for entry in residents_art(
+            image,
+            map,
+            &present,
+            EventFlags::Bitmap(&flags),
+            EventFlags::Bitmap(&flags),
+        ) {
             total += 1;
             match entry {
                 Ok(_) => drawn += 1,
@@ -140,7 +152,13 @@ fn exterior_bird_root_and_three_reuses_draw_without_placeholders() {
     let image = cartridge.image();
     let flags = new_game();
     let present = residents(image, 0x000A, EventFlags::Bitmap(&flags)).unwrap();
-    let art = residents_art(image, 0x000A, &present, EventFlags::Bitmap(&flags));
+    let art = residents_art(
+        image,
+        0x000A,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
     for offset in [0x03_8A19, 0x03_8A23, 0x03_8A2D, 0x03_8A37] {
         let index = present.iter().position(|r| r.record == offset).unwrap();
         let body = art[index].as_ref().unwrap_or_else(|error| {
@@ -170,11 +188,10 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
     mutated[0x03_ED3A] = 0x21;
     let image = mutated.as_slice();
     let flags = new_game();
-    // Every record, whether the flags would install it or not: the reuse
-    // chain is a property of the list, not of who is present.
-    let everyone: Vec<Resident> = SpawnList::from_rom(image, 0x000A)
+    // Every record the stream runs, present after its script or not: the
+    // reuse chain is a property of the executed list, not of who is present.
+    let everyone: Vec<Resident> = SpawnList::resolve(image, 0x000A, EventFlags::Bitmap(&flags))
         .unwrap()
-        .records()
         .iter()
         .map(|record| Resident {
             position: record.origin(),
@@ -186,9 +203,16 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             hflip: false,
             pose_age: 0,
             walking: false,
+            descriptor: None,
         })
         .collect();
-    let art = residents_art(image, 0x000A, &everyone, EventFlags::Bitmap(&flags));
+    let art = residents_art(
+        image,
+        0x000A,
+        &everyone,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
     let mut seen = 0;
     for (resident, entry) in everyone.iter().zip(&art) {
         if [0x03_8A23, 0x03_8A2D, 0x03_8A37].contains(&resident.record) {
@@ -219,7 +243,13 @@ fn a_four_record_resident_cycles_by_duration() {
     let image = cartridge.image();
     let flags = new_game();
     let present = residents(image, 0x000C, EventFlags::Bitmap(&flags)).unwrap();
-    let art = residents_art(image, 0x000C, &present, EventFlags::Bitmap(&flags));
+    let art = residents_art(
+        image,
+        0x000C,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
     let animated = art
         .iter()
         .filter_map(|entry| entry.as_ref().ok())
@@ -267,7 +297,13 @@ fn a_walking_resident_shows_walking_sequences_the_packet_holds() {
     let image = cartridge.image();
     let flags = new_game();
     let present = residents(image, 0x000D, EventFlags::Bitmap(&flags)).unwrap();
-    let art = residents_art(image, 0x000D, &present, EventFlags::Bitmap(&flags));
+    let art = residents_art(
+        image,
+        0x000D,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
     let index = present
         .iter()
         .position(|resident| resident.record == 0x03_8CB4)
@@ -282,4 +318,39 @@ fn a_walking_resident_shows_walking_sequences_the_packet_holds() {
             "sequence {selector}"
         );
     }
+}
+
+#[test]
+fn a_roster_keeps_its_bodies_after_a_conversation_changes_the_flags() {
+    // The roster spawned under the entry flags; a conversation may flip a
+    // flag that sends the spawn stream down another branch. Art for the
+    // same roster must still find every record in the entry's order.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let entry = new_game();
+    let later = vec![0xFFu8; 512];
+    let mut checked = 0;
+    for map in 0x000A..=0x0021 {
+        let present = residents(image, map, EventFlags::Bitmap(&entry)).unwrap();
+        let art = residents_art(
+            image,
+            map,
+            &present,
+            EventFlags::Bitmap(&entry),
+            EventFlags::Bitmap(&later),
+        );
+        for (resident, body) in present.iter().zip(&art) {
+            if resident.body {
+                checked += 1;
+                assert!(
+                    !matches!(body, Err(Placeholder::Invisible)),
+                    "map {map:#06x} record {:06X}",
+                    resident.record
+                );
+            }
+        }
+    }
+    assert!(checked > 20);
 }

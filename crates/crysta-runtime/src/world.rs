@@ -39,6 +39,8 @@ pub struct World<'a> {
     blocked: Vec<(u16, u16)>,
     /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
     events: Vec<u8>,
+    /// The bitmap at map entry, which decided the spawn stream's branches.
+    spawn_events: Vec<u8>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -222,6 +224,7 @@ impl<'a> World<'a> {
             residents: present,
             actors,
             blocked,
+            spawn_events: events.clone(),
             events,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -435,6 +438,13 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn events(&self) -> &[u8] {
         &self.events
+    }
+
+    /// The event-flag bitmap at map entry, which decided who spawned and in
+    /// what order; see [`crate::art::residents_art`].
+    #[must_use]
+    pub fn spawn_events(&self) -> &[u8] {
+        &self.spawn_events
     }
 
     /// Talks to the resident the player is facing, if there is one.
@@ -729,6 +739,7 @@ mod tests {
             hflip: false,
             pose_age: 0,
             walking: false,
+            descriptor: None,
         }
     }
 
@@ -755,6 +766,7 @@ mod tests {
             actors: vec![],
             blocked: vec![],
             events: new_game_flags(),
+            spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: true,

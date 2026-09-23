@@ -94,7 +94,9 @@ waits, other classes/private resources, native RNG or callback execution.
 ## Every slice walker
 
 The class is **descriptor mode `& $0F`** (`$80:FAA4`); a zero descriptor
-pointer reuses the previous record's class, base and packet. `$80:8F32`
+pointer reuses the class, base and packet of the last executed `$00`/`$01`
+record that parsed one (`$FD`/`$FE` records never do;
+`assets::maps::actors::descriptor_owner`). `$80:8F32`
 picks the movement row by `class & ~3` and `$80:8F85` the idle count by
 `class & 3`. The runtime admits the class-0 row on the common `$6000` base
 and derives, per resident: walk ticks = the direction's walking list (sum of

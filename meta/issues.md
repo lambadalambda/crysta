@@ -44,4 +44,3 @@
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
 - [ ] [Model the COP 8E pose wait from source](issues/model-pose-wait-service.md)
-- [ ] [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)

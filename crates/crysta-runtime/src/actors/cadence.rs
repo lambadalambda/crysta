@@ -6,7 +6,7 @@
 //! base is admitted, which moves 0.5 px per tick. Anything else keeps the
 //! actor's approximate projection.
 use assets::compression::decode;
-use assets::maps::actors::SpawnList;
+use assets::maps::actors::rom_offset as offset;
 use room_core::Direction;
 
 /// Ticks of one COP26 action, by the source chain of one resident.
@@ -27,7 +27,7 @@ impl Cadence {
 /// Why a resident keeps the approximate projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Refusal {
-    /// Not a `$01` record with a descriptor or an audited reuse of one.
+    /// The descriptor or its packet pointer is not readable ROM.
     Descriptor,
     /// `class & !3` selects a movement row other than class 0's.
     MovementRow(u8),
@@ -51,9 +51,13 @@ const IDLE_TABLE: [u8; 32] = [
     5, 1,
 ];
 
-/// Derives the resident's action timing, or says why it cannot.
-pub(super) fn derive(image: &[u8], map: u16, record: usize) -> Result<Cadence, Refusal> {
-    let (packet, mode) = descriptor(image, map, record).ok_or(Refusal::Descriptor)?;
+/// Derives the action timing of a resident built from the descriptor at
+/// `descriptor` (its own or the one it reuses), or says why it cannot.
+pub(super) fn derive(image: &[u8], descriptor: usize) -> Result<Cadence, Refusal> {
+    let (packet, mode) = image
+        .get(descriptor..descriptor + 4)
+        .and_then(|bytes| Some((offset(&bytes[..3])?, bytes[3])))
+        .ok_or(Refusal::Descriptor)?;
     // `$80:FAA4`: class = mode & $0F. `$80:FAAF..FABD`: base $4000 + (mode & $70) << 8.
     let class = mode & 0x0F;
     if class & !3 != 0 {
@@ -99,41 +103,6 @@ pub(super) fn derive(image: &[u8], map: u16, record: usize) -> Result<Cadence, R
         walk,
         idle: idles[0],
     })
-}
-
-/// The record's composition packet offset and descriptor mode byte.
-fn descriptor(image: &[u8], map: u16, record: usize) -> Option<(usize, u8)> {
-    let list = SpawnList::from_rom(image, map).ok()?;
-    let records: Vec<(u8, usize, &[u8])> = list
-        .records()
-        .iter()
-        .map(|r| (r.opcode(), r.offset(), r.bytes().get(7..10).unwrap_or(&[])))
-        .collect();
-    let at = offset(owner(&records, record)?)?;
-    let bytes = image.get(at..at + 4)?;
-    Some((offset(&bytes[..3])?, bytes[3]))
-}
-
-/// The descriptor pointer a record's actor is built from.
-///
-/// A zero pointer reuses the previous record's class, base and packet
-/// (`$80:FAF9..FB1A`). Only a chain of `$01` records back to the last one
-/// with a descriptor is followed. The sprite loader (`HouseActor::from_records`)
-/// instead steps over `$00`/`$FD` records; whether those move the native
-/// predecessor is not established, so here they refuse.
-fn owner<'a>(records: &[(u8, usize, &'a [u8])], record: usize) -> Option<&'a [u8]> {
-    let index = records.iter().position(|r| r.1 == record)?;
-    let first = records[..=index].iter().rposition(|r| r.2 != [0, 0, 0])?;
-    let chain = &records[first..=index];
-    (chain.iter().all(|r| r.0 == 1 && r.2.len() == 3)).then_some(records[first].2)
-}
-
-/// Normalized offset of a long ROM pointer: `$80..$BF:8000..FFFF` or `$C0..$FF`.
-fn offset(pointer: &[u8]) -> Option<usize> {
-    let bank = *pointer.get(2)?;
-    let address = u16::from_le_bytes([*pointer.first()?, *pointer.get(1)?]);
-    (bank >= 0xC0 || (bank >= 0x80 && address >= 0x8000))
-        .then_some(usize::from(bank & 0x3F) << 16 | usize::from(address))
 }
 
 fn display_lists(image: &[u8], packet: usize) -> Option<[u16; 6]> {
@@ -222,33 +191,6 @@ pub(super) fn benign_skipped_service(image: &[u8], pc: usize) -> bool {
 mod tests {
     use super::*;
 
-    #[test]
-    fn a_zero_descriptor_reuses_only_through_plain_records() {
-        let own: &[u8] = &[0x37, 0xED, 0x83];
-        let none: &[u8] = &[0, 0, 0];
-        let records = [
-            (1, 10, own),
-            (1, 20, none),
-            (1, 30, none),
-            (0xFD, 40, none),
-            (1, 50, none),
-        ];
-        assert_eq!(owner(&records, 10), Some(own));
-        assert_eq!(owner(&records, 30), Some(own));
-        // An `$FD` in the chain, a record not in the list, no owner at all.
-        assert_eq!(owner(&records, 50), None);
-        assert_eq!(owner(&records, 60), None);
-        assert_eq!(owner(&records[1..3], 30), None);
-        assert_eq!(offset(&[0x37, 0xED, 0x83]), Some(0x03_ED37));
-        assert_eq!(offset(&[0x22, 0x10, 0xD8]), Some(0x18_1022));
-        assert_eq!(
-            offset(&[0x00, 0x70, 0x83]),
-            None,
-            "below $8000 in a LoROM-style bank"
-        );
-        assert_eq!(offset(&[0, 0x80, 0x7E]), None);
-    }
-
     /// A body whose six lists hold the given raw durations.
     fn body(lists: [&[u8]; 6]) -> Vec<u8> {
         let mut body = vec![0; 12];
@@ -336,18 +278,29 @@ mod tests {
             ),
             (0x1B, 0x03_90F7, class_zero),
         ] {
+            let resident = residents(&image, map)
+                .into_iter()
+                .find(|resident| resident.record == record)
+                .unwrap();
             assert_eq!(
-                derive(&image, map, record),
+                derive(&image, resident.descriptor.unwrap()),
                 Ok(expected),
                 "{map:#x} {record:06X}"
             );
         }
+        // The two class-2 records without a descriptor take `$8A19`'s.
+        let town = residents(&image, 0xA);
+        for record in [0x03_8A19, 0x03_8A23, 0x03_8A2D] {
+            let resident = town
+                .iter()
+                .find(|resident| resident.record == record)
+                .unwrap();
+            assert_eq!(resident.descriptor, Some(0x03_ED37));
+        }
         // No other drawn resident in the slice runs COP26 then COP8F.
-        let flags = crate::world::new_game_flags();
-        let events = assets::maps::scripts::EventFlags::Bitmap(&flags);
         let mut walkers = 0;
         for map in 0xA..=0x21 {
-            for resident in crate::residents::residents(&image, map, events).unwrap() {
+            for resident in residents(&image, map) {
                 let Some(script) = resident.script.filter(|_| resident.body) else {
                     continue;
                 };
@@ -357,14 +310,20 @@ mod tests {
                     .any(|w| w[..2] == [2, 0x26] && w[6..] == [2, 0x8F]);
                 if walks {
                     walkers += 1;
-                    assert!(derive(&image, map, resident.record).is_ok(), "{map:#x}");
+                    let descriptor = resident.descriptor.unwrap();
+                    assert!(derive(&image, descriptor).is_ok(), "{map:#x}");
                 }
             }
         }
         assert_eq!(walkers, 8);
-        // A record outside the map's list, or an invisible `$FD` record.
-        assert_eq!(derive(&image, 0xA, 0x03_8CB4), Err(Refusal::Descriptor));
-        assert_eq!(derive(&image, 0xF, 0x03_8D4F), Err(Refusal::Descriptor));
+        // Bytes that are no descriptor: a pointer outside ROM.
+        assert_eq!(derive(&image, 0), Err(Refusal::Descriptor));
+    }
+
+    fn residents(image: &[u8], map: u16) -> Vec<crate::residents::Resident> {
+        let flags = crate::world::new_game_flags();
+        let events = assets::maps::scripts::EventFlags::Bitmap(&flags);
+        crate::residents::residents(image, map, events).unwrap()
     }
 
     #[test]
@@ -375,7 +334,7 @@ mod tests {
         let changed = |at: usize, value: u8| {
             let mut copy = image.clone();
             copy[at] = value;
-            derive(&copy, 0xD, 0x03_8CB4)
+            derive(&copy, 0x03_EDEB)
         };
         // Mode $24 is class 4, the 1 px/tick row; $30 a private resource.
         assert_eq!(changed(0x03_EDEE, 0x24), Err(Refusal::MovementRow(4)));
@@ -389,12 +348,6 @@ mod tests {
             assert_eq!(changed(at, image[at] ^ 2), Err(Refusal::Tables), "{at:06X}");
         }
         assert_eq!(changed(0x18_1022, 0xFF), Err(Refusal::Lists));
-        let no_descriptor = {
-            let mut copy = image.clone();
-            copy[0x03_8CBB..0x03_8CBE].fill(0);
-            derive(&copy, 0xD, 0x03_8CB4)
-        };
-        // The chain back reaches map D's `$FD` record at `$83:8CA3`.
-        assert_eq!(no_descriptor, Err(Refusal::Descriptor));
+        assert_eq!(changed(0x03_EDED, 0x70), Err(Refusal::Descriptor));
     }
 }

@@ -481,7 +481,8 @@ impl Session {
         );
         if stale {
             let events = assets::maps::scripts::EventFlags::Bitmap(self.world.events());
-            let art = residents_art(self.image, map, self.world.residents(), events);
+            let spawned = assets::maps::scripts::EventFlags::Bitmap(self.world.spawn_events());
+            let art = residents_art(self.image, map, self.world.residents(), spawned, events);
             self.art = Some((map, records, self.world.events().to_vec(), art));
         }
     }

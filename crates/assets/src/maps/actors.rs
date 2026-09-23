@@ -95,6 +95,13 @@ impl SpawnRecord {
     pub const fn offset(&self) -> usize {
         self.offset
     }
+    /// Normalized ROM offset of the record's own resource descriptor, when
+    /// its pointer names ROM (`$80..$BF:8000..FFFF` or `$C0..$FF`). A reusing
+    /// record has none; see [`descriptor_owner`].
+    #[must_use]
+    pub fn descriptor_offset(&self) -> Option<usize> {
+        rom_offset(self.bytes.get(7..10).filter(|_| self.opcode <= 1)?)
+    }
     /// Runtime address of the actor script this record installs.
     ///
     /// The record's pointer field is followed by a five-byte header, so the
@@ -384,5 +391,154 @@ fn record_length(image: &[u8], at: usize, opcode: u8, selector: u8) -> Option<us
             })
         }
         _ => None,
+    }
+}
+
+/// Index of the record whose resource descriptor the record at `index` is
+/// built from: its own, or the one a zero pointer reuses.
+///
+/// `records` must be in the order the stream executes them, as
+/// [`SpawnList::resolve`] returns them: `$FA` branches decide which records
+/// run. A `$00` or `$01` record parses its descriptor at `$80:FA65`; a
+/// pointer whose address word is zero instead reuses the last parsed class,
+/// movement base, palette and packet (`$80:FAF9..FB1A`). `$FD` and `$FE`
+/// records never touch that state. A descriptor in a bank at or above `$90`
+/// skips the parse, which is not followed here.
+#[must_use]
+pub fn descriptor_owner(records: &[SpawnRecord], index: usize) -> Option<usize> {
+    match parse(records.get(index)?) {
+        Parse::Own => Some(index),
+        Parse::Reuse => parsed_before(records, index),
+        Parse::None | Parse::Unknown => None,
+    }
+}
+
+/// Index of the last record before `index` that parsed a descriptor of its
+/// own, which a reuse at `index` would take. See [`descriptor_owner`].
+#[must_use]
+pub fn parsed_before(records: &[SpawnRecord], index: usize) -> Option<usize> {
+    for at in (0..index.min(records.len())).rev() {
+        match parse(&records[at]) {
+            Parse::Own => return Some(at),
+            Parse::Unknown => return None,
+            Parse::Reuse | Parse::None => {}
+        }
+    }
+    None
+}
+
+/// What a record does to the reuse state.
+enum Parse {
+    /// Parses a descriptor of its own.
+    Own,
+    /// Reuses the last parsed one: an address word of zero.
+    Reuse,
+    /// Leaves it alone: `$FD`/`$FE`.
+    None,
+    /// Not followed here: a bank at or above `$90`, which skips the parse,
+    /// or a record whose length is not the ten bytes the layout is known for.
+    Unknown,
+}
+
+fn parse(record: &SpawnRecord) -> Parse {
+    if record.opcode() > 1 {
+        return Parse::None;
+    }
+    match record.bytes() {
+        bytes if bytes.len() != 10 || bytes[9] >= 0x90 => Parse::Unknown,
+        [.., 0, 0, _] => Parse::Reuse,
+        _ => Parse::Own,
+    }
+}
+
+/// Normalized offset of a long ROM pointer: `$80..$BF:8000..FFFF` or
+/// `$C0..$FF`; `None` for anything else, such as RAM.
+#[must_use]
+pub fn rom_offset(pointer: &[u8]) -> Option<usize> {
+    let [low, high, bank] = *pointer else {
+        return None;
+    };
+    let address = u16::from_le_bytes([low, high]);
+    (bank >= 0xC0 || (bank >= 0x80 && address >= 0x8000))
+        .then_some(usize::from(bank & 0x3F) << 16 | usize::from(address))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn record(opcode: u8, offset: usize, descriptor: [u8; 3]) -> SpawnRecord {
+        let mut bytes = vec![opcode, 0, 0, 0, 0, 0x80, 0x88];
+        bytes.extend_from_slice(&descriptor);
+        SpawnRecord {
+            opcode,
+            tile_x: 0,
+            tile_y: 0,
+            bytes,
+            offset,
+        }
+    }
+
+    #[test]
+    fn a_zero_descriptor_reuses_the_last_parsed_one() {
+        let own = [0x37, 0xED, 0x83];
+        let other = [0x7E, 0xEC, 0x83];
+        let none = [0, 0, 0];
+        let fd = SpawnRecord {
+            bytes: vec![0xFD, 0, 0],
+            ..record(0xFD, 0, none)
+        };
+        let records = [
+            record(1, 0, own),
+            record(1, 1, none),
+            fd,
+            record(1, 3, none),
+            record(0, 4, other),
+            record(1, 5, none),
+        ];
+        // A record with its own descriptor owns it; reuse carries back
+        // through reusing records and over `$FD`, which never parses one.
+        assert_eq!(descriptor_owner(&records, 0), Some(0));
+        assert_eq!(descriptor_owner(&records, 1), Some(0));
+        assert_eq!(descriptor_owner(&records, 3), Some(0));
+        // A `$00` record parses its descriptor exactly as `$01` does.
+        assert_eq!(descriptor_owner(&records, 4), Some(4));
+        assert_eq!(descriptor_owner(&records, 5), Some(4));
+        // An `$FD` has no descriptor of its own.
+        assert_eq!(descriptor_owner(&records, 2), None);
+        assert_eq!(descriptor_owner(&records, 9), None);
+        // Nothing parsed before the first reuse.
+        assert_eq!(descriptor_owner(&records[1..], 0), None);
+        // A bank at or above `$90` skips the parse; not followed here.
+        let far = [
+            record(1, 0, own),
+            record(1, 1, [0, 0x80, 0x90]),
+            record(1, 2, none),
+        ];
+        assert_eq!(descriptor_owner(&far, 2), None);
+        assert_eq!(descriptor_owner(&far, 1), None);
+        // What a record at `index` would reuse, whatever it carries itself.
+        assert_eq!(parsed_before(&records, 0), None);
+        assert_eq!(parsed_before(&records, 3), Some(0));
+        assert_eq!(parsed_before(&records, 4), Some(0));
+        assert_eq!(parsed_before(&records, 5), Some(4));
+        assert_eq!(parsed_before(&records, 99), Some(4));
+        assert_eq!(records[0].descriptor_offset(), Some(0x03_ED37));
+        assert_eq!(records[1].descriptor_offset(), None);
+        assert_eq!(record(1, 0, [0, 0x70, 0x83]).descriptor_offset(), None);
+        assert_eq!(
+            record(1, 0, [0x22, 0x10, 0xD8]).descriptor_offset(),
+            Some(0x18_1022)
+        );
+        assert_eq!(rom_offset(&[0, 0x80, 0x7E]), None);
+        assert_eq!(rom_offset(&[0, 0x80]), None);
+        // A record longer than ten bytes stops the chain like a far bank.
+        let long = SpawnRecord {
+            bytes: [record(1, 0, own).bytes, vec![0; 6]].concat(),
+            ..record(1, 1, own)
+        };
+        let chain = [record(1, 0, own), long, record(1, 2, none)];
+        assert_eq!(descriptor_owner(&chain, 2), None);
+        assert_eq!(descriptor_owner(&chain, 1), None);
     }
 }

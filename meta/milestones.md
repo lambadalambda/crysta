@@ -149,7 +149,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Solid residents, the bedroom start, and resident animation](issues/crysta-solid-animated-residents.md)
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [Model the COP 8E pose wait from source](issues/model-pose-wait-service.md)
-- [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

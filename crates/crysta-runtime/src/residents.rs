@@ -6,7 +6,7 @@
 //! something a runtime can put in a room.
 
 use assets::maps::actor_script::{self, ScriptEffects};
-use assets::maps::actors::{ResolveError, SpawnList};
+use assets::maps::actors::{descriptor_owner, ResolveError, SpawnList};
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{HouseActor, ResidentPose};
 use assets::text::{DialoguePage, HouseDialogue};
@@ -34,6 +34,9 @@ pub struct Resident {
     pub pose_age: u32,
     /// Whether a step is under way.
     pub walking: bool,
+    /// Normalized offset of the resource descriptor the actor is built
+    /// from: the record's own, or the one a zero pointer reuses.
+    pub descriptor: Option<usize>,
 }
 
 impl Resident {
@@ -105,23 +108,16 @@ pub fn residents(
     map: u16,
     events: EventFlags<'_>,
 ) -> Result<Vec<Resident>, ResolveError> {
+    // In executed order, which decides what a zero descriptor reuses.
     let present = SpawnList::resolve(image, map, events)?;
-    // Bodies are decided over the whole list, present or not, because a
-    // record may reuse the resource of the record before it.
-    let list = SpawnList::from_rom(image, map).map_err(ResolveError::Decode)?;
-    let decoded = HouseActor::from_records(image, map, list.records(), |record| {
+    let decoded = HouseActor::from_records(image, map, &present, |record| {
         ResidentPose::from_script(image, record, events).unwrap_or_default()
     });
-    let decoded_for = |offset: usize| {
-        list.records()
-            .iter()
-            .position(|record| record.offset() == offset)
-            .and_then(|index| decoded[index].as_ref().ok())
-    };
     Ok(present
         .iter()
-        .map(|record| {
-            let actor = decoded_for(record.offset());
+        .enumerate()
+        .map(|(index, record)| {
+            let actor = decoded[index].as_ref().ok();
             let initial = actor.map_or(0, HouseActor::initial);
             Resident {
                 position: record.origin(),
@@ -133,6 +129,8 @@ pub fn residents(
                 hflip: false,
                 pose_age: 0,
                 walking: false,
+                descriptor: descriptor_owner(&present, index)
+                    .and_then(|owner| present[owner].descriptor_offset()),
             }
         })
         .filter(|resident| !despawns(image, resident, events))
