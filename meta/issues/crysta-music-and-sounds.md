@@ -32,3 +32,9 @@ in scenes, and plays sound effects from scripts and the player code.
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Base: `tools/native-music-qualification/README.md` (selection 3 upload and
   port protocol), [reverse the audio protocol](reverse-audio-protocol.md).
+
+## Progress
+
+- The three sub-issues are done (2026-09-23): the runtime cues tracks and
+  sound effects (`crysta_runtime::audio`), the app plays them through the
+  driver. Open: the text window's blips (`$28`/`$25`), and a playtest.

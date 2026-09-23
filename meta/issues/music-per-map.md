@@ -21,3 +21,12 @@ only selection 3.
 ## Notes
 
 - Parent: [Play the slice's music and sound effects](crysta-music-and-sounds.md)
+
+## Resolution
+
+- `crysta_runtime::audio::map_selection` reads the loading script's last
+  `08 FC` with the load's flags; the world cues track `n + 1` unless it is
+  the one loaded (`$86:9145`). The app extracts any track from the table
+  `$96:F2A0` and switches through the driver (`F0`, uploads, `F4`).
+- Story tests pin the bedroom (track 4), E and the town after `$23` (6),
+  `$41` (`$1C`) and the underworld (2).

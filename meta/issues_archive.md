@@ -113,3 +113,6 @@
 - [x] [Play the tour inside the box and take the spear](issues/box-tour-and-spear.md)
 - [x] [Let Ark walk in the box's rooms after an arch](issues/box-rooms-hang.md)
 - [x] [Let the friend at the blue door step aside](issues/blue-door-friend-steps-aside.md)
+- [x] [Select music per map load](issues/music-per-map.md)
+- [x] [Change music in scenes](issues/music-in-scenes.md)
+- [x] [Play sound effects](issues/sound-effects.md)
