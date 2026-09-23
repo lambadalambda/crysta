@@ -12,11 +12,15 @@ use std::collections::BTreeMap;
 /// Scratch words by address.
 pub type Scratch = BTreeMap<u16, u16>;
 
-/// Words scripts use as their own variables, with the evidence.
-const SCRATCH: [(u16, u16); 2] = [
+/// Words runs may use: scripts' own variables, and one engine word the
+/// runtime does not read. With the evidence.
+const SCRATCH: [(u16, u16); 3] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
+    // An engine word the runtime does not read: the spear's grant sets and
+    // clears its bit 8 (`$89:DA96`, `$89:DA31`); bit 15 places windows.
+    (0x048A, 0x048B),
 ];
 
 /// Instructions one run may take.
@@ -79,6 +83,18 @@ pub(super) fn run(image: &[u8], at: usize, words: &mut Scratch) -> Option<usize>
                     word.wrapping_sub(1)
                 };
                 set(*word);
+                pc + 3
+            }
+            // TSB / TRB absolute: Z from `A & word`.
+            0x0C | 0x1C => {
+                let (address, a) = (address()?, a?);
+                let word = words.entry(address).or_insert(0);
+                zero = Some(*word & a == 0);
+                *word = if opcode == 0x0C {
+                    *word | a
+                } else {
+                    *word & !a
+                };
                 pc + 3
             }
             // LDA / CMP immediate, CMP absolute.
@@ -176,6 +192,20 @@ mod tests {
         assert_eq!(words.get(&0x0440), Some(&0));
         words.insert(0x04BC, 1);
         assert_eq!(run(&image, AT + 6, &mut words), Some(AT + 14));
+    }
+
+    #[test]
+    fn tsb_and_trb_set_and_clear_bits_of_048a() {
+        // LDA #$0100; TSB $048A; COP; then LDA #$0100; TRB $048A; COP.
+        let code = [
+            0xA9, 0x00, 0x01, 0x0C, 0x8A, 0x04, 0x02, 0xA9, 0x00, 0x01, 0x1C, 0x8A, 0x04, 0x02,
+        ];
+        let image = image(&code);
+        let mut words = BTreeMap::from([(0x048A, 0x8000)]);
+        assert_eq!(run(&image, AT, &mut words), Some(AT + 6));
+        assert_eq!(words.get(&0x048A), Some(&0x8100));
+        assert_eq!(run(&image, AT + 7, &mut words), Some(AT + 13));
+        assert_eq!(words.get(&0x048A), Some(&0x8000));
     }
 
     #[test]

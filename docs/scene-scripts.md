@@ -36,6 +36,7 @@ callback on a confirm press when nothing else owns the window.
 | COP | Handler | Operands | Runtime behaviour |
 |---|---|---|---|
 | `1B` | `$80:8BEB` | text pointer | publishes a request; retries next frame while the window is busy |
+| `1C` | `$80:8C28` | bank, text pointer | as `1B`, bank first |
 | `1F` | `$80:8C4A` | — | blocks until the request is fully acknowledged |
 | `20` | `$80:8C9A` | — | yields each frame until the request ends |
 | `1A` | `$80:8B85` | catalog, table | blocks for the answer, then jumps through table[0 cancel, 1, 2] |
@@ -54,6 +55,7 @@ callback on a confirm press when nothing else owns the window.
 | `BC` | `$80:AAA5` | — | stores the next command as the continuation `RTL` resumes at |
 | `48` | `$80:96CB` | flag word | deletes the actor when the flag is set (bit 15) or clear |
 | `54` | `$80:99EB` | item, target | gives the item (target taken when full; not modelled) |
+| `60` | `$80:9A04` | item, pose word, sound id | grants the item (once per kind here) with its presentation, which is not drawn |
 | `3A` / `39` | `$80:929C` / `921F` | pose, vector, row / column | starts a scripted leg; the next `COP 8E` moves the actor at the class-0 stream, or skips the leg's loop at the target |
 | `A7` | `$80:A876` | — | deletes the actor |
 | `19` | `$80:8B35` | 14 bytes | writes the re-entry record `$0600..$060F`; stepped over |
@@ -83,7 +85,7 @@ Code that tests the player's animation (`LDA $7F:2016,X` / `$7F:0008,X`
 through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
 mismatch branch: the runtime's Ark only stands and walks. Short runs that
 only use script scratch words (`$0440`, `$04BC..$04C3`: `STZ`, `STA`,
-`LDA`, `INC`, `DEC`, `CMP` and branches) execute, as the tour's guide and
+`LDA`, `INC`, `DEC`, `CMP`, `TSB`/`TRB` and branches) execute, as the tour's guide and
 controller take turns through `$04BC`; the words outlive map loads. Tile patches
 survive a move between maps that share the first layer (`B`..`$11`, `$20`),
 because `$86:9145` does not reload it.
@@ -149,6 +151,14 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   walks as natively (`pandora-left-rest`). The tour maps load through the
   Pandora compile (`first_background`). The graphics controller `$89:D253`
   stays frozen: its loads are the compile's.
+- **The Crystal Spear, `$42`** (`$89:DA17`, callback `$89:DA56`): the first
+  talk sets `$240` and asks; consent sets `$241`; the next talk sets `$242`
+  and hands the resident's script to `$89:DA20`: `COP 60` grants item `$81`,
+  the presentation text `$88:D165` (`D7`: close at once) ends it, and
+  `COP 14` returns Ark to `$21` at (136,368). The spear's display stands on
+  the same cell; natively it lacks `+$04` bit 8, which the dispatcher
+  (`$87:C783`) requires. The runtime, without `+$04`, talks to the first
+  interactable actor on the cell instead.
 - **The blue door, map `$0C`** (`$83:8C32`): each hit counts in `$0640`;
   the first patches the upper cell and shows one page; the second patches
   both cells to the open stairs, marks them, sets `$292`, and the friends'

@@ -573,6 +573,10 @@ fn decode_profile(
                 }
             }
             0xd5 => d.boundary(at, Acknowledgement::Next)?,
+            // `$85:9D7F` clears the window and closes it without a press (a
+            // two-pass latch on `$0DA4` bit 7). Admitted only on an empty
+            // page, as the spear's presentation uses it.
+            0xd7 if d.page.glyphs.is_empty() && d.stack.is_empty() => return Ok(d.pages),
             0xe3 if d.pandora => {
                 let mask = d.word()?;
                 let destination = pandora::default_button_source(d.image, mask)?;

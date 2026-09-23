@@ -747,16 +747,21 @@ impl<'a> World<'a> {
             (x / 16).wrapping_add_signed(dx),
             (y / 16).wrapping_add_signed(dy),
         );
+        // Natively `$87:C783` takes the first actor hit whose `+$04` has bit 8
+        // and checks only that one (`$87:93B9`); `+$04` is not modelled, so
+        // the first interactable actor on the cell stands in. It differs only
+        // where a targetable actor without interaction stands in front of an
+        // interactable one; the spear's display lacks bit 8.
         let Some(index) = self
             .residents
             .iter()
-            .position(|resident| resident.cell() == faced)
+            .zip(&self.actors)
+            .position(|(resident, actor)| {
+                resident.cell() == faced && actor.interactable(self.facing)
+            })
         else {
             return false;
         };
-        if !self.actors[index].interactable(self.facing) {
-            return false;
-        }
         let player = self.position();
         let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
         let mut around = surroundings(

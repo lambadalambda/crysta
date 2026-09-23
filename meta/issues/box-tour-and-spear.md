@@ -28,5 +28,7 @@ Inside the box a guide leads a forced tour through `$41..$44` (`$243`, `$244`), 
 - The tour runs from the reloaded `$21` to `$244`: text item-label calls,
   native scratch-word runs (`$04BC`), eased moves (`COP ED`/`EE`) and
   `COP 91`. Landings match `COP 14`'s operands; Ark then walks as natively.
-- Remaining: the corridor to the weapon door and `$42`'s spear (`$240`..`$242`,
-  `COP 60` item `$81`), and the return to `$21`.
+- The corridor to the weapon door (slopes, the wooden door by hand) and
+  `$42`'s spear (`$240`..`$242`, item `$81`) follow the native route and
+  return Ark to `$21` at (136,368).
+- Remaining for the next issue: the return sequence in `$21` (`$FE`, `$23`).

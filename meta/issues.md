@@ -45,6 +45,5 @@
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
 - [ ] [Play the Crysta story from the wake-up scene to the world map](issues/play-crysta-story.md)
 - [ ] [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
-- [ ] [Play the tour inside the box and take the spear](issues/box-tour-and-spear.md)
 - [ ] [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [ ] [Leave through the south gate onto the world map](issues/south-gate-world-map.md)

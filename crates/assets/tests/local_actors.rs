@@ -724,3 +724,14 @@ fn decode_at_follows_item_label_calls() {
         assert!(!pages.is_empty());
     }
 }
+
+#[test]
+fn a_close_at_once_ends_the_spear_presentation_without_a_page() {
+    // `$88:D165` is `D7 D3`: `$85:9D7F` closes the window at once when no
+    // page is pending.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let pages = assets::text::HouseDialogue::decode_at(cartridge.image(), 0x88_D165).unwrap();
+    assert!(pages.is_empty());
+}

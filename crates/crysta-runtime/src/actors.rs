@@ -63,6 +63,12 @@ const CONTINUATION: u8 = 0xBC;
 /// Gives an item; `$80:99EB`. Operands: the item and a target taken when the
 /// inventory is full, which is not modelled.
 const GIVE_ITEM: u8 = 0x54;
+/// Grants an item with its presentation: item, the player's pose word and a
+/// sound id (`$80:9A04`); `$8D:9653` adds the item, or a unit of one held.
+const GRANT_ITEM: u8 = 0x60;
+/// Requests dialogue at a bank-first address: bank, then the word
+/// (`$80:8C28`), as `COP 1B` does in the script's own bank.
+const SHOW_TEXT_BANKED: u8 = 0x1C;
 /// Starts a scripted vertical leg toward a tile row; `$80:929C`. Operands:
 /// the pose, the movement vector and the row, signed, times 16. At the row it
 /// skips the leg's `COP 8E; COP 3B; BRA` loop.
@@ -913,14 +919,15 @@ impl Actor {
     ) -> bool {
         let image = around.image;
         match service {
-            SHOW_TEXT | TEXT_WAIT | TEXT_STEP | CHOICE => {
+            SHOW_TEXT | SHOW_TEXT_BANKED | TEXT_WAIT | TEXT_STEP | CHOICE => {
                 return self.text_service(service, operands, bank, around)
             }
             WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT | LONG_JUMP
-            | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG | OCCUPY => {
+            | CONTINUATION | DELETE_ON_FLAG | DELETE | WAIT_FOR_FLAG | OCCUPY => {
                 return self.script_service(service, operands, around)
             }
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
+            GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, around),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
@@ -1409,14 +1416,6 @@ impl Actor {
                 self.continuation = Some(operands);
                 self.pc = operands;
             }
-            GIVE_ITEM => {
-                let Some(&item) = image.get(operands) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                around.globals.items.push(item);
-                self.pc = operands + 3;
-            }
             DELETE => {
                 self.state = State::Gone;
                 return false;
@@ -1468,22 +1467,34 @@ impl Actor {
         let image = around.image;
         let dialogue = &mut around.globals.dialogue;
         match service {
-            SHOW_TEXT => {
-                let Some(pointer) = cadence::word(image, operands) else {
+            SHOW_TEXT | SHOW_TEXT_BANKED => {
+                let banked = service == SHOW_TEXT_BANKED;
+                let (bank, at) = if banked {
+                    let Some(&bank) = image.get(operands) else {
+                        self.state = State::Frozen;
+                        return false;
+                    };
+                    (u32::from(bank) << 16, operands + 1)
+                } else {
+                    (
+                        u32::try_from(bank).map_or(0, |bank| 0x80_0000 | bank),
+                        operands,
+                    )
+                };
+                let Some(pointer) = cadence::word(image, at) else {
                     self.state = State::Frozen;
                     return false;
                 };
                 if dialogue.busy() {
                     return false;
                 }
-                let source =
-                    u32::try_from(bank).map_or(0, |bank| 0x80_0000 | bank) | u32::from(pointer);
+                let source = bank | u32::from(pointer);
                 let Ok(pages) = HouseDialogue::decode_at(image, source) else {
                     self.state = State::Frozen;
                     return false;
                 };
                 dialogue.request(pages);
-                self.pc = operands + 2;
+                self.pc = at + 2;
                 true
             }
             TEXT_WAIT => {
@@ -1696,6 +1707,44 @@ impl Actor {
             return false;
         }
         !moving
+    }
+
+    /// `COP 54` and `COP 60`: items the player receives. Returns whether
+    /// execution continues this frame.
+    fn item_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            GIVE_ITEM => {
+                let Some(&item) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.items.push(item);
+                self.pc = operands + 3;
+            }
+            GRANT_ITEM => {
+                let Some(&item) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                // Quantities are not modelled: one held stays one entry. The
+                // player's presentation pose is not drawn.
+                if !around.globals.items.contains(&item) {
+                    around.globals.items.push(item);
+                }
+                self.pc = operands + 4;
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        }
+        true
     }
 
     /// `COP ED` and `COP EE`: an eased move ([`ease::Ease`]). Returns
@@ -2883,6 +2932,19 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         tick(&mut actor, &image);
         assert_eq!((actor.frozen_at(), actor.selector), (None, 7));
+    }
+
+    #[test]
+    fn cop_60_grants_an_item_once_and_steps_over_its_presentation() {
+        // COP60 $81 $01A4 $34, twice; pose 7.
+        let code = [
+            2, 0x60, 0x81, 0xA4, 0x01, 0x34, 2, 0x60, 0x81, 0xA4, 0x01, 0x34, 2, 0x80, 7, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.items, [0x81]);
+        assert_eq!(actor.selector, 7);
     }
 
     #[test]

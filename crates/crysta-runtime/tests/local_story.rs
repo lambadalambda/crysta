@@ -756,3 +756,52 @@ fn a_door_opens_only_from_a_cell_aligned_position() {
         );
     }
 }
+
+#[test]
+fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
+    // `$42`: around the pedestals to the spear at (72,384), facing Up. The
+    // callback `$89:DA56` sets `$240`, asks, and on consent sets `$241`; a
+    // second talk sets `$242`, grants item `$81` (`COP 60`), and the
+    // presentation leads to `$21` at (136,368) (`$89:DA49`).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = after_the_door();
+    for set in [0x22, 0x243, 0x244] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x0042, 136, 464, events).unwrap();
+    for (pad, frames) in [(2, 44), (1, 60), (2, 32), (1, 32), (3, 20), (1, 20)] {
+        replay(&mut world, &[(pad, frames), (5, 12)]);
+    }
+    assert_eq!(
+        (world.position(), world.facing()),
+        ((72, 384), Direction::Up)
+    );
+    world.update(None, A).unwrap();
+    assert!(flag(&world, 0x240), "the first talk");
+    for _ in 0..3000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if flag(&world, 0x241) && !reading && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(flag(&world, 0x241), "consent");
+    world.update(None, A).unwrap();
+    assert!(flag(&world, 0x242), "the second talk takes it");
+    for _ in 0..3000 {
+        let reading = world.dialogue().is_some() || world.in_scene();
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        if world.map() == 0x0021 {
+            break;
+        }
+    }
+    assert_eq!(world.items(), [0x81], "the Crystal Spear");
+    assert_eq!((world.map(), world.position()), (0x0021, (136, 368)));
+}
