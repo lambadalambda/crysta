@@ -12,7 +12,10 @@ workspace so native platform dependencies do not change reference-producer pins.
 ## Controls
 
 - Arrows/WASD or gamepad: movement.
-- Space/Enter or gamepad South/East: interact / advance dialogue.
+- Space/Enter or gamepad South (SNES A): interact, acknowledge a page, confirm
+  a choice.
+- X/Backspace or gamepad East (SNES B): cancel a choice.
+- Up/Down move a choice's cursor.
 - **M:** pause/resume music (not gameplay).
 - **− / +** (also numpad): change volume by 10%, clamped to 0–100%. Starts at50%.
 - Escape: quit and stop audio.

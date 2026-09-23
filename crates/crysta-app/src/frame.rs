@@ -230,6 +230,19 @@ pub fn draw_page(
     }
 }
 
+/// Draws the choice cursor, a small arrow in the text colour, at a
+/// page-relative position of the page whose box is at `origin`.
+pub fn draw_cursor(canvas: &mut Canvas, (left, top): (usize, usize), [x, y]: [u16; 2]) {
+    let (x, y) = (
+        signed(left + PAGE_MARGIN) + i32::from(x),
+        signed(top + PAGE_MARGIN) + i32::from(y),
+    );
+    for row in 0..7 {
+        let width = 4 - (row - 3i32).abs();
+        fill(canvas, (x, y + row), (width, 1), PAGE_PALETTE[1]);
+    }
+}
+
 /// Decodes a 24-bit top-down BMP, which is what the qualified renderer emits.
 ///
 /// Returns `None` for anything that is not that exact shape rather than
@@ -666,6 +679,19 @@ mod tests {
         assert_eq!(at(72 + 248, 8), PAGE_BOX, "right margin");
         assert_eq!(at(72 + 8, 216), PAGE_BOX, "bottom margin");
         assert_eq!(at(72 + 256, 8), 0, "outside the classic area");
+    }
+
+    #[test]
+    fn the_choice_cursor_points_right_inside_the_page() {
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
+        draw_cursor(&mut canvas, (10, 20), [16, 8]);
+        let at = |x: usize, y: usize| canvas.pixels[y * CLASSIC_WIDTH + x];
+        let (x, y) = (10 + PAGE_MARGIN + 16, 20 + PAGE_MARGIN + 8);
+        // Widest on its middle row, a single pixel at the tips.
+        assert_eq!(at(x + 3, y + 3), PAGE_PALETTE[1]);
+        assert_eq!(at(x + 4, y + 3), 0);
+        assert_eq!(at(x, y), PAGE_PALETTE[1]);
+        assert_eq!(at(x + 1, y), 0);
     }
 
     #[test]

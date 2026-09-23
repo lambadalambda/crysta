@@ -14,9 +14,9 @@ mod music_controls;
 mod music_data;
 mod music_output;
 
-use assets::text::{Acknowledgement, DialoguePage};
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::residents::Conversation;
+use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{Step, World};
 use frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use gilrs::{Axis, Button, Gilrs};
@@ -200,8 +200,8 @@ fn screenshot(
             "left" => Some(Direction::Left),
             "right" => Some(Direction::Right),
             "wait" => None,
-            "talk" => {
-                session.advance(None, true);
+            "talk" | "cancel" => {
+                session.advance(None, what == "talk", what == "cancel");
                 continue;
             }
             other => {
@@ -210,7 +210,7 @@ fn screenshot(
             }
         };
         for _ in 0..count {
-            session.advance(direction, false);
+            session.advance(direction, false, false);
         }
     }
     if let Some(error) = &session.fault {
@@ -257,14 +257,12 @@ fn screenshot(
         session.world.map(),
         session.world.position(),
         session.world.residents().len(),
-        session
-            .dialogue
-            .as_ref()
-            .map_or("closed".to_string(), |open| format!(
-                "page {} of {}",
-                open.index + 1,
-                open.pages.len()
-            )),
+        match (session.world.dialogue(), session.world.in_scene()) {
+            (Some(view), _) if view.cursor.is_some() => "choice",
+            (Some(_), true) => "open, world held",
+            (Some(_), false) => "open",
+            (None, _) => "closed",
+        },
     );
 }
 
@@ -272,12 +270,6 @@ fn screenshot(
 /// force, and their rasters. The flags are part of the key because a
 /// resident's pose comes from their walked script, which branches on them.
 type RosterArt = (u16, Vec<usize>, Vec<u8>, Vec<Result<Body, Placeholder>>);
-
-/// A conversation being shown, one page at a time.
-struct Dialogue {
-    pages: Vec<DialoguePage>,
-    index: usize,
-}
 
 /// The running world plus what it needs to draw.
 struct Session {
@@ -292,7 +284,8 @@ struct Session {
     /// Rasterized sequences by record, selector and mirror; `None` when the
     /// packet has no such sequence.
     sprites: HashMap<(usize, u8, bool), Option<Animation>>,
-    dialogue: Option<Dialogue>,
+    /// The direction held last frame, so a new one reads as a press.
+    last_direction: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
     tick: u64,
     last_step: Option<Step>,
@@ -312,7 +305,7 @@ impl Session {
             background_clock: background::VisitClock::new(START.0),
             art: None,
             sprites: HashMap::new(),
-            dialogue: None,
+            last_direction: None,
             tick: 0,
             last_step: None,
             last_interaction: None,
@@ -321,40 +314,34 @@ impl Session {
         }
     }
 
-    /// One frame of simulation: walking, or paging through dialogue.
-    ///
-    /// While a conversation is open the player stands still and the button
-    /// turns pages; the last page's acknowledgement closes it.
-    fn advance(&mut self, direction: Option<Direction>, interact: bool) {
-        self.advance_world(direction, interact);
+    /// One frame of simulation from the pad: the world's scripts decide
+    /// whether it walks, pages through text or answers a choice.
+    fn advance(&mut self, direction: Option<Direction>, confirm: bool, cancel: bool) {
+        let newly = |wanted| direction == Some(wanted) && self.last_direction != Some(wanted);
+        let presses = Presses {
+            confirm,
+            cancel,
+            up: newly(Direction::Up),
+            down: newly(Direction::Down),
+        };
+        self.last_direction = direction;
+        self.advance_world(direction, presses);
         if self.fault.is_none() {
             self.background_clock.advance(self.world.map());
         }
     }
 
-    fn advance_world(&mut self, direction: Option<Direction>, interact: bool) {
+    fn advance_world(&mut self, direction: Option<Direction>, presses: Presses) {
         if self.fault.is_some() {
             return;
         }
         self.tick += 1;
         self.last_step = None;
         self.last_interaction = None;
-        if let Some(open) = &mut self.dialogue {
-            if interact {
-                let last = open.index + 1 >= open.pages.len();
-                let closes =
-                    last || open.pages[open.index].acknowledgement() == Acknowledgement::End;
-                if closes {
-                    self.dialogue = None;
-                } else {
-                    open.index += 1;
-                }
-            }
-            return;
-        }
-        match self.world.step_interactive(direction) {
-            Ok(step) => {
+        match self.world.update(direction, presses) {
+            Ok((step, interaction)) => {
                 self.last_step = Some(step);
+                self.last_interaction = interaction;
                 if let Step::Refused(reason) = step {
                     if self.last_refusal != Some(reason) {
                         eprintln!("movement refused at map {:#06x} {:?}: {reason:?}; input reset, choose another direction", self.world.map(), self.world.position());
@@ -364,34 +351,7 @@ impl Session {
                     self.last_refusal = None;
                 }
             }
-            Err(error) => {
-                self.fail_world(&error);
-                return;
-            }
-        }
-        if !interact {
-            return;
-        }
-        // Talking first: a resident standing in a doorway should be spoken
-        // to rather than walked past.
-        match self.world.talk() {
-            Some(Conversation::Speaks { pages, .. }) if !pages.is_empty() => {
-                // Stand, rather than hold whatever stride the step left.
-                self.world.face(self.world.facing());
-                self.dialogue = Some(Dialogue { pages, index: 0 });
-            }
-            Some(Conversation::Speaks { .. }) => {}
-            Some(Conversation::Unsupported { source }) => {
-                eprintln!("the resident's line at ${source:04x} does not decode as text");
-            }
-            Some(Conversation::Unaccounted { service }) => {
-                eprintln!("the resident's script stops at COP ${service:02x}");
-            }
-            Some(Conversation::Silent) => eprintln!("..."),
-            None => match self.world.interact_checked() {
-                Ok(step) => self.last_interaction = Some(step),
-                Err(error) => self.fail_world(&error),
-            },
+            Err(error) => self.fail_world(&error),
         }
     }
 
@@ -420,7 +380,7 @@ impl Session {
         };
         let outcome = if self.fault.is_some() {
             serde_json::json!({"kind":"stopped"})
-        } else if self.last_step.is_none() {
+        } else if self.world.dialogue().is_some() {
             serde_json::json!({"kind":"dialogue"})
         } else {
             describe(
@@ -437,7 +397,7 @@ impl Session {
             "after":{"map":self.world.map(),"x":x,"y":y},
             "outcome":outcome, "movement":describe(self.last_step),
             "interaction":describe(self.last_interaction), "error":self.fault,
-            "dialogue_page":self.dialogue.as_ref().map(|open|open.index+1)})
+            "dialogue_open":self.world.dialogue().is_some(), "scene":self.world.in_scene()})
     }
 
     fn fail_world(&mut self, error: &crysta_runtime::world::WorldError) {
@@ -512,7 +472,6 @@ impl Session {
             art,
             atlas,
             sprites,
-            dialogue,
             ..
         } = self;
         let position = world.position();
@@ -579,8 +538,8 @@ impl Session {
             }
         }
         frame::mask_outside(frame, camera, region.bounds);
-        if let Some(open) = dialogue {
-            let page = &open.pages[open.index];
+        if let Some(view) = world.dialogue() {
+            let page = view.page;
             let dimensions = (usize::from(page.width()), usize::from(page.height()));
             let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
             let origin =
@@ -592,6 +551,9 @@ impl Session {
                 page.background_index(),
                 origin,
             );
+            if let Some(cursor) = view.cursor {
+                frame::draw_cursor(frame, origin, cursor);
+            }
         }
         camera
     }
@@ -611,6 +573,8 @@ struct App {
     frame: Canvas,
     /// Edge-triggered, so holding the button does not re-talk every frame.
     interaction: input::Interaction,
+    /// B: cancels a choice. Edge-triggered like the confirm button.
+    cancel: input::Interaction,
     started: std::time::Instant,
     clock: clock::Clock,
     suspended: bool,
@@ -638,6 +602,7 @@ impl App {
             keys: Vec::new(),
             frame: Canvas::new(width),
             interaction: input::Interaction::default(),
+            cancel: input::Interaction::default(),
             started: std::time::Instant::now(),
             clock: clock::Clock::new(std::time::Duration::ZERO),
             suspended: false,
@@ -746,6 +711,7 @@ impl ApplicationHandler for App {
     fn suspended(&mut self, _: &ActiveEventLoop) {
         self.suspended = true;
         self.interaction = input::Interaction::default();
+        self.cancel = input::Interaction::default();
         self.keys.clear();
         self.held = None;
         self.music_controls.set_focused(false);
@@ -801,6 +767,10 @@ impl ApplicationHandler for App {
                     }
                     PhysicalKey::Code(KeyCode::Space | KeyCode::Enter) => {
                         self.interaction.keyboard(pressed);
+                        None
+                    }
+                    PhysicalKey::Code(KeyCode::KeyX | KeyCode::Backspace) => {
+                        self.cancel.keyboard(pressed);
                         None
                     }
                     _ => None,
@@ -866,7 +836,7 @@ impl ApplicationHandler for App {
 
 impl App {
     fn poll_pad(&mut self) {
-        let mut interact = false;
+        let (mut interact, mut cancel) = (false, false);
         let mut direction = self.keys.last().copied();
         if let Some(pads) = &mut self.pads {
             while pads.next_event().is_some() {}
@@ -896,26 +866,28 @@ impl App {
                         });
                     }
                 }
-                if pad.is_pressed(Button::South) || pad.is_pressed(Button::East) {
-                    interact = true;
-                }
+                // SNES A confirms and B cancels: the pad's South and East.
+                interact |= pad.is_pressed(Button::South);
+                cancel |= pad.is_pressed(Button::East);
             }
         }
         self.held = direction;
         // Level-polled pad edges and keyboard events remain latched until a
         // simulation tick, even if several redraw/input wakeups happen first.
         self.interaction.gamepad(interact);
+        self.cancel.gamepad(cancel);
     }
 
     fn advance(&mut self) {
         let direction = self.held;
         let interact = self.interaction.take();
+        let cancel = self.cancel.take();
         let session = self.session();
         if session.fault.is_some() {
             return;
         }
         let before = (session.world.map(), session.world.position());
-        session.advance(direction, interact);
+        session.advance(direction, interact, cancel);
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
         if self.log.is_some() {
             let mut event = self.session().trace_frame(before, direction, interact);
@@ -985,7 +957,7 @@ mod session_tests {
         for count in [1, 3, 7, 21] {
             // Screenshot scripts can run multiple updates before first composition.
             for _ in 0..count {
-                session.advance(None, false);
+                session.advance(None, false, false);
             }
             session.ensure_background(&rom);
             changed |= river(&session) != first;
@@ -1068,7 +1040,7 @@ mod session_tests {
         let mut session = Session::new(image);
         session.world = World::enter(image, 0xA, 360, 472).unwrap();
         for _ in 0..3 {
-            session.advance(Some(Direction::Right), false);
+            session.advance(Some(Direction::Right), false, false);
         }
         assert_eq!(
             session.world.position(),
@@ -1076,10 +1048,10 @@ mod session_tests {
             "refused step must not move"
         );
         for _ in 0..8 {
-            session.advance(None, false);
+            session.advance(None, false, false);
         }
         for _ in 0..16 {
-            session.advance(Some(Direction::Left), false);
+            session.advance(Some(Direction::Left), false, false);
         }
         assert!(
             session.world.position().0 < 360,
