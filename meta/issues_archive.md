@@ -106,3 +106,4 @@
 - [x] [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)
 - [x] [Model the COP 8E pose wait from source](issues/model-pose-wait-service.md)
 - [x] [Run scene dialogue, choices and flags from scripts](issues/script-dialogue-choices.md)
+- [x] [Play Elle's wake-up scene](issues/bedroom-wake-up-scene.md)

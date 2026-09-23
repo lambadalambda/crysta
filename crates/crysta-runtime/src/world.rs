@@ -420,6 +420,7 @@ impl<'a> World<'a> {
             resident.hflip = actor.hflip;
             resident.pose_age = actor.pose_age;
             resident.walking = actor.walking;
+            resident.hidden = actor.hidden;
         }
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
@@ -493,6 +494,18 @@ impl<'a> World<'a> {
             return Ok((step, Some(self.interact_checked()?)));
         }
         Ok((step, None))
+    }
+
+    /// Whether a script has locked the pad's directions (`COP 2A`).
+    #[must_use]
+    pub const fn pad_locked(&self) -> bool {
+        self.globals.input_mask & PAD_DIRECTIONS != 0
+    }
+
+    /// Items scripts have given, in order.
+    #[must_use]
+    pub fn items(&self) -> &[u8] {
+        &self.globals.items
     }
 
     /// The dialogue window, if a script has something on it.
@@ -771,7 +784,7 @@ fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, W
 fn bodies(present: &[Resident]) -> Vec<Resident> {
     present
         .iter()
-        .filter(|resident| resident.body)
+        .filter(|resident| resident.body && !resident.hidden)
         .cloned()
         .collect()
 }
@@ -780,7 +793,7 @@ fn bodies(present: &[Resident]) -> Vec<Resident> {
 fn body_cells(present: &[Resident]) -> Vec<(u16, u16)> {
     present
         .iter()
-        .filter(|resident| resident.body)
+        .filter(|resident| resident.body && !resident.hidden)
         .map(Resident::collision_cell)
         .collect()
 }
@@ -842,12 +855,21 @@ fn occupied_by_others(
 ) -> Vec<(u16, u16)> {
     let mut occupied = vec![(x.saturating_sub(8) / 16, y.saturating_sub(16) / 16)];
     for (other, actor) in actors.iter().enumerate() {
-        if other != index && residents[other].body {
+        if other != index && residents[other].body && !actor.hidden {
             occupied.push(actor.collision_cell());
             occupied.extend(actor.destination());
         }
     }
     occupied
+}
+
+/// The flags a new game starts the bedroom with, before the wake-up: only
+/// `$FB`, which name entry sets (`$87:80EC`). Elle's script sets `$20`.
+#[must_use]
+pub fn fresh_game_flags() -> Vec<u8> {
+    let mut flags = new_game_flags();
+    flags[0x20 / 8] &= !(1 << (0x20 % 8));
+    flags
 }
 
 /// The measured new-game flag state: 32 and 251 are set.
@@ -918,6 +940,7 @@ mod tests {
             pose_age: 0,
             walking: false,
             descriptor: None,
+            hidden: false,
         }
     }
 

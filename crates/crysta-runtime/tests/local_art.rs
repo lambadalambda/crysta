@@ -205,6 +205,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             pose_age: 0,
             walking: false,
             descriptor: None,
+            hidden: false,
         })
         .collect();
     let art = residents_art(

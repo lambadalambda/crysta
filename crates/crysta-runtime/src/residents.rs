@@ -12,6 +12,7 @@ use assets::sprites::{HouseActor, ResidentPose};
 use assets::text::{DialoguePage, HouseDialogue};
 
 /// Someone standing in a map.
+#[allow(clippy::struct_excessive_bools)] // independent actor bits, not a state
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Resident {
     /// Pixel position, as the running game reports it.
@@ -37,6 +38,8 @@ pub struct Resident {
     /// Normalized offset of the resource descriptor the actor is built
     /// from: the record's own, or the one a zero pointer reuses.
     pub descriptor: Option<usize>,
+    /// Hidden by its script (entity `+$04` bit 15): not drawn, not blocking.
+    pub hidden: bool,
 }
 
 impl Resident {
@@ -131,6 +134,7 @@ pub fn residents(
                 walking: false,
                 descriptor: descriptor_owner(&present, index)
                     .and_then(|owner| present[owner].descriptor_offset()),
+                hidden: false,
             }
         })
         .filter(|resident| !despawns(image, resident, events))

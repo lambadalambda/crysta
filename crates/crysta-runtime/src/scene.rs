@@ -32,6 +32,9 @@ pub struct Globals {
     /// `$045E`: pad buttons scripts have locked (`COP 2A`/`29`), as the SNES
     /// pad word. `$FF50` leaves A and L free to acknowledge text.
     pub input_mask: u16,
+    /// Items scripts have given (`COP 54`), in order. The inventory's slots
+    /// and limits (`$7F:8000`) are not modelled.
+    pub items: Vec<u8>,
 }
 
 impl Globals {

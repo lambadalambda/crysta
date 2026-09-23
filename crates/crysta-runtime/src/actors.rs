@@ -57,6 +57,26 @@ const DELETE_ON_FLAG: u8 = 0x48;
 const LONG_JUMP: u8 = 0x06;
 /// Stores the next command as the continuation and goes on; `$80:AAA5`.
 const CONTINUATION: u8 = 0xBC;
+/// Gives an item; `$80:99EB`. Operands: the item and a target taken when the
+/// inventory is full, which is not modelled.
+const GIVE_ITEM: u8 = 0x54;
+/// Starts a scripted vertical leg toward a tile row; `$80:929C`. Operands:
+/// the pose, the movement vector and the row, signed, times 16. At the row it
+/// skips the leg's `COP 8E; COP 3B; BRA` loop.
+const WALK_TO_ROW: u8 = 0x3A;
+/// The same toward a tile column, times 16 plus 8; `$80:921F`.
+const WALK_TO_COLUMN: u8 = 0x39;
+/// Unlinks the actor; `$80:A876`.
+const DELETE: u8 = 0xA7;
+/// Waits for a flag, yielding each frame on itself; `$80:862E`. Without
+/// bit 15 it waits until the flag is set, with it until the flag is clear.
+const WAIT_FOR_FLAG: u8 = 0x05;
+/// Inline native code that hides the actor: `LDA $0004,X; ORA #$8000;
+/// STA $0004,X`. Entity `+$04` bit 15 keeps it out of the draw list
+/// (`$80:EB68`) and stops its animation and movement; its script runs on.
+const HIDE: [u8; 9] = [0xBD, 0x04, 0x00, 0x09, 0x00, 0x80, 0x9D, 0x04, 0x00];
+/// Inline native code that shows it again: `AND #$7FFF`.
+const SHOW: [u8; 9] = [0xBD, 0x04, 0x00, 0x29, 0xFF, 0x7F, 0x9D, 0x04, 0x00];
 /// Entity `+$06` bit that lets the player interact from any side.
 const INTERACT_ANY_SIDE: u16 = 0x0200;
 /// Entity `+$06` bit that lets the player interact only facing the actor.
@@ -217,6 +237,8 @@ pub struct Actor {
     pub pose_age: u32,
     /// Whether a step is under way.
     pub walking: bool,
+    /// Entity `+$04` bit 15: not drawn, not animated, not moved.
+    pub hidden: bool,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -239,6 +261,9 @@ pub struct Actor {
     continuation: Option<usize>,
     /// The actor's own script while a callback runs on it.
     outer: Option<Outer>,
+    /// A scripted leg's direction and frames applied, moving the actor
+    /// through the next pose wait at the class-0 stream's 1, 0, 1, ...
+    stream: Option<(Direction, u16)>,
     /// Derived operand lengths by service, since deriving one explores a
     /// handler's control flow and the loop runs every few frames. The outer
     /// option is whether it has been derived, the inner whether it could be.
@@ -265,6 +290,7 @@ impl Actor {
             hflip: false,
             pose_age: 0,
             walking: false,
+            hidden: false,
             pc,
             state,
             // A zero seed would stay zero.
@@ -277,6 +303,7 @@ impl Actor {
             interaction: 0,
             continuation: None,
             outer: None,
+            stream: None,
             lengths: vec![None; 256],
         }
     }
@@ -349,6 +376,7 @@ impl Actor {
             State::Ordinary { .. } => self.tick_ordinary(),
             State::Frozen | State::Gone | State::Blocked(_) => {}
             State::Waiting(frames) => {
+                self.apply_stream();
                 self.state = if frames <= 1 {
                     State::Running
                 } else {
@@ -551,6 +579,12 @@ impl Actor {
                     continue;
                 }
                 _ => {
+                    let native = image.get(self.pc..self.pc + 9);
+                    if native == Some(&HIDE) || native == Some(&SHOW) {
+                        self.hidden = native == Some(&HIDE);
+                        self.pc += 9;
+                        continue;
+                    }
                     self.state = State::Frozen;
                     return Run::Yielded;
                 }
@@ -582,9 +616,10 @@ impl Actor {
                 return self.text_service(service, operands, bank, around)
             }
             WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT | LONG_JUMP
-            | CONTINUATION | DELETE_ON_FLAG => {
+            | CONTINUATION | DELETE_ON_FLAG | GIVE_ITEM | DELETE | WAIT_FOR_FLAG => {
                 return self.script_service(service, operands, around)
             }
+            WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => {
                 let Some(selector) = image.get(operands).copied() else {
                     self.state = State::Frozen;
@@ -685,9 +720,11 @@ impl Actor {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
     }
 
-    /// `COP 8E`. Returns whether execution continues this frame.
+    /// `COP 8E`. Returns whether execution continues this frame. A scripted
+    /// leg moves through it, starting this frame, and stops when it ends.
     fn wait_for_pose(&mut self, operands: usize) -> bool {
         self.pc = operands;
+        self.apply_stream();
         // `$80:A32F` plays the selected list once: the next command
         // runs in the frame its last record ends. Unknown: the old
         // approximation, resuming two frames later.
@@ -703,6 +740,76 @@ impl Actor {
                 return false;
             }
         }
+        true
+    }
+
+    /// One frame of a scripted leg; cleared once the pose wait is over.
+    fn apply_stream(&mut self) {
+        let Some((direction, applied)) = self.stream else {
+            return;
+        };
+        if applied % 2 == 0 {
+            let (dx, dy) = delta(direction);
+            self.position = (
+                self.position.0.wrapping_add_signed(dx),
+                self.position.1.wrapping_add_signed(dy),
+            );
+        }
+        self.stream = Some((direction, applied + 1));
+        self.walking = true;
+        let ends = match self.state {
+            State::Waiting(frames) => frames <= 1,
+            _ => self
+                .pose_list(self.selector)
+                .is_some_and(|ticks| ticks <= 1),
+        };
+        if ends {
+            self.stream = None;
+            self.walking = false;
+        }
+    }
+
+    /// `COP 3A`/`39`: a scripted leg toward a row or column. Returns whether
+    /// execution continues this frame.
+    fn walk_toward(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        let Some(&[pose, vector, target]) = image.get(operands..operands + 3) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let target = i32::from(i8::from_ne_bytes([target])) * 16;
+        let (position, target, vertical) = if service == WALK_TO_ROW {
+            (i32::from(self.position.1), target, true)
+        } else {
+            (i32::from(self.position.0), target + 8, false)
+        };
+        if position == target {
+            // Past this leg's `COP 8E; COP 3B; BRA`.
+            self.pc = operands + 3 + 6 + if pose & 0x80 != 0 { 4 } else { 0 };
+            return true;
+        }
+        let forward = target > position;
+        let (direction, pose, vector) = match (vertical, forward) {
+            (true, true) => (Direction::Down, pose, vector),
+            (true, false) => (Direction::Up, pose.wrapping_add(1), vector.wrapping_add(1)),
+            (false, true) => (Direction::Right, pose, vector),
+            (false, false) => (Direction::Left, pose, vector),
+        };
+        // Only the class-0 row's audited common streams: $68/$69 down/up and
+        // $60 across, whose steps are 1, 0, 1, ... pixels.
+        let expected = match direction {
+            Direction::Down => 0x68,
+            Direction::Up => 0x69,
+            Direction::Left | Direction::Right => 0x60,
+        };
+        if self.cadence.is_none() || vector != expected {
+            self.state = State::Frozen;
+            return false;
+        }
+        self.facing = direction;
+        self.set_pose(pose & 0x7F, direction == Direction::Left);
+        self.pose_age = 0;
+        self.stream = Some((direction, 0));
+        self.pc = operands + 3;
         true
     }
 
@@ -767,6 +874,29 @@ impl Actor {
             CONTINUATION => {
                 self.continuation = Some(operands);
                 self.pc = operands;
+            }
+            GIVE_ITEM => {
+                let Some(&item) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.items.push(item);
+                self.pc = operands + 3;
+            }
+            DELETE => {
+                self.state = State::Gone;
+                return false;
+            }
+            WAIT_FOR_FLAG => {
+                let Some(word) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let set = EventFlags::Bitmap(&around.globals.events).get(word & 0x0FFF);
+                if set != Some(word & 0x8000 == 0) {
+                    return false;
+                }
+                self.pc = operands + 2;
             }
             DELETE_ON_FLAG => {
                 let Some(word) = cadence::word(image, operands) else {
@@ -2074,6 +2204,34 @@ mod scene_service_tests {
     }
 
     #[test]
+    fn inline_code_hides_and_shows_and_a_flag_wait_holds_between() {
+        // Hide; wait until flag $03 is set; show; pose 4; wait.
+        let mut code = HIDE.to_vec();
+        code.extend_from_slice(&[2, 0x05, 0x03, 0x00]);
+        code.extend_from_slice(&SHOW);
+        code.extend_from_slice(&[2, 0x80, 4, 2, 0x8E]);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let (image, mut actor) = run(&[(0, &code)], &mut globals);
+        assert!(actor.hidden);
+        for _ in 0..3 {
+            actor.tick(&mut around(&image, &mut globals));
+            assert!(actor.hidden && actor.selector == 0, "held by the flag wait");
+        }
+        globals.write_flag(0x8003);
+        actor.tick(&mut around(&image, &mut globals));
+        assert!(!actor.hidden);
+        assert_eq!(actor.selector, 4);
+        // With bit 15 the wait holds while the flag is set.
+        let mut set = Globals::with_events(vec![0; 512]);
+        set.write_flag(0x8003);
+        let (_, actor) = run(
+            &[(0, &[2, 0x05, 0x03, 0x80, 2, 0x80, 4, 2, 0x8E])],
+            &mut set,
+        );
+        assert_eq!(actor.selector, 0);
+    }
+
+    #[test]
     fn input_locks_deletion_jumps_and_continuations() {
         // Lock $FF50, unlock $0F00, then wait.
         let mut globals = Globals::with_events(vec![0; 512]);
@@ -2111,5 +2269,101 @@ mod scene_service_tests {
         globals.write_flag(0x0030);
         actor.tick(&mut around(&image, &mut globals));
         assert_eq!((actor.pc, globals.events[6] & 1), (AT, 1));
+    }
+}
+
+#[cfg(test)]
+mod scripted_leg_tests {
+    use super::*;
+
+    const AT: usize = 0x08_8000;
+
+    /// One frame of a leg service at (56,64), with class-0 timing admitted
+    /// and every pose list 32 ticks long.
+    fn leg(code: &[u8], admitted: bool) -> Actor {
+        let mut image = vec![0; AT + 0x40];
+        image[AT..AT + code.len()].copy_from_slice(code);
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        actor.pose_ticks = Some(vec![Some(32); 8]);
+        actor.cadence = admitted.then_some(cadence::Cadence {
+            walk: [32; 4],
+            idle: 16,
+        });
+        let mut globals = Globals::with_events(vec![0; 512]);
+        actor.tick(&mut Surroundings {
+            image: &image,
+            globals: &mut globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        });
+        actor
+    }
+
+    #[test]
+    fn a_leg_turns_poses_and_moves_its_first_pixel_at_once() {
+        // Down to row 6: pose 3, vector $68.
+        let down = leg(&[2, 0x3A, 3, 0x68, 6, 2, 0x8E], true);
+        assert_eq!(
+            (down.facing, down.selector, down.hflip),
+            (Direction::Down, 3, false)
+        );
+        assert_eq!((down.position, down.walking), ((56, 65), true));
+        assert_eq!(down.state, State::Waiting(31));
+        // Up to row 2: pose and vector one higher.
+        let up = leg(&[2, 0x3A, 3, 0x68, 2, 2, 0x8E], true);
+        assert_eq!(
+            (up.facing, up.selector, up.position),
+            (Direction::Up, 4, (56, 63))
+        );
+        // Left to column 1 (x 24): mirrored, vector not incremented.
+        let left = leg(&[2, 0x39, 5, 0x60, 1, 2, 0x8E], true);
+        assert_eq!(
+            (left.facing, left.selector, left.hflip),
+            (Direction::Left, 5, true)
+        );
+        assert_eq!(left.position, (55, 64));
+        // Right to column 5 (x 88).
+        let right = leg(&[2, 0x39, 5, 0x60, 5, 2, 0x8E], true);
+        assert_eq!(
+            (right.facing, right.hflip, right.position),
+            (Direction::Right, false, (57, 64))
+        );
+    }
+
+    #[test]
+    fn at_its_target_a_leg_skips_its_loop_and_bit_seven_skips_four_more() {
+        // Row 4 is y 64: skip 3 operands and `8E; 3B; BRA`, landing on the pose.
+        let done = leg(
+            &[
+                2, 0x3A, 3, 0x68, 4, 2, 0x8E, 2, 0x3B, 0x80, 0xF5, 2, 0x80, 7, 2, 0x8E,
+            ],
+            true,
+        );
+        assert_eq!((done.selector, done.position), (7, (56, 64)));
+        // Bit 7 of the pose: the loop also holds a four-byte `COP 23`.
+        let posed = leg(
+            &[
+                2, 0x3A, 0x83, 0x68, 4, 2, 0x8E, 2, 0x3B, 2, 0x23, 0, 0x80, 0x80, 0xF1, 2, 0x80, 9,
+                2, 0x8E,
+            ],
+            true,
+        );
+        assert_eq!(posed.selector, 9);
+    }
+
+    #[test]
+    fn a_leg_outside_the_audited_streams_freezes() {
+        assert_eq!(
+            leg(&[2, 0x3A, 3, 0x70, 6, 2, 0x8E], true).state,
+            State::Frozen
+        );
+        assert_eq!(
+            leg(&[2, 0x3A, 3, 0x68, 6, 2, 0x8E], false).state,
+            State::Frozen
+        );
     }
 }

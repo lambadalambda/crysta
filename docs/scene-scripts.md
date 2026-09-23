@@ -47,6 +47,18 @@ callback on a confirm press when nothing else owns the window.
 | `06` | `$80:864C` | long target | long jump |
 | `BC` | `$80:AAA5` | — | stores the next command as the continuation `RTL` resumes at |
 | `48` | `$80:96CB` | flag word | deletes the actor when the flag is set (bit 15) or clear |
+| `54` | `$80:99EB` | item, target | gives the item (target taken when full; not modelled) |
+| `3A` / `39` | `$80:929C` / `921F` | pose, vector, row / column | starts a scripted leg; the next `COP 8E` moves the actor at the class-0 stream, or skips the leg's loop at the target |
+| `A7` | `$80:A876` | — | deletes the actor |
+| `19` | `$80:8B35` | 14 bytes | writes the re-entry record `$0600..$060F`; stepped over |
+| `05` | `$80:862E` | flag word | yields on itself until the flag is set (bit 15 clear) or clear (bit 15 set) |
+
+Scripts also hide and show their actor with inline native code on entity
+`+$04` bit 15 (`LDA $0004,X; ORA #$8000` / `AND #$7FFF; STA $0004,X`, about
+160 and 265 sites). The draw list (`$80:EB68`) skips such an actor and its
+animation and movement stop; its script runs on. The runtime recognises
+exactly these two sequences: a hidden resident is neither drawn nor
+occupying its cell.
 
 Text pages end in `$D5` (A goes on), `$D3` (A closes) or `$D4` (the request
 returns at once and the page stays up for a following choice). A or L
@@ -62,6 +74,13 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
 - **Weaver, map `$13`** (`$83:8EBE`): choice 1 after one request; option 2 or
   cancel sets local flag 1 and grants nothing; option 1 sets `$28` and
   re-registers the callback. The retry path asks the same choice.
+
+- **Elle's wake-up, map `$0F`** (`$83:8D36`, a `$00` record, descriptor
+  `$83:F881`): on a fresh game (`$FB` only) she gives items `$7A` and `$A0`,
+  locks the pad, waits 120 frames, shows three requests (five pages, the
+  first two ending `$D5 $D4`), sets `$20`, walks four legs to the door
+  (unlocking the pad 320 frames after `$20`, as natively at 5903 → 6223) and
+  deletes herself.
 
 ## Open
 

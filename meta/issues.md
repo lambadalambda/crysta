@@ -44,7 +44,6 @@
 - [ ] [Qualify native horizontal Partial/8 and Solid/8 pairs](issues/qualify-horizontal-type8-pairs.md)
 - [ ] [Qualify native slope-mediated horizontal type8 contacts](issues/qualify-slope-mediated-type8.md)
 - [ ] [Play the Crysta story from the wake-up scene to the world map](issues/play-crysta-story.md)
-- [ ] [Play Elle's wake-up scene](issues/bedroom-wake-up-scene.md)
 - [ ] [Apply flag-gated doors, blockers and tile patches](issues/flag-gated-geometry.md)
 - [ ] [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
 - [ ] [Lift and throw pots to break the blue door](issues/pot-throw-door.md)

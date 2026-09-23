@@ -260,7 +260,7 @@ impl Animation {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Placeholder {
     /// The record installs no graphics resource, so the game draws nothing
-    /// for it either: a `$FD` or `$00` record is a script with a position,
+    /// for it either: a `$FD` record is a script with a position,
     /// not a body. Nothing should be drawn.
     Invisible,
     /// The record's descriptor, pose or frame was refused. Something stands
