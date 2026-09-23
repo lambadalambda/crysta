@@ -102,3 +102,4 @@
 - [x] [Derive each walker's step and idle timing from source](issues/derive-walker-cadence-from-source.md)
 - [x] [Execute counted loops, timed waits and the map branch in resident scripts](issues/execute-script-loops-and-waits.md)
 - [x] [Qualify the remaining Crysta walkers' movement cadence](issues/qualify-remaining-crysta-walkers.md)
+- [x] [Fix stale evidence paths in the cadence tool README](issues/fix-cadence-tool-readme-paths.md)

@@ -27,19 +27,22 @@ bytes to the verifier over stdout. It does not save extracted resources.
 neither bootstrap nor codec is copied. `serde_json` is the same MIT/Apache-2.0
 dependency already used by the repository.
 
-## Verify existing private evidence
+## Verify a probe run
 
-Set these paths to your owned ROM and retained probe outputs (ROM normalization,
-including supported copier headers, is handled by `rom::Rom::load`):
+Raw evidence is not kept at a fixed path: produce it with a fresh probe
+([below](#repeat-a-fresh-native-probe)) and verify that output. Set the ROM
+path to your owned cartridge (ROM normalization, including supported copier
+headers, is handled by `rom::Rom::load`):
 
 ```sh
 ROM='/path/to/Tenchi Souzou (Japan).sfc'
-WRAM='local/crysta-cadence/native/settledD.wram'
-SAMPLES='local/crysta-cadence/native.jsonl'
 BIN="${CARGO_TARGET_DIR:-$PWD/local/crysta-cadence-qualification/target}/release"
+out=$(mktemp -d local/crysta-cadence-qualification/replay-XXXXXX)
+"$BIN/crysta-cadence-probe" "$ROM" "$out/a" \
+  tools/crysta-cadence-qualification/route.jsonl >"$out/a.jsonl"
 python3 -B tools/crysta-cadence-qualification/verify.py \
   --rom "$ROM" --decoder "$BIN/crysta-cadence-decode" \
-  --wram "$WRAM" --samples "$SAMPLES"
+  --wram "$out/a/settledD.wram" --samples "$out/a.jsonl"
 ```
 
 The verifier reads evidence without rewriting it and prints `PASS` only after:

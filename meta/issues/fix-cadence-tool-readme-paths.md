@@ -23,3 +23,11 @@ probe runs replace them.
 ## Notes
 
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
+
+## Result
+
+- "Verify existing private evidence" became "Verify a probe run", which
+  produces its own evidence with the probe and verifies that output.
+- Every `sh` block in the README was extracted and run in order from the
+  repository root with only the ROM path set: build, unit tests, a map-D run,
+  two identical map-D replays and two identical town replays all pass.

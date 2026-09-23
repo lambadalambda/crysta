@@ -150,7 +150,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [Model the COP 8E pose wait from source](issues/model-pose-wait-service.md)
 - [Share one descriptor-reuse rule between sprites and cadence](issues/share-descriptor-reuse-rule.md)
-- [Fix stale evidence paths in the cadence tool README](issues/fix-cadence-tool-readme-paths.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
