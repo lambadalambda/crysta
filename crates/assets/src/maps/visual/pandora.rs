@@ -203,19 +203,16 @@ impl SourceCamera {
             &display_offset.to_le_bytes()[..2],
         )?;
         expect(image, display_offset, &display)?;
-        let record_offset = 0x16_be30 + usize::from(map_id) * 2;
-        expect(image, record_offset, &record)?;
-        let [a, b] = record.map(u16::from);
-        let left = (a & 15) * 256;
-        let top = (b & 15) * 256;
+        let region = super::camera::CameraRegion::from_rom(image, map_id)?;
+        expect(image, region.record_offset, &record)?;
         Ok(Self {
-            record_offset,
+            record_offset: region.record_offset,
             record,
-            bounds: [left, top, left + (a >> 4) * 256, top + (b >> 4) * 256],
+            bounds: region.bounds,
             scene_offset: scene,
             display_offset,
             display,
-            vertical_extent: 256,
+            vertical_extent: region.vertical_extent,
             hardware_background: if display[5] & 0x80 != 0 { 2 } else { 1 },
             ring_word_base: 0x3800,
             bgmode: display[6],
@@ -228,14 +225,7 @@ impl SourceCamera {
     /// region of at least `vertical_extent` height. ROM-derived contracts satisfy this.
     #[must_use]
     pub fn settled_origin(&self, player: [u16; 2]) -> [u16; 2] {
-        [
-            player[0]
-                .saturating_sub(128)
-                .clamp(self.bounds[0], self.bounds[2] - 256),
-            player[1]
-                .saturating_sub(112)
-                .clamp(self.bounds[1], self.bounds[3] - self.vertical_extent),
-        ]
+        super::camera::clamp_origin(self.bounds, self.vertical_extent, player)
     }
 }
 
