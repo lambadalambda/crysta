@@ -25,3 +25,10 @@ would draw past its box, and in the wide view outside the classic area.
 - Milestone: [M4 — Portable vertical slice](../milestones.md#m4-portable-vertical-slice).
 - Found in review of the 16:9 view. Real pages are about 224 pixels wide or
   less, so no current page is affected.
+
+## Result
+
+- `draw_page` draws at most 240x208 page pixels, the box less its margins.
+  The oversized-page test failed on the right margin before and passes after.
+  19 frame tests and app Clippy pass. A classic screenshot of a real dialogue
+  in `$0C` is byte-identical to before.

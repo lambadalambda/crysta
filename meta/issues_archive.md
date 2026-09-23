@@ -96,3 +96,4 @@
 - [x] [Verify native Crysta movement and animation cadence](issues/verify-native-crysta-cadence.md)
 - [x] [Clip the native Crysta camera to the source map region](issues/clip-native-crysta-camera.md)
 - [x] [Add a 16:9 view to the native Crysta app](issues/native-crysta-widescreen.md)
+- [x] [Clip dialogue pages to their box](issues/clip-wide-dialogue-pages.md)

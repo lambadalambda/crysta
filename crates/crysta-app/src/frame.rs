@@ -216,8 +216,13 @@ pub fn draw_page(
         *slot = PAGE_BOX;
     }
     let margin = signed(PAGE_MARGIN);
-    for row in 0..height {
-        for column in 0..width {
+    // A page larger than its box shows only what fits inside the margins.
+    let shown = (
+        width.min(CLASSIC_WIDTH - 2 * PAGE_MARGIN),
+        height.min(VIEW_HEIGHT - 2 * PAGE_MARGIN),
+    );
+    for row in 0..shown.1 {
+        for column in 0..shown.0 {
             let index = usize::from(indexed[row * width + column]) & 3;
             let at = (left + margin + signed(column), top + margin + signed(row));
             canvas.set(at, palette[index]);
@@ -641,6 +646,26 @@ mod tests {
         );
         // Above the box nothing was touched.
         assert_eq!(canvas.pixels[(top - 1) * CLASSIC_WIDTH + left], 0);
+    }
+
+    #[test]
+    fn an_oversized_page_stays_inside_its_box() {
+        let mut canvas = Canvas::new(WIDE_WIDTH);
+        let (width, height) = (300, 300);
+        draw_page(
+            &mut canvas,
+            &vec![1; width * height],
+            (width, height),
+            3,
+            (72, 0),
+        );
+        let at = |x: usize, y: usize| canvas.pixels[y * WIDE_WIDTH + x];
+        // The box is the classic 256 across and the view's 224 down.
+        assert_eq!(at(72 + 8, 8), PAGE_PALETTE[1]);
+        assert_eq!(at(72 + 247, 215), PAGE_PALETTE[1]);
+        assert_eq!(at(72 + 248, 8), PAGE_BOX, "right margin");
+        assert_eq!(at(72 + 8, 216), PAGE_BOX, "bottom margin");
+        assert_eq!(at(72 + 256, 8), 0, "outside the classic area");
     }
 
     #[test]
