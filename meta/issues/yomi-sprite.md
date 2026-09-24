@@ -27,4 +27,4 @@ Yomi is drawn as the pink placeholder: the art decoder refuses its sprite.
   the tour rooms. The spear's display `$83:957C`, whose script sets its own
   art base (`COP D8 $A2C000`), is refused rather than drawn with Yomi's body;
   it needs the Pandora direct-list art (`tour_object`). Pandora's Box in
-  `$21` (mode `$0004`, `box_art`) is also still a placeholder.
+  `$21` (mode `$0004`) now draws its list 3 from `box_art` (2026-09-24).
