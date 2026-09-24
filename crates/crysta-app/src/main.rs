@@ -46,10 +46,6 @@ fn main() {
             std::process::exit(1);
         }
     };
-    if cartridge.revision() != rom::Revision::Japan {
-        eprintln!("the slice is qualified only for the Japanese reference");
-        std::process::exit(1);
-    }
     // Headless: run a step script and write the composed frame out, so the
     // renderer can be inspected without a window.
     // The image is leaked once, so the world can borrow it for the run.
@@ -114,8 +110,9 @@ fn start_diagnostics(
         "rom_sha256": cartridge.digests().sha256, "music_available": music, "view_width": width,
         "initial": {"map": START.0, "x": START.1, "y": START.2},
         "movement_policy": "interactive-refusal-reset-v1",
-        "timing_policy": "ntsc-mean-fixed-step-v1",
-        "tick_period_ns": clock::FRAME_PERIOD.as_nanos(), "max_catch_up":clock::MAX_CATCH_UP,
+        "timing_policy": "console-mean-fixed-step-v2",
+        "revision": cartridge.revision().id(),
+        "tick_period_ns": clock::frame_period(cartridge.revision()).as_nanos(), "max_catch_up":clock::MAX_CATCH_UP,
         "limits": "portable-host diagnostics, not native qualification; rotated history may be incomplete"
     });
     match diagnostics::SessionLog::start(std::path::Path::new("local/crysta-app/logs"), metadata) {
@@ -289,6 +286,7 @@ impl App {
         log: Option<diagnostics::SessionLog>,
         width: usize,
     ) -> Self {
+        let period = clock::frame_period(cartridge.revision());
         Self {
             cartridge,
             image,
@@ -303,7 +301,7 @@ impl App {
             cancel: input::Interaction::default(),
             describe: input::Interaction::default(),
             started: std::time::Instant::now(),
-            clock: clock::Clock::new(std::time::Duration::ZERO),
+            clock: clock::Clock::with_period(std::time::Duration::ZERO, period),
             suspended: false,
             music,
             music_controls: music_controls::Controls::default(),

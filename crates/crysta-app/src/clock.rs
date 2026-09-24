@@ -8,6 +8,20 @@ use std::time::Duration;
 /// ares/sfc/ppu/counter/inline.hpp and ares/ares/ares.hpp. Host pacing only;
 /// this does not reproduce game logic skipped during a native lag frame.
 pub const FRAME_PERIOD: Duration = Duration::from_nanos(16_639_263);
+/// PAL non-interlaced: 1364 * 312 master clocks at 21.28137 MHz (the colour
+/// burst times 4.8, ares' `sfc/system/system.cpp`): ~50.006979 Hz. The
+/// European ROM runs here; its logic moves the same per frame
+/// (`docs/european-timing.md`).
+pub const PAL_FRAME_PERIOD: Duration = Duration::from_nanos(19_997_209);
+
+/// The frame period of a revision's console.
+#[must_use]
+pub const fn frame_period(revision: rom::Revision) -> Duration {
+    match revision {
+        rom::Revision::Japan => FRAME_PERIOD,
+        rom::Revision::EuropeEnglish => PAL_FRAME_PERIOD,
+    }
+}
 /// Frames one poll may run to catch up.
 pub const MAX_CATCH_UP: usize = 4;
 
@@ -22,19 +36,26 @@ pub struct Batch {
 /// Deadlines are relative to a host-owned monotonic origin, not wall-clock time.
 pub struct Clock {
     next: Duration,
+    period: Duration,
 }
 
 impl Clock {
-    /// A clock whose first frame is due one period after `now`.
+    /// An NTSC clock whose first frame is due one period after `now`.
     pub fn new(now: Duration) -> Self {
+        Self::with_period(now, FRAME_PERIOD)
+    }
+
+    /// A clock of `period` whose first frame is due one period after `now`.
+    pub fn with_period(now: Duration, period: Duration) -> Self {
         Self {
-            next: now + FRAME_PERIOD,
+            next: now + period,
+            period,
         }
     }
 
     /// Starts again from `now`.
     pub fn reset(&mut self, now: Duration) {
-        *self = Self::new(now);
+        *self = Self::with_period(now, self.period);
     }
 
     /// When the next frame is due.
@@ -47,7 +68,7 @@ impl Clock {
         let mut steps = 0;
         while now >= self.next && steps < MAX_CATCH_UP {
             steps += 1;
-            self.next += FRAME_PERIOD;
+            self.next += self.period;
         }
         let dropped_backlog = now >= self.next;
         if dropped_backlog {
@@ -65,6 +86,20 @@ impl Clock {
 mod tests {
     use super::*;
     use std::time::Duration;
+
+    #[test]
+    fn a_pal_clock_steps_at_fifty_hertz_and_keeps_its_period_on_reset() {
+        let period = frame_period(rom::Revision::EuropeEnglish);
+        let mut clock = Clock::with_period(Duration::ZERO, period);
+        assert_eq!(
+            clock.poll(FRAME_PERIOD * 2).steps,
+            1,
+            "one PAL frame in two NTSC"
+        );
+        clock.reset(Duration::ZERO);
+        assert_eq!(clock.deadline(), period);
+        assert_eq!(Duration::from_secs(1).as_nanos() / period.as_nanos(), 50);
+    }
 
     #[test]
     fn extra_event_loop_wakeups_do_not_advance_simulation() {
