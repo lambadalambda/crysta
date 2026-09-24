@@ -88,7 +88,12 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
     };
     let source = SpawnList::resolve(image, map, EventFlags::Bitmap(events))
         .ok()
-        .and_then(|records| SceneAnimation::from_records(image, &records).ok())
+        .and_then(|records| {
+            SceneAnimation::from_records(image, &records, |flag| {
+                EventFlags::Bitmap(events).get(flag) == Some(true)
+            })
+            .ok()
+        })
         .filter(|source| !source.is_empty());
     let animation = source.map(|source| Animated::new(image, map, scene, source, backdrop));
     Ok(CachedBackground {
