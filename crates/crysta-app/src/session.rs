@@ -336,6 +336,8 @@ impl Session {
         let region = background.region;
         let camera = background.camera(position, frame.width);
         frame::draw_background(frame, &background.frame, camera);
+        let screen = world.screen();
+        frame::mosaic(frame, screen.mosaic);
         let clouds = background;
         let background = &background.frame;
         let count = residents.len();
@@ -397,7 +399,8 @@ impl Session {
         }
         clouds.add_clouds(frame, camera, self.background_clock.tick());
         frame::extend_edges(frame, camera, region.bounds);
-        frame::dim(frame, world.brightness());
+        frame::tint(frame, screen.tint);
+        frame::dim(frame, screen.brightness);
         draw_dialogue(frame, world, position, camera, self.image);
         camera
     }

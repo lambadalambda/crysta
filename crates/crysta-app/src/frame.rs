@@ -5,6 +5,7 @@
 
 use assets::maps::visual::camera::CameraRegion;
 use assets::text::Placement;
+use crysta_runtime::world::Tint;
 
 /// Classic view width in pixels.
 pub const CLASSIC_WIDTH: usize = 256;
@@ -142,6 +143,40 @@ pub fn dim(canvas: &mut Canvas, brightness: u8) {
     let scale = u32::from(brightness) + 1;
     for pixel in &mut canvas.pixels {
         let channel = |shift: u32| (((*pixel >> shift) & 0xFF) * scale / 16) << shift;
+        *pixel = channel(16) | channel(8) | channel(0);
+    }
+}
+
+/// `MOSAIC`: each block of `size + 1` pixels, counted from the screen's
+/// top-left, shows its top-left pixel.
+pub fn mosaic(canvas: &mut Canvas, size: u8) {
+    let block = usize::from(size) + 1;
+    if block == 1 {
+        return;
+    }
+    let width = canvas.width;
+    for index in 0..canvas.pixels.len() {
+        let (x, y) = (index % width, index / width);
+        canvas.pixels[index] = canvas.pixels[(y - y % block) * width + x - x % block];
+    }
+}
+
+/// Moves every colour toward white per 5-bit channel, as the fades' palette
+/// changes do.
+pub fn tint(canvas: &mut Canvas, tint: Tint) {
+    if tint == Tint::None {
+        return;
+    }
+    let change = |channel: u32| match tint {
+        Tint::None => channel,
+        Tint::Raise(by) => (channel + u32::from(by)).min(31),
+        Tint::Floor(floor) => channel.max(u32::from(floor).min(31)),
+    };
+    for pixel in &mut canvas.pixels {
+        let channel = |shift: u32| {
+            let wide = change((*pixel >> shift & 0xFF) >> 3);
+            (wide << 3 | wide >> 2) << shift
+        };
         *pixel = channel(16) | channel(8) | channel(0);
     }
 }
@@ -406,6 +441,30 @@ mod tests {
         assert_eq!(canvas.pixels[0], 0x0078_4008, "half");
         dim(&mut canvas, 0);
         assert_eq!(canvas.pixels[0], 0x0007_0400, "a sixteenth");
+    }
+
+    #[test]
+    fn a_mosaic_repeats_each_blocks_top_left_pixel() {
+        let mut canvas = Canvas::new(4);
+        canvas.pixels = (0..8).collect();
+        mosaic(&mut canvas, 1);
+        assert_eq!(canvas.pixels, [0, 0, 2, 2, 0, 0, 2, 2]);
+        mosaic(&mut canvas, 0);
+        assert_eq!(canvas.pixels, [0, 0, 2, 2, 0, 0, 2, 2], "size 0 is off");
+    }
+
+    #[test]
+    fn a_tint_raises_or_floors_each_five_bit_channel() {
+        use crysta_runtime::world::Tint;
+        // 5-bit (0, 16, 31), widened as the renderer does.
+        let mut canvas = filled(1, 0x0000_84FF);
+        tint(&mut canvas, Tint::Raise(4));
+        assert_eq!(canvas.pixels[0], 0x0021_A5FF, "(4, 20, 31)");
+        tint(&mut canvas, Tint::Floor(31));
+        assert_eq!(canvas.pixels[0], 0x00FF_FFFF, "white");
+        let mut canvas = filled(1, 0x0000_84FF);
+        tint(&mut canvas, Tint::None);
+        assert_eq!(canvas.pixels[0], 0x0000_84FF);
     }
 
     #[test]
