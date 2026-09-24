@@ -1,9 +1,12 @@
-//! Source-only Japanese music and sound effect extraction; no captured
-//! machine state.
+//! Source-only music and sound effect extraction; no captured machine
+//! state.
 //!
-//! Selection 3 (track 4) is qualified byte for byte; other tracks share its
-//! framing through the track table. Transfer protocol and evidence are
-//! documented in `tools/native-music-qualification/README.md`.
+//! Selection 3 (track 4) is qualified byte for byte on the Japanese ROM;
+//! other tracks share its framing through the track table. Transfer
+//! protocol and evidence are documented in
+//! `tools/native-music-qualification/README.md`. The European ROM holds the
+//! same driver in place and the same data elsewhere
+//! (`docs/european-timing.md`).
 
 use std::ops::Range;
 
@@ -11,7 +14,10 @@ use rom::{Revision, Rom, RuntimeRomAddress};
 
 const MAX_BLOCKS: usize = 16;
 const BOOTSTRAP: usize = 0x06_ac42;
+/// The sample pool `$B8:8000` (`LDA #$B8` at `$86:AAE6`), European
+/// `$BA:8000`.
 const SAMPLE_POOL: usize = 0x38_8000;
+const EUROPEAN_SAMPLE_POOL: usize = 0x3a_8000;
 /// The highest sample ID a selection may name; the pool is scanned to it.
 const LAST_SAMPLE: u8 = 0x7f;
 
@@ -70,7 +76,7 @@ pub struct Track {
 /// Extraction fails closed on revision, framing, source, or destination errors.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum MusicDataError {
-    /// Requires the built-in authenticated Japanese revision, not a caller label.
+    /// Requires a built-in authenticated revision, not a caller label.
     UnsupportedRom,
     /// A source range is truncated or its arithmetic overflowed.
     SourceBounds {
@@ -86,7 +92,7 @@ pub enum MusicDataError {
 impl std::fmt::Display for MusicDataError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::UnsupportedRom => f.write_str("music requires the authenticated Japanese ROM"),
+            Self::UnsupportedRom => f.write_str("music requires an authenticated ROM"),
             Self::SourceBounds { offset, length } => write!(
                 f,
                 "music ROM range {offset:#x}+{length:#x} is out of bounds"
@@ -99,35 +105,54 @@ impl std::error::Error for MusicDataError {}
 
 type Result<T> = std::result::Result<T, MusicDataError>;
 
-/// The track table `$96:F2A0`: a long pointer, then the parameter's low
-/// nibble (`$86:AC26`).
+/// The track table `$96:F2A0` (European `$99:F9EA`): a long pointer, then
+/// the parameter's low nibble (`$86:AC26`).
 const TRACKS: usize = 0x16_f2a0;
+const EUROPEAN_TRACKS: usize = 0x19_f9ea;
 /// The last entry that points at a track; later ones are other data.
 const LAST_TRACK: u8 = 0x3b;
-/// The sound effect bank the host uploads before any track.
+/// The sound effect bank the host uploads before any track (`$C6:2191`,
+/// European `$C8:2191`).
 const SOUND_BANK: usize = 0x06_2191;
+const EUROPEAN_SOUND_BANK: usize = 0x08_2191;
 
-fn authenticated(rom: &Rom) -> Result<&[u8]> {
-    let digest = rom.digests();
-    if rom.revision() != Revision::Japan
-        || digest.sha256 != Revision::Japan.sha256()
-        || digest.crc32 != Revision::Japan.crc32()
-    {
+/// A revision's music data: the track table, the sound bank, the pool.
+struct Layout {
+    tracks: usize,
+    sound_bank: usize,
+    sample_pool: usize,
+}
+
+fn authenticated(rom: &Rom) -> Result<(&[u8], Layout)> {
+    let (revision, digest) = (rom.revision(), rom.digests());
+    if digest.sha256 != revision.sha256() || digest.crc32 != revision.crc32() {
         return Err(MusicDataError::UnsupportedRom);
     }
-    Ok(rom.image())
+    let layout = match revision {
+        Revision::Japan => Layout {
+            tracks: TRACKS,
+            sound_bank: SOUND_BANK,
+            sample_pool: SAMPLE_POOL,
+        },
+        Revision::EuropeEnglish => Layout {
+            tracks: EUROPEAN_TRACKS,
+            sound_bank: EUROPEAN_SOUND_BANK,
+            sample_pool: EUROPEAN_SAMPLE_POOL,
+        },
+    };
+    Ok((rom.image(), layout))
 }
 
 /// Extract the driver and its sound effect bank.
 ///
 /// # Errors
-/// Rejects unauthenticated/non-Japanese images and invalid bounded framing.
+/// Rejects unauthenticated images and invalid bounded framing.
 pub fn extract_driver(rom: &Rom) -> Result<Driver> {
-    let image = authenticated(rom)?;
+    let (image, layout) = authenticated(rom)?;
     let (bootstrap, _) = inline_group(image, BOOTSTRAP)?;
     Ok(Driver {
         bootstrap,
-        sounds: upload_at(image, SOUND_BANK)?,
+        sounds: upload_at(image, layout.sound_bank, layout.sample_pool)?,
     })
 }
 
@@ -136,20 +161,20 @@ pub fn extract_driver(rom: &Rom) -> Result<Driver> {
 /// # Errors
 /// As [`extract_driver`], and rejects an index the table does not hold.
 pub fn extract_track(rom: &Rom, track: u8) -> Result<Track> {
-    let image = authenticated(rom)?;
-    let (source, stop_parameter) = track_source(image, track)?;
+    let (image, layout) = authenticated(rom)?;
+    let (source, stop_parameter) = track_source(image, layout.tracks, track)?;
     Ok(Track {
         index: track,
         stop_parameter,
-        upload: upload_at(image, source)?,
+        upload: upload_at(image, source, layout.sample_pool)?,
     })
 }
 
-fn track_source(image: &[u8], track: u8) -> Result<(usize, u8)> {
+fn track_source(image: &[u8], tracks: usize, track: u8) -> Result<(usize, u8)> {
     if !(1..=LAST_TRACK).contains(&track) {
         return Err(MusicDataError::Invalid("track outside the table"));
     }
-    let entry = bytes(image, TRACKS + usize::from(track) * 4, 4)?;
+    let entry = bytes(image, tracks + usize::from(track) * 4, 4)?;
     let pointer = RuntimeRomAddress::new(u32::from_le_bytes([entry[0], entry[1], entry[2], 0]))
         .map_err(|_| MusicDataError::Invalid("track pointer"))?;
     Ok((pointer.normalized().value() as usize, entry[3] & 15))
@@ -157,7 +182,7 @@ fn track_source(image: &[u8], track: u8) -> Result<(usize, u8)> {
 
 /// An inline group, then the sample IDs after its terminator
 /// (`$86:AAA9`).
-fn upload_at(image: &[u8], source: usize) -> Result<Upload> {
+fn upload_at(image: &[u8], source: usize, sample_pool_at: usize) -> Result<Upload> {
     let (sequence, tail) = inline_group(image, source)?;
     let count = usize::from(bytes(image, tail, 1)?[0]);
     let last = bytes(image, tail + 1, count)?
@@ -165,7 +190,7 @@ fn upload_at(image: &[u8], source: usize) -> Result<Upload> {
         .copied()
         .max()
         .unwrap_or(0);
-    let pool = sample_pool(image, SAMPLE_POOL, last)?;
+    let pool = sample_pool(image, sample_pool_at, last)?;
     let samples = sample_group(image, tail, sequence.terminal_destination, &pool)?;
     Ok(Upload { sequence, samples })
 }
@@ -223,8 +248,20 @@ fn inline_group(image: &[u8], mut cursor: usize) -> Result<(TransferGroup, usize
 }
 
 // $86:AAEA restarts this length-prefixed pool scan for each sample ID. Reading
-// it once is equivalent; both skipping and copying advance FFFF -> next:8000.
+// it once is equivalent; both skipping and copying advance FFFF -> next:8000,
+// and bank $BF's end to $C0:8000, the image's start: the European pool's
+// sample 61 continues there. A zero length skips an entry (only uploading
+// one fails). A length header is read without the skip; none of either pool
+// starts at a bank's last byte.
 fn sample_pool(image: &[u8], mut cursor: usize, last: u8) -> Result<Vec<Transfer>> {
+    let next = |cursor: usize| {
+        let cursor = cursor % Rom::IMAGE_SIZE;
+        if cursor.is_multiple_of(0x10000) {
+            cursor + 0x8000
+        } else {
+            cursor
+        }
+    };
     if last > LAST_SAMPLE {
         return Err(MusicDataError::Invalid(
             "sample index exceeds qualified pool",
@@ -233,24 +270,17 @@ fn sample_pool(image: &[u8], mut cursor: usize, last: u8) -> Result<Vec<Transfer
     let mut pool = Vec::new();
     for _ in 0..=last {
         let length = usize::from(word(image, cursor)?);
-        if length == 0 {
-            return Err(MusicDataError::Invalid("zero sample length"));
-        }
         cursor += 2;
         let mut data = Vec::with_capacity(length);
         let mut source_ranges = Vec::new();
         while data.len() < length {
-            if cursor.is_multiple_of(0x10000) {
-                cursor += 0x8000;
-            }
+            cursor = next(cursor);
             let size = (length - data.len()).min(0x10000 - (cursor & 0xffff));
             data.extend_from_slice(bytes(image, cursor, size)?);
             source_ranges.push(cursor..cursor + size);
             cursor += size;
         }
-        if cursor.is_multiple_of(0x10000) {
-            cursor += 0x8000;
-        }
+        cursor = next(cursor);
         pool.push(Transfer {
             destination: 0,
             source_ranges,
@@ -332,16 +362,16 @@ mod tests {
         assert_eq!(blocks[0].data, [11, 22, 33, 44]);
         assert_eq!(blocks[0].source_ranges, [0xfffe..0x10000, 0x18000..0x18002]);
         assert!(sample_pool(&image[..0x18001], 0xfffc, 0).is_err());
-        assert!(sample_pool(&[0; 4], 0, 0).is_err());
+        assert!(sample_pool(&[0; 1], 0, 0).is_err());
     }
 
     #[test]
     fn a_track_entry_is_a_long_pointer_and_the_parameters_low_nibble() {
         let mut image = vec![0; TRACKS + 0x100];
         image[TRACKS + 4 * 4..TRACKS + 4 * 5].copy_from_slice(&[0x82, 0x8c, 0xaa, 0x27]);
-        assert_eq!(track_source(&image, 4), Ok((0x2a_8c82, 7)));
+        assert_eq!(track_source(&image, TRACKS, 4), Ok((0x2a_8c82, 7)));
         for outside in [0, LAST_TRACK + 1] {
-            assert!(track_source(&image, outside).is_err());
+            assert!(track_source(&image, TRACKS, outside).is_err());
         }
     }
 
@@ -398,6 +428,92 @@ mod tests {
         .unwrap();
         assert!(extract_driver(&fake).is_err());
         assert!(extract_track(&fake, 4).is_err());
+    }
+
+    #[test]
+    fn a_sample_past_the_images_end_continues_in_bank_zero() {
+        // `INC $78` takes bank `$BF` to `$C0`, the image's first bank.
+        let mut image = vec![0; 0x40_0000];
+        image[0x3f_fffc..].copy_from_slice(&[4, 0, 11, 22]);
+        image[0x8000..0x8002].copy_from_slice(&[33, 44]);
+        let blocks = sample_pool(&image, 0x3f_fffc, 0).unwrap();
+        assert_eq!(blocks[0].data, [11, 22, 33, 44]);
+        assert_eq!(
+            blocks[0].source_ranges,
+            [0x3f_fffe..0x40_0000, 0x8000..0x8002]
+        );
+    }
+
+    #[test]
+    fn a_zero_length_sample_is_skipped_but_never_uploaded() {
+        let image = [0, 0, 2, 0, 11, 22];
+        let pool = sample_pool(&image, 0, 1).unwrap();
+        assert_eq!((pool[0].data.len(), &pool[1].data[..]), (0, &[11, 22][..]));
+        assert!(sample_group(&[1, 0], 0, 0x1000, &pool).is_err());
+        assert!(sample_group(&[1, 1], 0, 0x1000, &pool).is_ok());
+    }
+
+    /// A local ROM: `variable`'s path, else the repository's `local/` copy.
+    fn local(variable: &str, name: &str) -> Option<Rom> {
+        let path = std::env::var(variable).map_or_else(
+            |_| {
+                std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                    .join("../../local")
+                    .join(name)
+            },
+            std::path::PathBuf::from,
+        );
+        Rom::load(&std::fs::read(path).ok()?).ok()
+    }
+
+    #[test]
+    fn the_european_music_is_the_japanese_one_moved() {
+        let (Some(europe), Some(japan)) = (
+            local("CRYSTA_EU_ROM", "Terranigma (E) [!].smc"),
+            local("CRYSTA_JP_ROM", "Tenchi Souzou (Japan).sfc"),
+        ) else {
+            return;
+        };
+        let payload = |group: &TransferGroup| -> Vec<(u16, Vec<u8>)> {
+            group
+                .blocks
+                .iter()
+                .map(|block| (block.destination, block.data.clone()))
+                .collect()
+        };
+        let upload = |upload: &Upload| {
+            (
+                payload(&upload.sequence),
+                upload.sequence.terminal_destination,
+                payload(&upload.samples),
+            )
+        };
+        let (eu, jp) = (
+            extract_driver(&europe).unwrap(),
+            extract_driver(&japan).unwrap(),
+        );
+        assert_eq!(eu.bootstrap, jp.bootstrap, "the same driver in place");
+        assert_eq!(upload(&eu.sounds), upload(&jp.sounds));
+        for track in 1..=LAST_TRACK {
+            let (eu, jp) = (
+                extract_track(&europe, track).unwrap(),
+                extract_track(&japan, track).unwrap(),
+            );
+            assert_eq!(eu.stop_parameter, jp.stop_parameter, "{track:#x}");
+            assert_eq!(upload(&eu.upload), upload(&jp.upload), "{track:#x}");
+        }
+        // Sample 61 of the European pool runs past the image's end: its
+        // start is the Japanese copy's, its rest bank 0's code. No track
+        // names it.
+        let pool = sample_pool(europe.image(), EUROPEAN_SAMPLE_POOL, 61).unwrap();
+        assert_eq!(
+            pool[61].source_ranges,
+            [0x3f_c01b..0x40_0000, 0x00_8000..0x00_ddb3]
+        );
+        let japanese = sample_pool(japan.image(), SAMPLE_POOL, 61).unwrap();
+        assert_eq!(pool[61].data.len(), japanese[61].data.len());
+        assert_eq!(pool[61].data[..0x3fe5], japanese[61].data[..0x3fe5]);
+        assert_ne!(pool[61].data, japanese[61].data);
     }
 
     #[test]
