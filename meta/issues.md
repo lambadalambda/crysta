@@ -52,3 +52,8 @@
 - [ ] [Open the shops in Crysta](issues/crysta-shops.md)
 - [ ] [Run the shop's talk callback](issues/shop-state-machine.md)
 - [ ] [Draw the shop display](issues/shop-display.md)
+- [ ] [Draw the text window as the game does](issues/native-text-window.md)
+- [ ] [Draw the light rays in the rooms](issues/light-rays.md)
+- [ ] [Show the area titles](issues/area-titles.md)
+- [ ] [Place the friends in the pot scene as natively](issues/pot-scene-friends.md)
+- [ ] [Let Ark run](issues/running.md)
