@@ -53,6 +53,5 @@
 - [ ] [Run the shop's talk callback](issues/shop-state-machine.md)
 - [ ] [Draw the shop display](issues/shop-display.md)
 - [ ] [Draw the text window as the game does](issues/native-text-window.md)
-- [ ] [Draw the light rays in the rooms](issues/light-rays.md)
 - [ ] [Show the area titles](issues/area-titles.md)
 - [ ] [Let Ark run](issues/running.md)

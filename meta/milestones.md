@@ -142,7 +142,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
 - [Draw the text window as the game does](issues/native-text-window.md)
-- [Draw the light rays in the rooms](issues/light-rays.md)
 - [Show the area titles](issues/area-titles.md)
 - [Let Ark run](issues/running.md)
 - [Play the Crysta slice free-roam in a native app](issues/free-roam-crysta-app.md)
