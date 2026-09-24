@@ -6,6 +6,10 @@ The app boots the sound driver once and plays Crysta's theme (selection 3)
 throughout, with no sound effects. The game changes music on map loads and
 in scenes, and plays sound effects from scripts and the player code.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Requirements
 
 - Music follows each map's loading script (`08 FC` selection, flag-dependent)

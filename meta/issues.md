@@ -49,4 +49,3 @@
 - [ ] [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
 - [ ] [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
 - [ ] [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
-- [ ] [Publish the Crysta slice as a web demo](issues/crysta-web-demo.md)

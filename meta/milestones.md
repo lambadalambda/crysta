@@ -150,11 +150,10 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Walking residents: execute the ordinary loop](issues/crysta-walking-residents.md)
 - [Play the Crysta story from the wake-up scene to the world map](issues/play-crysta-story.md)
 - [Run scripted movement, entry scenes and map transfers](issues/scripted-movement-scenes.md)
-- [Lift and throw pots to break the blue door](issues/pot-throw-door.md)
-- [Open the box in the cellar](issues/cellar-box-sequence.md)
-- [Play the tour inside the box and take the spear](issues/box-tour-and-spear.md)
 - [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
+- [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
+- [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1

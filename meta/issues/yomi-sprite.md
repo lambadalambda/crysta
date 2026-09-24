@@ -4,6 +4,10 @@
 
 Yomi is drawn as the pink placeholder: the art decoder refuses its sprite.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Requirements
 
 - Decode Yomi's sprite resources from source and draw it.

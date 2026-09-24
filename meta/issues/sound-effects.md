@@ -5,6 +5,10 @@
 Scripts (`COP 37`, the `COP 76` queue at `$04D6`, `COP 60`'s sound id) and
 the player's actions request sound effects; the runtime steps over them.
 
+## Dependencies
+
+- [Play the slice's music and sound effects](crysta-music-and-sounds.md)
+
 ## Requirements
 
 - Trace the sound effect command format and the host's port writes.

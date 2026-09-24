@@ -118,3 +118,4 @@
 - [x] [Play sound effects](issues/sound-effects.md)
 - [x] [Show Ark's lift, carry and throw poses](issues/ark-pot-poses.md)
 - [x] [Animate door and stair transitions](issues/door-and-stair-transitions.md)
+- [x] [Publish the Crysta slice as a web demo](issues/crysta-web-demo.md)

@@ -4,6 +4,10 @@
 
 The friend standing in front of the blue door in C does not step aside, as he does natively.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Requirements
 
 - Find the script or proximity rule that moves him and run it.

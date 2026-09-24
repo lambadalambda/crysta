@@ -6,6 +6,10 @@ Scripts change the music during situations (for example `COP 38` writes a
 music word to `$04B6`). How the host turns that into driver commands is not
 traced.
 
+## Dependencies
+
+- [Play the slice's music and sound effects](crysta-music-and-sounds.md)
+
 ## Requirements
 
 - Trace the scene music services and their host path to the driver.

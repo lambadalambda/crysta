@@ -5,6 +5,10 @@
 A static web build of the Crysta app for GitHub Pages: players select their
 own Japanese ROM, which never leaves the browser, and play the slice.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Requirements
 
 - Build the runtime and the app's renderer to WebAssembly; share the
@@ -38,3 +42,13 @@ own Japanese ROM, which never leaves the browser, and play the slice.
   publish it. A node smoke check runs 600 frames and ten seconds of sound in
   memory: 133 ms and 130 ms. Not yet played in a browser (the headless
   browser does not start in this environment), and there is no GitHub remote.
+
+## Resolution
+
+- Published at <https://lambadalambda.github.io/crysta/> from
+  <https://github.com/lambadalambda/crysta>; `.github/workflows/pages.yml`
+  rebuilds and deploys it on every push to `main`. The user played it in the
+  browser (2026-09-24), including the wide 16:9 view.
+- The site holds code only; the workflow fails if it finds a ROM file. The
+  ROM is read with `File.arrayBuffer()` and never sent or stored (by
+  construction; no network capture was made).

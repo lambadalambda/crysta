@@ -4,6 +4,10 @@
 
 Lifting a pot plays no lift animation, and while carrying Ark keeps his ordinary walking frames with the pot drawn above him.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Requirements
 
 - Ark's lift, held idle/walk and throw poses from his animation tables (`docs/pandora-pots.md` sprite table: table0 seq03-05, table1 seq09-0B, table3 seq0F-11).

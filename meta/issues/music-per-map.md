@@ -6,6 +6,10 @@ Each map's loading script selects a track (`08 FC nn`), with flag-dependent
 branches (Crysta's bedroom: selection 3 while `$23` is clear). The app plays
 only selection 3.
 
+## Dependencies
+
+- [Play the slice's music and sound effects](crysta-music-and-sounds.md)
+
 ## Requirements
 
 - Extract any selection's sequence and samples from source, as selection 3 is.

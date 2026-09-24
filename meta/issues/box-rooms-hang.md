@@ -6,6 +6,10 @@ Entering a room of the box through an arch left the pad locked: the arch
 locks it (`COP 2A $F0FF`) before `COP 14`, and the runtime carried the mask
 across the transfer.
 
+## Dependencies
+
+- [Play the Crysta story from the wake-up scene to the world map](play-crysta-story.md)
+
 ## Acceptance Criteria
 
 - After each arch, Ark walks in `$42`, `$43` and `$44`; natively `$045E` is 0
