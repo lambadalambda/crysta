@@ -96,6 +96,15 @@ impl PandoraArt {
     pub fn lists(&self) -> &[PandoraPoseList] {
         &self.lists
     }
+    /// List `selector` of the object sheet at `base` (`COP D8`), as a
+    /// script that points its art there draws it: the blue door's hit
+    /// target (`$88:AAEE`, `$A2:C000` list 0), the spear's display.
+    ///
+    /// # Errors
+    /// Refuses a list outside the qualified shapes.
+    pub fn object(image: &[u8], base: u32, selector: u8) -> Result<Self, SpriteError> {
+        object_list(&mut Loader::new(image), base, base, selector)
+    }
     /// Exact source selector lookup.
     #[must_use]
     pub fn list(&self, selector: u8) -> Option<&PandoraPoseList> {
@@ -461,19 +470,28 @@ fn tour_object(loader: &mut Loader<'_>) -> Result<PandoraArt, SpriteError> {
     if b[..6] != [2, 0xb2, 0xf8, 0xff, 2, 0xd8] || b[9..] != [2, 0x48, 0x42, 0x82, 2, 0x80, 8] {
         return Err(SpriteError::Invalid("changed tour object script"));
     }
-    let base = cpu(&b[6..9]);
-    // Existing, source-qualified shared object sheet/palette load (also used by F).
+    object_list(loader, 0x89_d9f9, cpu(&b[6..9]), b[15])
+}
+/// A list of the object sheet a script points its art at (`COP D8 base`),
+/// with the source-qualified shared object sheet and palette load (also
+/// used by F's prop).
+fn object_list(
+    loader: &mut Loader<'_>,
+    id: u32,
+    base: u32,
+    selector: u8,
+) -> Result<PandoraArt, SpriteError> {
     let resource = loader.prop()?.resource;
     let lists = direct_lists(
         loader,
         base,
-        &[b[15]],
+        &[selector],
         resource.palette_base,
         resource.graphics.tiles.len(),
     )?;
     let HouseGraphicsKey::Compressed(key) = resource.graphics.key;
     Ok(PandoraArt {
-        id: 0x89_d9f9,
+        id,
         graphics_key: PandoraGraphicsKey::Compressed(key),
         graphics: resource.graphics.tiles.clone(),
         palette_base: resource.palette_base,
