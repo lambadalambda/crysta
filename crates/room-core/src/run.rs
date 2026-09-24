@@ -1,12 +1,12 @@
 //! Ark's run: the dash a double tap starts, and the brake that ends it,
-//! as measured on the native probe (`docs/input-admission.md`).
+//! as measured on the native probe (`docs/input-admission.md`, "Dash").
 //!
 //! A second press of the same direction inside the onset window, which
 //! [`WalkingState::step`] refuses as an accelerated trigger, starts a dash
 //! (`$84:AE12`): a still setup frame, then 3, 2, 2 pixels a frame for as long
 //! as the direction is held. Released, it runs on for 8 frames of grace;
 //! the same direction again resumes it, another one turns it, and the
-//! opposite one brakes at once. The brake slides 15 pixels over 16 frames
+//! opposite one brakes the frame after. The brake slides 15 pixels over 16 frames
 //! (sound `$0D`), and a direction from its fifth frame walks off. A wall
 //! ends the dash: a walk if the direction is held, else a stand.
 //! Diagonals, the dash attack and the dash jump are not modelled.
@@ -56,15 +56,6 @@ pub struct RunStep {
     pub braked: bool,
 }
 
-const fn opposite(direction: Direction) -> Direction {
-    match direction {
-        Direction::Up => Direction::Down,
-        Direction::Down => Direction::Up,
-        Direction::Left => Direction::Right,
-        Direction::Right => Direction::Left,
-    }
-}
-
 /// One frame of walking, or of the run under way.
 ///
 /// # Errors
@@ -95,23 +86,15 @@ pub fn step(
             grace,
         }) => {
             let stride = DASH[usize::from(frame % 3)];
+            let on = |grace| Some(dash(direction, frame % 3 + 1, grace));
             match input.direction {
-                Some(held) if held == opposite(direction) => {
-                    (Some(brake(direction, 0)), direction, BRAKE[0])
-                }
-                Some(held) if held == direction => (
-                    Some(dash(direction, frame % 3 + 1, GRACE)),
-                    direction,
-                    stride,
-                ),
+                Some(held) if held == direction => (on(GRACE), direction, stride),
+                // Out of grace, or the frame after an opposite press.
+                _ if grace == 0 => (Some(brake(direction, 0)), direction, BRAKE[0]),
+                Some(held) if held == direction.opposite() => (on(0), direction, stride),
                 // Another direction turns the dash, from a setup frame.
                 Some(turn) => (Some(dash(turn, 0, GRACE)), turn, 0),
-                None if grace <= 1 => (Some(brake(direction, 0)), direction, BRAKE[0]),
-                None => (
-                    Some(dash(direction, frame % 3 + 1, grace - 1)),
-                    direction,
-                    stride,
-                ),
+                None => (on(grace - 1), direction, stride),
             }
         }
         Some(Run::Brake { direction, frame }) => {
@@ -231,20 +214,20 @@ mod tests {
     fn released_it_runs_eight_frames_then_brakes_fifteen_pixels() {
         let mut inputs = tap();
         inputs.extend([R, R]);
-        inputs.extend([None; 8 + 16]);
+        inputs.extend([None; 8 + 16 + 1]);
         let (moves, brakes, state) = run(&floor(), &inputs);
-        assert_eq!(brakes, [6 + 7]);
-        assert_eq!(moves[6..13], [2, 3, 2, 2, 3, 2, 2], "the grace");
-        assert_eq!(moves[13..29].iter().sum::<i16>(), 15, "the slide");
+        assert_eq!(brakes, [6 + 8]);
+        assert_eq!(moves[6..14], [2, 3, 2, 2, 3, 2, 2, 3], "the grace");
+        assert_eq!(moves[14..30].iter().sum::<i16>(), 15, "the slide");
         assert_eq!(state, None, "standing after 16 frames");
     }
 
     #[test]
     fn the_opposite_brakes_at_once_and_a_press_walks_off_from_the_fifth_frame() {
         let mut inputs = tap();
-        inputs.extend([R, Some(Direction::Left), None, None, None]);
+        inputs.extend([R, Some(Direction::Left), None, None, None, None]);
         let (_, brakes, state) = run(&floor(), &inputs);
-        assert_eq!(brakes, [5]);
+        assert_eq!(brakes, [6], "the frame after the press");
         assert_eq!(
             state,
             Some(Run::Brake {

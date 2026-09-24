@@ -48,6 +48,17 @@ impl Direction {
         1 << self as u8
     }
 
+    /// The direction the other way.
+    #[must_use]
+    pub const fn opposite(self) -> Self {
+        match self {
+            Self::Down => Self::Up,
+            Self::Up => Self::Down,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+
     const fn horizontal(self) -> bool {
         matches!(self, Self::Left | Self::Right)
     }
