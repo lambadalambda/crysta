@@ -88,3 +88,12 @@ fn the_shop_texts_pick_their_parts_by_the_words_they_read() {
     // The first item's name (`$92:8632`): six glyphs, five of two bytes.
     assert_eq!(names[0], 6);
 }
+
+#[test]
+fn the_shop_confirm_is_a_two_option_choice() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let choice = assets::text::HouseDialogue::choice_at(cartridge.image(), 0x0A).unwrap();
+    assert_eq!(choice.options.map(|option| option.result), [1, 2]);
+}

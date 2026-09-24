@@ -190,7 +190,7 @@ pub struct DialogueOption {
     pub neighbors: [Option<u8>; 4],
 }
 
-/// One of the two admitted choice catalogs. Native initial option is result 1;
+/// One of the admitted choice catalogs (0, 1 and the shop's `$0A`). Native initial option is result 1;
 /// confirm is A/L, cancel is B/result 0. No option labels are fabricated.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DialogueChoice {
@@ -271,7 +271,7 @@ impl HouseDialogue {
     /// script's `COP 1A`.
     ///
     /// # Errors
-    /// Rejects catalogs other than 0 and 1 and malformed records.
+    /// Rejects catalogs other than 0, 1 and `$0A`, and malformed records.
     pub fn choice_at(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError> {
         decode_choice(image, catalog)
     }
@@ -292,7 +292,8 @@ fn bytes(image: &[u8], source: u32, count: usize) -> Result<&[u8], TextError> {
         .ok_or_else(|| invalid(source, "truncated source"))
 }
 fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError> {
-    if catalog > 1 {
+    // The house's catalogs 0 and 1, and the shop's confirm `$0A`.
+    if ![0, 1, 0x0A].contains(&catalog) {
         return Err(invalid(0, "unsupported choice catalog"));
     }
     let pointer = bytes(image, 0x92_c259 + u32::from(catalog) * 2, 2)?;
