@@ -19,6 +19,7 @@ use std::fmt;
 pub mod actors;
 pub mod art;
 pub mod audio;
+pub mod inventory;
 pub mod plane;
 pub mod residents;
 pub mod scene;

@@ -484,6 +484,10 @@ impl<'a> World<'a> {
                 0
             },
         );
+        self.globals.scratch.insert(
+            crate::actors::PRIME_BLUE,
+            self.globals.inventory.prime_blue(),
+        );
         for index in 0..self.actors.len() {
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(
@@ -817,10 +821,10 @@ impl<'a> World<'a> {
         self.globals.input_mask & PAD_DIRECTIONS != 0
     }
 
-    /// Items scripts have given, in order.
+    /// The items held, in slot order.
     #[must_use]
-    pub fn items(&self) -> &[u8] {
-        &self.globals.items
+    pub fn items(&self) -> Vec<u8> {
+        self.globals.inventory.items()
     }
 
     /// Whether the dialogue page on screen is still typing out; presses
@@ -1144,7 +1148,10 @@ impl<'a> World<'a> {
             events,
             self.base.room.passive_directional_type8_special_bit_clear(),
         )?;
-        entered.globals.items.clone_from(&self.globals.items);
+        entered
+            .globals
+            .inventory
+            .clone_from(&self.globals.inventory);
         entered.globals.scratch.clone_from(&self.globals.scratch);
         entered.globals.audio = audio;
         // The same first layer is not reloaded: its patches stay, and the

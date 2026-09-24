@@ -78,7 +78,8 @@ one cell.
 
 - Money: `$0694` (4 BCD digits) and `$0696` (the fifth), up to 99,999;
   added at `$8D:95DB`, taken at `$8D:95FF`.
-- Prime Blue: `$07ED`, BCD, capped at 999 (`$8D:95A8`, `$8D:95C0`).
+- Prime Blue: `$07ED`, BCD (`$8D:95A8`, `$8D:95C0`). The add compares the
+  BCD sum with `$03E8` as binary, so 400 or more becomes the raw `$03E7`.
 - Inventory: `$7F:8000`, (item, count) pairs, 9 of each at most, placed by
   `$8D:9732`: `$01..$0F` one fixed slot each (`$8D:9790`), `$10..$79` 27
   shared slots at `$00..$35`, `$7A..$7F` fixed, `$80..$9B` 12 slots at

@@ -43,9 +43,8 @@ pub struct Globals {
     /// WRAM words scripts keep as their own variables (see
     /// `actors::native`); they outlive map loads, as WRAM does.
     pub scratch: crate::actors::Scratch,
-    /// Items scripts have given (`COP 54`), in order. The inventory's slots
-    /// and limits (`$7F:8000`) are not modelled.
-    pub items: Vec<u8>,
+    /// Money, Prime Blue and the items scripts have given.
+    pub inventory: crate::inventory::Inventory,
     /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
     /// door's hit count. Cleared on every map load (`$8D:8AED`).
     pub counters: Vec<u8>,
@@ -77,7 +76,7 @@ impl Globals {
             player_action: false,
             transfer: None,
             scratch: crate::actors::Scratch::new(),
-            items: Vec::new(),
+            inventory: crate::inventory::Inventory::default(),
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),

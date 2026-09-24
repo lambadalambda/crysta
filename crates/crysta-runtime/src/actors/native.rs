@@ -33,9 +33,10 @@ const SCRATCH: [(u16, u16); 3] = [
 pub const PLAYER_ACTION: u16 = 0x097C;
 /// Engine words runs may read but not write: the player's action word,
 /// and the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
-/// the Prime Blue shop `$1D` tests (`$88:C7ED`); the slice has none, so it
-/// reads 0.
-const READABLE: [u16; 2] = [PLAYER_ACTION, 0x07ED];
+/// the Prime Blue shop `$1D` tests (`$88:C7ED`).
+const READABLE: [u16; 2] = [PLAYER_ACTION, PRIME_BLUE];
+/// `$07ED`, the Prime Blue count in BCD, as runs read it.
+pub const PRIME_BLUE: u16 = 0x07ED;
 
 /// Instructions one run may take: the freezing's whitening loops 37 times.
 const STEPS: usize = 512;

@@ -17,7 +17,7 @@ mod cadence;
 mod ease;
 mod motion;
 mod native;
-pub use native::{Scratch, PLAYER_ACTION};
+pub use native::{Scratch, PLAYER_ACTION, PRIME_BLUE};
 
 use crate::scene::{Globals, Transfer};
 use assets::maps::actor_script::{
@@ -61,8 +61,8 @@ const DELETE_ON_FLAG: u8 = 0x48;
 const LONG_JUMP: u8 = 0x06;
 /// Stores the next command as the continuation and goes on; `$80:AAA5`.
 const CONTINUATION: u8 = 0xBC;
-/// Gives an item; `$80:99EB`. Operands: the item and a target taken when the
-/// inventory is full, which is not modelled.
+/// Gives an item; `$80:99EB`. Operands: the item and a target in the
+/// script's bank, taken when the inventory is full.
 const GIVE_ITEM: u8 = 0x54;
 /// Grants an item with its presentation: item, the player's pose word and a
 /// sound id (`$80:9A04`); `$8D:9653` adds the item, or a unit of one held.
@@ -1035,7 +1035,7 @@ impl Actor {
                 self.pc = target;
             }
             RETURN => self.pc = self.call.take().unwrap_or(operands),
-            GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, around),
+            GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, bank, around),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
@@ -1893,16 +1893,21 @@ impl Actor {
         &mut self,
         service: u8,
         operands: usize,
+        bank: usize,
         around: &mut Surroundings<'_>,
     ) -> bool {
         let image = around.image;
         match service {
             GIVE_ITEM => {
-                let Some(&item) = image.get(operands) else {
+                let (Some(&item), Some(full)) =
+                    (image.get(operands), cadence::word(image, operands + 1))
+                else {
                     self.state = State::Frozen;
                     return false;
                 };
-                around.globals.items.push(item);
+                if !around.globals.inventory.add(item) {
+                    return self.jump(bank, full);
+                }
                 self.pc = operands + 3;
             }
             GRANT_ITEM => {
@@ -1916,11 +1921,9 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                // Quantities are not modelled: one held stays one entry. The
-                // player's presentation pose is not drawn.
-                if !around.globals.items.contains(&item) {
-                    around.globals.items.push(item);
-                }
+                // A full inventory keeps nothing; the presentation goes on.
+                // The player's presentation pose is not drawn.
+                around.globals.inventory.add(item);
                 around.globals.audio.fanfare(track, frames);
                 self.pc = operands + 4;
             }
@@ -3199,7 +3202,25 @@ mod script_service_tests {
     }
 
     #[test]
-    fn cop_60_grants_an_item_once_and_steps_over_its_presentation() {
+    fn cop_54_gives_an_item_or_jumps_when_the_inventory_is_full() {
+        // COP54 $10 -> $800A; pose 7; wait; pose 9; wait.
+        let code = [
+            2, 0x54, 0x10, 0x0A, 0x80, 2, 0x80, 7, 2, 0xBD, 2, 0x80, 9, 2, 0xBD,
+        ];
+        for (held, selector) in [(0, 7), (9, 9)] {
+            let (image, mut actor) = actor_running(&code);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            for _ in 0..held {
+                globals.inventory.add(0x10);
+            }
+            tick_at(&mut actor, &image, &mut globals, (0, 0));
+            assert_eq!(actor.selector, selector, "{held} held");
+            assert_eq!(globals.inventory.count(0x10), 9.min(held + 1));
+        }
+    }
+
+    #[test]
+    fn cop_60_grants_an_item_each_time_and_steps_over_its_presentation() {
         // COP60 $81 $01A4 $34, twice; pose 7.
         let code = [
             2, 0x60, 0x81, 0xA4, 0x01, 0x34, 2, 0x60, 0x81, 0xA4, 0x01, 0x34, 2, 0x80, 7, 2, 0xBD,
@@ -3207,7 +3228,8 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         let mut globals = Globals::with_events(vec![0; 512]);
         tick_at(&mut actor, &image, &mut globals, (0, 0));
-        assert_eq!(globals.items, [0x81]);
+        assert_eq!(globals.inventory.items(), [0x81]);
+        assert_eq!(globals.inventory.count(0x81), 2);
         assert_eq!(actor.selector, 7);
     }
 
