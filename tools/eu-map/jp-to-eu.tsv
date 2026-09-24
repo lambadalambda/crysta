@@ -1,0 +1,580 @@
+jp_address	eu_address	kind	method	confidence	note
+80:80DF	80:80DF	script	exact	high	run 0xf5 bytes +code +table +shape; code; crates/crysta-runtime/src/actors/native.rs:51
+80:83B2	80:83B2	script	exact	high	run 0x1a2 bytes +code +shape; code; crates/assets/src/maps/actor_script.rs:16
+80:A24F	80:A24F	sprite	exact	high	run 0x1cc bytes +code; code; crates/assets/src/sprites/pandora.rs:663 (+1)
+80:A255	80:A255	sprite	aligned	medium	gap 0x2e bytes, same length; code; crates/assets/src/sprites/pandora.rs:662 (+2)
+80:A261	80:A261	sprite	aligned	medium	gap 0x2e bytes, same length; code; crates/assets/src/sprites/pandora.rs:678 (+2)
+80:E85C	80:E85C	map	exact	high	run 0x2af0 bytes +code +table; code; crates/assets/src/maps/collision.rs:17
+81:8000	81:8000	music	exact	high	run 0x6840 bytes +code +table +shape; code; crates/assets/src/maps/exits.rs:15 (+5)
+81:8001	81:8001	music	exact	high	run 0x6840 bytes +code +table +shape; test; crates/crysta-app/src/music_data.rs:334
+81:8002	81:8002	music	exact	high	run 0x6840 bytes +code +table +shape; test; crates/crysta-app/src/music_data.rs:333 (+1)
+81:8004	81:8004	music	exact	high	run 0x6840 bytes +shape; test; crates/crysta-app/src/music_data.rs:357
+81:8016	81:8016	code	exact	high	run 0x6840 bytes +shape; test; crates/crysta-runtime/src/world.rs:1604
+81:8018	81:8018	code	exact	high	run 0x6840 bytes +shape; test; crates/crysta-runtime/src/world.rs:1604
+81:88AC	81:88AC	code	exact	high	run 0x6840 bytes +table +shape; test; crates/crysta-runtime/src/world.rs:1605
+81:88B8	81:88B8	code	exact	high	run 0x6840 bytes +table +shape; test; crates/crysta-runtime/src/world.rs:1605 (+1)
+81:8F42	81:8F42	code	exact	high	run 0x6840 bytes +shape; code; crates/crysta-runtime/src/world.rs:1414 (+2)
+81:8F9B	81:8F9B	code	exact	high	run 0x6840 bytes +shape; code; crates/crysta-runtime/src/world.rs:1409 (+2)
+81:F462	81:F462	script	exact	high	run 0x1221 bytes +code +shape; code; crates/crysta-runtime/src/actors/ease.rs:11
+82:0000	82:0000	bank	bank	high	bank of 5 weighted addresses in it; run 0x8000 bytes +shape +lz; code; crates/assets/src/maps/exits.rs:17
+82:8000	82:8000	sprite	exact	high	run 0x202 bytes +code +table +shape; code; crates/assets/src/maps/visual/camera.rs:34 (+5)
+82:8002	82:8002	map	exact	high	run 0x202 bytes +table +shape; test; crates/assets/src/maps/visual/pandora.rs:289
+82:8014	82:8014	map	exact	high	run 0x202 bytes; code; crates/assets/src/maps/visual/crysta_animation.rs:74 (+1)
+82:8020	82:8020	sprite	exact	high	run 0x202 bytes; test; crates/assets/src/sprites/house_npc.rs:206
+82:8023	82:8023	map	exact	high	run 0x202 bytes +table; test; crates/assets/src/maps/visual/camera.rs:138
+83:0000	83:0000	bank	bank	high	bank of 85 weighted addresses in it; run 0x8000 bytes +shape +lz; code; crates/assets/src/maps/actors.rs:18
+83:8000	83:8000	script	exact	high	run 0x19 bytes +code +table +shape; code; crates/assets/src/maps/actors.rs:17 (+8)
+83:8002	83:8002	map	exact	high	run 0x19 bytes +table; test; crates/assets/src/maps/visual/camera.rs:98 (+2)
+83:8014	83:8014	map	exact	high	run 0x19 bytes +table; code; crates/assets/src/maps/visual/crysta_animation.rs:74 (+2)
+83:8015	83:8015	map	exact	high	run 0x19 bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:446
+83:8016	83:8016	map	aligned	medium	gap 0x37 bytes, same length; test; crates/assets/src/maps/visual/crysta_animation.rs:293
+83:801A	83:801A	sprite	aligned	medium	gap 0x37 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:369 (+1)
+83:801E	83:801E	sprite	aligned	high	gap 0x37 bytes, same length +table; test; crates/assets/src/sprites/house_tests.rs:374
+83:8020	83:8020	sprite	aligned	high	gap 0x37 bytes, same length +code; test; crates/assets/src/sprites/house_npc.rs:103
+83:8023	83:8023	map	aligned	medium	gap 0x37 bytes, same length; test; crates/assets/src/maps/visual/camera.rs:138
+83:89A7	83:89A7	map	exact	high	run 0xc bytes; code; crates/assets/src/maps/visual/pandora.rs:122
+83:89BF	83:89BF	sprite	exact	high	run 0xc bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:142
+83:89C9	83:89C9	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/pandora_phases.rs:143
+83:89FB	83:89FB	script	exact	medium	local block 9 bytes; test; crates/crysta-runtime/src/actors/cadence.rs:319
+83:8A05	83:8A05	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/pandora_phases.rs:144
+83:8A19	83:8A19	script	exact	medium	local block 8 bytes; code; crates/assets/src/sprites/pandora_phases.rs:145 (+2)
+83:8A23	83:8A23	script	exact	medium	local block 5 bytes; code; crates/assets/src/sprites/pandora_phases.rs:146 (+2)
+83:8A2D	83:8A2D	script	exact	medium	local block 9 bytes; code; crates/assets/src/sprites/pandora_phases.rs:147 (+3)
+83:8A73	83:8A73	map	aligned	medium	gap 0x6 bytes, same length; code; crates/assets/src/maps/visual/crysta_animation.rs:20 (+1)
+83:8A78	83:8A78	map	exact	high	local block 4 bytes +table; code; crates/assets/src/maps/visual/crysta_animation.rs:21
+83:8A79	83:8A79	map	exact	medium	local block 4 bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:436
+83:8A7D	83:8A7D	map	exact	medium	local block 4 bytes; code; crates/assets/src/maps/visual/crysta_animation.rs:22
+83:8A7F	83:8A7F	map	aligned	medium	gap 0x1 bytes, same length; test; crates/assets/src/maps/visual/crysta_animation.rs:436
+83:8A82	83:8A82	map	exact	medium	local block 4 bytes; code; crates/assets/src/maps/visual/crysta_animation.rs:23 (+1)
+83:8A86	83:8A86	map	estimate	low	gap 0x6->0xa bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:446
+83:8B96	83:8B9E	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:262
+83:8C0A	83:8C12	sprite	exact	medium	local block 5 bytes; code; crates/assets/src/sprites/house_tests.rs:263 (+5)
+83:8C14	83:8C1C	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/house_tests.rs:192 (+6)
+83:8C1E	83:8C26	sprite	exact	medium	local block 8 bytes; code; crates/assets/src/sprites/house_tests.rs:265 (+3)
+83:8C28	83:8C30	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/house_tests.rs:266 (+3)
+83:8CA1	83:8CA9	sprite	exact	high	run 0xf bytes; test; crates/assets/src/sprites/house_tests.rs:367 (+3)
+83:8CB4	83:8CBC	script	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:200 (+3)
+83:8CFA	83:8D02	map	exact	high	run 0xe bytes; code; crates/assets/src/maps/visual/pandora.rs:123
+83:8D03	83:8D0B	sprite	exact	high	run 0xe bytes; test; crates/assets/src/sprites/house_tests.rs:274
+83:8D1E	83:8D26	sprite	exact	high	run 0x14 bytes; test; crates/assets/src/sprites/house_tests.rs:372 (+1)
+83:8D4F	83:8D57	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:221 (+2)
+83:8D50	83:8D58	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:295
+83:8D51	83:8D59	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:296 (+1)
+83:8D53	83:8D5B	sprite	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:379
+83:8D69	83:8D71	sprite	exact	high	run 0x10 bytes +code; test; crates/assets/src/sprites/house_npc.rs:106
+83:8D72	83:8D7A	sprite	exact	high	run 0x10 bytes; test; crates/assets/src/sprites/house_npc.rs:207
+83:8D7C	83:8D84	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_npc.rs:114 (+2)
+83:8D7D	83:8D85	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_npc.rs:184
+83:8D7E	83:8D86	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_npc.rs:185
+83:8D86	83:8D8E	sprite	exact	medium	local block 6 bytes; test; crates/assets/src/sprites/house_tests.rs:166 (+1)
+83:8DE2	83:8DEA	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:270
+83:8EAB	83:8EB3	map	exact	high	run 0xf bytes; code; crates/assets/src/maps/visual/pandora.rs:124
+83:8EBE	83:8EC6	sprite	exact	medium	local block 4 bytes; code; crates/assets/src/sprites/pandora_phases.rs:155
+83:8F67	83:8F6F	script	exact	medium	local block 5 bytes (one side); test; crates/crysta-runtime/src/actors/cadence.rs:324
+83:9000	83:9008	sprite	estimate	low	gap 0x17->0x12 bytes; test; crates/assets/src/maps/visual/camera.rs:128 (+1)
+83:9001	83:9009	map	estimate	low	gap 0x17->0x12 bytes; test; crates/assets/src/maps/visual/camera.rs:131 (+1)
+83:9002	83:900A	code	estimate	low	gap 0x17->0x12 bytes; test; crates/crysta-runtime/src/world.rs:1706
+83:9013	83:9016	sprite	aligned	medium	gap 0x4 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:461
+83:90BD	83:90BB	script	exact	medium	local block 5 bytes; test; crates/crysta-runtime/src/actors/cadence.rs:328
+83:90F7	83:90F5	script	exact	medium	local block 10 bytes; test; crates/crysta-runtime/src/actors/cadence.rs:334
+83:923A	83:9244	map	exact	high	run 0xe bytes; code; crates/assets/src/maps/visual/pandora.rs:125
+83:9243	83:924D	sprite	exact	high	run 0xe bytes; test; crates/assets/src/sprites/house_tests.rs:274
+83:9268	83:9272	map	exact	high	run 0x15 bytes; code; crates/assets/src/maps/visual/pandora.rs:126
+83:927B	83:9285	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/pandora_phases.rs:241
+83:928F	83:9299	sprite	exact	medium	local block 5 bytes; code; crates/assets/src/sprites/house_tests.rs:274 (+1)
+83:9527	83:9531	map	exact	high	run 0x13 bytes; code; crates/assets/src/maps/visual/pandora.rs:127
+83:9530	83:953A	sprite	exact	high	run 0x13 bytes; code; crates/assets/src/sprites/pandora_phases.rs:257 (+1)
+83:9569	83:9570	map	exact	high	run 0xe bytes; code; crates/assets/src/maps/visual/pandora.rs:128
+83:9572	83:9579	sprite	exact	high	run 0xe bytes; code; crates/assets/src/sprites/pandora_phases.rs:288
+83:957C	83:9583	sprite	exact	medium	local block 6 bytes; code; crates/assets/src/sprites/pandora_phases.rs:295
+83:95B7	83:95BC	map	exact	high	run 0xe bytes; code; crates/assets/src/maps/visual/pandora.rs:129
+83:95C0	83:95C5	sprite	exact	high	run 0xe bytes; code; crates/assets/src/sprites/pandora_phases.rs:289
+83:95F4	83:95F5	map	exact	high	run 0xe bytes; code; crates/assets/src/maps/visual/pandora.rs:130
+83:95FD	83:95FE	sprite	exact	high	run 0xe bytes; code; crates/assets/src/sprites/pandora_phases.rs:287
+83:EBE4	83:EB8C	sprite	pointer	medium	12 of 0 code refs, 12 table refs agree; gap 0x14->0x15 bytes; code; crates/assets/src/sprites/pandora.rs:293 (+5)
+83:EC7E	83:EC26	sprite	exact	high	run 0xc bytes +table; code; crates/assets/src/sprites/pandora.rs:294 (+1)
+83:ECAE	83:EC56	sprite	exact	high	run 0xc bytes +table; test; crates/assets/src/sprites/house_tests.rs:350
+83:ECC6	83:EC6E	sprite	exact	high	local block 10 bytes +table; code; crates/assets/src/sprites/pandora.rs:296 (+2)
+83:ED37	83:ECDF	script	exact	high	run 0xc bytes +table; code; crates/assets/src/maps/actors.rs:595 (+5)
+83:ED5A	83:ED02	sprite	exact	high	local block 10 bytes +table; code; crates/assets/src/sprites/house_npc.rs:127 (+16)
+83:ED62	83:ED0A	sprite	exact	high	run 0xc bytes; test; crates/assets/src/sprites/house_npc.rs:209
+83:ED65	83:ED0D	sprite	exact	high	run 0xc bytes; test; crates/assets/src/sprites/house_npc.rs:210
+83:ED67	83:ED0F	sprite	exact	high	run 0xc bytes +table; test; crates/assets/src/sprites/house_tests.rs:199 (+1)
+83:ED74	83:ED1C	sprite	exact	high	run 0xc bytes +table; code; crates/assets/src/sprites/house_tests.rs:349 (+2)
+83:ED7F	83:ED27	sprite	exact	high	local block 10 bytes +table; test; crates/assets/src/sprites/house_tests.rs:470
+83:EDEB	83:ED93	script	exact	high	run 0xc bytes +table +shape; test; crates/assets/src/sprites/house_tests.rs:470 (+1)
+83:EDED	83:ED95	script	estimate	low	anchors disagree; test; crates/crysta-runtime/src/actors/cadence.rs:406
+83:EDEE	83:ED89	script	exact	high	run 0xc bytes; test; crates/crysta-runtime/src/actors/cadence.rs:395 (+2)
+83:EDF8	83:ED93	sprite	exact	high	run 0xc bytes; code; crates/assets/src/sprites/pandora.rs:299 (+1)
+83:F8A8	83:F850	sprite	exact	high	run 0xc bytes +table; code; crates/assets/src/sprites/pandora.rs:301 (+4)
+83:F8C0	83:F868	sprite	exact	high	local block 10 bytes +table; code; crates/assets/src/sprites/pandora.rs:300 (+2)
+83:F984	83:F92C	sprite	exact	high	local block 7 bytes (one side) +table; code; crates/assets/src/sprites/pandora.rs:406 (+5)
+83:F98D	83:F935	sprite	aligned	medium	gap 0x5 bytes, same length (one side); test; crates/assets/src/sprites/pandora_tests.rs:218
+83:F990	83:F938	sprite	exact	medium	local block 8 bytes (one side); test; crates/assets/src/sprites/pandora_tests.rs:218
+83:FFCF	FE:6883	sprite	estimate	low	anchors disagree; test; crates/assets/src/sprites/house_tests.rs:373
+83:FFED	FE:68A1	sprite	estimate	low	anchors disagree; test; crates/assets/src/sprites/house_tests.rs:368
+84:0000	84:0000	bank	bank	high	bank of 15 weighted addresses in it; run 0x8000 bytes +shape +lz; code; crates/assets/src/maps/actors.rs:19
+84:A12E	84:A12E	script	exact	high	run 0x1f4 bytes +shape; code; crates/crysta-runtime/src/residents.rs:101
+84:B4C8	84:B4C8	sprite	exact	high	run 0x11 bytes; code; crates/assets/src/sprites/pandora.rs:696
+84:B4DA	84:B4DA	sprite	exact	high	run 0x11 bytes; code; crates/assets/src/sprites/pandora.rs:697
+84:B4F7	84:B4F7	sprite	exact	high	run 0x11 bytes; code; crates/assets/src/sprites/pandora.rs:698
+84:B509	84:B509	sprite	exact	high	run 0x10 bytes +code; code; crates/assets/src/sprites/pandora.rs:710
+84:B51A	84:B51A	sprite	exact	high	run 0x14 bytes; code; crates/assets/src/sprites/pandora.rs:710
+84:B52F	84:B52F	sprite	exact	high	run 0xe bytes; code; crates/assets/src/sprites/pandora.rs:710
+84:B540	84:B540	sprite	exact	high	run 0x12 bytes; code; crates/assets/src/sprites/pandora.rs:699
+84:B553	84:B553	sprite	exact	high	run 0x18 bytes; code; crates/assets/src/sprites/pandora.rs:700
+84:B56A	84:B56A	sprite	exact	high	run 0x12 bytes; code; crates/assets/src/sprites/pandora.rs:701
+84:BE7C	84:BE7C	sprite	exact	high	run 0xbe bytes; code; crates/assets/src/sprites/pandora.rs:702
+84:BE88	84:BE88	sprite	exact	high	run 0xbe bytes; code; crates/assets/src/sprites/pandora.rs:703
+84:BE98	84:BE98	sprite	exact	high	run 0xbe bytes; code; crates/assets/src/sprites/pandora.rs:704
+84:C2B8	84:C2B8	sprite	exact	high	run 0x3f bytes +table +shape; code; crates/assets/src/sprites/pandora.rs:721
+84:C701	84:C701	sprite	exact	high	run 0x3f4 bytes +shape; code; crates/assets/src/sprites/pandora.rs:718
+85:0000	85:0000	bank	bank	high	bank of 11 weighted addresses in it; run 0x8000 bytes +table +shape +lz; code; crates/assets/src/text/pandora.rs:191
+85:81E4	85:81E4	text	exact	high	run 0x50f bytes +code +shape; code; crates/assets/src/text/window.rs:19
+85:96BE	85:970E	text	exact	high	run 0x2d bytes; code; crates/assets/src/text/pandora.rs:188
+85:970D	85:975D	text	aligned	high	gap 0xd bytes, same length +code; code; crates/assets/src/text/pandora.rs:189
+85:9711	85:9761	text	aligned	medium	gap 0xd bytes, same length; text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/pandora/tests.rs:199
+85:9713	85:9763	text	aligned	medium	gap 0xd bytes, same length; text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/pandora/tests.rs:199
+85:BEF7	85:BF8F	text	exact	high	run 0x255 bytes +shape; code; crates/assets/src/text/pandora.rs:178 (+2)
+85:C800	85:C898	text	exact	high	run 0x2e bytes; test; crates/assets/src/text/pandora/tests.rs:200 (+1)
+85:C802	85:C89A	text	aligned	medium	gap 0x2 bytes, same length (one side); text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/pandora/tests.rs:200
+C6:2191	C8:2191	music	exact	high	run 0x777f bytes +shape; code; crates/crysta-app/src/music_data.rs:108
+86:959C	86:959C	sprite	exact	high	run 0x1ea bytes +code; code; crates/assets/src/maps/scripts.rs:14 (+8)
+86:959F	86:959F	map	aligned	medium	gap 0x16 bytes, same length; test; crates/assets/src/maps/visual.rs:1109
+86:95BA	86:95BA	map	exact	medium	local block 8 bytes; test; crates/assets/src/maps/visual.rs:932 (+1)
+86:95BD	86:95BD	map	aligned	medium	gap 0x55 bytes, same length; test; crates/assets/src/maps/visual.rs:932
+86:95C9	86:95C9	sprite	aligned	medium	gap 0x55 bytes, same length; test; crates/assets/src/sprites/house.rs:923 (+1)
+86:A28C	86:A28C	map	exact	high	local block 5 bytes +code; code; crates/assets/src/maps/scripts.rs:15 (+9)
+86:A28F	86:A28F	sprite	exact	medium	local block 5 bytes; code; crates/assets/src/sprites/pandora.rs:507
+86:AC42	86:AC42	music	exact	high	run 0xfc0 bytes +code +table +shape; code; crates/crysta-app/src/music_data.rs:13
+86:AC46	86:AC46	music	exact	high	run 0xfc0 bytes +shape; test; crates/crysta-app/src/music_data.rs:464
+86:AC66	86:AC66	music	exact	high	run 0xfc0 bytes +shape; test; crates/crysta-app/src/music_data.rs:464
+86:AC6A	86:AC6A	music	exact	high	run 0xfc0 bytes +shape; test; crates/crysta-app/src/music_data.rs:465
+86:B85F	86:B85F	music	exact	high	run 0xfc0 bytes +table +shape; test; crates/crysta-app/src/music_data.rs:465
+86:B863	86:B863	music	exact	high	run 0xfc0 bytes +shape; test; crates/crysta-app/src/music_data.rs:466
+86:B8D2	86:B8D2	music	exact	high	run 0xfc0 bytes +shape; test; crates/crysta-app/src/music_data.rs:466
+87:8C99	87:8C8E	text	exact	high	run 0x3d bytes; code; crates/assets/src/text.rs:397
+87:973D	87:9697	sprite	exact	high	run 0x7c bytes +code +shape; code; crates/assets/src/sprites/pandora.rs:541
+87:98C2	87:987F	script	exact	high	local block 11 bytes +table; code; crates/assets/src/maps/visual/scene_animation.rs:14 (+1)
+87:98EB	87:98A8	script	exact	high	run 0x54 bytes +table +shape; code; crates/assets/src/maps/visual/scene_animation.rs:13 (+1)
+88:0000	88:0000	bank	bank	high	bank of 97 weighted addresses in it; run 0x891 bytes; test; crates/assets/src/sprites/house_tests.rs:52 (+1)
+88:8000	88:8000	text	exact	high	run 0x9d bytes +code +table +shape; test; crates/assets/src/text/tests.rs:3 (+50)
+88:8001	88:8001	text	exact	high	run 0x9d bytes +code +table +shape; test; crates/assets/src/text/tests.rs:57 (+1)
+88:8002	88:8002	script	exact	high	run 0x9d bytes +code +table +shape; test; crates/crysta-runtime/src/actors.rs:2543
+88:8003	88:8003	text	exact	high	run 0x9d bytes +code +table +shape; test; crates/assets/src/text/pandora/tests.rs:203
+88:8006	88:8006	text	exact	high	run 0x9d bytes +code +shape; test; crates/assets/src/text/pandora/tests.rs:236
+88:8008	88:8008	text	exact	high	run 0x9d bytes +code +shape; test; crates/assets/src/text/pandora/tests.rs:142
+88:8010	88:8010	script	exact	high	run 0x9d bytes +table +shape; test; crates/crysta-runtime/src/actors.rs:3097 (+1)
+88:8029	88:8029	script	exact	high	run 0x9d bytes +code +table +shape; test; crates/crysta-runtime/src/actors.rs:3270
+88:8FDA	88:91B1	text	exact	high	local block 7 bytes +code; code; crates/assets/src/text.rs:14
+88:8FF0	88:91C6	text	exact	high	local block 6 bytes +code; code; crates/assets/src/text.rs:16 (+1)
+88:9000	88:91D6	text	estimate	low	gap 0xc->0x2e bytes; test; crates/assets/src/text/tests.rs:168 (+1)
+88:9002	88:91FA	text	exact	medium	local block 7 bytes; text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/tests.rs:168
+88:905A	88:925C	text	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 88:9400 (local block 8 bytes); code; crates/assets/src/text.rs:18 (+3)
+88:90D9	88:931A	text	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 88:946C (local block 4 bytes); code; crates/assets/src/text.rs:24 (+3)
+88:9156	88:94C8	text	exact	medium	local block 6 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text.rs:25 (+1)
+88:918C	88:9548	text	exact	medium	local block 8 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text.rs:26 (+2)
+88:91D6	88:9591	text	exact	medium	local block 4 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text.rs:27 (+2)
+88:98A9	88:9D51	sprite	exact	high	run 0xc bytes +table; test; crates/assets/src/sprites/house_npc.rs:117
+88:98D3	88:9D7B	sprite	aligned	high	gap 0x12 bytes, same length +code +table; test; crates/assets/src/sprites/house_npc.rs:120
+88:98D7	88:9D7F	sprite	exact	high	run 0x12 bytes; test; crates/assets/src/sprites/house_npc.rs:208 (+1)
+88:9A6A	88:9F4D	sprite	exact	high	run 0x10 bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:395
+88:9AD0	88:9FB3	sprite	exact	high	run 0x10 bytes +shape; code; crates/assets/src/sprites/pandora_phases.rs:173
+88:9AE9	88:9FCC	text	exact	high	run 0x10 bytes +shape; code; crates/assets/src/text/pandora.rs:15
+88:9AFB	88:9FDE	text	exact	medium	local block 7 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:16
+88:9B01	88:9FE4	sprite	exact	high	run 0x14 bytes; code; crates/assets/src/sprites/pandora_phases.rs:178 (+1)
+88:9B11	88:9FF4	text	exact	high	run 0x14 bytes; code; crates/assets/src/text/pandora.rs:17
+88:9B9F	88:A082	text	exact	high	run 0x24 bytes +shape; code; crates/assets/src/text/pandora.rs:20
+88:9BC2	88:A0A5	text	exact	high	run 0xe bytes +shape; code; crates/assets/src/text/pandora.rs:21
+88:9BEF	88:A0D2	text	exact	high	run 0x2b bytes +shape; code; crates/assets/src/text/pandora.rs:22
+88:9C10	88:A0F3	text	exact	high	run 0x1f bytes; code; crates/assets/src/text/pandora.rs:25
+88:9C16	88:A0F9	sprite	exact	high	run 0x24 bytes; code; crates/assets/src/sprites/pandora_phases.rs:363
+88:9C25	88:A108	sprite	exact	high	run 0x24 bytes; code; crates/assets/src/sprites/pandora_phases.rs:363
+88:9DA9	88:A28C	text	aligned	medium	gap 0x6 bytes, same length; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:18
+88:9DC3	88:A2A6	text	exact	high	local block 11 bytes +code; code; crates/assets/src/text/pandora.rs:21 (+2)
+88:9DEB	88:A2D7	text	exact	high	local block 10 bytes +code; code; crates/assets/src/text/pandora.rs:22 (+2)
+88:9E0A	88:A2FD	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:25 (+2)
+88:9E9C	88:A3A7	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:15 (+2)
+88:9EE3	88:A40F	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:16 (+2)
+88:9EFC	88:A435	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:17 (+4)
+88:9FA9	88:A513	text	exact	high	local block 8 bytes +code; code; crates/assets/src/text/pandora.rs:18 (+2)
+88:A15F	88:A78A	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:19 (+2)
+88:A17B	88:A7B7	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:20 (+2)
+88:A1A4	88:A7E8	sprite	exact	high	run 0x12 bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:396
+88:A20A	88:A84E	sprite	exact	high	run 0xe bytes +shape; code; crates/assets/src/sprites/pandora_phases.rs:174
+88:A241	88:A885	text	exact	high	run 0x1c bytes; code; crates/assets/src/text/pandora.rs:23
+88:A247	88:A88B	sprite	exact	high	run 0x38 bytes; code; crates/assets/src/sprites/pandora_phases.rs:355
+88:A256	88:A89A	sprite	exact	high	run 0x38 bytes; code; crates/assets/src/sprites/pandora_phases.rs:355
+88:A295	88:A8D9	text	exact	high	local block 6 bytes +code; code; crates/assets/src/text/pandora.rs:23 (+2)
+88:A321	88:A9A6	sprite	exact	high	run 0x10 bytes +table +shape; code; crates/assets/src/sprites/pandora_phases.rs:397
+88:A387	88:AA0C	sprite	exact	high	run 0xe bytes +shape; code; crates/assets/src/sprites/pandora_phases.rs:172
+88:A38B	88:AA10	sprite	exact	high	run 0xe bytes; test; crates/assets/src/sprites/pandora_tests.rs:208
+88:A3D9	88:AA5E	text	exact	high	run 0x31 bytes; code; crates/assets/src/text/pandora.rs:24
+88:A3DF	88:AA64	sprite	exact	high	run 0x3a bytes; code; crates/assets/src/sprites/pandora_phases.rs:359
+88:A3EA	88:AA6F	sprite	exact	high	run 0x3a bytes; code; crates/assets/src/sprites/pandora_phases.rs:359
+88:A420	88:AAA5	text	exact	medium	local block 6 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:24 (+2)
+88:A4EB	88:ABB9	sprite	exact	high	run 0x10 bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:398
+88:A56D	88:AC3B	sprite	exact	high	run 0x51 bytes; code; crates/assets/src/sprites/pandora_phases.rs:348
+88:A56F	88:AC3D	sprite	exact	high	run 0x51 bytes +shape; test; crates/assets/src/sprites/pandora_tests.rs:211
+88:A578	88:AC46	sprite	exact	high	run 0x51 bytes; code; crates/assets/src/sprites/pandora_phases.rs:349
+88:A583	88:AC51	sprite	exact	high	run 0x51 bytes; code; crates/assets/src/sprites/pandora_phases.rs:350
+88:A868	88:AFEF	script	exact	high	run 0x10 bytes +shape; test; crates/crysta-runtime/src/actors.rs:2845 (+2)
+88:ABBC	88:B3FA	text	aligned	medium	gap 0x6 bytes, same length +shape; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:19
+88:ACF5	88:B550	sprite	exact	high	run 0xe bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:399
+88:AD95	88:B5F0	text	exact	high	run 0x49 bytes +shape; code; crates/assets/src/text/pandora.rs:26
+88:ADB7	88:B612	text	exact	high	run 0xc bytes +shape; code; crates/assets/src/text/pandora.rs:27
+88:ADCB	88:B626	text	exact	high	run 0x15 bytes +code; code; crates/assets/src/text/pandora.rs:26 (+2)
+88:ADF2	88:B653	text	exact	high	local block 10 bytes +code; code; crates/assets/src/text/pandora.rs:27 (+3)
+88:AE29	88:B68A	text	estimate	low	gap 0x63->0x86 bytes; test; crates/assets/src/text/pandora/tests.rs:77
+88:AE50	88:B6B1	text	estimate	low	gap 0x63->0x86 bytes; test; crates/assets/src/text/pandora/tests.rs:79
+88:AE5E	88:B6E2	text	exact	high	run 0x1f bytes +shape; test; crates/assets/src/text/pandora/tests.rs:77
+88:AE77	88:B6FB	text	exact	high	run 0x1f bytes; code; crates/assets/src/text/pandora.rs:28
+88:AE85	88:B709	text	exact	high	run 0xc bytes; code; crates/assets/src/text/pandora.rs:29
+88:AE93	88:B717	text	exact	high	run 0xc bytes +shape; code; crates/assets/src/text/pandora.rs:30
+88:AEA1	88:B725	text	exact	high	run 0xc bytes +shape; code; crates/assets/src/text/pandora.rs:31
+88:AEB8	88:B73C	sprite	exact	high	run 0x28 bytes +table +shape; code; crates/assets/src/sprites/pandora_phases.rs:400
+88:AFA6	88:B82A	text	exact	high	run 0x6c bytes +code; code; crates/assets/src/text/pandora.rs:28 (+2)
+88:AFE1	88:B874	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:29 (+2)
+88:B064	88:B935	text	exact	high	local block 7 bytes +code; code; crates/assets/src/text/pandora.rs:30 (+2)
+88:B0FB	88:B9F2	text	exact	high	local block 7 bytes +code; code; crates/assets/src/text/pandora.rs:31 (+2)
+88:B673	88:C0D2	text	aligned	medium	gap 0x6 bytes, same length; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:13
+88:B69C	88:C0FB	text	exact	medium	local block 9 bytes +shape; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:14
+88:B6C7	88:C126	text	exact	high	local block 7 bytes +code; code; crates/assets/src/text/pandora.rs:13 (+4)
+88:B722	88:C1A7	text	exact	high	local block 10 bytes +code; code; crates/assets/src/text/pandora.rs:128 (+4)
+88:B758	88:C1E4	text	exact	high	local block 8 bytes +code; code; crates/assets/src/text/pandora.rs:14 (+5)
+88:B7E3	88:C2D4	text	exact	high	local block 5 bytes +code; code; crates/assets/src/text/pandora.rs:128 (+4)
+88:C697	88:D5D5	script	exact	high	run 0xd bytes; code; crates/assets/src/maps/visual/scene_animation.rs:18 (+1)
+88:C6B8	88:D5F6	script	exact	high	run 0x11 bytes +shape; code; crates/assets/src/maps/visual/scene_animation.rs:18 (+1)
+88:D60D	88:E40F	sprite	exact	high	local block 10 bytes +table +shape; test; crates/assets/src/sprites/house_tests.rs:222 (+2)
+88:D60F	88:E411	sprite	exact	high	local block 10 bytes +shape; test; crates/assets/src/sprites/house_tests.rs:481
+88:D618	88:E41A	sprite	aligned	medium	gap 0x6 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:223 (+5)
+88:D641	88:E443	sprite	exact	high	run 0x1e bytes +code +shape; test; crates/assets/src/sprites/house_tests.rs:226 (+1)
+88:D64F	88:E451	sprite	exact	high	run 0x1e bytes; test; crates/assets/src/sprites/house_tests.rs:382 (+1)
+88:D651	88:E453	sprite	aligned	medium	gap 0x1 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:484
+88:FFF5	FF:0C08	sprite	estimate	low	anchors disagree; test; crates/assets/src/sprites/house_tests.rs:378
+89:8000	98:A50B	script	exact	high	run 0x11 bytes +table; test; crates/crysta-runtime/src/actors/native.rs:319
+89:D24E	89:CB3E	map	exact	high	run 0x13 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:180 (+2)
+89:D253	89:CB43	map	exact	high	run 0x13 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:182 (+2)
+89:D255	89:CB45	map	exact	high	run 0x13 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:73 (+1)
+89:D256	89:CB46	map	exact	high	run 0x13 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:126
+89:D257	89:CB47	map	exact	high	run 0x13 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:73
+89:D25A	89:CB4A	map	aligned	medium	gap 0x1 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:74 (+1)
+89:D26C	89:CB5C	map	exact	high	local block 19 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:98 (+2)
+89:D273	89:CB63	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:99
+89:D27A	89:CB6A	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:100
+89:D281	89:CB71	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:101
+89:D288	89:CB78	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:102
+89:D28F	89:CB7F	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:103
+89:D296	89:CB86	map	exact	high	local block 4 bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:104
+89:D29D	89:CB8D	map	exact	high	run 0x2d bytes +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:259 (+1)
+89:D2A1	89:CB91	map	exact	high	run 0x2d bytes +shape; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:99 (+1)
+89:D2AD	89:CB9D	sprite	exact	high	run 0x2d bytes +table +shape; code; crates/assets/src/sprites/pandora_phases.rs:401
+89:D2C1	89:CBB1	sprite	exact	high	run 0x2d bytes +shape; code; crates/assets/src/sprites/pandora_phases.rs:258
+89:D2F4	89:CBE4	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:264
+89:D30E	89:CBFE	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:265
+89:D328	89:CC18	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:266
+89:D342	89:CC32	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:267
+89:D35C	89:CC4C	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:268
+89:D376	89:CC66	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:269
+89:D390	89:CC80	sprite	exact	high	run 0xdc bytes; code; crates/assets/src/sprites/pandora_phases.rs:270
+89:D3E0	89:CCD0	text	exact	medium	local block 10 bytes +shape; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:32
+89:D3F4	89:CCE4	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:33
+89:D408	89:CCF8	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:34
+89:D41C	89:CD0C	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:35
+89:D430	89:CD20	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:36
+89:D444	89:CD34	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:37
+89:D458	89:CD48	text	exact	high	run 0x12 bytes +shape; code; crates/assets/src/text/pandora.rs:38
+89:D470	89:CD60	text	exact	high	run 0x16 bytes; code; crates/assets/src/text/pandora.rs:39
+89:D48B	89:CD7B	text	exact	high	run 0x19 bytes +shape; code; crates/assets/src/text/pandora.rs:46 (+1)
+89:D4A4	89:CD94	text	exact	high	run 0x17 bytes; code; crates/assets/src/text/pandora.rs:40
+89:D4AE	89:CD9E	text	exact	medium	local block 8 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:41
+89:D4C9	89:CDB9	text	exact	high	run 0x19 bytes; code; crates/assets/src/text/pandora.rs:42
+89:D4D3	89:CDC3	text	exact	medium	local block 8 bytes; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:43
+89:D4EE	89:CDDE	text	exact	high	run 0x19 bytes +shape; code; crates/assets/src/text/pandora.rs:44
+89:D4F8	89:CDE8	text	exact	medium	local block 8 bytes +shape; text page, no script names it: confirm with the EU text decoder; code; crates/assets/src/text/pandora.rs:45
+89:D50F	89:CDFF	text	exact	high	run 0x16 bytes +code; code; crates/assets/src/text/pandora.rs:32 (+2)
+89:D548	89:CE34	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:33 (+2)
+89:D5E5	89:CF07	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:34 (+2)
+89:D622	89:CF59	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:35 (+2)
+89:D66D	89:CFB3	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:36 (+2)
+89:D6A7	89:CFFA	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:37 (+2)
+89:D6DD	89:D03F	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:38 (+2)
+89:D720	89:D0A2	text	exact	high	local block 5 bytes +code; code; crates/assets/src/text/pandora.rs:39 (+9)
+89:D735	89:D0C1	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:46 (+4)
+89:D7C1	89:D156	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:40 (+2)
+89:D92D	89:D319	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:42 (+2)
+89:D991	89:D38A	text	exact	high	local block 4 bytes +code; code; crates/assets/src/text/pandora.rs:44 (+2)
+89:D9F9	89:D3FC	sprite	exact	high	run 0xe bytes +table; code; crates/assets/src/sprites/pandora.rs:473 (+2)
+89:D9FE	89:D401	sprite	exact	high	run 0xe bytes +shape; code; crates/assets/src/sprites/pandora.rs:469 (+2)
+89:DC78	89:D731	sprite	exact	high	run 0xe bytes +table; code; crates/assets/src/sprites/pandora_phases.rs:402
+CB:7A98	CD:7A98	text	exact	high	run 0x8000 bytes; code; crates/assets/src/text/window.rs:20
+CC:2B2C	CE:2B2C	sprite	exact	high	run 0x7d0a bytes +shape; test; crates/assets/src/sprites/house_npc.rs:194
+CC:2B2E	CE:2B2E	sprite	exact	high	run 0x7d0a bytes +shape; test; crates/assets/src/sprites/house_npc.rs:152
+CC:2B4C	CE:2B4C	sprite	exact	high	run 0x7d0a bytes; test; crates/assets/src/sprites/house_npc.rs:194
+8C:9000	8C:91FB	sprite	exact	medium	local block 5 bytes; test; crates/assets/src/sprites/house_tests.rs:143
+8C:9022	8C:921D	sprite	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:155
+8C:9042	8C:9243	sprite	aligned	medium	gap 0x11 bytes, same length; test; crates/assets/src/sprites/house_tests.rs:156
+8D:8020	8D:8020	sprite	exact	high	run 0x555 bytes +table +shape; test; crates/assets/src/sprites/house_npc.rs:196 (+1)
+8D:8040	8D:8040	sprite	exact	high	run 0x555 bytes +code +table +shape; test; crates/assets/src/sprites/house_npc.rs:201
+8D:8C52	8D:8C52	code	exact	high	run 0x395 bytes +shape; code; crates/crysta-app/src/background.rs:459 (+1)
+8D:8C53	8D:8C53	code	exact	high	run 0x395 bytes; test; crates/crysta-app/src/background.rs:582
+8D:9407	8D:9407	map	exact	high	run 0x2b bytes +code; code; crates/assets/src/maps/visual/scene_animation.rs:24
+8D:A8EA	8D:A8EA	script	exact	high	run 0x12ee bytes +code +shape; code; crates/crysta-runtime/src/actors/native.rs:51
+8D:A8FD	8D:A8FD	script	exact	high	run 0x12ee bytes +code +shape; code; crates/crysta-runtime/src/actors/native.rs:51
+8D:AA96	8D:AA96	script	exact	high	run 0x12ee bytes +code +shape; code; crates/crysta-runtime/src/actors/native.rs:51 (+1)
+90:8000	90:8000	sprite	exact	high	run 0x49 bytes +code +table +shape; test; crates/assets/src/sprites/house_tests.rs:395
+92:0000	92:0000	bank	bank	high	bank of 16 weighted addresses in it; run 0x8000 bytes +lz; code; crates/assets/src/labels.rs:77 (+4)
+92:8095	92:80AF	shop	pointer	medium	25 of 25 code refs, 0 table refs agree; anchors disagree; code; crates/crysta-runtime/src/shop.rs:25
+92:8179	92:81A4	shop	pointer	medium	2 of 2 code refs, 0 table refs agree; anchors disagree; code; crates/assets/src/shop_display.rs:24
+92:A1ED	92:A438	shop	exact	high	run 0x10 bytes +code; code; crates/crysta-runtime/src/shop.rs:18
+92:A2A0	92:A53D	shop	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 92:A438 (run 0xd bytes); code; crates/crysta-runtime/src/shop.rs:19
+92:A355	92:A65E	shop	pointer	medium	4 of 4 code refs, 0 table refs agree; gap 0x3a9->0x10d bytes; code; crates/crysta-runtime/src/shop.rs:20
+92:A4FB	92:A792	shop	pointer	low	1 of 1 code refs, 0 table refs agree; gap 0x3a9->0x10d bytes; code; crates/crysta-runtime/src/shop.rs:21
+92:A541	92:A79D	shop	pointer	low	1 of 1 code refs, 0 table refs agree; gap 0x3a9->0x10d bytes; code; crates/crysta-runtime/src/shop.rs:28
+92:A65D	92:A8BD	shop	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 92:A65E (local block 11 bytes); code; crates/crysta-runtime/src/shop.rs:28
+92:A765	92:A9E7	shop	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 92:A79D (local block 7 bytes); code; crates/crysta-runtime/src/shop.rs:22
+92:A86C	92:AAE0	shop	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 92:A8BD (local block 7 bytes); code; crates/crysta-runtime/src/shop.rs:23
+92:A8EE	92:ABAE	shop	pointer	medium	1 rewritten code refs agree (1 code refs, 0 table refs); bytes suggested 92:A9E7 (local block 4 bytes); code; crates/crysta-runtime/src/shop.rs:28
+92:A911	92:ABCD	shop	exact	high	local block 10 bytes +code; code; crates/crysta-runtime/src/shop.rs:28
+92:C259	92:C407	text	pointer	medium	3 of 3 code refs, 0 table refs agree; gap 0x14->0x0 bytes; code; crates/assets/src/text.rs:319 (+1)
+92:C25B	92:C407	text	estimate	low	gap 0x14->0x0 bytes; test; crates/assets/src/text/tests.rs:115 (+1)
+92:C25D	92:C407	text	estimate	low	gap 0x14->0x0 bytes; test; crates/assets/src/text/tests.rs:135
+92:C447	92:C5CD	text	pointer	low	1 of 1 code refs, 0 table refs agree; gap 0x99->0x83 bytes; code; crates/assets/src/text.rs:584
+92:C449	92:C5E3	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:32 (+1)
+92:C44B	92:C5E5	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:32 (+2)
+92:C44D	92:C5E7	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:178 (+1)
+92:C461	92:C5FB	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:183
+92:C463	92:C5FD	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:183
+92:C479	92:C601	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:187
+92:C47B	92:C601	text	estimate	low	gap 0x99->0x83 bytes; test; crates/assets/src/text/tests.rs:187
+92:C5E7	92:C793	text	pointer	low	1 of 1 code refs, 0 table refs agree; gap 0x1a8->0x1688 bytes; code; crates/assets/src/labels.rs:20 (+1)
+92:C5F3	92:C799	text	estimate	low	gap 0x1a8->0x1688 bytes; test; crates/assets/src/text/pandora/tests.rs:229
+92:C631	92:C7D7	text	estimate	low	gap 0x1a8->0x1688 bytes; test; crates/assets/src/text/pandora/tests.rs:229
+92:C800	92:DE8A	text	estimate	low	gap 0x22->0x24 bytes; test; crates/assets/src/text/tests.rs:33 (+8)
+92:C802	92:DE8C	text	estimate	low	gap 0x22->0x24 bytes; test; crates/assets/src/text/tests.rs:75 (+6)
+92:C803	92:DE8D	text	estimate	low	gap 0x22->0x24 bytes; test; crates/assets/src/text/tests.rs:33
+92:C804	92:DE8E	text	estimate	low	gap 0x22->0x24 bytes; test; crates/assets/src/text/tests.rs:141
+92:C80A	92:DE94	text	estimate	low	gap 0x22->0x24 bytes; test; crates/assets/src/text/tests.rs:137
+92:C80C	92:DE98	text	exact	medium	local block 11 bytes; text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/tests.rs:137
+92:CC8A	92:E2FC	script	exact	high	run 0xf bytes +shape; code; crates/crysta-runtime/src/actors.rs:205
+92:D57D	92:EBEF	shop	exact	high	run 0x2e bytes +code; code; crates/assets/src/shops.rs:14 (+1)
+D4:3ACB	D6:3ACB	sprite	exact	high	run 0x8002 bytes +code +table +shape +lz; test; crates/assets/src/sprites/house_tests.rs:81 (+1)
+D4:518C	D6:518C	sprite	exact	high	run 0x8002 bytes +code +table +shape +lz; test; crates/assets/src/sprites/pandora_tests.rs:199
+96:0000	99:0000	bank	bank	high	bank of 31 weighted addresses in it; run 0x8000 bytes +shape; code; crates/assets/src/shops.rs:13 (+4)
+D6:4B77	D8:4B77	sprite	exact	high	run 0x8000 bytes +table +shape +lz; test; crates/assets/src/sprites/house_npc.rs:142 (+5)
+D6:5EA2	D8:5EA2	sprite	exact	high	run 0x8000 bytes +code +table +shape +lz; test; crates/assets/src/sprites/house_tests.rs:82 (+1)
+D6:6385	D8:6385	sprite	exact	high	run 0x8000 bytes +table +shape +lz; test; crates/assets/src/sprites/house_tests.rs:78 (+1)
+96:BB64	99:C2AE	map	pointer	medium	2 of 2 code refs, 0 table refs agree; anchors disagree; code; crates/assets/src/maps/visual/camera.rs:42 (+4)
+96:BB66	99:C2B0	map	pointer	low	1 of 1 code refs, 0 table refs agree; anchors disagree; test; crates/assets/src/maps/visual/pandora.rs:251 (+1)
+96:BB71	96:C612	map	estimate	low	anchors disagree; test; crates/assets/src/maps/visual/camera.rs:138
+96:BC02	99:C34C	map	exact	high	run 0xafa bytes; code; crates/assets/src/maps/visual/pandora.rs:133
+96:BC04	99:C34E	map	exact	high	run 0xafa bytes; test; crates/assets/src/maps/visual/camera.rs:138
+96:BC1D	99:C367	map	exact	high	run 0xafa bytes; code; crates/assets/src/maps/visual/pandora.rs:136
+96:BC2F	99:C379	map	exact	high	run 0xafa bytes; code; crates/assets/src/maps/visual/pandora.rs:141
+96:BCDA	99:C424	map	exact	high	run 0xafa bytes +shape; code; crates/assets/src/maps/visual/pandora.rs:144
+96:BE30	99:C57A	map	exact	high	run 0xafa bytes +code; code; crates/assets/src/maps/visual/camera.rs:48 (+3)
+96:BE32	99:C57C	map	exact	high	run 0xafa bytes +shape; test; crates/assets/src/maps/visual/camera.rs:103 (+2)
+96:BE52	99:C59C	map	exact	high	run 0xafa bytes +shape; test; crates/assets/src/maps/visual/camera.rs:110
+96:BE53	99:C59D	map	exact	high	run 0xafa bytes +shape; test; crates/assets/src/maps/visual/camera.rs:138
+96:C6DC	99:CE26	shop	exact	high	run 0xafa bytes +code; code; crates/assets/src/shops.rs:11 (+2)
+96:C900	99:D04A	shop	exact	high	run 0x811 bytes +shape; test; crates/assets/src/shops.rs:160
+96:C909	99:D053	shop	exact	high	run 0x811 bytes +shape; test; crates/assets/src/shops.rs:160
+96:CD9D	99:D4E7	map	exact	high	run 0x811 bytes +code +shape; code; crates/assets/src/maps/flag_patches.rs:11
+96:DDBD	99:E507	sprite	exact	high	run 0x404 bytes +code; code; crates/assets/src/sprites/pandora.rs:531
+96:E1A6	99:E8F0	sprite	exact	high	run 0x275 bytes +code +shape; code; crates/assets/src/sprites/pandora_tests.rs:74 (+2)
+96:E1AB	99:E8F5	sprite	exact	high	run 0x275 bytes +shape; code; crates/assets/src/sprites/pandora_tests.rs:75 (+2)
+96:F2A0	99:F9EA	music	exact	high	run 0x7c bytes +code; code; crates/crysta-app/src/music_data.rs:104
+97:0000	D9:0000	bank	exact	low	no resolved address in this bank; run 0x8000 bytes +table; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:10
+D8:1022	DA:1022	script	exact	high	run 0x5d25 bytes +code +table +shape +lz; test; crates/assets/src/maps/actors.rs:600 (+5)
+98:817D	9A:817D	script	exact	medium	local block 4 bytes; code; crates/crysta-runtime/src/actors/cadence.rs:171
+98:8181	9A:8181	script	aligned	medium	gap 0x3 bytes, same length; test; crates/crysta-runtime/src/actors/cadence.rs:402
+98:819C	9A:819C	map	exact	high	run 0x12 bytes +table; code; crates/assets/src/maps/visual.rs:603 (+2)
+98:81A5	9A:81A5	map	exact	high	run 0x12 bytes; code; crates/assets/src/maps/visual.rs:789 (+1)
+98:81A9	9A:81A9	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:922
+98:8272	9A:8272	script	exact	medium	local block 5 bytes; code; crates/crysta-runtime/src/actors/cadence.rs:171
+98:831C	9A:831C	map	exact	high	run 0x39 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:60
+98:831E	9A:831E	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:36
+98:8321	9A:8321	map	exact	medium	local block 7 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:242
+98:8326	9A:8326	map	exact	medium	local block 7 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:34
+98:8329	9A:8329	map	exact	medium	local block 6 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:249
+98:832E	9A:832E	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:35
+98:8338	9A:8338	map	exact	high	local block 10 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:71
+98:833A	9A:833A	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:37 (+1)
+98:8340	9A:8340	map	exact	high	local block 6 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:79
+98:8342	9A:8342	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:38 (+1)
+98:8348	9A:8348	map	exact	high	local block 6 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:87
+98:834A	9A:834A	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:39 (+1)
+98:8350	9A:8350	map	exact	high	run 0xc bytes +table; code; crates/assets/src/maps/visual.rs:488 (+2)
+98:8354	9A:8354	map	exact	high	run 0xc bytes +table; code; crates/assets/src/maps/visual.rs:779
+98:8358	9A:8358	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:941
+98:835F	9A:835F	map	exact	high	run 0xc bytes +table; code; crates/assets/src/maps/visual.rs:779
+98:8361	9A:8361	map	exact	high	run 0xc bytes; test; crates/assets/src/maps/visual.rs:942 (+1)
+98:8366	9A:8366	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:1004
+98:8369	9A:8369	map	exact	high	run 0xf bytes; code; crates/assets/src/maps/visual.rs:779
+98:836D	9A:836D	map	exact	high	run 0xf bytes; test; crates/assets/src/maps/visual.rs:943
+98:8372	9A:8372	map	exact	high	run 0xf bytes; code; crates/assets/src/maps/visual.rs:779
+98:8377	9A:8377	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:944
+98:837A	9A:837A	map	exact	medium	local block 6 bytes; code; crates/assets/src/maps/visual.rs:779
+98:837F	9A:837F	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:945
+98:8389	9A:8389	map	aligned	medium	gap 0x3 bytes, same length; test; crates/assets/src/maps/visual.rs:1004
+98:8390	9A:8390	map	exact	high	run 0x7d bytes +table +shape; code; crates/assets/src/maps/visual.rs:547 (+2)
+98:83C6	9A:83C6	map	exact	high	run 0x7d bytes +table; code; crates/assets/src/maps/visual.rs:620
+98:83D2	9A:83D2	map	exact	high	run 0x7d bytes +table; code; crates/assets/src/maps/visual.rs:621
+98:83DE	9A:83DE	map	exact	high	run 0x7d bytes +table; code; crates/assets/src/maps/visual.rs:622
+98:83EA	9A:83EA	map	exact	high	run 0x7d bytes +table +shape; code; crates/assets/src/maps/visual.rs:623
+98:83F6	9A:83F6	map	exact	high	run 0x7d bytes +table +shape; code; crates/assets/src/maps/visual.rs:624
+98:8401	9A:8401	map	exact	high	run 0x7d bytes +table; code; crates/assets/src/maps/visual.rs:734 (+2)
+98:8405	9A:8405	sprite	exact	high	run 0x7d bytes +table; code; crates/assets/src/maps/visual.rs:520 (+4)
+98:8409	9A:8409	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual.rs:918 (+1)
+98:8410	9A:8410	map	exact	high	local block 7 bytes +table; code; crates/assets/src/maps/visual.rs:781
+98:8412	9A:8412	map	aligned	medium	gap 0x7 bytes, same length; test; crates/assets/src/maps/visual.rs:921 (+1)
+98:8417	9A:8417	map	aligned	medium	gap 0x7 bytes, same length; test; crates/assets/src/maps/visual.rs:1095
+98:841A	9A:841A	map	exact	high	run 0x1b bytes; test; crates/assets/src/maps/visual.rs:1095
+98:841E	9A:841E	map	exact	high	run 0x1b bytes +table; code; crates/assets/src/maps/visual.rs:781 (+4)
+98:8422	9A:8422	map	exact	high	run 0x1b bytes; test; crates/assets/src/maps/visual.rs:917 (+1)
+98:8425	9A:8425	map	exact	high	run 0x1b bytes; test; crates/assets/src/maps/visual.rs:1092
+98:8427	9A:8427	sprite	exact	high	run 0x1b bytes; code; crates/assets/src/maps/visual.rs:781 (+2)
+98:842C	9A:842C	map	exact	high	run 0x1b bytes; test; crates/assets/src/maps/visual.rs:919 (+1)
+98:842F	9A:842F	map	exact	high	run 0x1b bytes; code; crates/assets/src/maps/visual.rs:781 (+1)
+98:8434	9A:8434	map	aligned	medium	gap 0x3 bytes, same length; test; crates/assets/src/maps/visual.rs:920 (+1)
+98:8446	9A:8446	sprite	exact	high	run 0x1b bytes +table +shape; code; crates/assets/src/maps/visual.rs:735 (+4)
+98:844D	9A:844D	map	exact	high	run 0x1b bytes +table; code; crates/assets/src/maps/visual.rs:736 (+3)
+98:8454	9A:8454	map	exact	high	run 0x1b bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:28
+98:845A	9A:845A	map	aligned	high	gap 0x2 bytes, same length +code; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:31
+98:8461	9A:8461	map	exact	high	local block 9 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:9 (+3)
+98:8465	9A:8465	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:25
+98:8468	9A:8468	map	exact	high	run 0x17 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:158
+98:846C	9A:846C	map	exact	high	run 0x17 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:26
+98:8471	9A:8471	map	exact	high	run 0x17 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:158
+98:8476	9A:8476	map	exact	high	run 0x17 bytes; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:27
+98:8479	9A:8479	map	exact	high	run 0x17 bytes; code; crates/assets/src/maps/visual/pandora/recipes.rs:158
+98:847E	9A:847E	map	aligned	medium	gap 0x3 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:28
+98:8496	9A:8496	sprite	exact	high	run 0x1e bytes +table +shape; code; crates/assets/src/maps/visual.rs:505 (+4)
+98:84AD	9A:84AD	map	exact	high	run 0x1a bytes +table +shape; code; crates/assets/src/maps/visual.rs:738 (+2)
+98:84AF	9A:84AF	map	exact	high	run 0x1a bytes +shape; test; crates/assets/src/maps/visual.rs:1086
+98:84B4	9A:84B4	map	exact	high	run 0x1a bytes +table +shape; code; crates/assets/src/maps/visual.rs:739 (+3)
+98:84BF	9A:84BF	map	exact	high	run 0x1a bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:18 (+3)
+98:84C3	9A:84C3	map	aligned	medium	gap 0xc bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:29
+98:84C6	9A:84C6	map	aligned	medium	gap 0xc bytes, same length; code; crates/assets/src/maps/visual/pandora/recipes.rs:154
+98:84C8	9A:84C8	map	aligned	medium	gap 0xc bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:30
+98:84D7	9A:84D7	map	exact	high	run 0x41 bytes +table +shape; code; crates/assets/src/maps/visual/pandora/recipes.rs:36
+98:85E9	9A:85E9	map	exact	high	run 0x1c bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:44
+98:85EF	9A:85EF	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:32
+98:85F5	9A:85F5	map	exact	high	local block 10 bytes +table; code; crates/assets/src/maps/visual/pandora/recipes.rs:52
+98:85FB	9A:85FB	map	aligned	medium	gap 0x2 bytes, same length; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:33
+9A:0000	9C:0000	bank	bank	high	bank of 29 weighted addresses in it; run 0x55a7b bytes +lz; code; crates/assets/src/maps/visual/crysta_animation.rs:95 (+3)
+9A:8000	9C:8000	map	exact	high	run 0x55a7b bytes +code +shape; code; crates/assets/src/maps/visual/crysta_animation.rs:97 (+2)
+9A:8002	9C:8002	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/crysta_animation.rs:325
+9A:8004	9C:8004	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/scene_animation.rs:259 (+1)
+9A:8006	9C:8006	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/scene_animation.rs:259 (+1)
+9A:8046	9C:8046	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/crysta_animation.rs:436
+9A:8788	9C:8788	map	exact	high	run 0x55a7b bytes +shape; code; crates/assets/src/maps/visual/crysta_animation.rs:89
+9A:9000	9C:9000	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/scene_animation.rs:260 (+1)
+9A:900C	9C:900C	map	exact	high	run 0x55a7b bytes +code +shape; test; crates/assets/src/maps/visual/scene_animation.rs:260
+9A:97A1	9C:97A1	map	exact	high	run 0x55a7b bytes +shape; code; crates/assets/src/maps/visual/crysta_animation.rs:88
+9A:97A4	9C:97A4	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:437
+9A:97A5	9C:97A5	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/crysta_animation.rs:437
+9A:97A6	9C:97A6	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:446
+9A:A000	9C:A000	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/scene_animation.rs:262
+9A:A004	9C:A004	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/scene_animation.rs:262
+9A:D064	9C:D064	sprite	exact	high	run 0x55a7b bytes +table; code; crates/assets/src/sprites.rs:271
+9B:8000	9D:8000	map	exact	high	run 0x55a7b bytes +code +table +shape; code; crates/assets/src/maps/visual/crysta_animation.rs:95 (+4)
+9B:8002	9D:8002	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/crysta_animation.rs:298
+9B:807E	9D:807E	map	exact	high	run 0x55a7b bytes +code; code; crates/assets/src/maps/visual/crysta_animation.rs:86 (+2)
+9B:807F	9D:807F	map	exact	high	run 0x55a7b bytes +code; test; crates/assets/src/maps/visual/crysta_animation.rs:444 (+1)
+9B:8081	9D:8081	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:437 (+1)
+9B:8083	9D:8083	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:437
+9B:8085	9D:8085	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:437
+9B:80DE	9D:80DE	map	exact	high	run 0x55a7b bytes +shape; test; crates/assets/src/maps/visual/crysta_animation.rs:437
+9B:84DF	9D:84DF	map	exact	high	run 0x55a7b bytes +shape; code; crates/assets/src/maps/visual/crysta_animation.rs:87 (+1)
+9B:86DF	9D:86DF	map	exact	high	run 0x55a7b bytes; test; crates/assets/src/maps/visual/crysta_animation.rs:437 (+1)
+A0:8000	A2:8000	map	exact	high	run 0x3e7f6 bytes +code +table; test; crates/assets/src/maps/visual.rs:905 (+3)
+A1:8000	A3:8000	map	exact	high	run 0x3e7f6 bytes +code +table; test; crates/assets/src/maps/visual.rs:918 (+2)
+A1:8002	A3:8002	map	exact	high	run 0x3e7f6 bytes; test; crates/assets/src/maps/visual.rs:912
+A1:8004	A3:8004	map	exact	high	run 0x3e7f6 bytes; test; crates/assets/src/maps/visual.rs:912
+A2:8000	A4:8000	shop	exact	high	run 0xfffa bytes +code +table; code; crates/assets/src/shop_display.rs:19 (+11)
+A2:C000	A4:C000	sprite	exact	high	run 0xfffa bytes +code +shape; code; crates/assets/src/sprites/house_tests.rs:456 (+5)
+A2:C014	A4:C014	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/pandora_tests.rs:17
+A2:C084	A4:C084	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:232
+A2:C100	A4:C100	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:233
+A2:C200	A4:C200	sprite	exact	high	run 0xfffa bytes; test; crates/assets/src/sprites/house_tests.rs:234
+A2:C204	A4:C204	sprite	exact	high	run 0xfffa bytes; test; crates/assets/src/sprites/house_tests.rs:281
+A2:C210	A4:C210	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:235
+A2:C211	A4:C211	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:236
+A2:C217	A4:C217	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:305
+A2:C300	A4:C300	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:456
+A2:C825	A4:C825	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:274
+A2:D000	A4:D000	sprite	exact	high	run 0xfffa bytes +code; test; crates/assets/src/sprites/house_tests.rs:457
+A2:D204	A4:D204	sprite	exact	high	run 0xfffa bytes +code +shape; test; crates/assets/src/sprites/house_tests.rs:464
+E3:0004	E5:0004	sprite	exact	high	run 0xfffa bytes +shape; test; crates/assets/src/sprites/house_tests.rs:383
+A3:8000	A5:8000	map	exact	high	run 0xfffa bytes +code +lz; test; crates/assets/src/maps/visual.rs:907 (+4)
+A4:8000	A6:8000	map	exact	high	run 0x4ce91 bytes +code +shape; test; crates/assets/src/maps/visual.rs:914 (+5)
+A4:8002	A6:8002	map	exact	high	run 0x4ce91 bytes +shape; test; crates/assets/src/maps/visual.rs:914 (+7)
+A4:8800	A6:8800	map	exact	high	run 0x4ce91 bytes +code +shape; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:30 (+1)
+A4:9000	A6:9000	map	exact	high	run 0x4ce91 bytes +code; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:33 (+1)
+A4:9800	A6:9800	map	exact	high	run 0x4ce91 bytes; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:74 (+5)
+A4:A000	A6:A000	map	exact	high	run 0x4ce91 bytes +shape; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:40 (+1)
+A4:A1E4	A6:A1E4	sprite	exact	high	run 0x4ce91 bytes +code +shape; code; crates/assets/src/sprites.rs:271
+A4:C000	A6:C000	map	exact	high	run 0x4ce91 bytes +code +shape; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:75 (+1)
+A4:C800	A6:C800	map	exact	high	run 0x4ce91 bytes +shape; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:76 (+1)
+A4:D000	A6:D000	map	exact	high	run 0x4ce91 bytes +code; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:77 (+1)
+A5:8000	A7:8000	map	exact	high	run 0x4ce91 bytes +code +shape; test; crates/assets/src/maps/visual.rs:922 (+1)
+A5:8002	A7:8002	map	exact	high	run 0x4ce91 bytes +shape; test; crates/assets/src/maps/visual/pandora/recipes/fixtures.rs:56
+A6:8000	A8:8000	map	exact	high	run 0x4ce91 bytes +lz; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:71 (+3)
+A7:8000	A9:8000	map	exact	high	run 0x4ce91 bytes +code +lz; test; crates/assets/src/maps/visual/pandora/compiler_tests.rs:72 (+1)
+A8:0000	AA:0000	bank	bank	medium	bank of 2 weighted addresses in it; run 0x4ce91 bytes +shape; code; crates/assets/src/shop_display.rs:101 (+1)
+A8:8000	AA:8000	shop	exact	high	run 0x4ce91 bytes +code +table; code; crates/assets/src/shop_display.rs:18
+A9:9000	AB:9000	text	exact	high	run 0x18051 bytes +shape +lz; code; crates/assets/src/shop_display.rs:13 (+1)
+A9:F02F	AB:F02F	shop	exact	high	run 0x18051 bytes +shape +lz; code; crates/assets/src/shop_display.rs:11 (+1)
+AA:8C82	AC:8C82	music	exact	high	run 0x18051 bytes +table +shape; test; crates/crysta-app/src/music_data.rs:342
+AA:8C86	AC:8C86	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:481
+AA:8CB6	AC:8CB6	music	exact	high	run 0x18051 bytes; test; crates/crysta-app/src/music_data.rs:481
+AA:8CBA	AC:8CBA	music	exact	high	run 0x18051 bytes; test; crates/crysta-app/src/music_data.rs:482
+AA:8CD2	AC:8CD2	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:482
+AA:8CD6	AC:8CD6	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:483
+AA:9848	AC:9848	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:483
+AA:984C	AC:984C	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:484
+AA:986C	AC:986C	music	exact	high	run 0x18051 bytes; test; crates/crysta-app/src/music_data.rs:484
+AA:9870	AC:9870	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:485
+AA:9872	AC:9872	music	exact	high	run 0x18051 bytes; test; crates/crysta-app/src/music_data.rs:485
+AA:9876	AC:9876	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:486
+AA:9878	AC:9878	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:486
+AA:987C	AC:987C	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:487
+AA:9884	AC:9884	music	exact	high	run 0x18051 bytes +shape; test; crates/crysta-app/src/music_data.rs:487
+AB:F037	AE:8000	script	exact	high	run 0x8c0 bytes +shape +lz; code; crates/crysta-runtime/src/actors.rs:177 (+2)
+AF:E43B	B1:E981	shop	exact	high	run 0x7816 bytes +shape; code; crates/assets/src/shop_display.rs:22
+B0:8000	B2:87D9	sprite	exact	high	run 0x12ca bytes; code; crates/assets/src/sprites/pandora.rs:551 (+2)
+B0:DE49	B2:E26C	text	exact	high	run 0x2453 bytes +code +shape; code; crates/assets/src/labels.rs:24
+B1:DA31	B3:DFB2	shop	exact	high	run 0x1021 bytes +code +shape; code; crates/assets/src/shop_display.rs:22
+B2:8B58	B4:90BB	text	exact	high	run 0xe8 bytes +shape; code; crates/assets/src/labels.rs:36
+B2:8B5A	B4:90BD	sprite	exact	high	run 0xe8 bytes +shape; test; crates/assets/src/sprites/house_tests.rs:249
+B2:8B78	B4:90DB	text	exact	high	run 0xe8 bytes +shape; code; crates/assets/src/shop_display.rs:15 (+1)
+B4:8000	B6:8000	text	exact	high	run 0xf051 bytes; code; crates/assets/src/labels.rs:18 (+2)
+B4:8840	B6:8B7C	text	estimate	low	anchors disagree; test; crates/assets/src/text/tests.rs:20 (+1)
+B4:8841	B6:8B7D	text	estimate	low	anchors disagree; test; crates/assets/src/text/pandora/tests.rs:151
+B4:A880	B7:D502	text	exact	medium	local block 22 bytes; text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/tests.rs:23
+B5:8040	B7:8040	text	exact	high	run 0x14007 bytes +shape; test; crates/assets/src/text/tests.rs:21
+B8:8000	BA:8000	music	exact	high	run 0x2a20b bytes; code; crates/crysta-app/src/music_data.rs:14
+B8:EF5A	BA:EF5A	music	exact	high	run 0x2a20b bytes; test; crates/crysta-app/src/music_data.rs:508
+B9:0000	BB:0000	bank	bank	high	bank of 32 weighted addresses in it; run 0x2a20b bytes +table +shape +lz; test; crates/crysta-app/src/music_data.rs:508
+B9:8000	BB:8000	music	exact	high	run 0x8008 bytes +code +shape; test; crates/crysta-app/src/music_data.rs:508
+B9:9015	BB:9015	music	exact	high	run 0x8008 bytes +shape; test; crates/crysta-app/src/music_data.rs:508
+B9:A5FD	BB:A5FD	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:503
+B9:A927	BB:A927	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:503
+B9:CF4F	BB:CF4F	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:504
+B9:D1CE	BB:D1CE	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:504
+B9:D1D0	BB:D1D0	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:505
+B9:E175	BB:E175	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:505
+B9:E177	BB:E177	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:506
+B9:E1AD	BB:E1AD	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:506
+B9:E1AF	BB:E1AF	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:509
+B9:E200	BB:E200	music	exact	high	run 0x8008 bytes +shape; test; crates/crysta-app/src/music_data.rs:509
+B9:E202	BB:E202	music	exact	high	run 0x8008 bytes; test; crates/crysta-app/src/music_data.rs:510
+B9:E700	BB:E700	music	exact	high	run 0x8008 bytes +shape; test; crates/crysta-app/src/music_data.rs:510
+B9:E702	BB:E702	music	exact	high	run 0x8008 bytes +shape; test; crates/crysta-app/src/music_data.rs:511
+B9:EAD7	BB:EAD7	music	exact	high	run 0x8008 bytes +shape; test; crates/crysta-app/src/music_data.rs:511
+BE:8000	C0:0000	sprite	exact	high	run 0x8000 bytes +table +shape +lz; test; crates/assets/src/sprites/house_npc.rs:193 (+2)
+BF:8000	C1:0000	sprite	exact	high	run 0x8000 bytes +table +shape +lz; test; crates/assets/src/sprites/house_tests.rs:144 (+1)
+BF:8010	C1:0010	sprite	exact	high	run 0x8000 bytes +shape; test; crates/assets/src/sprites/house_tests.rs:357
+BF:9000	C1:1000	sprite	exact	high	run 0x8000 bytes +shape; test; crates/assets/src/sprites/house_tests.rs:145 (+1)
+BF:96F9	C1:16F9	sprite	exact	high	run 0x8000 bytes +table +shape +lz; test; crates/assets/src/sprites/house_npc.rs:149
