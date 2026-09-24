@@ -8,6 +8,7 @@
 
 use super::VisualMapError;
 use crate::graphics::{self, Bgr555, Tile4bpp};
+use crate::layout;
 use crate::maps::actors::SpawnRecord;
 
 const GRAPHICS_SERVICE: u32 = 0x87_98EB;
@@ -71,19 +72,31 @@ impl SceneAnimation {
         flag: impl Fn(u16) -> bool,
     ) -> Result<Self, VisualMapError> {
         let mut animation = Self::default();
+        // The services' scripts in this revision (`layout`).
+        let script = |address| layout::at(image, address).ok_or(BAD);
+        let (graphics, palette) = (script(GRAPHICS_SERVICE)?, script(PALETTE_SERVICE)?);
+        let until_35 = [script(UNTIL_35[0].0)?, script(UNTIL_35[1].0)?];
         for record in records.iter().filter(|record| record.opcode() == 0xFB) {
             let Some(&selector) = record.bytes().get(1) else {
                 continue;
             };
             let fixed = UNTIL_35
                 .iter()
-                .find(|&&(script, _, _)| Some(script) == record.script())
+                .zip(until_35)
+                .find(|&(_, script)| Some(script) == record.script())
+                .map(|(service, _)| service)
                 .filter(|_| !flag(FLAG_35));
             match (record.script(), fixed) {
-                (Some(GRAPHICS_SERVICE), _) | (_, Some(&(_, false, _))) => {
+                (Some(script), _) if script == graphics => {
+                    animation.graphics(image, selector)?;
+                }
+                (Some(script), _) if script == palette => {
+                    animation.palette(image, selector)?;
+                }
+                (_, Some(&(_, false, _))) => {
                     animation.graphics(image, fixed.map_or(selector, |service| service.2))?;
                 }
-                (Some(PALETTE_SERVICE), _) | (_, Some(&(_, true, _))) => {
+                (_, Some(&(_, true, _))) => {
                     animation.palette(image, fixed.map_or(selector, |service| service.2))?;
                 }
                 _ => {}
@@ -93,13 +106,15 @@ impl SceneAnimation {
     }
 
     fn graphics(&mut self, image: &[u8], selector: u8) -> Result<(), VisualMapError> {
-        let first = within(image, GRAPHICS_LOOKUP + usize::from(selector) * 2, 2)?;
+        let lookup = layout::offset(image, GRAPHICS_LOOKUP).ok_or(BAD)?;
+        let banks = layout::offset(image, GRAPHICS_BANKS).ok_or(BAD)?;
+        let first = within(image, lookup + usize::from(selector) * 2, 2)?;
         let base = if first[1] & 0x80 == 0 {
-            GRAPHICS_LOOKUP
+            lookup
         } else {
             let entry = within(
                 image,
-                GRAPHICS_BANKS + usize::from(u16::from_le_bytes([first[0], first[1] & 0x7F])),
+                banks + usize::from(u16::from_le_bytes([first[0], first[1] & 0x7F])),
                 3,
             )?;
             usize::from(entry[2] & 0x3F) << 16
@@ -125,11 +140,15 @@ impl SceneAnimation {
     }
 
     fn palette(&mut self, image: &[u8], selector: u8) -> Result<(), VisualMapError> {
-        let records = table(image, PALETTE, selector, 6)?;
+        let bases = (
+            layout::offset(image, PALETTE.0).ok_or(BAD)?,
+            layout::offset(image, PALETTE.1).ok_or(BAD)?,
+        );
+        let records = table(image, bases, selector, 6)?;
         let mut tick = 0;
         let mut tracks: Vec<Track<Bgr555>> = Vec::new();
         for bytes in records {
-            let source = PALETTE.1 + usize::from(u16::from_le_bytes([bytes[1], bytes[2]]));
+            let source = bases.1 + usize::from(u16::from_le_bytes([bytes[1], bytes[2]]));
             let size = usize::from(bytes[4]) + 1;
             for repetition in 0..usize::from(bytes[0]) {
                 let payload = within(image, source + repetition * size, size)?;

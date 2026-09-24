@@ -266,3 +266,46 @@ fn the_window_art_is_the_japanese_one_moved() {
         WindowArt::from_rom(japan.image()).unwrap()
     );
 }
+
+#[test]
+fn every_maps_scene_animation_plays_as_the_japanese_one() {
+    // The town's crystal clouds draw from the animated tiles `$1F0..$1FF`;
+    // unanimated they are the placeholder boxes of the static sheet.
+    use assets::maps::actors::SpawnList;
+    use assets::maps::scripts::EventFlags;
+    use assets::maps::visual::scene_animation::SceneAnimation;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let mut events = vec![0u8; 512];
+    for flag in [32usize, 251, 0x20] {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    let animation = |image: &[u8], map| {
+        let records = SpawnList::resolve(image, map, EventFlags::Bitmap(&events)).unwrap();
+        SceneAnimation::from_records(image, &records, |flag| {
+            events[usize::from(flag) / 8] & (1 << (flag % 8)) != 0
+        })
+        .unwrap_or_else(|error| panic!("{map:#x}: {error}"))
+    };
+    for map in (0x0Au16..=0x21).chain(0x41..=0x44) {
+        let (ours, theirs) = (
+            animation(europe.image(), map),
+            animation(japan.image(), map),
+        );
+        assert_eq!(ours.is_empty(), theirs.is_empty(), "{map:#x}");
+        assert_eq!(
+            ours.tiles().collect::<Vec<_>>(),
+            theirs.tiles().collect::<Vec<_>>(),
+            "{map:#x}"
+        );
+        assert_eq!(
+            ours.colors().collect::<Vec<_>>(),
+            theirs.colors().collect::<Vec<_>>(),
+            "{map:#x}"
+        );
+        for age in [0, 7, 40, 333] {
+            assert_eq!(ours.phase_key(age), theirs.phase_key(age), "{map:#x} {age}");
+        }
+    }
+}
