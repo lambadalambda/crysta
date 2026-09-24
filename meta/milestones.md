@@ -155,6 +155,11 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
 - [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
 - [Open the shops in Crysta](issues/crysta-shops.md)
+- [Decode the shop stock and item names](issues/shop-data.md)
+- [Decode the shop texts' indexed controls](issues/shop-text.md)
+- [Keep money, Prime Blue and the inventory](issues/money-and-inventory.md)
+- [Run the shop's talk callback](issues/shop-state-machine.md)
+- [Draw the shop display](issues/shop-display.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
