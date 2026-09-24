@@ -1,5 +1,7 @@
 //! The slice on the European English ROM (ADR 0004).
 use assets::maps::exits::ExitList;
+use assets::maps::scripts::EventFlags;
+use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use crysta_runtime::{BOX_MAPS, MAPS};
@@ -109,5 +111,51 @@ fn every_slice_map_loads_and_runs_as_the_japanese_one() {
             eu.frozen_scripts()
         );
         assert_eq!(state(&eu), state(&jp), "{map:#x} after 300 frames");
+    }
+}
+
+/// A body's first pose, unmirrored, as rasters; or why there is none.
+fn first_pose(body: &Result<Body, Placeholder>) -> Result<Animation, String> {
+    match body {
+        Ok(body) => body
+            .animation(body.initial(), false)
+            .map_err(|e| format!("{e:?}")),
+        Err(placeholder) => Err(format!("{placeholder:?}")),
+    }
+}
+
+#[test]
+fn the_slice_art_is_the_japanese_art() {
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let (eu, jp) = (europe.image(), japan.image());
+    let ark = |image| format!("{:?}", ArkAtlas::from_rom(image).unwrap());
+    assert_eq!(ark(eu), ark(jp));
+    for map in MAPS.chain(BOX_MAPS) {
+        let (x, y) = arrival(jp, map);
+        let bodies = |image| {
+            let world = World::enter_with_events(image, map, x, y, fresh_game_flags()).unwrap();
+            let flags = EventFlags::Bitmap(world.events());
+            residents_art(image, map, world.residents(), flags, flags)
+                .iter()
+                .map(first_pose)
+                .collect::<Vec<_>>()
+        };
+        let (eu, jp) = (bodies(eu), bodies(jp));
+        assert_eq!(eu.len(), jp.len(), "{map:#x}");
+        for (index, (eu, jp)) in eu.iter().zip(&jp).enumerate() {
+            // Known gap: the box in `$21` is drawn from the Pandora sprite
+            // library, which reads Japanese addresses still.
+            if (map, index) == (0x21, 3) {
+                assert!(eu.is_err());
+                continue;
+            }
+            assert!(
+                eu == jp,
+                "{map:#x} resident {index}: {:?}",
+                eu.as_ref().err()
+            );
+        }
     }
 }
