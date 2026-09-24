@@ -1,4 +1,5 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
+use crate::frame::rgb;
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
@@ -424,11 +425,6 @@ fn metatile_pixels(scene: &StaticBackground, tile: u16) -> Option<Vec<(u8, bool)
 
 fn static_rgb(index: u8, scene: &StaticBackground, at: (usize, usize)) -> u32 {
     let [r, g, b] = map_inspector::static_pixel_rgb(index, scene, at.0, at.1);
-    u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
-}
-
-fn rgb(color: Bgr555) -> u32 {
-    let [r, g, b] = color.rgb8();
     u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
 }
 

@@ -63,6 +63,8 @@ pub struct Session {
     pub carry_art: Option<CarryArt>,
     /// Rasterized carry lists by art, selector and mirror.
     pub carry_frames: HashMap<(u32, u8, bool), Option<Animation>>,
+    /// The shop display's art.
+    pub shop_art: crate::shop::ShopArtCache,
     /// The direction held last frame, so a new one reads as a press.
     pub last_direction: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
@@ -100,6 +102,7 @@ impl Session {
                 .inspect_err(|error| eprintln!("carry poses unavailable: {error}"))
                 .ok(),
             carry_frames: HashMap::new(),
+            shop_art: crate::shop::ShopArtCache::default(),
             last_direction: None,
             tick: 0,
             last_step: None,
@@ -294,6 +297,24 @@ impl Session {
     /// in hand at Ark's origin (its frames carry the height), then along its
     /// flight.
     pub fn carry_sprites(&mut self) -> (Option<Raster>, Option<Placed>) {
+        // A bought item held up: the lift's standing pose facing Down
+        // (`$84:B4BF`, `COP 84 03`); the shop draws the item.
+        let holding = self
+            .world
+            .shop()
+            .and_then(crysta_runtime::shop::Shop::display)
+            .is_some_and(|display| display.holding);
+        if holding {
+            let pose = PandoraSprites::carry_pose(PandoraCarryMotion::Standing, 0);
+            let ark = pose.and_then(|pose| {
+                self.carry_frame(
+                    (pose.ark_art, pose.ark_selector, pose.ark_hflip),
+                    self.tick,
+                    false,
+                )
+            });
+            return (ark, None);
+        }
         let carry = self.world.carry().and_then(|carry| {
             let pose = PandoraSprites::carry_pose(carry.motion, carry.facing)?;
             // The lift and the throw run once from their start; holding loops.
@@ -425,6 +446,16 @@ impl Session {
         }
         clouds.add_clouds(frame, camera, self.background_clock.tick());
         frame::extend_edges(frame, camera, region.bounds);
+        if let Some(display) = world.shop().and_then(crysta_runtime::shop::Shop::display) {
+            let on_screen = |(x, y): (u16, u16)| (i32::from(x) - camera.0, i32::from(y) - camera.1);
+            self.shop_art.draw(
+                frame,
+                self.image,
+                &display,
+                (on_screen(display.position), on_screen(position)),
+                world.money(),
+            );
+        }
         frame::tint(frame, screen.tint);
         frame::dim(frame, screen.brightness);
         draw_dialogue(frame, world, position, camera, self.image);

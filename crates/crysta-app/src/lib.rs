@@ -14,3 +14,4 @@ pub mod frame;
 pub mod music;
 pub mod music_data;
 pub mod session;
+pub mod shop;

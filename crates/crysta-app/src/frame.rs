@@ -3,6 +3,7 @@
 //! Everything here is a pure function over decoded pixels, so the renderer can
 //! be tested without opening a window or owning a GPU.
 
+use assets::graphics::Bgr555;
 use assets::maps::visual::camera::CameraRegion;
 use assets::text::Placement;
 use crysta_runtime::world::Tint;
@@ -33,13 +34,19 @@ impl Canvas {
     }
 
     /// Sets one pixel; anything off the view is dropped rather than wrapped.
-    fn set(&mut self, (x, y): (i32, i32), colour: u32) {
+    pub(crate) fn set(&mut self, (x, y): (i32, i32), colour: u32) {
         if let (Ok(x), Ok(y)) = (usize::try_from(x), usize::try_from(y)) {
             if x < self.width && y < VIEW_HEIGHT {
                 self.pixels[y * self.width + x] = colour;
             }
         }
     }
+}
+
+/// A colour as the canvas keeps it, `0x00RRGGBB`.
+pub(crate) fn rgb(colour: Bgr555) -> u32 {
+    let [r, g, b] = colour.rgb8();
+    u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
 }
 
 fn signed(value: usize) -> i32 {
