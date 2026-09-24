@@ -37,15 +37,13 @@ pub struct Game {
 }
 
 impl Game {
-    /// Authenticates the ROM and starts a new game, as the native app does.
+    /// Authenticates the ROM, Japanese or European, and starts a new
+    /// game, as the native app does.
     ///
     /// # Errors
-    /// A ROM that is not the Japanese reference.
+    /// A ROM that is neither.
     pub fn new(bytes: &[u8]) -> Result<Self, String> {
         let cartridge = rom::Rom::load(bytes).map_err(|error| error.to_string())?;
-        if cartridge.revision() != rom::Revision::Japan {
-            return Err("the slice is qualified only for the Japanese reference".into());
-        }
         // The world borrows the image for the page's lifetime.
         let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
         Ok(Self {
@@ -55,6 +53,13 @@ impl Game {
             held: 0,
             player: None,
         })
+    }
+
+    /// Milliseconds a frame lasts on the ROM's console: NTSC for the
+    /// Japanese ROM, PAL for the European one.
+    #[must_use]
+    pub fn frame_ms(&self) -> f64 {
+        crysta_app::clock::frame_period(self.cartridge.revision()).as_secs_f64() * 1000.0
     }
 
     /// One frame with the buttons held now; the music hears the world's
@@ -171,7 +176,7 @@ mod web {
         /// Starts a game from the ROM's bytes.
         ///
         /// # Errors
-        /// A ROM that is not the Japanese reference.
+        /// A ROM that is neither the Japanese nor the European one.
         #[wasm_bindgen(constructor)]
         pub fn new(bytes: &[u8]) -> Result<WebGame, JsError> {
             super::Game::new(bytes)
@@ -192,6 +197,11 @@ mod web {
         /// Switches to the wide 16:9 view, or back.
         pub fn set_wide(&mut self, wide: bool) {
             self.0.set_wide(wide);
+        }
+
+        /// Milliseconds a frame lasts on the ROM's console.
+        pub fn frame_ms(&self) -> f64 {
+            self.0.frame_ms()
         }
 
         /// The view's width.
@@ -247,6 +257,23 @@ mod tests {
     }
 
     #[test]
+    fn the_european_rom_starts_at_its_pal_rate() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../local/Terranigma (E) [!].smc"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let mut game = Game::new(&bytes).unwrap();
+        for _ in 0..130 {
+            game.frame(0);
+        }
+        assert!(game.fault().is_none());
+        assert!((game.frame_ms() - 19.997_209).abs() < 1e-6);
+    }
+
+    #[test]
     fn another_rom_is_refused() {
         assert!(Game::new(&[0; 1024]).is_err());
     }
@@ -285,8 +312,12 @@ mod tests {
             return;
         };
         let mut game = Game::new(&bytes).unwrap();
-        // Elle speaks some 120 frames in; held A turns only the first page.
+        // Elle speaks some 120 frames in; held A turns only the first page,
+        // once it has typed out.
         for _ in 0..130 {
+            game.frame(0);
+        }
+        while game.session.world.typing() {
             game.frame(0);
         }
         assert!(game.session.world.dialogue().is_some());

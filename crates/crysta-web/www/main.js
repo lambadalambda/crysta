@@ -1,7 +1,6 @@
 // The page: ROM selection, the frame loop, input and sound.
 import init, { WebGame } from './crysta_web.js';
 
-const FRAME_MS = 16.639263; // The SNES's 60.1 Hz.
 const RATE = 32000;
 const AHEAD = 0.1; // Seconds of sound queued.
 const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32, DESCRIBE: 64 };
@@ -165,12 +164,14 @@ function loop(now, token) {
   if (running !== token) return;
   try {
     if (last === null) last = now;
-    owed = Math.min(owed + (now - last), FRAME_MS * 4);
+    // The console's rate: 60.1 Hz for the Japanese ROM, 50 Hz for the European.
+    const frameMs = game.frame_ms();
+    owed = Math.min(owed + (now - last), frameMs * 4);
     last = now;
-    while (owed >= FRAME_MS) {
+    while (owed >= frameMs) {
       game.frame(buttons() | latched);
       latched = 0;
-      owed -= FRAME_MS;
+      owed -= frameMs;
     }
     const fault = game.fault();
     if (fault) say(`The game stopped: ${fault}`, true);
