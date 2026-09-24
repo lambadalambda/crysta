@@ -309,3 +309,14 @@ fn every_maps_scene_animation_plays_as_the_japanese_one() {
         }
     }
 }
+
+#[test]
+fn the_elders_question_is_catalog_two() {
+    // `$88:90E3`: `COP 1A 02` asks "Apologize" or not (the Japanese Elder
+    // asks catalog 0).
+    let Some(rom) = european() else {
+        return;
+    };
+    let choice = HouseDialogue::choice_at(rom.image(), 2).unwrap();
+    assert_eq!(choice.options.map(|option| option.result), [1, 2]);
+}

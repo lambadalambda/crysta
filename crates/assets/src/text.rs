@@ -313,8 +313,10 @@ fn bytes(image: &[u8], source: u32, count: usize) -> Result<&[u8], TextError> {
         .ok_or_else(|| invalid(source, "truncated source"))
 }
 fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError> {
-    // The house's catalogs 0 and 1, and the shop's confirm `$0A`.
-    if ![0, 1, 0x0A].contains(&catalog) {
+    // The Japanese house's catalogs 0 and 1, and the shop's confirm `$0A`;
+    // the European scripts number theirs apart (the Elder asks 2), so there
+    // every catalog whose records check out is taken.
+    if per_revision(image, ![0, 1, 0x0A].contains(&catalog), false) {
         return Err(invalid(0, "unsupported choice catalog"));
     }
     let table = CHOICES
@@ -333,7 +335,7 @@ fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError>
                 .ok_or_else(|| invalid(source, "choice outside standard window"))?;
         }
         let position = [tile_offset % 64 * 4, tile_offset / 64 * 8];
-        if tile_offset % 2 != 0 || position[0] >= 224 || position[1] >= 48 {
+        if tile_offset % 2 != 0 || position[0] >= 224 || position[1] >= standard(image)[1] {
             return Err(invalid(source, "choice outside page"));
         }
         let mut neighbors = [None; 4];
