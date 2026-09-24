@@ -97,6 +97,81 @@ pub fn first_background(image: &[u8], map_id: u16) -> Result<StaticBackground, V
     }
 }
 
+/// A map's second layer: the town's crystal clouds (`$0A`), which the
+/// scene drives as a subscreen layer added onto the view (see
+/// `docs/house-exterior.md`). Its tiles and colors are the first layer's,
+/// the animated `$1F0..$1FF` in palette 6.
+#[derive(Debug)]
+pub struct SecondLayer {
+    layer: StaticLayer,
+    metatiles: Vec<[BgTileWord; 4]>,
+}
+
+impl SecondLayer {
+    /// Decodes the second layer (`10 02`) and its metatiles
+    /// (`20 00 40 00 02`) the map's loading script names.
+    ///
+    /// # Errors
+    /// Rejects maps other than the town `$0A`, a script that names either
+    /// resource other than once, and resources that do not decode.
+    pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
+        if map_id != 0x000A {
+            return Err(VisualMapError::Unsupported(
+                "unqualified second layer map ID",
+            ));
+        }
+        let program = scripts::resolve_map(image, map_id, Limits::default())
+            .map_err(VisualMapError::Script)?;
+        let only = |kind: ResourceKind, operand: &[u8]| {
+            let mut found = program.instructions.iter().filter_map(|i| match i.command {
+                Command::Resource { kind: k, source }
+                    if k == kind && i.bytes.get(1..1 + operand.len()) == Some(operand) =>
+                {
+                    Some(source.normalized().value() as usize)
+                }
+                _ => None,
+            });
+            match (found.next(), found.next()) {
+                (Some(offset), None) => Ok(offset),
+                _ => Err(VisualMapError::Unsupported(
+                    "second layer resource not named exactly once",
+                )),
+            }
+        };
+        let layer = StaticLayer::from_rom(image, only(ResourceKind::Layer, &[0x02])?)
+            .map_err(VisualMapError::Layer)?;
+        let definitions = resource(
+            image,
+            only(ResourceKind::Metatiles, &[0x00, 0x40, 0x00, 0x02])?,
+            ResourceKind::Metatiles,
+            0x1000,
+            true,
+        )?;
+        let metatiles = definitions
+            .decoded()
+            .chunks_exact(8)
+            .map(|record| {
+                std::array::from_fn(|i| {
+                    BgTileWord::new(u16::from_le_bytes([record[i * 2], record[i * 2 + 1]]))
+                })
+            })
+            .collect();
+        Ok(Self { layer, metatiles })
+    }
+
+    /// The layer's cells.
+    #[must_use]
+    pub const fn layer(&self) -> &StaticLayer {
+        &self.layer
+    }
+
+    /// Four tile words per metatile.
+    #[must_use]
+    pub fn metatiles(&self) -> &[[BgTileWord; 4]] {
+        &self.metatiles
+    }
+}
+
 /// Qualified first-background resources and sampling.
 ///
 /// [`Self::from_rom`] admits Japanese maps $000A–$000D, $000F–$0011 and $0128.

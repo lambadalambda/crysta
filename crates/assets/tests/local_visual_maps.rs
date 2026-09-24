@@ -291,3 +291,31 @@ fn the_projection_reproduces_the_qualified_fixed_offsets() {
         );
     }
 }
+
+#[test]
+fn the_towns_second_layer_holds_the_crystal_clouds() {
+    // `$0A`'s script loads a second layer (`10 02`) and its metatiles
+    // (`20 00 40 00 02`): a 16x16-cell sheet with two 32x32 clouds, drawn
+    // from tiles `$1F0..$1FF` in palette 6 -- the tiles and colors the
+    // exterior animation cycles.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let clouds = assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x000A).unwrap();
+    let layer = clouds.layer();
+    assert_eq!((layer.width(), layer.height()), (16, 16));
+    let mut used: Vec<u16> = layer.cells().iter().map(|cell| cell.raw()).collect();
+    used.sort_unstable();
+    used.dedup();
+    assert_eq!(used, [0, 0x60, 0x61, 0x62, 0x63, 0x68, 0x69, 0x6A, 0x6B]);
+    for &metatile in &used[1..] {
+        for word in clouds.metatiles()[usize::from(metatile)] {
+            assert!(
+                (0x1F0..=0x1FF).contains(&word.tile_index()),
+                "{metatile:#x}"
+            );
+            assert_eq!(word.palette(), 6);
+        }
+    }
+    assert!(assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x000B).is_err());
+}

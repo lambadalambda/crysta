@@ -121,7 +121,12 @@ A differs substantially from indoor final composition:
   window result. CGADSUB `$33` selects **saturating addition**, no halving,
   for BG1/BG2/OBJ/backdrop; OBJ palettes 0–3 are not math-eligible. Fixed color,
   window geometry and per-pixel effects are not reproduced by a blanket tint.
-- **Omitted:** secondary BG1 art and alternate scrolling; subscreen/fixed-color/
+- The native app adds the secondary layer, the crystal clouds
+  (`assets::maps::visual::SecondLayer`), onto the view with the animated
+  tiles and colors; it scrolls with the camera and drifts one pixel left and
+  down every three frames (`$0810`/`$0814` at the town checkpoints: 80
+  pixels over 241 frames). Its phase after the load is not matched.
+- **Omitted:** subscreen/fixed-color/
   window/color-math composition; BG3 output; animation timing; transient text;
   shadows and unqualified actor output. Do not claim native-complete RGB.
 - Source compact records `$838A73/$838A78` select graphics animation **0/1**.
