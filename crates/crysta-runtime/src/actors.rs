@@ -19,7 +19,7 @@ mod motion;
 mod native;
 pub use native::{Scratch, PLAYER_ACTION};
 
-use crate::scene::Globals;
+use crate::scene::{Globals, Transfer};
 use assets::maps::actor_script::{
     self, chained_condition_holds, chained_condition_length, flag_branch_taken, BRANCH_ON_FLAG,
     CHAINED_BRANCH, CHAINED_DESPAWN, REGISTER_CALLBACK, SHOW_TEXT, WRITE_FLAG,
@@ -2072,8 +2072,9 @@ impl Actor {
                 self.pc = operands + 3;
             }
             TRANSFER => {
-                let (Some(map), Some(x), Some(y)) = (
+                let (Some(map), Some(&mode), Some(x), Some(y)) = (
                     cadence::word(image, operands),
+                    image.get(operands + 2),
                     cadence::word(image, operands + 4),
                     cadence::word(image, operands + 6),
                 ) else {
@@ -2081,8 +2082,13 @@ impl Actor {
                     return false;
                 };
                 // The loader places the player at the queued position plus
-                // (8,16); mode and selector pick fades not drawn here.
-                around.globals.transfer = Some((map, x + 8, y + 16));
+                // (8,16); the mode picks the fades, the selector only the
+                // player's arrival script.
+                around.globals.transfer = Some(Transfer {
+                    map,
+                    position: (x + 8, y + 16),
+                    mode,
+                });
                 self.pc = operands + 8;
             }
             _ => {
@@ -3172,7 +3178,12 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         let mut globals = Globals::with_events(vec![0; 512]);
         tick_at(&mut actor, &image, &mut globals, (0, 0));
-        assert_eq!(globals.transfer, Some((0x21, 136, 368)));
+        let transfer = Transfer {
+            map: 0x21,
+            position: (136, 368),
+            mode: 7,
+        };
+        assert_eq!(globals.transfer, Some(transfer));
         assert_eq!(actor.selector, 7, "the script goes on");
     }
 

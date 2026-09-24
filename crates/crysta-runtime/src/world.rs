@@ -23,8 +23,10 @@ use std::fmt;
 
 mod contact;
 mod door;
+mod fade;
 mod pots;
 mod transition;
+pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
 
 /// A map the player is standing in, and where they are standing.
@@ -73,6 +75,8 @@ pub struct World<'a> {
     /// Leaving through an exit, and arriving after one ([`transition`]).
     leaving: Option<transition::Leaving>,
     arriving: Option<transition::Arriving>,
+    /// A script transfer's fades ([`fade`]).
+    fading: Option<fade::Fading>,
     /// The brightness since the last load, which the fade-in raises a step
     /// a frame.
     dawn: u8,
@@ -287,6 +291,7 @@ impl<'a> World<'a> {
             arrival: None,
             leaving: None,
             arriving: None,
+            fading: None,
             dawn: 15,
             animate: false,
         })
@@ -689,11 +694,8 @@ impl<'a> World<'a> {
         let steps = self.frame(direction, presses);
         self.animate = false;
         let steps = steps?;
-        // A transfer a script queued this frame loads at its end.
-        let steps = match self.follow_transfer()? {
-            Some(entered) => (entered, None),
-            None => steps,
-        };
+        // A transfer a script queued this frame starts fading out.
+        self.queue_transfer();
         self.globals.audio.end_frame();
         Ok(steps)
     }
@@ -710,12 +712,16 @@ impl<'a> World<'a> {
             Direction::Up => 0x0800,
         });
         self.dawn = (self.dawn + 1).min(15);
+        if let Some(blip) = self.globals.dialogue.tick() {
+            self.globals.audio.sound_port3(blip);
+        }
         if let Some(step) = self.transition_frame()? {
             self.apply_patches()?;
             return Ok((step, None));
         }
-        if let Some(blip) = self.globals.dialogue.tick() {
-            self.globals.audio.sound_port3(blip);
+        if let Some(step) = self.fade_frame()? {
+            self.apply_patches()?;
+            return Ok((step, None));
         }
         if self.scene.is_some() {
             self.answer_scene(presses);
@@ -796,6 +802,8 @@ impl<'a> World<'a> {
         self.arrival = None;
         self.leaving = None;
         self.arriving = None;
+        self.fading = None;
+        self.globals.transfer = None;
     }
 
     /// Sets an event flag as `COP 07` would; for hosts and tests.
@@ -1388,6 +1396,7 @@ mod tests {
             arrival: None,
             leaving: None,
             arriving: None,
+            fading: None,
             dawn: 15,
             animate: false,
         }

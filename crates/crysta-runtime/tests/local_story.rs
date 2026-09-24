@@ -784,7 +784,7 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     events[0x22 / 8] |= 1 << (0x22 % 8);
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
     cues(&mut world);
-    let mut reading_frames = 0;
+    let (mut reading_frames, mut mosaic) = (0, Vec::new());
     for _ in 0..2000 {
         let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         reading_frames += u32::from(reading);
@@ -794,8 +794,19 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
         if world.map() == 0x0041 {
             break;
         }
+        mosaic.extend(Some(world.screen().mosaic).filter(|&size| size > 0));
     }
     assert_eq!((world.map(), world.position()), (0x0041, (136, 208)));
+    // Mode 4: 32 frames darkening into a growing mosaic, and back.
+    assert_eq!(mosaic.len(), 29, "from the third frame");
+    assert_eq!(mosaic.last(), Some(&15));
+    let screen = world.screen();
+    assert_eq!((screen.brightness, screen.mosaic), (0, 15));
+    assert_eq!(
+        frames_until(&mut world, 40, |world| !world.in_transition()),
+        32
+    );
+    assert_eq!(world.screen(), crysta_runtime::world::Screen::FULL);
     assert_eq!(reading_frames, 14, "one A per page over the four requests");
     // The box plays `$31` (`COP 30 31`, `$88:AE70`); `$41` selects `$1B`.
     assert_eq!(cues(&mut world).0, [0x31, 0x1C]);

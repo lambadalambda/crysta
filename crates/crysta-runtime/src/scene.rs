@@ -38,8 +38,8 @@ pub struct Globals {
     /// `$097C & $0810`: the player is in a forced action, such as a recoil,
     /// which `COP DF` waits out.
     pub player_action: bool,
-    /// A map transfer `COP 14` queued: map and player position.
-    pub transfer: Option<(u16, u16, u16)>,
+    /// A map transfer `COP 14` queued.
+    pub transfer: Option<Transfer>,
     /// WRAM words scripts keep as their own variables (see
     /// `actors::native`); they outlive map loads, as WRAM does.
     pub scratch: crate::actors::Scratch,
@@ -135,6 +135,17 @@ fn bcd_add(a: u16, b: u16) -> u16 {
     (0..4).fold(0, |bcd, i| {
         bcd | (u16::try_from(sum / 10u32.pow(i) % 10).unwrap_or(0) << (i * 4))
     })
+}
+
+/// A map transfer a script queued (`COP 14`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Transfer {
+    /// The map to load.
+    pub map: u16,
+    /// Where the player stands after the load.
+    pub position: (u16, u16),
+    /// The fades' mode (`$0484`), see [`crate::world::Screen`].
+    pub mode: u8,
 }
 
 /// The pad's direction bits in the SNES word: Up, Down, Left, Right.

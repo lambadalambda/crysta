@@ -1,4 +1,4 @@
-//! Contact callbacks, the player's recoil from them, and script transfers.
+//! Contact callbacks and the player's recoil from them.
 //!
 //! The pair pass (`$85:D30C`) matches the player's body against actors whose
 //! `+$04` bit `$0200` arms a contact callback (`$7F:1010`), queues the
@@ -126,22 +126,6 @@ impl World<'_> {
         } else {
             Step::Walked
         }))
-    }
-
-    /// Follows a transfer a script queued (`COP 14`): the map loads at the
-    /// queued position. The load clears the pad mask, as every load does;
-    /// the next map's scripts lock it again where they hold the player (the
-    /// guide in the reloaded `$21`, `$88:AEC5`; natively the mask is 0 in
-    /// `$42` after the weapon door).
-    pub(super) fn follow_transfer(&mut self) -> Result<Option<Step>, WorldError> {
-        let Some((map, x, y)) = self.globals.transfer.take() else {
-            return Ok(None);
-        };
-        let mut entered = self.enter_destination(map, x, y, self.globals.audio.clone())?;
-        entered.face(self.facing);
-        let from = self.map;
-        *self = entered;
-        Ok(Some(Step::Entered { from, to: map }))
     }
 }
 

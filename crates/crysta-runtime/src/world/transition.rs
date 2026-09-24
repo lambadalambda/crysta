@@ -13,8 +13,8 @@
 //! legacy placement, for route discovery.
 //!
 //! Not modelled: the loads' own frames (3 to 5 natively, more between the
-//! house and the town, which only lengthens the dark), the other fade types
-//! (script transfers' modes), and the player's walking poses on stairs.
+//! house and the town, which only lengthens the dark), and the player's
+//! walking poses on stairs. Script transfers fade by their mode ([`super::fade`]).
 
 use super::{Step, World, WorldError, EXIT_SOUND, STAIRS, STAIRS_UP};
 use crate::{admitted, WORLD_MAPS};
@@ -331,9 +331,8 @@ impl World<'_> {
         true
     }
 
-    /// The screen's brightness, 0 dark to 15 full.
-    #[must_use]
-    pub fn brightness(&self) -> u8 {
+    /// The brightness of an exit's fades, 0 dark to 15 full.
+    pub(super) fn exit_brightness(&self) -> u8 {
         let level = self
             .leaving
             .as_ref()
@@ -346,7 +345,7 @@ impl World<'_> {
     /// Whether the player is leaving or arriving.
     #[must_use]
     pub const fn in_transition(&self) -> bool {
-        self.leaving.is_some() || self.arriving.is_some()
+        self.leaving.is_some() || self.arriving.is_some() || self.fading.is_some()
     }
 
     /// A frame of leaving or arriving, if one is under way: the player
