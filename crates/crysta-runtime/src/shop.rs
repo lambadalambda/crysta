@@ -71,10 +71,34 @@ pub struct Counter<'a, 'b> {
     pub audio: &'b mut Audio,
 }
 
+/// What the shop's display shows (the display actor `$92:D190`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Display {
+    /// The item on offer.
+    pub item: u8,
+    /// The count.
+    pub quantity: u8,
+    /// The count's price in money.
+    pub price: u32,
+    /// Whether it cannot be bought: the icon's colours are halved
+    /// (`$92:D17A`, `$84:C29F`).
+    pub dim: bool,
+    /// Whether Ark holds the bought item up, the count row gone.
+    pub holding: bool,
+    /// The talk target's position, which places the display.
+    pub position: (u16, u16),
+    /// Frames since the item changed: the name types a glyph every 2.
+    pub age: u16,
+}
+
 /// A shop under way.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Shop {
     kind: u8,
+    position: (u16, u16),
+    /// Frames since the item changed, and whether it cannot be bought.
+    age: u16,
+    dim: bool,
     stock: Vec<ShopItem>,
     /// The chosen stock entry (`+$16`) and count (`$0DD2`).
     index: usize,
@@ -94,6 +118,9 @@ impl Shop {
     pub fn open(record: &Record, inventory: &Inventory) -> Self {
         let mut shop = Self {
             kind: record.kind,
+            position: record.position,
+            age: 0,
+            dim: false,
             stock: record.stock.clone(),
             index: 0,
             quantity: 1,
@@ -117,6 +144,20 @@ impl Shop {
     #[must_use]
     pub fn showing(&self) -> Option<(u8, u8)> {
         self.display.then(|| (self.item().item, self.quantity))
+    }
+
+    /// The display, while the shop shows one.
+    #[must_use]
+    pub fn display(&self) -> Option<Display> {
+        self.display.then(|| Display {
+            item: self.item().item,
+            quantity: self.quantity,
+            price: self.item().price * u32::from(self.quantity),
+            dim: self.dim,
+            holding: matches!(self.steps.front(), Some(Step::Hold(_))),
+            position: self.position,
+            age: self.age,
+        })
     }
 
     /// Whether the loop reads the pad now, between its texts.
@@ -175,6 +216,7 @@ impl Shop {
     /// for the window, a hold frame, or the next pass of the loop.
     pub fn frame(&mut self, presses: Presses, counter: &mut Counter<'_, '_>) -> bool {
         let answer = counter.dialogue.press(presses);
+        let shown = self.index;
         let mut browsed = false;
         for _ in 0..8 {
             let Some(&step) = self.steps.front() else {
@@ -215,6 +257,14 @@ impl Shop {
             if !go_on {
                 break;
             }
+        }
+        self.age = if self.index == shown {
+            self.age.saturating_add(1)
+        } else {
+            0
+        };
+        if self.display {
+            self.dim = self.refusal(counter.image, counter.inventory).is_some();
         }
         false
     }

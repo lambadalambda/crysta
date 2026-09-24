@@ -1450,6 +1450,14 @@ fn the_item_shop_browses_refuses_sells_and_lets_ark_go() {
         },
     );
     assert_eq!(showing(&world), Some((0x11, 2)));
+    let display = world
+        .shop()
+        .and_then(crysta_runtime::shop::Shop::display)
+        .unwrap();
+    assert_eq!(
+        (display.price, display.dim, display.holding),
+        (50, true, false)
+    );
     assert_eq!(cues(&mut world).1, [0x2200, 0x2200]);
     // No money: the refusal, then the help again.
     press_a(&mut world);
