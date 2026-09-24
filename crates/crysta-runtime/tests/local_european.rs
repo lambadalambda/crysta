@@ -215,3 +215,186 @@ fn the_pandora_art_is_the_japanese_art_under_the_japanese_keys() {
         }
     }
 }
+
+/// The item shop in `$1E` as `local_story.rs` plays it: browse, a refusal
+/// for want of money, a purchase, leaving. What the player sees of it but
+/// the text and the display's place (the European spawner sets the talk
+/// target 8 pixels higher), and where each page shown ends.
+fn shop_story(image: &[u8]) -> (Vec<String>, Vec<u32>) {
+    use crysta_runtime::audio::Cue;
+    use crysta_runtime::shop::Shop;
+    use room_core::Direction;
+    let a = Presses {
+        confirm: true,
+        ..Presses::NONE
+    };
+    let mut world = World::enter(image, 0x001E, 632, 144).unwrap();
+    world
+        .update(Some(Direction::Up), Presses::default())
+        .unwrap();
+    for _ in 0..200 {
+        if !world.in_transition() {
+            break;
+        }
+        world.update(None, Presses::default()).unwrap();
+    }
+    world.take_cues();
+    let (mut log, mut pages) = (Vec::new(), Vec::new());
+    let step = |world: &mut World<'_>, presses: Presses, pages: &mut Vec<u32>| {
+        world.update(None, presses).unwrap();
+        if let Some(view) = world.dialogue() {
+            let end = view.page.boundary_source();
+            if pages.last() != Some(&end) {
+                pages.push(end);
+            }
+        }
+    };
+    // Frames until the shop browses, acknowledging each typed page with A
+    // (the confirm's cursor starts on "buy").
+    let browse = |world: &mut World<'_>, pages: &mut Vec<u32>| {
+        for _ in 0..2000 {
+            if world.shop().is_some_and(Shop::browsing) {
+                return;
+            }
+            let waiting = world.dialogue().is_some() && !world.typing();
+            step(world, if waiting { a } else { Presses::NONE }, pages);
+        }
+        panic!("the shop does not browse");
+    };
+    let observe = |world: &mut World<'_>, log: &mut Vec<String>| {
+        let sounds: Vec<_> = world
+            .take_cues()
+            .into_iter()
+            .filter(|cue| !matches!(cue, Cue::Sound(0x2800 | 0x2500)))
+            .collect();
+        let display = world.shop().and_then(Shop::display);
+        log.push(format!(
+            "{:?} {:?} {} {:?} {:?}",
+            world.shop().and_then(Shop::showing),
+            display.map(|d| (d.item, d.quantity, d.price, d.dim, d.holding)),
+            world.money(),
+            world.items(),
+            sounds
+        ));
+    };
+    step(&mut world, a, &mut pages);
+    assert!(world.in_scene(), "the shop holds the world");
+    browse(&mut world, &mut pages);
+    observe(&mut world, &mut log);
+    for presses in [
+        Presses {
+            right: true,
+            ..Presses::NONE
+        },
+        Presses {
+            up: true,
+            ..Presses::NONE
+        },
+    ] {
+        step(&mut world, presses, &mut pages);
+    }
+    observe(&mut world, &mut log);
+    // No money: the refusal, then the help again.
+    step(&mut world, a, &mut pages);
+    browse(&mut world, &mut pages);
+    observe(&mut world, &mut log);
+    // With 60 the two cost 50: confirm, buy, thanks.
+    world.give_money(60);
+    step(&mut world, a, &mut pages);
+    browse(&mut world, &mut pages);
+    observe(&mut world, &mut log);
+    step(
+        &mut world,
+        Presses {
+            cancel: true,
+            ..Presses::NONE
+        },
+        &mut pages,
+    );
+    for _ in 0..600 {
+        if !world.in_scene() {
+            break;
+        }
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.shop().is_none(), "Ark leaves");
+    observe(&mut world, &mut log);
+    (log, pages)
+}
+
+#[test]
+fn the_item_shop_sells_as_the_japanese_one_with_english_texts() {
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let (eu, jp) = (shop_story(europe.image()), shop_story(japan.image()));
+    assert_eq!(eu.0, jp.0);
+    // The pages are the texts the shop code requests (`COP 1C` in
+    // `$92:CD70`, European `$92:E3D4..E599`), each decoding whole: the
+    // greeting, the help, "no money", the help, the confirm, the thanks,
+    // the help.
+    let texts = |image, texts: [u32; 7]| {
+        let mut ends: Vec<u32> = Vec::new();
+        for text in texts {
+            let pages = assets::text::HouseDialogue::decode_reading(image, text, |address| {
+                (address == 0x0DE8).then_some(0)
+            })
+            .unwrap();
+            ends.extend(
+                pages
+                    .iter()
+                    .map(assets::text::DialoguePage::boundary_source),
+            );
+        }
+        ends.dedup();
+        ends
+    };
+    let (greeting, help, money, confirm, thanks) =
+        (0x92_A2A0, 0x92_A355, 0x92_A541, 0x92_A765, 0x92_A86C);
+    let japanese = [greeting, help, money, help, confirm, thanks, help];
+    assert_eq!(jp.1, texts(japan.image(), japanese));
+    let (greeting, help, money, confirm, thanks) =
+        (0x92_A53D, 0x92_A65E, 0x92_A79D, 0x92_A9E7, 0x92_AAE0);
+    let european = [greeting, help, money, help, confirm, thanks, help];
+    assert_eq!(eu.1, texts(europe.image(), european));
+}
+
+#[test]
+fn every_european_shop_text_decodes_as_the_japanese_one() {
+    // Sold out, greeting, help, description, the four refusals, confirm,
+    // thanks; the farewell only closes the window. The "no free slot"
+    // refusal's second page does not decode in either revision.
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let decode = |rom: &Rom, text: u32, kind: u8| {
+        assets::text::HouseDialogue::decode_reading(rom.image(), text, |at| match at {
+            0x0DE8 => Some(kind),
+            0x0DD0 => Some(0x10),
+            _ => None,
+        })
+        .map(|pages| pages.iter().all(|page| !page.glyphs().is_empty()))
+        .map_err(|_| ())
+    };
+    for (jp, eu) in [
+        (0x92_A1ED, 0x92_A438),
+        (0x92_A2A0, 0x92_A53D),
+        (0x92_A355, 0x92_A65E),
+        (0x92_A4FB, 0x92_A792),
+        (0x92_A541, 0x92_A79D),
+        (0x92_A65D, 0x92_A8BD),
+        (0x92_A8EE, 0x92_ABAE),
+        (0x92_A911, 0x92_ABCD),
+        (0x92_A765, 0x92_A9E7),
+        (0x92_A86C, 0x92_AAE0),
+    ] {
+        for kind in [0, 3] {
+            let expected = decode(&japan, jp, kind);
+            assert!(expected != Ok(false), "{jp:#x} type {kind}");
+            assert_eq!(decode(&europe, eu, kind), expected, "{eu:#x} type {kind}");
+        }
+    }
+    let farewell = |rom: &Rom, at: usize| rom.image()[at];
+    assert_eq!(farewell(&europe, 0x12_80AF), 0xD7, "closes the window");
+    assert_eq!(farewell(&japan, 0x12_8095), 0xD7);
+}

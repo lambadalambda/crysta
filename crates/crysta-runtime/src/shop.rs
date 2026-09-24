@@ -10,22 +10,29 @@
 use crate::audio::Audio;
 use crate::inventory::{bcd, Inventory, MOST};
 use crate::scene::{Dialogue, Presses};
+use assets::layout::Address;
 use assets::shops::{prime_blue_cost, Shop as Record, ShopItem};
 use assets::text::{DialoguePage, HouseDialogue};
 use std::collections::VecDeque;
 
-/// The texts, in bank `$92`: each picks its shop type's part (`$0DE8`).
-const SOLD_OUT: u32 = 0x92_A1ED;
-const GREETING: u32 = 0x92_A2A0;
-const HELP: u32 = 0x92_A355;
-const DESCRIPTION: u32 = 0x92_A4FB;
-const CONFIRM: u32 = 0x92_A765;
-const THANKS: u32 = 0x92_A86C;
+/// The texts, in bank `$92`, as the shop code requests them (`COP 1C`;
+/// European `$92:E3D4..E599`): each picks its shop type's part (`$0DE8`).
+const SOLD_OUT: Address = Address::both(0x92_A1ED, 0x92_A438);
+const GREETING: Address = Address::both(0x92_A2A0, 0x92_A53D);
+const HELP: Address = Address::both(0x92_A355, 0x92_A65E);
+const DESCRIPTION: Address = Address::both(0x92_A4FB, 0x92_A792);
+const CONFIRM: Address = Address::both(0x92_A765, 0x92_A9E7);
+const THANKS: Address = Address::both(0x92_A86C, 0x92_AAE0);
 /// `$92:8095` closes the window (`$D7`) as the shop ends.
-const FAREWELL: u32 = 0x92_8095;
+const FAREWELL: Address = Address::both(0x92_8095, 0x92_80AF);
 /// Refusals by `$92:D120`'s code: 0 money, 1 too many, 2 Prime Blue, 3 no
 /// free slot.
-const REFUSALS: [u32; 4] = [0x92_A541, 0x92_A65D, 0x92_A8EE, 0x92_A911];
+const REFUSALS: [Address; 4] = [
+    Address::both(0x92_A541, 0x92_A79D),
+    Address::both(0x92_A65D, 0x92_A8BD),
+    Address::both(0x92_A8EE, 0x92_ABAE),
+    Address::both(0x92_A911, 0x92_ABCD),
+];
 /// The confirm's choice catalog (`COP 1A 0A`): 1 buys.
 const CHOICE: u8 = 0x0A;
 const BUY: u8 = 1;
@@ -42,7 +49,7 @@ const HOLD: u16 = 61;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Step {
     /// Shows a text and waits for the window (`COP 1C`, `COP 1F`).
-    Say(u32),
+    Say(Address),
     /// Opens the confirm choice and waits for its answer.
     Ask,
     /// Buys the chosen item and count.
@@ -280,7 +287,7 @@ impl Shop {
 
     /// Requests a text, then waits until the window is free. Returns
     /// whether the shop goes on this frame.
-    fn say(&mut self, text: u32, counter: &mut Counter<'_, '_>) -> bool {
+    fn say(&mut self, text: Address, counter: &mut Counter<'_, '_>) -> bool {
         if !self.asked {
             let pages = self.pages(counter.image, text);
             self.asked = counter.dialogue.request(pages);
@@ -333,8 +340,11 @@ impl Shop {
     }
 
     /// A text's pages as this shop and its item pick them.
-    fn pages(&self, image: &[u8], text: u32) -> Vec<DialoguePage> {
+    fn pages(&self, image: &[u8], text: Address) -> Vec<DialoguePage> {
         let (kind, item) = (self.kind, self.item().item);
+        let Some(text) = text.of(image) else {
+            return Vec::new();
+        };
         HouseDialogue::decode_reading(image, text, |address| match address {
             0x0DE8 => Some(kind),
             0x0DD0 => Some(item),
