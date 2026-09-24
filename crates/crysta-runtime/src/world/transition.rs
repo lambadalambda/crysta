@@ -175,6 +175,51 @@ const STILL: Motion = &[(16, 0, 0)];
 /// Frames of a fade.
 const FADE: u16 = 16;
 
+/// The dark frames of a load, from the last frame of the fade out to the
+/// first of the fade in, as the native route measures them (no NMI while
+/// `$86:86ED` decompresses and uploads): they grow with what the load
+/// must decompress and whether the music's samples change, which the
+/// cache (`$0418`..`$044E`) decides. Loads the route does not take stay
+/// dark for [`DARK`] frames, its usual room-to-room load.
+const MEASURED_DARK: [((u16, u16), u16); 27] = [
+    ((0x0F, 0x10), 17),
+    ((0x10, 0x0C), 18),
+    ((0x0C, 0x0B), 17),
+    ((0x0B, 0x0C), 18),
+    ((0x0C, 0x0D), 18),
+    ((0x0D, 0x0A), 52),
+    ((0x0A, 0x13), 48),
+    ((0x13, 0x0A), 52),
+    ((0x0A, 0x0D), 40),
+    ((0x0D, 0x0C), 18),
+    ((0x0C, 0x0E), 72),
+    ((0x0E, 0x20), 17),
+    ((0x20, 0x21), 23),
+    ((0x21, 0x21), 23),
+    ((0x21, 0x41), 69),
+    ((0x41, 0x44), 14),
+    ((0x44, 0x42), 15),
+    ((0x42, 0x43), 14),
+    ((0x43, 0x41), 24),
+    ((0x41, 0x42), 15),
+    ((0x42, 0x21), 83),
+    ((0x21, 0x20), 18),
+    ((0x20, 0x0E), 16),
+    ((0x0E, 0x0C), 18),
+    ((0x0A, 0x03), 96),
+    ((0x03, 0x100), 84),
+    ((0x100, 0x101), 67),
+];
+const DARK: u16 = 17;
+
+/// The dark frames of the load from `from` to `to`.
+pub(super) fn dark_frames(from: u16, to: u16) -> u16 {
+    MEASURED_DARK
+        .iter()
+        .find(|(maps, _)| *maps == (from, to))
+        .map_or(DARK, |&(_, frames)| frames)
+}
+
 /// `$8D:8985`: each selector's arrival adjustment, as (dx, dy).
 const ADJUSTMENTS: [(i16, i16); 15] = [
     (0, 0),
@@ -345,7 +390,7 @@ impl World<'_> {
     /// Whether the player is leaving or arriving.
     #[must_use]
     pub const fn in_transition(&self) -> bool {
-        self.leaving.is_some() || self.arriving.is_some() || self.fading.is_some()
+        self.leaving.is_some() || self.arriving.is_some() || self.fading.is_some() || self.dark > 0
     }
 
     /// A frame of leaving or arriving, if one is under way: the player
@@ -406,6 +451,7 @@ impl World<'_> {
         }
         let from = self.map;
         let to = entered.map;
+        entered.dark = dark_frames(from, to);
         *self = entered;
         Ok(Step::Entered { from, to })
     }

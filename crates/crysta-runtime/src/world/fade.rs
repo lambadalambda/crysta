@@ -9,12 +9,11 @@
 //! | 1 | 80 frames, a step each 5 (`$8A01`) | 80 frames (`$8A90`) |
 //! | 2, 3 | a cut after one frame (`$8A15`) | 2: 16 frames; 3: a cut |
 //! | 4, 5 | 32 frames, a step each 2, mosaic growing (`$8A1D`) | 4: the reverse (`$8AB0`); 5: a cut |
-//! | 6, 7 | 37 whitening steps of 3 frames, then the slow fade (`$8A3B`) | 6: slow; 7: slow from white, then 33 steps of 3 frames back to colour (`$8AD0`) |
+//! | 6, 7 | 37 whitening steps of 4 frames, then the slow fade (`$8A3B`) | 6: slow; 7: slow from white, then 33 steps of 3 frames back to colour (`$8AD0`) |
 //!
 //! Measured on the native route (`departure/journey.jsonl`): mode 0 and
-//! mode 4 fade out in 16 and 32 frames. Not modelled: the load's own dark
-//! frames (3 natively, 49 and 68 around the box's tour), and that each
-//! whitening step runs only one game frame of its three.
+//! mode 4 fade out in 16 and 32 frames; the load's dark frames between
+//! the fades are [`super::transition::dark_frames`].
 
 use super::{Step, World, WorldError};
 use crate::scene::Transfer;
@@ -39,6 +38,19 @@ impl Fading {
             mode: transfer.mode,
             transfer,
             frame: 0,
+        }
+    }
+
+    /// Whether this frame is a game frame, in which the actors run: each
+    /// whitening and colouring step runs one, then waits out its other
+    /// frames with the NMI off (`$86:815C`).
+    const fn game_frame(self) -> bool {
+        match self {
+            Self::Out {
+                mode: 6 | 7, frame, ..
+            } if frame < WHITENING => frame % WHITENING_STEP == 0,
+            Self::In { mode: 7, frame } if frame > SLOW => (frame - SLOW) % COLOURING_STEP == 1,
+            _ => true,
         }
     }
 
@@ -118,9 +130,15 @@ impl Screen {
     }
 }
 
-const WHITENING: u16 = 37 * 3;
+/// A whitening step: one game frame and two bare vblanks, and a lag frame
+/// natively (147 frames for 37 steps).
+const WHITENING_STEP: u16 = 4;
+const WHITENING: u16 = 37 * WHITENING_STEP;
 const SLOW: u16 = 80;
-const COLOURING: u16 = 33 * 3;
+/// A colouring step: one game frame and two bare vblanks (natively 111
+/// frames for 33 steps, the lag varying with the actors).
+const COLOURING_STEP: u16 = 3;
+const COLOURING: u16 = 33 * COLOURING_STEP;
 
 /// Frames the fade out of `mode` lasts.
 pub(super) const fn out_frames(mode: u8) -> u16 {
@@ -162,11 +180,11 @@ pub(super) fn out(mode: u8, frame: u16) -> Screen {
             }
         }
         6 | 7 if frame <= WHITENING => Screen {
-            tint: Tint::Raise(step(frame, 3)),
+            tint: Tint::Raise(step(frame, WHITENING_STEP)),
             ..Screen::FULL
         },
         6 | 7 => Screen {
-            tint: Tint::Raise(step(WHITENING, 3)),
+            tint: Tint::Raise(step(WHITENING, WHITENING_STEP)),
             ..down(5, WHITENING)
         },
         _ => down(1, 0),
@@ -200,7 +218,7 @@ pub(super) fn into(mode: u8, frame: u16) -> Screen {
             ..up(5)
         },
         7 => Screen {
-            tint: Tint::Floor(31u8.saturating_sub(step(frame - SLOW, 3))),
+            tint: Tint::Floor(31u8.saturating_sub(step(frame - SLOW, COLOURING_STEP))),
             ..Screen::FULL
         },
         _ => up(1),
@@ -236,7 +254,9 @@ impl World<'_> {
         let Some(fading) = self.fading.take() else {
             return Ok(None);
         };
-        self.run_actors()?;
+        if fading.game_frame() {
+            self.run_actors()?;
+        }
         let (next, load) = fading.tick(&mut self.globals.transfer);
         let Some(transfer) = load else {
             self.fading = next;
@@ -248,6 +268,7 @@ impl World<'_> {
         entered.face(self.facing);
         entered.fading = next;
         let from = self.map;
+        entered.dark = super::transition::dark_frames(from, transfer.map);
         *self = entered;
         Ok(Some(Step::Entered {
             from,
@@ -259,6 +280,7 @@ impl World<'_> {
     #[must_use]
     pub fn screen(&self) -> Screen {
         match self.fading {
+            _ if self.dark > 0 => Screen::lit(0),
             Some(Fading::Out { mode, frame, .. }) => out(mode, frame),
             Some(Fading::In { mode, frame }) => into(mode, frame),
             None => Screen::lit(self.exit_brightness()),
@@ -307,6 +329,19 @@ mod tests {
         assert_eq!((next.is_some(), load, queued.is_some()), (true, None, true));
     }
 
+    #[test]
+    fn a_white_step_runs_one_game_frame() {
+        let mut fading = Fading::start(transfer(0x21, 7));
+        let mut queued = None;
+        let mut games = Vec::new();
+        for _ in 0..12 {
+            games.push(fading.game_frame());
+            fading = fading.tick(&mut queued).0.unwrap();
+        }
+        let expected = [true, false, false, false].repeat(3);
+        assert_eq!(games, expected);
+    }
+
     fn brightness(fade: impl Fn(u16) -> Screen, frames: u16) -> Vec<u8> {
         (1..=frames).map(|frame| fade(frame).brightness).collect()
     }
@@ -340,13 +375,13 @@ mod tests {
 
     #[test]
     fn mode_7_whitens_then_darkens_and_comes_back_from_white() {
-        assert_eq!(out_frames(7), 191);
+        assert_eq!(out_frames(7), 228);
         assert_eq!(out(7, 1).tint, Tint::Raise(1));
         assert_eq!(
-            (out(7, 111).brightness, out(7, 111).tint),
+            (out(7, 148).brightness, out(7, 148).tint),
             (15, Tint::Raise(37))
         );
-        assert_eq!(out(7, 191).brightness, 0);
+        assert_eq!(out(7, 228).brightness, 0);
         assert_eq!(in_frames(7), 179);
         assert_eq!(into(7, 0).tint, Tint::Floor(31));
         assert_eq!(

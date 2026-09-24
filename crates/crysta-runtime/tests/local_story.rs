@@ -800,8 +800,12 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     // Mode 4: 32 frames darkening into a growing mosaic, and back.
     assert_eq!(mosaic.len(), 29, "from the third frame");
     assert_eq!(mosaic.last(), Some(&15));
-    let screen = world.screen();
-    assert_eq!((screen.brightness, screen.mosaic), (0, 15));
+    // Dark for the load's 69 native frames, then the mosaic comes back.
+    assert_eq!(world.screen().brightness, 0);
+    assert_eq!(
+        frames_until(&mut world, 80, |world| world.screen().mosaic == 15),
+        69
+    );
     assert_eq!(
         frames_until(&mut world, 40, |world| !world.in_transition()),
         32
@@ -1102,8 +1106,10 @@ fn a_door_walks_ark_out_and_in_with_the_fades() {
         brightness.push(world.brightness());
     }
     assert_eq!(world.position(), (120, 625), "native rest");
+    // Dark for the load's 18 native frames, then the fade in.
+    assert!(brightness[..18].iter().all(|&level| level == 0));
     assert_eq!(
-        brightness[..16],
+        brightness[18..34],
         (1..=15).chain([15]).collect::<Vec<u8>>()[..]
     );
 }
@@ -1301,6 +1307,7 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
     assert_eq!((world.map(), world.position()), (0x0003, (536, 528)));
     // The underworld selects 1.
     assert_eq!(cues(&mut world), (vec![2], vec![0x4D00]));
+    frames_until(&mut world, 200, |world| !world.in_transition());
     replay(&mut world, &[(5, 16)]);
     assert_eq!(world.position(), (536, 544), "underworld-arrival");
     // Crysta's rectangle on the plane leads back into the town.

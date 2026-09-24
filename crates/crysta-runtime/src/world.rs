@@ -77,6 +77,8 @@ pub struct World<'a> {
     arriving: Option<transition::Arriving>,
     /// A script transfer's fades ([`fade`]).
     fading: Option<fade::Fading>,
+    /// Dark frames left of the last load ([`transition::dark_frames`]).
+    dark: u16,
     /// The brightness since the last load, which the fade-in raises a step
     /// a frame.
     dawn: u8,
@@ -292,6 +294,7 @@ impl<'a> World<'a> {
             leaving: None,
             arriving: None,
             fading: None,
+            dark: 0,
             dawn: 15,
             animate: false,
         })
@@ -715,6 +718,11 @@ impl<'a> World<'a> {
             Direction::Down => 0x0400,
             Direction::Up => 0x0800,
         });
+        // A load's dark frames run nothing.
+        if self.dark > 0 {
+            self.dark -= 1;
+            return Ok((Step::Stayed, None));
+        }
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
             self.globals.audio.sound_port3(blip);
@@ -807,6 +815,7 @@ impl<'a> World<'a> {
         self.leaving = None;
         self.arriving = None;
         self.fading = None;
+        self.dark = 0;
         self.globals.transfer = None;
     }
 
@@ -1404,6 +1413,7 @@ mod tests {
             leaving: None,
             arriving: None,
             fading: None,
+            dark: 0,
             dawn: 15,
             animate: false,
         }
