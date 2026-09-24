@@ -268,7 +268,10 @@ impl ArkSprites {
         let palette = std::array::from_fn(|i| Bgr555::new(word(colors, i * 2)));
         ranges.extend([0xf941..0xf948, palette_range]);
         let mut frames = Vec::new();
+        // European `$A6:A1E4` and `$9C:D064`, as `$80:A24F` names them.
         for (resource, base, count) in [(0, 0x24_a1e4, 1), (1, 0x1a_d064, 6)] {
+            let base = crate::layout::offset(image, base)
+                .ok_or(SpriteError::Invalid("unrecorded Ark frame list"))?;
             ranges.push(base..base + 6);
             for axis in 0..3 {
                 let offset = usize::from(word(take(image, base + axis * 2, 2)?, 0));

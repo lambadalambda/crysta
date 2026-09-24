@@ -145,3 +145,27 @@ fn the_slice_load_patches_are_the_japanese_ones() {
         .unwrap()
         .is_empty());
 }
+
+#[test]
+fn arks_frames_are_the_japanese_ones() {
+    use assets::sprites::ArkSprites;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let (eu, jp) = (
+        ArkSprites::from_rom(europe.image()).unwrap(),
+        ArkSprites::from_rom(japan.image()).unwrap(),
+    );
+    let frames = |sprites: &ArkSprites| {
+        sprites
+            .frames()
+            .iter()
+            .map(|frame| format!("{:?}", frame.composition()))
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(frames(&eu), frames(&jp));
+    assert_eq!(
+        (eu.graphics(0), eu.graphics(1), eu.palette()),
+        (jp.graphics(0), jp.graphics(1), jp.palette())
+    );
+}
