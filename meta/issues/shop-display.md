@@ -17,3 +17,13 @@ name and price window of the display actor `$92:D190`.
 
 - The window's layout is not decoded yet; a frame from the reference
   emulator is needed.
+
+## Progress
+
+- Drawn from ROM art (`assets::shop_display`, `crysta_app::shop`): the
+  name, icon, count row, coin, price, bag and money, and Ark's hold pose
+  after a purchase (2026-09-24). A frame of `$1E` matches the native
+  capture but for the text window's style and the room's light beams.
+  Open: a native frame of the Prime Blue shop `$1D` (its two Prime Blue
+  sprites, `$92:D52C`/`$92:D53F`), and the weapon and armour markers
+  (`$85:E699`, `$85:E6F7`) no Crysta shop shows.
