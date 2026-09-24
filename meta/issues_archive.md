@@ -123,3 +123,4 @@
 - [x] [Decode the shop stock](issues/shop-data.md)
 - [x] [Decode the shop texts' indexed controls](issues/shop-text.md)
 - [x] [Keep money, Prime Blue and the inventory](issues/money-and-inventory.md)
+- [x] [Place the friends in the pot scene as natively](issues/pot-scene-friends.md)

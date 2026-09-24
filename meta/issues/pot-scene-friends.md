@@ -17,3 +17,11 @@ hidden helper behind the door.
 ## Acceptance Criteria
 
 - The scene's visible actors stand where the native route has them.
+
+## Resolution
+
+- The "friend" at the door was the door's hit target `$88:AAEE` (record
+  `$38C32`), drawn with the friend's reused descriptor. Its script points
+  its art at the object sheet (`COP 48`, `COP 48`, `COP D8 $A2C000`,
+  `COP 80 0`); natively nothing shows there, so it is not drawn. The
+  spear's display in `$42` now draws its own list the same way.

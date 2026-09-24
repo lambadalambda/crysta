@@ -144,7 +144,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw the text window as the game does](issues/native-text-window.md)
 - [Draw the light rays in the rooms](issues/light-rays.md)
 - [Show the area titles](issues/area-titles.md)
-- [Place the friends in the pot scene as natively](issues/pot-scene-friends.md)
 - [Let Ark run](issues/running.md)
 - [Play the Crysta slice free-roam in a native app](issues/free-roam-crysta-app.md)
 - [Promote the Crysta room builder into a library](issues/crysta-room-library.md)
