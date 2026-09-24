@@ -5,7 +5,7 @@
 //! times by `class & 3`. Only the class-0 movement row on the common `$6000`
 //! base is admitted, which moves 0.5 px per tick. Anything else keeps the
 //! actor's approximate projection.
-use super::COMMON_SOURCE;
+use super::{COMMON_SIZE, COMMON_SOURCE};
 use assets::compression::decode;
 use assets::layout;
 use assets::maps::actors::rom_offset as offset;
@@ -190,9 +190,9 @@ pub(super) fn common_streams(image: &[u8]) -> bool {
             return false;
         }
     }
-    let Some(common) = decode(image.get(source..).unwrap_or(&[]), 0x1A0C)
+    let Some(common) = decode(image.get(source..).unwrap_or(&[]), COMMON_SIZE)
         .ok()
-        .filter(|packet| packet.data.len() == 0x1A0C)
+        .filter(|packet| packet.data.len() == COMMON_SIZE)
         .map(|packet| packet.data)
     else {
         return false;

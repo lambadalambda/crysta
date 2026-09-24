@@ -203,7 +203,7 @@ const SOUND_PORT3: u8 = 0x36;
 /// `$92:CC8A`, the shops' spawner: native code that spawns a talk target
 /// for each shop record of the map, then deletes itself. The world keeps
 /// the targets ([`crate::shop`]), so the spawner just ends.
-pub const SHOP_SPAWNER: u32 = 0x92_CC8A;
+const SHOP_SPAWNER: u32 = 0x92_CC8A;
 
 /// Whether `script` is the shops' spawner in `image`'s revision
 /// (European `$92:E2FC`).
@@ -505,8 +505,6 @@ impl Actor {
     #[must_use]
     pub fn new(position: (u16, u16), script: Option<u32>, initial: u8, seed: u32) -> Self {
         let (pc, state) = match script {
-            // The shops' spawner ends at once; the world keeps its targets.
-            Some(SHOP_SPAWNER) => (0, State::Gone),
             Some(script) if (0x80..=0xBF).contains(&(script >> 16)) => {
                 ((script & 0x3F_FFFF) as usize, State::Running)
             }
@@ -562,14 +560,14 @@ impl Actor {
         resident: &crate::residents::Resident,
         seed: u32,
     ) -> Self {
-        let script = resident.script.map(|script| {
-            if is_shop_spawner(image, script) {
-                SHOP_SPAWNER
-            } else {
-                script
-            }
-        });
-        let mut actor = Self::new(resident.position, script, resident.initial, seed);
+        let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
+        // The shops' spawner ends at once; the world keeps its targets.
+        if resident
+            .script
+            .is_some_and(|script| is_shop_spawner(image, script))
+        {
+            (actor.pc, actor.state) = (0, State::Gone);
+        }
         actor.map = map;
         actor.parameter = image.get(resident.record + 3).copied().unwrap_or(0);
         actor.descriptor = resident.descriptor;

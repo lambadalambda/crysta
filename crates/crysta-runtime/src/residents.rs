@@ -151,7 +151,8 @@ pub fn residents(
         })
         .filter(|resident| {
             resident.script.is_none_or(|script| {
-                // Named in the image's revision; one unrecorded matches nothing.
+                // Named in the image's revision; all five are recorded, and
+                // the European slice test would show one that is not.
                 std::iter::once(PLAYER)
                     .chain(SERVICES)
                     .all(|japan| layout::at(image, japan) != Some(script))
