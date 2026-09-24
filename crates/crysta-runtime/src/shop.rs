@@ -428,6 +428,21 @@ mod tests {
     }
 
     #[test]
+    fn the_prime_blue_shop_also_wants_prime_blue() {
+        // `$92:D57D` at item `$10` in this image: a cost of 2.
+        let mut image = vec![0; 0x13_0000];
+        image[0x12_D57D + 0x20] = 0x02;
+        let mut inventory = Inventory::default();
+        inventory.add_money(100);
+        let mut shop = browsing(&inventory);
+        shop.kind = PRIME_BLUE_SHOP;
+        assert_eq!(shop.price(&image), (10, 2));
+        assert_eq!(shop.refusal(&image, &inventory), Some(2), "none held");
+        inventory.add_prime_blue(2);
+        assert_eq!(shop.refusal(&image, &inventory), None);
+    }
+
+    #[test]
     fn the_count_wraps_from_nine_to_one_and_back() {
         let inventory = Inventory::default();
         let mut shop = browsing(&inventory);
