@@ -37,7 +37,10 @@ fn europe_dump_normalizes_and_loads() {
     let rom = Rom::load(&image).expect("known-good European dump must load");
     assert_eq!(rom.revision(), Revision::EuropeEnglish);
     assert_eq!(rom.image().len(), Rom::IMAGE_SIZE);
-    assert_eq!(Revision::of_image(rom.image()), Some(Revision::EuropeEnglish));
+    assert_eq!(
+        Revision::of_image(rom.image()),
+        Some(Revision::EuropeEnglish)
+    );
     // The normalized image must expose the internal title at 0xFFC0.
     let title = &rom.image()[0xFFC0..0xFFC0 + 12];
     assert_eq!(
