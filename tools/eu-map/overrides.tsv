@@ -1,0 +1,2 @@
+jp_address	eu_address	reason
+83:EDF8	83:EDA0	the C spawn $83:8C30 names it; the byte run matched the descriptor before it

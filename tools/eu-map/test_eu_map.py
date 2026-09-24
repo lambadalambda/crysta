@@ -132,5 +132,21 @@ class References(unittest.TestCase):
 
 
 
+class Overrides(unittest.TestCase):
+    def test_an_override_replaces_the_match_and_keeps_the_kind(self):
+        with tempfile.TemporaryDirectory() as root:
+            path = os.path.join(root, 'overrides.tsv')
+            with open(path, 'w', encoding='utf-8') as handle:
+                handle.write('jp_address\teu_address\treason\n'
+                             '83:EDF8\t83:EDA0\tthe spawn names it\n'
+                             '84:0000\t84:0000\tnamed by no source\n')
+            overrides = eumap.load_overrides(path)
+        rows = {0x03_EDF8: ('83:EDF8', '83:ED93', 'sprite', 'exact', 'high', 'run; code; a.rs:1')}
+        eumap.apply_overrides(rows, overrides)
+        self.assertEqual(rows, {0x03_EDF8: (
+            '83:EDF8', '83:EDA0', 'sprite', 'hand', 'high',
+            'the spawn names it (matched 83:ED93); run; code; a.rs:1')})
+
+
 if __name__ == '__main__':
     unittest.main()

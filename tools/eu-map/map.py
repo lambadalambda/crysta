@@ -19,6 +19,7 @@ Methods, tried in order, each recorded in the `method` column:
              occurs once near the aligned estimate in the European ROM;
   pointer    references to the address (24-bit, or 16-bit from its bank)
              sit at aligned places, and the European values there agree.
+  hand       overrides.tsv sets it, after the matching, with a reason.
 """
 import bisect
 import difflib
@@ -466,6 +467,27 @@ def layout(aligner):
     return lines
 
 
+def load_overrides(path):
+    """{jp offset: (eu runtime address, reason)} from an overrides TSV."""
+    overrides = {}
+    with open(path, encoding='utf-8') as handle:
+        next(handle)
+        for line in handle:
+            if line.strip():
+                jp, eu, reason = line.rstrip('\n').split('\t')
+                overrides[disasm65.normalized(jp)] = (eu, reason)
+    return overrides
+
+
+def apply_overrides(rows, overrides):
+    """Sets the overridden rows' European address, method `hand` and the
+    reason; an override for an address no source names is dropped."""
+    for o, (eu, reason) in overrides.items():
+        if o in rows:
+            jp, found, kind, _, _, note = rows[o]
+            rows[o] = (jp, eu, kind, 'hand', 'high', f'{reason} (matched {found}); {note}')
+
+
 def main(argv):
     args = [a for a in argv if not a.startswith('--')]
     opts = dict(a[2:].split('=', 1) for a in argv if a.startswith('--') and '=' in a)
@@ -495,6 +517,7 @@ def main(argv):
         rows[o] = (runtime(o), runtime(target) if target is not None else '-',
                    kind_of(uses, o), method, confidence, note)
     bank_rows(rows, found)
+    apply_overrides(rows, load_overrides(os.path.join(HERE, 'overrides.tsv')))
     rows = [rows[o] for o in sorted(rows)]
     out = open(opts['out'], 'w', encoding='utf-8') if 'out' in opts else sys.stdout
     print('jp_address\teu_address\tkind\tmethod\tconfidence\tnote', file=out)
