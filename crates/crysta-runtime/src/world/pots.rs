@@ -78,7 +78,8 @@ pub struct CarriedPot {
     /// Its tile, `$FA` or `$FB`.
     pub tile: u16,
     /// Its sprite's art (`$96:E1A6` for `$FA`, `$96:E1AB` for `$FB`), for
-    /// [`assets::sprites::PandoraSprites::get`].
+    /// [`assets::sprites::PandoraSprites::get`]: the Japanese addresses,
+    /// the art's keys in either revision.
     pub art: u32,
     /// Where it flies, once released; `None` while in hand.
     pub flight: Option<(u16, u16)>,
