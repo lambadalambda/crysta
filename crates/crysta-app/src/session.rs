@@ -315,6 +315,12 @@ impl Session {
             });
             return (ark, None);
         }
+        // Dashing loops its list; the brake holds its one frame.
+        if let Some((motion, facing, age)) = self.world.run_pose() {
+            let ark = PandoraSprites::run_pose(motion, facing)
+                .and_then(|pose| self.carry_frame(pose, u64::from(age), false));
+            return (ark, None);
+        }
         let carry = self.world.carry().and_then(|carry| {
             let pose = PandoraSprites::carry_pose(carry.motion, carry.facing)?;
             // The lift and the throw run once from their start; holding loops.
