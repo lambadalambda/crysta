@@ -29,9 +29,10 @@ pub struct WindowArt {
     pub frame: [[u8; 64]; 8],
     /// The interior tile `$20`.
     pub interior: [u8; 64],
-    /// BG3 colours 0..8: palette 0 (1 white, 2 edge) and palette 1 (5 the
-    /// default speaker colour, 6 its edge); colour 3 and 7 are the shade.
-    pub colours: [Bgr555; 8],
+    /// BG3 colours 0..12: palettes 0 (1 white, 2 edge), 1 (5 the default
+    /// speaker colour, 6 its edge) and 2; each palette's colour 3 is the
+    /// shade.
+    pub colours: [Bgr555; 12],
     /// The prompt's four 16×16 glyphs.
     pub prompt: Vec<[u8; 256]>,
     shade: [Bgr555; 32],
@@ -69,7 +70,7 @@ impl WindowArt {
         for (index, slot) in frame.iter_mut().enumerate() {
             *slot = tile(0x10 + index)?;
         }
-        let mut colours = [Bgr555::new(0); 8];
+        let mut colours = [Bgr555::new(0); 12];
         for (index, slot) in (0_u32..).zip(colours.iter_mut()) {
             *slot = colour(COLOURS + index * 2)?;
         }
