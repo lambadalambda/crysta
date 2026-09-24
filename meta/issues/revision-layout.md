@@ -26,3 +26,9 @@ with lookups in a layout chosen by `rom::Revision`.
   (`crates/crysta-runtime/tests/local_european.rs`). Open: the Pandora
   sprites, the shop texts, the labels, the shop display, the window art,
   the music extraction.
+- The Pandora sprites, the box, the shop texts, the titles and labels, the
+  shop display, the window art and the music extraction read the European
+  ROM too; art IDs stay the Japanese addresses as portable keys
+  (2026-09-24). The committed `europe.rs` holds the rows the code needed
+  then; a fresh `map.py` run over newer code adds rows, each to be checked
+  before use.
