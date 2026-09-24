@@ -1,7 +1,7 @@
 //! Audited instruction windows. Map-script, controller and COP5A pointers are distinct.
 use super::super::{
-    layout, resource, script_bank, scripts, validate_spans, Bgr555, Load, ResourceKind, RoomSpan,
-    StaticBackground, StaticLayer, VisualMapError, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED,
+    relocated, resource, script_bank, scripts, validate_spans, Bgr555, Load, ResourceKind,
+    RoomSpan, StaticBackground, StaticLayer, VisualMapError, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED,
     ROOM_SUBSCRIPTS,
 };
 use super::{expect, Initialization};
@@ -106,9 +106,7 @@ const PALETTES: &[(usize, u8, u8)] = &[
 ];
 /// The image offset in `image`'s revision of Japanese offset `japan`.
 fn located(image: &[u8], japan: usize) -> Result<usize, VisualMapError> {
-    layout::offset(image, japan).ok_or(VisualMapError::Unsupported(
-        "unqualified Pandora source profile",
-    ))
+    relocated(image, japan, "unqualified Pandora source profile")
 }
 /// Entry `index` of the table at Japanese offset `table` points at `target`.
 fn table(image: &[u8], table: usize, index: usize, target: usize) -> Result<(), VisualMapError> {
@@ -143,7 +141,9 @@ fn load(
     let bytes = image
         .get(at..at + len)
         .ok_or(VisualMapError::Unsupported("truncated Pandora load"))?;
-    let bank = script_bank(image).ok_or(VisualMapError::Unsupported("truncated Pandora load"))?;
+    let bank = script_bank(image).ok_or(VisualMapError::Unsupported(
+        "unrecorded Pandora script bank",
+    ))?;
     let source = scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("pointer field"), bank)
         .map_err(VisualMapError::Script)?
         .normalized()

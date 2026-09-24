@@ -728,6 +728,16 @@ fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     Ok(selected)
 }
 
+/// The image offset in `image`'s revision of Japanese offset `japan`, or
+/// `why` it is refused when none is recorded.
+pub(super) fn relocated(
+    image: &[u8],
+    japan: usize,
+    why: &'static str,
+) -> Result<usize, VisualMapError> {
+    layout::offset(image, japan).ok_or(VisualMapError::Unsupported(why))
+}
+
 /// The bank the map-loading scripts sit in (`$98`; `$9A` in the European
 /// ROM), the base their packed resource pointers count from.
 pub(super) fn script_bank(image: &[u8]) -> Option<u8> {
@@ -735,8 +745,9 @@ pub(super) fn script_bank(image: &[u8]) -> Option<u8> {
 }
 
 fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
-    let invalid = || VisualMapError::Unsupported("unqualified room script profile");
-    let located = |japan: usize| layout::offset(image, japan).ok_or_else(invalid);
+    const PROFILE: &str = "unqualified room script profile";
+    let invalid = || VisualMapError::Unsupported(PROFILE);
+    let located = |japan: usize| relocated(image, japan, PROFILE);
     let entry: u32 = match id {
         0xa => 0x98_8350,
         0xb => 0x98_8401,
@@ -804,7 +815,7 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     .into_iter()
     .map(|(kind, at, p, len)| {
         let at = located(at)?;
-        let bytes = &image[at..at + len];
+        let bytes = image.get(at..at + len).ok_or_else(invalid)?;
         let source =
             scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("three-byte field"), bank)
                 .map_err(VisualMapError::Script)?
@@ -819,7 +830,7 @@ fn validate_spans(image: &[u8], spans: &[&RoomSpan]) -> Result<(), VisualMapErro
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
     let bank = script_bank(image).ok_or_else(invalid)?;
     for span in spans {
-        let offset = layout::offset(image, span.offset).ok_or_else(invalid)?;
+        let offset = relocated(image, span.offset, "unqualified room script profile")?;
         let bytes = image
             .get(offset..offset + span.bytes.len())
             .ok_or_else(invalid)?;

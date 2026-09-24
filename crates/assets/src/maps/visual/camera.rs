@@ -1,7 +1,6 @@
 //! Source camera regions: the part of a shared layer that one map may show.
 
-use super::VisualMapError;
-use crate::layout;
+use super::{relocated, VisualMapError};
 
 /// A map's camera bounds and vertical clamp, as the map loader sets them.
 ///
@@ -31,19 +30,18 @@ impl CameraRegion {
                 .ok_or(unsupported("truncated camera source"))
         };
         let word = |at: usize| bytes(at, 2).map(|b| usize::from(u16::from_le_bytes([b[0], b[1]])));
+        let located = |japan: usize| relocated(image, japan, "unrecorded camera source");
         // `$86955C..959B` takes bank `$83` only after a zero bank-`$82` entry.
-        if word(0x28000 + map)? != 0 {
+        if word(located(0x28000)? + map)? != 0 {
             return Err(unsupported("scene outside bank $83"));
         }
-        let prefix = bytes(0x30000 + word(0x38000 + map)?, 2)?;
+        let scenes = located(0x38000)?;
+        let prefix = bytes((scenes & 0x3f_0000) + word(scenes + map)?, 2)?;
         // `$868C77..8C86` indexes `$96BB64 + 2*(selector & $3F)`.
         if prefix[0] != 0 || prefix[1] & 0xc0 != 0 {
             return Err(unsupported("unaudited scene prefix"));
         }
         // The European table is `$99:C2AE` (the operand at `$86:8C85`).
-        let located = |japan: usize| {
-            layout::offset(image, japan).ok_or(unsupported("unrecorded camera source"))
-        };
         let table = located(0x16_bb64)?;
         let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1]) * 2)?;
         // Profile byte +4 bit 6 selects `$0866 = 256` at `$868CDE..8CE6`.

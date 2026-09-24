@@ -191,16 +191,24 @@ impl SourceCamera {
                 .ok_or(VisualMapError::Unsupported(
                     "unqualified Pandora camera map",
                 ))?;
-        let located = |japan: usize| {
-            crate::layout::offset(image, japan).ok_or(VisualMapError::Unsupported(
-                "unqualified Pandora source profile",
-            ))
+        let located =
+            |japan: usize| super::relocated(image, japan, "unqualified Pandora source profile");
+        // Each table points within its own bank.
+        let same_bank = |at: usize, table: usize| {
+            if at & 0x3f_0000 == table & 0x3f_0000 {
+                Ok(at)
+            } else {
+                Err(VisualMapError::Unsupported(
+                    "unqualified Pandora source profile",
+                ))
+            }
         };
-        let scene = located(scene)?;
-        expect(image, 0x28000 + usize::from(map_id) * 2, &[0, 0])?;
+        let scenes = located(0x38000)?;
+        let scene = same_bank(located(scene)?, scenes)?;
+        expect(image, located(0x28000)? + usize::from(map_id) * 2, &[0, 0])?;
         expect(
             image,
-            0x38000 + usize::from(map_id) * 2,
+            scenes + usize::from(map_id) * 2,
             &scene.to_le_bytes()[..2],
         )?;
         expect(image, scene, &[0, selector])?;
@@ -208,10 +216,11 @@ impl SourceCamera {
             .iter()
             .find(|r| r.0 == selector)
             .ok_or(VisualMapError::Unsupported("unaudited display selector"))?;
-        let display_offset = located(display_offset)?;
+        let displays = located(0x16_bb64)?;
+        let display_offset = same_bank(located(display_offset)?, displays)?;
         expect(
             image,
-            located(0x16_bb64)? + usize::from(selector) * 2,
+            displays + usize::from(selector) * 2,
             &display_offset.to_le_bytes()[..2],
         )?;
         expect(image, display_offset, &display)?;
