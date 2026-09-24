@@ -695,7 +695,8 @@ mod session_tests {
         let mut session = Session::new(image);
         // `$0C` is the second page of a layer it shares with `$0B` and `$0D`;
         // the exterior's 1280-pixel sheet has a 1024-pixel region. Wide, the
-        // room is centred between blank sides and the exterior shows more.
+        // room is centred between sides that repeat its edge pixels, and the
+        // exterior shows more.
         for (width, map, position, camera) in [
             (CLASSIC_WIDTH, 0xC, (136, 300), (0, 256)),
             (CLASSIC_WIDTH, 0xA, (504, 1000), (376, 768)),
@@ -706,15 +707,18 @@ mod session_tests {
             session.world = World::enter(image, map, position.0, position.1).unwrap();
             session.background_clock = background::VisitClock::new(map);
             assert_eq!(session.compose(&rom, &mut frame), camera, "map {map:#x}");
-            let (outside, inside): (Vec<_>, Vec<_>) = frame
+            let side = (WIDE_WIDTH - CLASSIC_WIDTH) / 2;
+            let inside: Vec<_> = frame
                 .pixels
                 .chunks(width)
                 .flat_map(|row| row.iter().enumerate())
-                .partition(|(x, _)| {
-                    let side = (WIDE_WIDTH - CLASSIC_WIDTH) / 2;
-                    camera.0 < 0 && (*x < side || *x >= side + CLASSIC_WIDTH)
-                });
-            assert!(outside.iter().all(|(_, pixel)| **pixel == 0));
+                .filter(|(x, _)| !(camera.0 < 0 && (*x < side || *x >= side + CLASSIC_WIDTH)))
+                .collect();
+            for row in frame.pixels.chunks(width).filter(|_| camera.0 < 0) {
+                assert!(row[..side].iter().all(|pixel| *pixel == row[side]));
+                let right = side + CLASSIC_WIDTH - 1;
+                assert!(row[right..].iter().all(|pixel| *pixel == row[right]));
+            }
             assert!(inside.iter().filter(|(_, pixel)| **pixel != 0).count() > inside.len() / 2);
         }
         for map in 0xA..=0x21 {
