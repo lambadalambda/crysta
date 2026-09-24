@@ -5,6 +5,7 @@
 //! and [`assets::maps::actor_script`] walks the second; this joins them into
 //! something a runtime can put in a room.
 
+use assets::layout;
 use assets::maps::actor_script::{self, ScriptEffects};
 use assets::maps::actors::{descriptor_owner, ResolveError, SpawnList};
 use assets::maps::scripts::EventFlags;
@@ -149,10 +150,12 @@ pub fn residents(
             }
         })
         .filter(|resident| {
-            resident
-                .script
-                .is_none_or(|script| script != PLAYER && !SERVICES.contains(&script))
-                && !despawns(image, resident, events)
+            resident.script.is_none_or(|script| {
+                // Named in the image's revision; one unrecorded matches nothing.
+                std::iter::once(PLAYER)
+                    .chain(SERVICES)
+                    .all(|japan| layout::at(image, japan) != Some(script))
+            }) && !despawns(image, resident, events)
         })
         .collect())
 }
