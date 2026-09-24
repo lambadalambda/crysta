@@ -511,7 +511,8 @@ fn draw_dialogue(
     };
     let page = view.page;
     let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
-    let origin = crate::window::content_origin(page.placement(), player_screen_y, frame.width);
+    let origin =
+        crate::window::content_origin(image, page.placement(), player_screen_y, frame.width);
     // As much of the page as has typed out.
     let typed = page.typed(image, view.glyphs);
     crate::window::draw_window(frame, art, page, (&typed, view.glyphs), origin, tick);

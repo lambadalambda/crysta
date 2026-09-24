@@ -10,20 +10,26 @@ use assets::text::window::{WindowArt, PROMPT_TICKS};
 use assets::text::{Acknowledgement, DialoguePage, Placement};
 
 /// The standard window's content, in tiles: columns 2..30, rows 20..26
-/// (`$C1`), or rows 4..10 above a player low on the screen (`$DA`).
+/// (`$C1`), or rows 4..10 above a player low on the screen (`$DA`). The
+/// European windows hold four lines: rows 19..27 (base `$04C4`) and 4..12
+/// (`$0104`).
 const BOTTOM: (usize, usize) = (2, 20);
+const EUROPEAN_BOTTOM: (usize, usize) = (2, 19);
 const TOP: (usize, usize) = (2, 4);
 
-/// Where a page's content starts on the canvas.
+/// Where a page's content starts on the canvas, in `image`'s revision.
 #[must_use]
 pub fn content_origin(
+    image: &[u8],
     placement: Placement,
     player_screen_y: usize,
     view_width: usize,
 ) -> (i32, i32) {
     let (column, row) = match placement {
         Placement::AwayFromPlayer if player_screen_y >= VIEW_HEIGHT / 2 => TOP,
-        Placement::Bottom | Placement::AwayFromPlayer => BOTTOM,
+        Placement::Bottom | Placement::AwayFromPlayer => {
+            assets::layout::per_revision(image, BOTTOM, EUROPEAN_BOTTOM)
+        }
         Placement::Tile { column, row } => (usize::from(column), usize::from(row)),
     };
     let left = view_width.saturating_sub(CLASSIC_WIDTH) / 2;
@@ -180,7 +186,7 @@ mod tests {
                         .is_some_and(|glyph| glyph.palette == 1)
             })
             .expect("a named page that waits");
-        let origin = content_origin(page.placement(), 0, CLASSIC_WIDTH);
+        let origin = content_origin(image, page.placement(), 0, CLASSIC_WIDTH);
         let draw = |shown: usize| {
             let mut canvas = Canvas::new(CLASSIC_WIDTH);
             let typed = page.typed(image, shown);
@@ -217,18 +223,37 @@ mod tests {
 
     #[test]
     fn the_standard_window_starts_on_line_159_or_above_a_low_player() {
-        assert_eq!(content_origin(Placement::Bottom, 100, 256), (16, 159));
+        let japan = [0; 16];
         assert_eq!(
-            content_origin(Placement::AwayFromPlayer, 150, 256),
-            (16, 31)
-        );
-        assert_eq!(
-            content_origin(Placement::AwayFromPlayer, 50, 256),
+            content_origin(&japan, Placement::Bottom, 100, 256),
             (16, 159)
         );
         assert_eq!(
-            content_origin(Placement::Tile { column: 2, row: 23 }, 0, 400),
+            content_origin(&japan, Placement::AwayFromPlayer, 150, 256),
+            (16, 31)
+        );
+        assert_eq!(
+            content_origin(&japan, Placement::AwayFromPlayer, 50, 256),
+            (16, 159)
+        );
+        assert_eq!(
+            content_origin(&japan, Placement::Tile { column: 2, row: 23 }, 0, 400),
             (72 + 16, 183)
+        );
+    }
+
+    #[test]
+    fn the_european_bottom_window_starts_a_row_higher() {
+        let mut europe = vec![b' '; 0x1_0000];
+        europe[0xFFC0..0xFFCC].copy_from_slice(b"TERRANIGMA P");
+        // `$C1` at base `$04C4`: row 19; `$DA` at `$0104`: row 4.
+        assert_eq!(
+            content_origin(&europe, Placement::Bottom, 100, 256),
+            (16, 151)
+        );
+        assert_eq!(
+            content_origin(&europe, Placement::AwayFromPlayer, 150, 256),
+            (16, 31)
         );
     }
 }
