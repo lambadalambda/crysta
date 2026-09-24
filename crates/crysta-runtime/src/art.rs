@@ -331,8 +331,9 @@ pub struct Body {
 #[derive(Debug)]
 enum BodyArt {
     House(HouseActor),
-    /// Pandora's Box: its one list, rasterized unmirrored and mirrored.
-    Box([Animation; 2]),
+    /// One list of a Pandora art (Pandora's Box, an object sheet's list),
+    /// rasterized unmirrored and mirrored.
+    List(u8, [Animation; 2]),
 }
 
 /// Pandora's Box in `$21` (`$83:928F`): descriptor `$83:F984`, mode
@@ -356,10 +357,10 @@ impl Body {
                 (actor.graphics(), actor.palette(), actor.palette_base()),
                 hflip,
             ),
-            BodyArt::Box(animations) if selector == BOX_SELECTOR => {
+            BodyArt::List(list, animations) if selector == *list => {
                 Ok(animations[usize::from(hflip)].clone())
             }
-            BodyArt::Box(_) => Err(SpriteError::Invalid("no such box list").into()),
+            BodyArt::List(..) => Err(SpriteError::Invalid("no such list").into()),
         }
     }
 
@@ -368,7 +369,7 @@ impl Body {
     pub const fn initial(&self) -> u8 {
         match &self.art {
             BodyArt::House(actor) => actor.initial(),
-            BodyArt::Box(_) => BOX_SELECTOR,
+            BodyArt::List(list, _) => *list,
         }
     }
 
@@ -377,11 +378,23 @@ impl Body {
         let art = sprites
             .get(BOX_ART)
             .ok_or(SpriteError::Invalid("no box art"))?;
+        Self::list(art, BOX_SELECTOR)
+    }
+
+    /// The list `selector` of the object sheet at `base`.
+    fn object(image: &[u8], (base, selector): (u32, u8)) -> Result<Self, ArtError> {
+        Self::list(&PandoraArt::object(image, base, selector)?, selector)
+    }
+
+    fn list(art: &PandoraArt, selector: u8) -> Result<Self, ArtError> {
         Ok(Self {
-            art: BodyArt::Box([
-                list_animation(art, BOX_SELECTOR, false)?,
-                list_animation(art, BOX_SELECTOR, true)?,
-            ]),
+            art: BodyArt::List(
+                selector,
+                [
+                    list_animation(art, selector, false)?,
+                    list_animation(art, selector, true)?,
+                ],
+            ),
         })
     }
 }
@@ -448,6 +461,17 @@ pub fn residents_art(
                 .iter()
                 .position(|record| record.offset() == resident.record)
                 .and_then(|index| decoded[index].take());
+            if let Some(own) = own_art(image, resident) {
+                // The object sheet is qualified in the tour rooms only;
+                // elsewhere what the list draws is not known, and the blue
+                // door's target in C shows nothing natively.
+                return if (0x41..=0x44).contains(&map) {
+                    Body::object(image, own)
+                        .map_err(|error| Placeholder::Refused(error.to_string()))
+                } else {
+                    Err(Placeholder::Invisible)
+                };
+            }
             match found {
                 None | Some(Err(RecordRefusal::NoDescriptor)) => Err(Placeholder::Invisible),
                 Some(Err(RecordRefusal::PredecessorRefused)) => {
@@ -462,9 +486,6 @@ pub fn residents_art(
                 Some(Err(RecordRefusal::Invalid(error))) => {
                     Err(Placeholder::Refused(error.to_string()))
                 }
-                Some(Ok(_)) if sets_own_art(image, resident) => Err(Placeholder::Refused(
-                    "the script sets its own art base (`COP D8`)".into(),
-                )),
                 Some(Ok(actor)) => Ok(Body {
                     art: BodyArt::House(actor),
                 }),
@@ -473,21 +494,32 @@ pub fn residents_art(
         .collect()
 }
 
-/// Whether a resident's script opens by pointing its art elsewhere (`COP D8`,
-/// after an optional `COP B2` offset), as the spear's display `$89:D9FE`
-/// does: then its descriptor, often reused from the record before, is not
-/// what it draws.
-fn sets_own_art(image: &[u8], resident: &Resident) -> bool {
-    let Some(start) = resident
-        .script
-        .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
-    else {
-        return false;
-    };
-    let Some(code) = image.get(start..start + 6) else {
-        return false;
-    };
-    code[..2] == [2, 0xD8] || (code[..2] == [2, 0xB2] && code[4..6] == [2, 0xD8])
+/// The object sheet and list a resident's script points its art at before
+/// its first pose: `COP D8 base`, then `COP 80 list`, with `COP B2`
+/// (an offset) and `COP 48` (a flag check) allowed first, as the spear's
+/// display `$89:D9FE` and the blue door's hit target `$88:AAEE` do. Its
+/// descriptor, often reused from the record before, is not what it draws.
+fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
+    let mut at = usize::try_from(resident.script? & 0x3F_FFFF).ok()?;
+    let mut base = None;
+    for _ in 0..8 {
+        let code = image.get(at..at + 5)?;
+        match code[..2] {
+            [2, 0x48 | 0xB2] => at += 4,
+            [2, 0xD8] => {
+                base = Some(
+                    0x80_0000
+                        | u32::from(code[4]) << 16
+                        | u32::from(code[3]) << 8
+                        | u32::from(code[2]),
+                );
+                at += 5;
+            }
+            [2, 0x80] => return base.map(|base| (base, code[2])),
+            _ => return None,
+        }
+    }
+    None
 }
 
 #[cfg(test)]

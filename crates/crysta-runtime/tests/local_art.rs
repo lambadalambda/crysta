@@ -344,7 +344,8 @@ fn a_roster_keeps_its_bodies_after_a_conversation_changes_the_flags() {
             EventFlags::Bitmap(&later),
         );
         for (resident, body) in present.iter().zip(&art) {
-            if resident.body {
+            // The blue door's hit target draws its own list, undecoded in C.
+            if resident.body && resident.record != 0x03_8C32 {
                 checked += 1;
                 assert!(
                     !matches!(body, Err(Placeholder::Invisible)),
@@ -383,10 +384,11 @@ fn yomi_draws_in_the_weapons_room_and_the_spears_display_does_not_borrow_it() {
             .expect("present")
     };
     assert!(of(0x03_9572).is_ok(), "Yomi");
-    assert!(
-        matches!(of(0x03_957C), Err(Placeholder::Refused(_))),
-        "the spear's display"
-    );
+    // The display draws list 8 of the object sheet its script names.
+    let display = of(0x03_957C).as_ref().expect("the spear's display");
+    assert_eq!(display.initial(), 8);
+    let animation = display.animation(8, false).unwrap();
+    assert!(animation.frames.iter().any(Raster::is_visible));
 }
 
 #[test]
@@ -463,4 +465,33 @@ fn pandoras_box_draws_its_selector_three_in_its_room() {
         .find(|r| r.record == 0x03_928F)
         .unwrap();
     assert_eq!((running.selector, running.hidden), (3, false));
+}
+
+#[test]
+fn the_blue_doors_hit_target_is_not_drawn_as_a_friend() {
+    // `$88:AAEE` reuses the friend's descriptor but points its art at the
+    // object sheet (`COP 48`, `COP 48`, `COP D8 $A2C000`, `COP 80 0`).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut flags = new_game();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        flags[set / 8] |= 1 << (set % 8);
+    }
+    let present = residents(image, 0x000C, EventFlags::Bitmap(&flags)).unwrap();
+    let art = residents_art(
+        image,
+        0x000C,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
+    let index = present
+        .iter()
+        .position(|r| r.record == 0x03_8C32)
+        .expect("present");
+    // Natively nothing shows at the door (user screenshot); what the object
+    // sheet's list draws in C is not decoded.
+    assert!(matches!(art[index], Err(Placeholder::Invisible)));
 }
