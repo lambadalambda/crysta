@@ -129,7 +129,7 @@ pub fn bcd(word: u16) -> Option<u32> {
     })
 }
 
-fn read(image: &[u8], at: u32, count: usize) -> Result<&[u8], ShopError> {
+pub(crate) fn read(image: &[u8], at: u32, count: usize) -> Result<&[u8], ShopError> {
     let start = usize::try_from(at & 0x3F_FFFF).map_err(|_| ShopError::Truncated(at))?;
     image
         .get(start..start + count)

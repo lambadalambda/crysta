@@ -97,3 +97,38 @@ fn the_shop_confirm_is_a_two_option_choice() {
     let choice = assets::text::HouseDialogue::choice_at(cartridge.image(), 0x0A).unwrap();
     assert_eq!(choice.options.map(|option| option.result), [1, 2]);
 }
+
+#[test]
+fn the_shop_display_art_decodes_from_its_sources() {
+    use assets::shop_display::{halve, item_icon, name_glyphs, ShopArt};
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let art = ShopArt::from_rom(image).unwrap();
+    // Sprite tiles `$40..$5F`: `$50` is blank, `$51` solid.
+    assert_eq!(art.sprites.len(), 32);
+    assert!(art.sprites[0x10].pixels().iter().all(|&p| p == 0));
+    assert!(art.sprites[0x11].pixels().iter().all(|&p| p != 0));
+    assert!(art.sprites[usize::from(ShopArt::TIMES - 0x40)]
+        .pixels()
+        .iter()
+        .any(|&p| p != 0));
+    // BG3 characters: the digits' halves and the bag.
+    assert_eq!(art.panel.len(), 0x60);
+    for tile in [0x21, 0x31, 0x40, 0x51] {
+        assert!(art.panel[tile].iter().any(|&p| p != 0), "{tile:#x}");
+    }
+    assert_eq!(art.count_palette[14].raw(), 0x7FFF);
+    // The icon of `$10`: tiles from `$A2:8800`, palette entry 5.
+    let (tiles, palette) = item_icon(image, 0x10).unwrap();
+    assert!(tiles
+        .iter()
+        .any(|tile| tile.pixels().iter().any(|&p| p != 0)));
+    assert_eq!(palette.len(), 8);
+    assert_eq!(halve(assets::graphics::Bgr555::new(0x012B)).raw(), 0x0085);
+    // `$10`'s name: width 5, six glyphs.
+    let (width, glyphs) = name_glyphs(image, 0x10).unwrap();
+    assert_eq!((width, glyphs.len()), (5, 6));
+    assert!(glyphs.iter().all(|glyph| glyph.iter().all(|&p| p < 3)));
+}

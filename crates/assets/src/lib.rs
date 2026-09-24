@@ -5,6 +5,7 @@ pub mod cpu;
 pub mod graphics;
 
 pub mod maps;
+pub mod shop_display;
 pub mod shops;
 pub mod sprites;
 pub mod text;
