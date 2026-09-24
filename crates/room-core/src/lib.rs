@@ -18,6 +18,7 @@ mod house;
 mod pandora;
 pub mod pots;
 mod room;
+pub mod run;
 pub mod slice;
 mod snapshot;
 mod transition;
@@ -146,6 +147,20 @@ impl WalkingState {
             phase: 0,
             last_activation: None,
             onset_remaining: 0,
+        }
+    }
+
+    /// Walking in `direction` already, as after a dash stopped at a wall,
+    /// with `onset` ticks left of the onset window.
+    pub(crate) const fn walking(x: u16, y: u16, direction: Direction, onset: u8) -> Self {
+        Self {
+            x,
+            y,
+            active: Some(direction),
+            delayed: Some(direction),
+            phase: 0,
+            last_activation: Some(direction),
+            onset_remaining: onset,
         }
     }
 
