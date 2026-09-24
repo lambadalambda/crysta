@@ -113,8 +113,16 @@ pub struct DialoguePage {
     duration: u16,
     /// Colour 5, palette 1's first: the speaker's colour.
     speaker: u16,
+    /// Where the text stood as the page ended: the prompt's cell.
+    end: [u16; 2],
 }
 impl DialoguePage {
+    /// Where the text stood as the page ended, relative to the content:
+    /// a `$D5` page's prompt shows there (`$85:9D94`).
+    #[must_use]
+    pub const fn end(&self) -> [u16; 2] {
+        self.end
+    }
     /// The speaker's colour (colour 5): `$1B9F` as a window opens, or what
     /// `$CA 05` wrote (`$7F:060A`).
     #[must_use]
@@ -462,6 +470,7 @@ impl Decoder<'_> {
         self.page.boundary_source = source;
         self.page.acknowledgement = action;
         self.page.speaker = self.speaker;
+        self.page.end = self.position;
         // A glyph at speed 0 shows on the tick it shares with the one before.
         let last = self.page.glyphs.last().map_or(0, |glyph| glyph.tick + 1);
         self.page.duration = self.tick.max(last);
@@ -602,6 +611,7 @@ fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> 
         placement,
         duration: 0,
         speaker: SPEAKER,
+        end: [0, 0],
     }
 }
 /// Draws a glyph into a page's pixels, `transparent` clearing its colour 3
