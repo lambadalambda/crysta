@@ -398,25 +398,27 @@ impl Session {
         clouds.add_clouds(frame, camera, self.background_clock.tick());
         frame::extend_edges(frame, camera, region.bounds);
         frame::dim(frame, world.brightness());
-        draw_dialogue(frame, world, position, camera);
+        draw_dialogue(frame, world, position, camera, self.image);
         camera
     }
 }
 
 /// The dialogue window over the view, placed by the player's screen row.
-fn draw_dialogue(frame: &mut Canvas, world: &World<'_>, position: (u16, u16), camera: (i32, i32)) {
+fn draw_dialogue(
+    frame: &mut Canvas,
+    world: &World<'_>,
+    position: (u16, u16),
+    camera: (i32, i32),
+    image: &[u8],
+) {
     if let Some(view) = world.dialogue() {
         let page = view.page;
         let dimensions = (usize::from(page.width()), usize::from(page.height()));
         let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
         let origin = frame::page_origin(page.placement(), dimensions, player_screen_y, frame.width);
-        frame::draw_page(
-            frame,
-            page.indexed(),
-            dimensions,
-            page.background_index(),
-            origin,
-        );
+        // As much of the page as has typed out.
+        let typed = page.typed(image, view.glyphs);
+        frame::draw_page(frame, &typed, dimensions, page.background_index(), origin);
         if let Some(cursor) = view.cursor {
             frame::draw_cursor(frame, origin, cursor);
         }
