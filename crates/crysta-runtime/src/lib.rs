@@ -23,6 +23,7 @@ pub mod inventory;
 pub mod plane;
 pub mod residents;
 pub mod scene;
+pub mod shop;
 pub mod world;
 
 /// Maps the static exit graph bounds the Crysta slice to.

@@ -199,6 +199,10 @@ const PLAY_SELECTION: u8 = 0x32;
 /// Sound effects: port 3 (`$80:91E8`, `$04B7`), port 2 (`$80:91FC`,
 /// `$04B6`), both (`$80:9210`).
 const SOUND_PORT3: u8 = 0x36;
+/// `$92:CC8A`, the shops' spawner: native code that spawns a talk target
+/// for each shop record of the map, then deletes itself. The world keeps
+/// the targets ([`crate::shop`]), so the spawner just ends.
+pub const SHOP_SPAWNER: u32 = 0x92_CC8A;
 const SOUND_PORT2: u8 = 0x37;
 const SOUND_WORD: u8 = 0x38;
 /// Branches on the player inside a rectangle of cells around the actor;
@@ -494,6 +498,8 @@ impl Actor {
     #[must_use]
     pub fn new(position: (u16, u16), script: Option<u32>, initial: u8, seed: u32) -> Self {
         let (pc, state) = match script {
+            // The shops' spawner ends at once; the world keeps its targets.
+            Some(SHOP_SPAWNER) => (0, State::Gone),
             Some(script) if (0x80..=0xBF).contains(&(script >> 16)) => {
                 ((script & 0x3F_FFFF) as usize, State::Running)
             }

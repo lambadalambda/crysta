@@ -5,11 +5,12 @@
 //! player into the next one. Two exact return records additionally own the
 //! player through measured initialized-to-free arrival profiles.
 
-use crate::actors::{Actor, Surroundings, Wait};
+use crate::actors::{Actor, Surroundings, Wait, SHOP_SPAWNER};
 use crate::audio::{map_selection, Audio, Cue};
 use crate::plane::Plane;
 use crate::residents::{residents, Resident};
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
+use crate::shop::{Counter, Shop};
 use crate::{admitted, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
@@ -77,6 +78,9 @@ pub struct World<'a> {
     arriving: Option<transition::Arriving>,
     /// A script transfer's fades ([`fade`]).
     fading: Option<fade::Fading>,
+    /// The shops' talk targets here, and the shop open ([`crate::shop`]).
+    counters: Vec<assets::shops::Shop>,
+    shop: Option<Shop>,
     /// Dark frames left of the last load ([`transition::dark_frames`]).
     dark: u16,
     /// The brightness since the last load, which the fade-in raises a step
@@ -294,6 +298,8 @@ impl<'a> World<'a> {
             leaving: None,
             arriving: None,
             fading: None,
+            counters: Vec::new(),
+            shop: None,
             dark: 0,
             dawn: 15,
             animate: false,
@@ -572,6 +578,7 @@ impl<'a> World<'a> {
         let selection = map_selection(self.image, self.map, &self.globals.events);
         self.globals.audio.load_map(selection);
         self.pots = pots::Pots::at_entry(self.map, self.base.room.cells());
+        self.counters = self.shop_counters();
         self.plane = WORLD_MAPS.contains(&self.map).then(|| {
             let cells = self
                 .base
@@ -740,6 +747,11 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((Step::Stayed, None));
         }
+        if self.shop.is_some() {
+            self.shop_frame(presses)?;
+            self.apply_patches()?;
+            return Ok((Step::Stayed, None));
+        }
         if let Some(step) = self.contact_frame()? {
             self.apply_patches()?;
             return Ok((step, None));
@@ -819,6 +831,17 @@ impl<'a> World<'a> {
         self.globals.transfer = None;
     }
 
+    /// Adds money; for hosts and tests.
+    pub fn give_money(&mut self, amount: u32) {
+        self.globals.inventory.add_money(amount);
+    }
+
+    /// The money the player has.
+    #[must_use]
+    pub const fn money(&self) -> u32 {
+        self.globals.inventory.money()
+    }
+
     /// Sets an event flag as `COP 07` would; for hosts and tests.
     pub fn set_flag(&mut self, flag: u16) {
         self.globals.write_flag(0x8000 | flag);
@@ -852,7 +875,69 @@ impl<'a> World<'a> {
     /// Whether a script holds the world still.
     #[must_use]
     pub const fn in_scene(&self) -> bool {
-        self.scene.is_some()
+        self.scene.is_some() || self.shop.is_some()
+    }
+
+    /// The shop the player is in, if any.
+    #[must_use]
+    pub const fn shop(&self) -> Option<&Shop> {
+        self.shop.as_ref()
+    }
+
+    /// A frame of the shop: its loop reads the presses, and the actors go
+    /// on, as the loop runs a game frame a pass (`$80:80DF`).
+    fn shop_frame(&mut self, presses: Presses) -> Result<(), WorldError> {
+        if let Some(shop) = &mut self.shop {
+            let ended = shop.frame(
+                presses,
+                &mut Counter {
+                    image: self.image,
+                    dialogue: &mut self.globals.dialogue,
+                    inventory: &mut self.globals.inventory,
+                    audio: &mut self.globals.audio,
+                },
+            );
+            if ended {
+                self.shop = None;
+            }
+        }
+        self.run_actors()
+    }
+
+    /// The shops `$92:CC8A` spawns here: the records for this map whose
+    /// flag is set, when the map runs the spawner.
+    fn shop_counters(&self) -> Vec<assets::shops::Shop> {
+        if !self
+            .residents
+            .iter()
+            .any(|r| r.script == Some(SHOP_SPAWNER))
+        {
+            return Vec::new();
+        }
+        let flags = EventFlags::Bitmap(&self.globals.events);
+        assets::shops::shops(self.image)
+            .unwrap_or_default()
+            .into_iter()
+            // `$92:CD56`: a record without stock deletes its target.
+            .filter(|shop| shop.map == self.map && !shop.stock.is_empty())
+            .filter(|shop| shop.flag.is_none_or(|flag| flags.get(flag) == Some(true)))
+            .collect()
+    }
+
+    /// Opens the shop whose talk target the player faces: the first
+    /// spawned, as natively the first actor hit answers. A resident on
+    /// the cell that does not take interaction does not block it here,
+    /// though the first actor hit would natively.
+    fn open_shop(&mut self, faced: (u16, u16)) -> bool {
+        let Some(record) = self
+            .counters
+            .iter()
+            .find(|shop| (shop.position.0 / 16, shop.position.1 / 16) == faced)
+        else {
+            return false;
+        };
+        self.shop = Some(Shop::open(record, &self.globals.inventory));
+        true
     }
 
     /// The interaction dispatcher (`$87:923F`): runs the callback of the
@@ -881,7 +966,7 @@ impl<'a> World<'a> {
                 resident.cell() == faced && actor.interactable(self.facing)
             })
         else {
-            return false;
+            return self.open_shop(faced);
         };
         let player = self.position();
         let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
@@ -1413,6 +1498,8 @@ mod tests {
             leaving: None,
             arriving: None,
             fading: None,
+            counters: Vec::new(),
+            shop: None,
             dark: 0,
             dawn: 15,
             animate: false,

@@ -1406,3 +1406,75 @@ fn the_friend_steps_aside_after_the_door_breaks_and_a_press_waits_for_it() {
     assert!(path.contains(&Some((120, 512))), "walked down");
     assert_eq!(path.last(), Some(&None), "and left");
 }
+
+#[test]
+fn the_item_shop_browses_refuses_sells_and_lets_ark_go() {
+    // `$1E`: the talk target `$92:CD70` stands on (39,6); Ark faces it from
+    // below. Left and Right choose (port 3 `$22`), Up the count, A buys
+    // after the confirm (`$47`), B leaves.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter(image, 0x001E, 632, 120).unwrap();
+    world
+        .update(Some(Direction::Up), Presses::default())
+        .unwrap();
+    settle(&mut world);
+    cues(&mut world);
+    press_a(&mut world);
+    assert!(world.in_scene(), "the shop holds the world");
+    let browse = |world: &mut World<'_>| {
+        frames_until(world, 600, |world| {
+            world
+                .shop()
+                .is_some_and(crysta_runtime::shop::Shop::browsing)
+        })
+    };
+    browse(&mut world);
+    let showing = |world: &World<'_>| world.shop().and_then(crysta_runtime::shop::Shop::showing);
+    assert_eq!(showing(&world), Some((0x10, 1)));
+    let press = |world: &mut World<'_>, presses| world.update(None, presses).unwrap();
+    press(
+        &mut world,
+        Presses {
+            right: true,
+            ..Presses::NONE
+        },
+    );
+    press(
+        &mut world,
+        Presses {
+            up: true,
+            ..Presses::NONE
+        },
+    );
+    assert_eq!(showing(&world), Some((0x11, 2)));
+    assert_eq!(cues(&mut world).1, [0x2200, 0x2200]);
+    // No money: the refusal, then the help again.
+    press_a(&mut world);
+    frames_until(&mut world, 10, |world| world.typing() && world.in_scene());
+    press_a(&mut world);
+    browse(&mut world);
+    assert_eq!(world.money(), 0);
+    // With 60 the two cost 50: confirm, buy, thanks.
+    world.give_money(60);
+    press_a(&mut world);
+    frames_until(&mut world, 600, |world| {
+        world.dialogue().and_then(|view| view.cursor).is_some()
+    });
+    press_a(&mut world);
+    browse(&mut world);
+    assert_eq!(world.money(), 10);
+    assert_eq!(world.items(), [0x11]);
+    assert!(cues(&mut world).1.contains(&0x4700));
+    press(
+        &mut world,
+        Presses {
+            cancel: true,
+            ..Presses::NONE
+        },
+    );
+    frames_until(&mut world, 60, |world| !world.in_scene());
+    assert!(world.shop().is_none());
+}
