@@ -1,7 +1,8 @@
 //! Audited instruction windows. Map-script, controller and COP5A pointers are distinct.
 use super::super::{
-    resource, scripts, validate_spans, Bgr555, Load, ResourceKind, RoomSpan, StaticBackground,
-    StaticLayer, VisualMapError, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED, ROOM_SUBSCRIPTS,
+    layout, resource, script_bank, scripts, validate_spans, Bgr555, Load, ResourceKind, RoomSpan,
+    StaticBackground, StaticLayer, VisualMapError, ROOM_AUDIO, ROOM_COMMON, ROOM_SHARED,
+    ROOM_SUBSCRIPTS,
 };
 use super::{expect, Initialization};
 
@@ -103,8 +104,20 @@ const PALETTES: &[(usize, u8, u8)] = &[
     (0x9d28f, 88, 8),
     (0x9d296, 104, 8),
 ];
-fn table(image: &[u8], at: usize, target: usize) -> Result<(), VisualMapError> {
-    expect(image, at, &(target | 0x80_0000).to_le_bytes()[..3])
+/// The image offset in `image`'s revision of Japanese offset `japan`.
+fn located(image: &[u8], japan: usize) -> Result<usize, VisualMapError> {
+    layout::offset(image, japan).ok_or(VisualMapError::Unsupported(
+        "unqualified Pandora source profile",
+    ))
+}
+/// Entry `index` of the table at Japanese offset `table` points at `target`.
+fn table(image: &[u8], table: usize, index: usize, target: usize) -> Result<(), VisualMapError> {
+    let target = located(image, target)?;
+    expect(
+        image,
+        located(image, table)? + index * 3,
+        &(target | 0x80_0000).to_le_bytes()[..3],
+    )
 }
 fn root(image: &[u8], id: u16) -> Result<&'static RoomSpan, VisualMapError> {
     let span = &ROOTS
@@ -112,13 +125,14 @@ fn root(image: &[u8], id: u16) -> Result<&'static RoomSpan, VisualMapError> {
         .find(|r| r.0 == id)
         .ok_or(VisualMapError::Unsupported("unqualified Pandora map root"))?
         .1;
-    table(image, 0x6959c + usize::from(id) * 3, span.offset)?;
+    table(image, 0x6959c, usize::from(id), span.offset)?;
     validate_spans(image, &[span])?;
     Ok(span)
 }
 fn subscript(image: &[u8], id: usize, target: usize) -> Result<(), VisualMapError> {
-    table(image, 0x6a28c + id * 3, target)
+    table(image, 0x6a28c, id, target)
 }
+/// A load at image offset `at`, already in `image`'s revision.
 fn load(
     image: &[u8],
     at: usize,
@@ -129,7 +143,8 @@ fn load(
     let bytes = image
         .get(at..at + len)
         .ok_or(VisualMapError::Unsupported("truncated Pandora load"))?;
-    let source = scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("pointer field"), 0x98)
+    let bank = script_bank(image).ok_or(VisualMapError::Unsupported("truncated Pandora load"))?;
+    let source = scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("pointer field"), bank)
         .map_err(VisualMapError::Script)?
         .normalized()
         .value() as usize;
@@ -151,19 +166,24 @@ fn ordinary_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             pointers: &[4, 14, 22, 30],
         };
         validate_spans(image, &[&HOUSE13, &continuation, &ROOM_AUDIO])?;
-        [0x18_841e, 0x18_84bf, 0x18_8427, 0x18_842f, 0x18_84c6]
+        [0x18_841e, 0x18_84bf, 0x18_8427, 0x18_842f, 0x18_84c6].map(|at| located(image, at))
     } else {
         subscript(image, 0x1f, 0x18_8461)?;
         validate_spans(image, &[&CELLAR])?;
-        [0x18_8468, 0x18_8461, 0x18_8471, 0x18_8479, root.offset + 4]
+        // The root's own layer load, four bytes past its FE.
+        let layer = located(image, root.offset).map(|at| at + 4);
+        let [graphics, colors, definitions, attributes] =
+            [0x18_8468, 0x18_8461, 0x18_8471, 0x18_8479].map(|at| located(image, at));
+        [graphics, colors, definitions, attributes, layer]
     };
+    let offsets = offsets.into_iter().collect::<Result<Vec<_>, _>>()?;
     [
         (ResourceKind::Graphics, offsets[0], 4, 9),
         (ResourceKind::Palette, offsets[1], 4, 7),
         (ResourceKind::Metatiles, offsets[2], 5, 8),
         (ResourceKind::Metatiles, offsets[3], 5, 8),
         (ResourceKind::Layer, offsets[4], 2, 5),
-        (ResourceKind::Palette, 0x18_81a5, 4, 7),
+        (ResourceKind::Palette, located(image, 0x18_81a5)?, 4, 7),
     ]
     .into_iter()
     .map(|(k, a, p, n)| load(image, a, p, n, k))
@@ -177,9 +197,10 @@ fn cpu_source(bank: u8, address: u16) -> Result<usize, VisualMapError> {
     Ok(((usize::from(bank) & 63) << 16) | usize::from(address))
 }
 fn controller_graphics(image: &[u8]) -> Result<usize, VisualMapError> {
-    expect(image, 0x9d24e, &[0, 0, 0xd0, 0, 0])?;
+    expect(image, located(image, 0x9d24e)?, &[0, 0, 0xd0, 0, 0])?;
+    let start = located(image, 0x9d253)?;
     let bytes = image
-        .get(0x9d253..0x9d26c)
+        .get(start..start + 0x19)
         .ok_or(VisualMapError::Unsupported("truncated controller"))?;
     for (i, &value) in CONTROLLER.iter().enumerate() {
         if ![2, 3, 7].contains(&i) {
@@ -194,6 +215,7 @@ fn cop_palette(
     destination: u8,
     count: u8,
 ) -> Result<super::super::VisualResource, VisualMapError> {
+    let at = located(image, at)?;
     expect(image, at, &[2, 0x5a])?;
     expect(image, at + 5, &[destination, count])?;
     let source = cpu_source(
@@ -228,7 +250,14 @@ pub(super) fn compile(
     let predecessor = ordinary_loads(image, 0x21)?;
     root(image, 0x41)?;
     let current = root(image, id)?;
-    let layer_source = load(image, current.offset, 2, 5, ResourceKind::Layer)?.1;
+    let layer_source = load(
+        image,
+        located(image, current.offset)?,
+        2,
+        5,
+        ResourceKind::Layer,
+    )?
+    .1;
     let layer = StaticLayer::from_rom(image, layer_source).map_err(VisualMapError::Layer)?;
     let graphics = resource(
         image,
@@ -239,14 +268,28 @@ pub(super) fn compile(
     )?;
     let definitions = resource(
         image,
-        load(image, 0x18_8321, 5, 8, ResourceKind::Metatiles)?.1,
+        load(
+            image,
+            located(image, 0x18_8321)?,
+            5,
+            8,
+            ResourceKind::Metatiles,
+        )?
+        .1,
         ResourceKind::Metatiles,
         4096,
         true,
     )?;
     let attributes = resource(
         image,
-        load(image, 0x18_8329, 5, 8, ResourceKind::Metatiles)?.1,
+        load(
+            image,
+            located(image, 0x18_8329)?,
+            5,
+            8,
+            ResourceKind::Metatiles,
+        )?
+        .1,
         ResourceKind::Metatiles,
         512,
         true,
@@ -256,7 +299,7 @@ pub(super) fn compile(
         .iter()
         .map(|&(a, d, n)| cop_palette(image, a, d, n))
         .collect::<Result<_, _>>()?;
-    expect(image, 0x9d29d, &[0x22, 0x5c, 0x92, 0x86])?;
+    expect(image, located(image, 0x9d29d)?, &[0x22, 0x5c, 0x92, 0x86])?;
     let mut palette = [Bgr555::new(0); 128];
     for (color, bytes) in palette.iter_mut().zip(shared.decoded().chunks_exact(2)) {
         *color = Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]]));

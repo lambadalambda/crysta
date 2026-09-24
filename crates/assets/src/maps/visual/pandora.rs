@@ -191,6 +191,12 @@ impl SourceCamera {
                 .ok_or(VisualMapError::Unsupported(
                     "unqualified Pandora camera map",
                 ))?;
+        let located = |japan: usize| {
+            crate::layout::offset(image, japan).ok_or(VisualMapError::Unsupported(
+                "unqualified Pandora source profile",
+            ))
+        };
+        let scene = located(scene)?;
         expect(image, 0x28000 + usize::from(map_id) * 2, &[0, 0])?;
         expect(
             image,
@@ -202,9 +208,10 @@ impl SourceCamera {
             .iter()
             .find(|r| r.0 == selector)
             .ok_or(VisualMapError::Unsupported("unaudited display selector"))?;
+        let display_offset = located(display_offset)?;
         expect(
             image,
-            0x16_bb64 + usize::from(selector) * 2,
+            located(0x16_bb64)? + usize::from(selector) * 2,
             &display_offset.to_le_bytes()[..2],
         )?;
         expect(image, display_offset, &display)?;

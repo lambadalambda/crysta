@@ -1,6 +1,7 @@
 //! Source camera regions: the part of a shared layer that one map may show.
 
 use super::VisualMapError;
+use crate::layout;
 
 /// A map's camera bounds and vertical clamp, as the map loader sets them.
 ///
@@ -39,13 +40,19 @@ impl CameraRegion {
         if prefix[0] != 0 || prefix[1] & 0xc0 != 0 {
             return Err(unsupported("unaudited scene prefix"));
         }
-        let display = 0x16_0000 + word(0x16_bb64 + usize::from(prefix[1]) * 2)?;
+        // The European table is `$99:C2AE` (the operand at `$86:8C85`).
+        let located = |japan: usize| {
+            layout::offset(image, japan).ok_or(unsupported("unrecorded camera source"))
+        };
+        let table = located(0x16_bb64)?;
+        let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1]) * 2)?;
         // Profile byte +4 bit 6 selects `$0866 = 256` at `$868CDE..8CE6`.
         if bytes(display + 4, 1)?[0] & 0x40 == 0 {
             return Err(unsupported("unaudited camera clamp height"));
         }
         let vertical_extent = 256;
-        let record_offset = 0x16_be30 + map;
+        // European `$99:C57A`, the operand at `$86:9375`.
+        let record_offset = located(0x16_be30)? + map;
         let record = bytes(record_offset, 2)?;
         let (a, b) = (u16::from(record[0]), u16::from(record[1]));
         // `$869371..93F7`: low nibble is the first page, high nibble the page count.

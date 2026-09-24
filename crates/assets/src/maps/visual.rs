@@ -12,6 +12,7 @@ use super::{
 use crate::{
     compression,
     graphics::{self, BgTileWord, Bgr555, GraphicsError, IndexedPixel, Tile4bpp},
+    layout,
 };
 use std::{fmt, ops::Range};
 
@@ -727,8 +728,15 @@ fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     Ok(selected)
 }
 
+/// The bank the map-loading scripts sit in (`$98`; `$9A` in the European
+/// ROM), the base their packed resource pointers count from.
+pub(super) fn script_bank(image: &[u8]) -> Option<u8> {
+    layout::at(image, 0x98_8350).and_then(|address| u8::try_from(address >> 16).ok())
+}
+
 fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
+    let located = |japan: usize| layout::offset(image, japan).ok_or_else(invalid);
     let entry: u32 = match id {
         0xa => 0x98_8350,
         0xb => 0x98_8401,
@@ -739,18 +747,22 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         0x11 => 0x98_84b4,
         _ => return Err(invalid()),
     };
-    let at = 0x06_959c + usize::from(id) * 3;
-    if image.get(at..at + 3) != Some(&entry.to_le_bytes()[..3]) {
-        return Err(invalid());
-    }
+    // Each table entry points at its script in the image's revision.
+    let points_at = |table: usize, index: usize, entry: u32| -> Result<(), VisualMapError> {
+        let at = located(table)? + index * 3;
+        let entry = layout::at(image, entry).ok_or_else(invalid)?;
+        if image.get(at..at + 3) == Some(&entry.to_le_bytes()[..3]) {
+            Ok(())
+        } else {
+            Err(invalid())
+        }
+    };
+    points_at(0x06_959c, usize::from(id), entry)?;
     for &(index, entry) in ROOM_SUBSCRIPTS {
         if id == 0xa && index == 1 {
             continue; // Exterior falls through its own loads; no deferred room subscript.
         }
-        let at = 0x06_a28c + index * 3;
-        if image.get(at..at + 3) != Some(&entry.to_le_bytes()[..3]) {
-            return Err(invalid());
-        }
+        points_at(0x06_a28c, index, entry)?;
     }
     // B falls through FE $0001 into the common palette load; C/D/10/11
     // defer subscript $0001 and END. F additionally loads non-overlapping OBJ art.
@@ -774,6 +786,7 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
         ]
     };
     validate_spans(image, spans)?;
+    let bank = script_bank(image).ok_or_else(invalid)?;
     // Fixed offsets into validated windows; never discover instruction boundaries.
     let offsets = if id == 0xa {
         [0x18_8369, 0x18_8354, 0x18_8372, 0x18_837a, 0x18_835f]
@@ -790,9 +803,10 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
     ]
     .into_iter()
     .map(|(kind, at, p, len)| {
+        let at = located(at)?;
         let bytes = &image[at..at + len];
         let source =
-            scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("three-byte field"), 0x98)
+            scripts::unpack_pointer(bytes[p..p + 3].try_into().expect("three-byte field"), bank)
                 .map_err(VisualMapError::Script)?
                 .normalized()
                 .value() as usize;
@@ -803,9 +817,11 @@ fn room_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
 
 fn validate_spans(image: &[u8], spans: &[&RoomSpan]) -> Result<(), VisualMapError> {
     let invalid = || VisualMapError::Unsupported("unqualified room script profile");
+    let bank = script_bank(image).ok_or_else(invalid)?;
     for span in spans {
+        let offset = layout::offset(image, span.offset).ok_or_else(invalid)?;
         let bytes = image
-            .get(span.offset..span.offset + span.bytes.len())
+            .get(offset..offset + span.bytes.len())
             .ok_or_else(invalid)?;
         if bytes
             .iter()
@@ -822,7 +838,7 @@ fn validate_spans(image: &[u8], spans: &[&RoomSpan]) -> Result<(), VisualMapErro
         for &p in span.pointers {
             let source = scripts::unpack_pointer(
                 bytes[p..p + 3].try_into().expect("three-byte field"),
-                0x98,
+                bank,
             )
             .map_err(VisualMapError::Script)?
             .normalized()
