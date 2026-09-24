@@ -120,3 +120,5 @@
 - [x] [Animate door and stair transitions](issues/door-and-stair-transitions.md)
 - [x] [Publish the Crysta slice as a web demo](issues/crysta-web-demo.md)
 - [x] [Complete the town's residents](issues/town-residents-complete.md)
+- [x] [Decode the shop stock](issues/shop-data.md)
+- [x] [Decode the shop texts' indexed controls](issues/shop-text.md)
