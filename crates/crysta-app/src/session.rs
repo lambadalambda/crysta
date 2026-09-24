@@ -335,8 +335,9 @@ impl Session {
         };
         let region = background.region;
         let camera = background.camera(position, frame.width);
+        frame::draw_background(frame, &background.frame, camera);
+        background.add_clouds(frame, camera, self.background_clock.tick());
         let background = &background.frame;
-        frame::draw_background(frame, background, camera);
         let count = residents.len();
         let mut order: Vec<(u16, usize, usize)> = residents
             .iter()

@@ -1,7 +1,7 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::visual::{
-    camera::CameraRegion, crysta_animation::CrystaAnimation, StaticBackground,
+    camera::CameraRegion, crysta_animation::CrystaAnimation, SecondLayer, StaticBackground,
 };
 
 /// Presentation age since entry, advanced by host simulation updates, not redraws.
@@ -151,6 +151,52 @@ pub struct CachedBackground {
 }
 
 impl CachedBackground {
+    /// Adds the town's crystal clouds onto the view (`$0A`'s second layer,
+    /// `docs/house-exterior.md`): a subscreen layer the scene adds to the
+    /// main screen (`CGADSUB $33`), drawn from the animated tiles and colors.
+    /// It scrolls with the camera and drifts a pixel left and down every
+    /// three frames (`$086C`/`$086E` = `$02FF`/`$0201`, native town
+    /// checkpoints: 80 pixels over 241 frames). Drawn before the sprites,
+    /// which the addition leaves out.
+    pub fn add_clouds(&self, canvas: &mut crate::frame::Canvas, camera: (i32, i32), age: u64) {
+        let Some(animation) = &self.animation else {
+            return;
+        };
+        let Some(clouds) = &animation.clouds else {
+            return;
+        };
+        let layer = clouds.layer();
+        let (width, height) = (layer.width() * 16, layer.height() * 16);
+        let drift = i64::try_from(age / 3).unwrap_or(0);
+        let wrap = |at: i64, extent: usize| {
+            usize::try_from(at.rem_euclid(i64::try_from(extent).unwrap_or(1))).unwrap_or(0)
+        };
+        for (row, line) in canvas.pixels.chunks_mut(canvas.width).enumerate() {
+            let y = wrap(
+                i64::from(camera.1) + i64::try_from(row).unwrap_or(0) + drift,
+                height,
+            );
+            for (column, pixel) in line.iter_mut().enumerate() {
+                let x = wrap(
+                    i64::from(camera.0) + i64::try_from(column).unwrap_or(0) - drift,
+                    width,
+                );
+                let cell = usize::from(layer.cells()[y / 16 * layer.width() + x / 16].raw() & 511);
+                if cell == 0 {
+                    continue;
+                }
+                if let Ok(IndexedPixel::Opaque { palette_index, .. }) = graphics::sample_metatile(
+                    &clouds.metatiles()[cell],
+                    &animation.tiles,
+                    x % 16,
+                    y % 16,
+                ) {
+                    *pixel = add(*pixel, rgb(animation.palette[usize::from(palette_index)]));
+                }
+            }
+        }
+    }
+
     /// The camera for the player: a world map's, or the region's clamp.
     pub fn camera(&self, player: (u16, u16), width: usize) -> (i32, i32) {
         if self.world {
@@ -212,6 +258,15 @@ struct AnimatedExterior {
     // Map cell index and bitmask of source phase-key slots it depends on.
     cells: Vec<(usize, u8)>,
     key: Option<[Option<u64>; 7]>,
+    /// The crystal clouds; `None` when the second layer does not decode.
+    clouds: Option<SecondLayer>,
+}
+
+/// The SNES's colour addition: each channel saturates.
+fn add(main: u32, sub: u32) -> u32 {
+    let channel =
+        |shift: u32| (((main >> shift) & 0xFF) + ((sub >> shift) & 0xFF)).min(0xFF) << shift;
+    channel(16) | channel(8) | channel(0)
 }
 
 impl AnimatedExterior {
@@ -255,6 +310,7 @@ impl AnimatedExterior {
             backdrop,
             cells,
             key: None,
+            clouds: SecondLayer::from_rom(image, 0x000A).ok(),
         })
     }
 
@@ -395,6 +451,12 @@ fn composite_backdrop(pixels: &mut [u32], indices: &[u8], color: u32) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn colour_addition_saturates_each_channel() {
+        assert_eq!(super::add(0x0010_2030, 0x0001_0203), 0x0011_2233);
+        assert_eq!(super::add(0x00F0_8000, 0x0020_9001), 0x00FF_FF01);
+    }
 
     #[test]
     #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
