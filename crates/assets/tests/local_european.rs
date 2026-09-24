@@ -254,3 +254,15 @@ fn the_shop_display_is_the_japanese_art_with_english_names() {
     // "Crystal " is a dictionary word (`E5 0A`).
     assert_eq!(name(0x32), (3, "Crystal Thread".to_owned()));
 }
+
+#[test]
+fn the_window_art_is_the_japanese_one_moved() {
+    use assets::text::window::WindowArt;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    assert_eq!(
+        WindowArt::from_rom(europe.image()).unwrap(),
+        WindowArt::from_rom(japan.image()).unwrap()
+    );
+}

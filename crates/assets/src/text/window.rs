@@ -8,7 +8,8 @@
 //! a window is open, HDMA (`$85:80D3`, table `$85:8160`) rewrites colour 3
 //! every scanline from `$85:81E4`, a 32-line shade repeating down the
 //! screen. `$D5` pages show the prompt `$CB:7A98` (4 glyphs, 9 ticks each)
-//! in the cell after their last glyph.
+//! in the cell after their last glyph. The European ROM holds the same
+//! bytes at `$AB:9000`, `$B4:90DB` and `$CD:7A98` ([`crate::layout::at`]).
 
 use super::TextError;
 use crate::compression;
@@ -44,7 +45,17 @@ impl WindowArt {
     /// # Errors
     /// Refuses a packet or table outside the image or malformed.
     pub fn from_rom(image: &[u8]) -> Result<Self, TextError> {
-        let start = usize::try_from(CHARACTERS & 0x3F_FFFF).unwrap_or(usize::MAX);
+        let located = |japan: u32| {
+            crate::layout::at(image, japan)
+                .ok_or_else(|| super::invalid(japan, "unrecorded in this revision"))
+        };
+        let (characters_at, colours_at, shade_at, prompt_at) = (
+            located(CHARACTERS)?,
+            located(COLOURS)?,
+            located(SHADE)?,
+            located(PROMPT)?,
+        );
+        let start = usize::try_from(characters_at & 0x3F_FFFF).unwrap_or(usize::MAX);
         let characters = image
             .get(start..)
             .and_then(|input| compression::decode(input, 0x2000).ok())
@@ -72,14 +83,14 @@ impl WindowArt {
         }
         let mut colours = [Bgr555::new(0); 12];
         for (index, slot) in (0_u32..).zip(colours.iter_mut()) {
-            *slot = colour(COLOURS + index * 2)?;
+            *slot = colour(colours_at + index * 2)?;
         }
         let mut shade = [Bgr555::new(0); 32];
         for (line, slot) in (0_u32..).zip(shade.iter_mut()) {
-            *slot = colour(SHADE + line * 4 + 2)?;
+            *slot = colour(shade_at + line * 4 + 2)?;
         }
         let prompt = (0..4)
-            .map(|index| Ok(decode_glyph_2bpp(bytes(PROMPT + index * 64, 64)?)))
+            .map(|index| Ok(decode_glyph_2bpp(bytes(prompt_at + index * 64, 64)?)))
             .collect::<Result<_, TextError>>()?;
         Ok(Self {
             frame,
