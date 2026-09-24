@@ -5,7 +5,7 @@
 use crysta_app::frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use crysta_app::music::{Player, Synth};
 use crysta_app::music_data::{extract_driver, extract_track};
-use crysta_app::session::Session;
+use crysta_app::session::{Buttons, Session};
 use room_core::Direction;
 
 /// Pad bits the page sends each frame.
@@ -22,6 +22,8 @@ pub mod buttons {
     pub const CONFIRM: u32 = 16;
     /// B: cancel a choice.
     pub const CANCEL: u32 = 32;
+    /// L: the shop's item description.
+    pub const DESCRIBE: u32 = 64;
 }
 
 /// One game from one ROM.
@@ -69,10 +71,13 @@ impl Game {
         .into_iter()
         .find(|&(bit, _)| held & bit != 0)
         .map(|(_, direction)| direction);
-        self.session.advance(
+        self.session.advance_with(
             direction,
-            pressed & buttons::CONFIRM != 0,
-            pressed & buttons::CANCEL != 0,
+            Buttons {
+                confirm: pressed & buttons::CONFIRM != 0,
+                cancel: pressed & buttons::CANCEL != 0,
+                describe: pressed & buttons::DESCRIBE != 0,
+            },
         );
         let cues = self.session.world.take_cues();
         if let Some(player) = &mut self.player {

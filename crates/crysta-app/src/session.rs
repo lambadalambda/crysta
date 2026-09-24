@@ -17,6 +17,17 @@ use std::collections::HashMap;
 /// wakes them. The prologue title card before it is not shown.
 pub const START: (u16, u16, u16) = (0x000F, 304, 112);
 
+/// The buttons pressed this frame, besides the pad's directions.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Buttons {
+    /// A: talk, confirm, lift.
+    pub confirm: bool,
+    /// B: cancel.
+    pub cancel: bool,
+    /// L: the shop's item description.
+    pub describe: bool,
+}
+
 /// What a resident whose art was refused is drawn as: a block, so that
 /// someone is visibly there and visibly not right.
 const PLACEHOLDER: u32 = 0x00C0_50C0;
@@ -101,12 +112,27 @@ impl Session {
     /// One frame of simulation from the pad: the world's scripts decide
     /// whether it walks, pages through text or answers a choice.
     pub fn advance(&mut self, direction: Option<Direction>, confirm: bool, cancel: bool) {
+        self.advance_with(
+            direction,
+            Buttons {
+                confirm,
+                cancel,
+                describe: false,
+            },
+        );
+    }
+
+    /// As [`Self::advance`], with every button the world reads.
+    pub fn advance_with(&mut self, direction: Option<Direction>, buttons: Buttons) {
         let newly = |wanted| direction == Some(wanted) && self.last_direction != Some(wanted);
         let presses = Presses {
-            confirm,
-            cancel,
+            confirm: buttons.confirm,
+            cancel: buttons.cancel,
+            describe: buttons.describe,
             up: newly(Direction::Up),
             down: newly(Direction::Down),
+            left: newly(Direction::Left),
+            right: newly(Direction::Right),
         };
         self.last_direction = direction;
         self.advance_world(direction, presses);

@@ -592,12 +592,14 @@ const PRESS_A: Presses = Presses {
     cancel: false,
     up: false,
     down: false,
+    ..Presses::NONE
 };
 const PRESS_B: Presses = Presses {
     confirm: false,
     cancel: true,
     up: false,
     down: false,
+    ..Presses::NONE
 };
 
 /// Presses once the page on screen has typed out: presses while it types

@@ -9,7 +9,7 @@ mod input;
 mod music_controls;
 mod music_output;
 
-use crysta_app::session::{Session, START};
+use crysta_app::session::{Buttons, Session, START};
 use crysta_app::{background, clock, frame, music, music_data};
 
 use crysta_runtime::art::Placeholder;
@@ -272,6 +272,7 @@ struct App {
     interaction: input::Interaction,
     /// B: cancels a choice. Edge-triggered like the confirm button.
     cancel: input::Interaction,
+    describe: input::Interaction,
     started: std::time::Instant,
     clock: clock::Clock,
     suspended: bool,
@@ -300,6 +301,7 @@ impl App {
             frame: Canvas::new(width),
             interaction: input::Interaction::default(),
             cancel: input::Interaction::default(),
+            describe: input::Interaction::default(),
             started: std::time::Instant::now(),
             clock: clock::Clock::new(std::time::Duration::ZERO),
             suspended: false,
@@ -426,6 +428,7 @@ impl ApplicationHandler for App {
         self.suspended = true;
         self.interaction = input::Interaction::default();
         self.cancel = input::Interaction::default();
+        self.describe = input::Interaction::default();
         self.keys.clear();
         self.held = None;
         self.music_controls.set_focused(false);
@@ -485,6 +488,10 @@ impl ApplicationHandler for App {
                     }
                     PhysicalKey::Code(KeyCode::KeyX | KeyCode::Backspace) => {
                         self.cancel.keyboard(pressed);
+                        None
+                    }
+                    PhysicalKey::Code(KeyCode::KeyQ) => {
+                        self.describe.keyboard(pressed);
                         None
                     }
                     _ => None,
@@ -550,7 +557,7 @@ impl ApplicationHandler for App {
 
 impl App {
     fn poll_pad(&mut self) {
-        let (mut interact, mut cancel) = (false, false);
+        let (mut interact, mut cancel, mut describe) = (false, false, false);
         let mut direction = self.keys.last().copied();
         if let Some(pads) = &mut self.pads {
             while pads.next_event().is_some() {}
@@ -583,6 +590,7 @@ impl App {
                 // SNES A confirms and B cancels: the pad's South and East.
                 interact |= pad.is_pressed(Button::South);
                 cancel |= pad.is_pressed(Button::East);
+                describe |= pad.is_pressed(Button::LeftTrigger);
             }
         }
         self.held = direction;
@@ -590,18 +598,27 @@ impl App {
         // simulation tick, even if several redraw/input wakeups happen first.
         self.interaction.gamepad(interact);
         self.cancel.gamepad(cancel);
+        self.describe.gamepad(describe);
     }
 
     fn advance(&mut self) {
         let direction = self.held;
         let interact = self.interaction.take();
         let cancel = self.cancel.take();
+        let describe = self.describe.take();
         let session = self.session();
         if session.fault.is_some() {
             return;
         }
         let before = (session.world.map(), session.world.position());
-        session.advance(direction, interact, cancel);
+        session.advance_with(
+            direction,
+            Buttons {
+                confirm: interact,
+                cancel,
+                describe,
+            },
+        );
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
         let cues = session.world.take_cues();
         self.play(&cues);

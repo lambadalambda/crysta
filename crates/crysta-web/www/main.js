@@ -4,13 +4,14 @@ import init, { WebGame } from './crysta_web.js';
 const FRAME_MS = 16.639263; // The SNES's 60.1 Hz.
 const RATE = 32000;
 const AHEAD = 0.1; // Seconds of sound queued.
-const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32 };
+const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32, DESCRIBE: 64 };
 const DIRECTIONS = 15;
 const KEYS = {
   ArrowUp: 'UP', KeyW: 'UP', ArrowDown: 'DOWN', KeyS: 'DOWN',
   ArrowLeft: 'LEFT', KeyA: 'LEFT', ArrowRight: 'RIGHT', KeyD: 'RIGHT',
   KeyX: 'CONFIRM', Enter: 'CONFIRM', Space: 'CONFIRM',
   KeyZ: 'CANCEL', Backspace: 'CANCEL',
+  KeyQ: 'DESCRIBE',
 };
 
 const status = document.getElementById('status');
@@ -63,7 +64,8 @@ function keyboard() {
 }
 
 // Standard-mapped pads, as the native app reads them: the D-pad, else the
-// stick's stronger axis; A (South) confirms, B (East) cancels.
+// stick's stronger axis; A (South) confirms, B (East) cancels, LB
+// describes a shop's item.
 function pad() {
   let bits = 0;
   for (const gamepad of navigator.getGamepads?.() ?? []) {
@@ -80,6 +82,7 @@ function pad() {
     }
     if (button(0)) bits |= BUTTONS.CONFIRM;
     if (button(1)) bits |= BUTTONS.CANCEL;
+    if (button(4)) bits |= BUTTONS.DESCRIBE;
   }
   return bits;
 }

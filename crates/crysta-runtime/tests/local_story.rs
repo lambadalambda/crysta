@@ -19,6 +19,7 @@ const A: Presses = Presses {
     cancel: false,
     up: false,
     down: false,
+    ..Presses::NONE
 };
 
 fn flag(world: &World<'_>, flag: usize) -> bool {

@@ -20,6 +20,25 @@ pub struct Presses {
     pub up: bool,
     /// Down on the pad.
     pub down: bool,
+    /// Left on the pad, which the shop's item choice reads.
+    pub left: bool,
+    /// Right on the pad.
+    pub right: bool,
+    /// L alone, which asks the shop for an item's description.
+    pub describe: bool,
+}
+
+impl Presses {
+    /// No press.
+    pub const NONE: Self = Self {
+        confirm: false,
+        cancel: false,
+        up: false,
+        down: false,
+        left: false,
+        right: false,
+        describe: false,
+    };
 }
 
 /// What scripts read and write beyond their own actor.
@@ -387,12 +406,14 @@ mod tests {
         cancel: false,
         up: false,
         down: false,
+        ..Presses::NONE
     };
     const B: Presses = Presses {
         confirm: false,
         cancel: true,
         up: false,
         down: false,
+        ..Presses::NONE
     };
 
     fn choice() -> DialogueChoice {
