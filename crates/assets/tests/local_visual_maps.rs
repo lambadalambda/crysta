@@ -338,7 +338,10 @@ fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_mode
     }
     let animation = |map| {
         let records = SpawnList::resolve(image, map, EventFlags::Bitmap(&events)).unwrap();
-        SceneAnimation::from_records(image, &records).unwrap()
+        SceneAnimation::from_records(image, &records, |flag| {
+            events[usize::from(flag) / 8] & (1 << (flag % 8)) != 0
+        })
+        .unwrap()
     };
     let animated: Vec<u16> = (0x0Au16..=0x21)
         .chain(0x41..=0x44)
@@ -347,8 +350,8 @@ fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_mode
     assert_eq!(
         animated,
         [
-            0x0A, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x15, 0x18, 0x1B, 0x1C, 0x1F, 0x41, 0x42, 0x43,
-            0x44
+            0x0A, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x15, 0x17, 0x18, 0x19, 0x1B, 0x1C, 0x1F, 0x41,
+            0x42, 0x43, 0x44
         ]
     );
     let town = animation(0x0A);

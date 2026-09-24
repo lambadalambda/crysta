@@ -12,6 +12,11 @@ use crate::maps::actors::SpawnRecord;
 
 const GRAPHICS_SERVICE: u32 = 0x87_98EB;
 const PALETTE_SERVICE: u32 = 0x87_98C2;
+/// Services with their table fixed in the script, playing until event flag
+/// `$35` is set (`COP 08 35 80`): the palette `$88:C697` (`COP 8A 08`) and
+/// the graphics `$88:C6B8` (`COP 8C 12`), in `$17` and `$19`.
+const UNTIL_35: [(u32, bool, u8); 2] = [(0x88_C697, true, 0x08), (0x88_C6B8, false, 0x12)];
+const FLAG_35: u16 = 0x35;
 /// The graphics service's selector lookup at `$9B:8000` (`$8D:93D8`): a
 /// word with bit 15 names a table bank in `$8D:9407`'s three-byte entries
 /// (`$9B:8000`, `$9C:8000`); offsets there count from the entry's base.
@@ -54,20 +59,33 @@ pub struct SceneAnimation {
 
 impl SceneAnimation {
     /// Decodes the tables of the services among `records`, a map's spawn
-    /// list. A map without services has an empty animation.
+    /// list, with `flag` telling which event flags are set. A map without
+    /// services has an empty animation.
     ///
     /// # Errors
     /// Rejects a table that leaves its bank, is not terminated, or whose
     /// graphics do not decode.
-    pub fn from_records(image: &[u8], records: &[SpawnRecord]) -> Result<Self, VisualMapError> {
+    pub fn from_records(
+        image: &[u8],
+        records: &[SpawnRecord],
+        flag: impl Fn(u16) -> bool,
+    ) -> Result<Self, VisualMapError> {
         let mut animation = Self::default();
         for record in records.iter().filter(|record| record.opcode() == 0xFB) {
             let Some(&selector) = record.bytes().get(1) else {
                 continue;
             };
-            match record.script() {
-                Some(GRAPHICS_SERVICE) => animation.graphics(image, selector)?,
-                Some(PALETTE_SERVICE) => animation.palette(image, selector)?,
+            let fixed = UNTIL_35
+                .iter()
+                .find(|&&(script, _, _)| Some(script) == record.script())
+                .filter(|_| !flag(FLAG_35));
+            match (record.script(), fixed) {
+                (Some(GRAPHICS_SERVICE), _) | (_, Some(&(_, false, _))) => {
+                    animation.graphics(image, fixed.map_or(selector, |service| service.2))?;
+                }
+                (Some(PALETTE_SERVICE), _) | (_, Some(&(_, true, _))) => {
+                    animation.palette(image, fixed.map_or(selector, |service| service.2))?;
+                }
                 _ => {}
             }
         }
