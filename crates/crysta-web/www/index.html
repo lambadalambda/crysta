@@ -6,8 +6,8 @@
 <title>Terranigma: Crysta</title>
 <style>
   body { background: #111; color: #ddd; font: 15px/1.4 system-ui, sans-serif; margin: 0; }
-  main { max-width: 800px; margin: 0 auto; padding: 1.5em; }
-  canvas { width: 100%; max-width: 768px; aspect-ratio: 256 / 224; image-rendering: pixelated;
+  main { max-width: 1240px; margin: 0 auto; padding: 1.5em; }
+  canvas { width: 100%; image-rendering: pixelated;
            background: #000; display: block; margin: 1em 0; }
   button, input { font: inherit; }
   .hidden { display: none; }
@@ -24,11 +24,12 @@
      not upload or store it.</p>
   <p><label>ROM file: <input id="rom" type="file" accept=".sfc,.smc"></label></p>
   <p id="status"></p>
-  <p><button id="start" class="hidden">Start</button></p>
+  <p><button id="start" class="hidden">Start</button>
+     <label><input id="wide" type="checkbox"> Wide view (16:9)</label></p>
   <canvas id="view" width="256" height="224" tabindex="0"></canvas>
   <p>Arrows or <kbd>WASD</kbd>: walk. <kbd>X</kbd>, <kbd>Enter</kbd> or <kbd>Space</kbd>:
      talk, confirm, lift. <kbd>Z</kbd> or <kbd>Backspace</kbd>: cancel. <kbd>M</kbd>: sound
-     on or off. A gamepad works too.</p>
+     on or off. <kbd>V</kbd>: wide or classic view. A gamepad works too.</p>
 </main>
 <script type="module" src="./main.js"></script>
 </body>

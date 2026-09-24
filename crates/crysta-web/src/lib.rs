@@ -2,7 +2,7 @@
 //! music, driven a frame at a time by the page (`www/`). The ROM comes from
 //! the player's own file and stays in memory; nothing is fetched or stored.
 
-use crysta_app::frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT};
+use crysta_app::frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use crysta_app::music::{Player, Synth};
 use crysta_app::music_data::{extract_driver, extract_track};
 use crysta_app::session::Session;
@@ -97,6 +97,12 @@ impl Game {
             .collect()
     }
 
+    /// Switches between the classic 256-pixel view and the wide 16:9 one,
+    /// as the native app's `V` does.
+    pub fn set_wide(&mut self, wide: bool) {
+        self.canvas = Canvas::new(if wide { WIDE_WIDTH } else { CLASSIC_WIDTH });
+    }
+
     /// The view's width in pixels.
     #[must_use]
     pub const fn width(&self) -> usize {
@@ -178,6 +184,11 @@ mod web {
             self.0.draw()
         }
 
+        /// Switches to the wide 16:9 view, or back.
+        pub fn set_wide(&mut self, wide: bool) {
+            self.0.set_wide(wide);
+        }
+
         /// The view's width.
         pub fn width(&self) -> usize {
             self.0.width()
@@ -211,6 +222,24 @@ mod web {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_wide_view_draws_400_pixels_across() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../local/Tenchi Souzou (Japan).sfc"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let mut game = Game::new(&bytes).unwrap();
+        game.set_wide(true);
+        game.frame(0);
+        assert_eq!(game.width(), 400);
+        assert_eq!(game.draw().len(), 400 * Game::height() * 4);
+        game.set_wide(false);
+        assert_eq!(game.draw().len(), 256 * Game::height() * 4);
+    }
 
     #[test]
     fn another_rom_is_refused() {

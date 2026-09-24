@@ -16,6 +16,7 @@ const KEYS = {
 const status = document.getElementById('status');
 const start = document.getElementById('start');
 const canvas = document.getElementById('view');
+const wide = document.getElementById('wide');
 const context = canvas.getContext('2d');
 let game = null;
 let running = null; // The running loop's token; a new game ends the old loop.
@@ -36,6 +37,10 @@ let latched = 0;
 addEventListener('keydown', (event) => {
   if (!running) return;
   if (event.code === 'KeyM' && !event.repeat) toggleSound();
+  if (event.code === 'KeyV' && !event.repeat) {
+    wide.checked = !wide.checked;
+    applyView();
+  }
   const name = KEYS[event.code];
   if (!name) return;
   event.preventDefault();
@@ -102,6 +107,7 @@ document.getElementById('rom').addEventListener('change', async (event) => {
   try {
     await init();
     game = new WebGame(new Uint8Array(await file.arrayBuffer()));
+    applyView();
     say('Ready.');
     start.classList.remove('hidden');
   } catch (error) {
@@ -131,6 +137,17 @@ start.addEventListener('click', async () => {
   running = token;
   requestAnimationFrame((now) => loop(now, token));
 });
+
+// The canvas follows the view: 256 or 400 pixels across, three times over
+// at most.
+function applyView() {
+  game?.set_wide(wide.checked);
+  canvas.width = game?.width() ?? (wide.checked ? 400 : 256);
+  canvas.height = 224;
+  canvas.style.maxWidth = `${canvas.width * 3}px`;
+  canvas.style.aspectRatio = `${canvas.width} / ${canvas.height}`;
+}
+wide.addEventListener('change', applyView);
 
 function toggleSound() {
   if (!audio) return;
