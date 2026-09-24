@@ -15,3 +15,4 @@ pub mod music;
 pub mod music_data;
 pub mod session;
 pub mod shop;
+pub mod title;

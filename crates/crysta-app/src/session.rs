@@ -65,6 +65,8 @@ pub struct Session {
     pub carry_frames: HashMap<(u32, u8, bool), Option<Animation>>,
     /// The shop display's art.
     pub shop_art: crate::shop::ShopArtCache,
+    /// The area titles.
+    pub titles: crate::title::Titles,
     /// The direction held last frame, so a new one reads as a press.
     pub last_direction: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
@@ -103,6 +105,7 @@ impl Session {
                 .ok(),
             carry_frames: HashMap::new(),
             shop_art: crate::shop::ShopArtCache::default(),
+            titles: crate::title::Titles::default(),
             last_direction: None,
             tick: 0,
             last_step: None,
@@ -452,20 +455,36 @@ impl Session {
         }
         clouds.add_second_layer(frame, camera, self.background_clock.tick());
         frame::extend_edges(frame, camera, region.bounds);
+        self.draw_labels(frame, camera);
+        let world = &self.world;
+        frame::tint(frame, screen.tint);
+        frame::dim(frame, screen.brightness);
+        draw_dialogue(frame, world, position, camera, self.image);
+        camera
+    }
+}
+
+impl Session {
+    /// The sprites over the scene that nothing adds onto: the shop's
+    /// display and the area title (priority 3).
+    fn draw_labels(&mut self, frame: &mut Canvas, camera: (i32, i32)) {
+        let world = &self.world;
         if let Some(display) = world.shop().and_then(crysta_runtime::shop::Shop::display) {
             let on_screen = |(x, y): (u16, u16)| (i32::from(x) - camera.0, i32::from(y) - camera.1);
             self.shop_art.draw(
                 frame,
                 self.image,
                 &display,
-                (on_screen(display.position), on_screen(position)),
+                (on_screen(display.position), on_screen(world.position())),
                 world.money(),
             );
         }
-        frame::tint(frame, screen.tint);
-        frame::dim(frame, screen.brightness);
-        draw_dialogue(frame, world, position, camera, self.image);
-        camera
+        self.titles.draw(
+            frame,
+            self.image,
+            (world.map(), world.spawn_events()),
+            world.since_arrival(),
+        );
     }
 }
 
