@@ -49,9 +49,11 @@ fn arrival(image: &[u8], map: u16) -> (u16, u16) {
         .map_or((128, 128), |record| record.destination_position())
 }
 
-/// What a resident shows: where, whether a body, and its pose.
-fn residents(world: &World<'_>) -> Vec<((u16, u16), bool, u8, bool)> {
-    world
+/// What a player sees of a world, without its text: the residents (where,
+/// whether a body, the pose, hidden), the collision, the patches, the
+/// flags, and whether input is locked, a scene runs or text is shown.
+fn state(world: &World<'_>) -> impl PartialEq + std::fmt::Debug {
+    let residents: Vec<_> = world
         .residents()
         .iter()
         .map(|resident| {
@@ -62,7 +64,18 @@ fn residents(world: &World<'_>) -> Vec<((u16, u16), bool, u8, bool)> {
                 resident.hidden,
             )
         })
-        .collect()
+        .collect();
+    (
+        residents,
+        world.room().clone(),
+        world.patched_cells().to_vec(),
+        world.events().to_vec(),
+        (
+            world.pad_locked(),
+            world.in_scene(),
+            world.dialogue().is_some(),
+        ),
+    )
 }
 
 #[test]
@@ -75,17 +88,26 @@ fn every_slice_map_loads_and_runs_as_the_japanese_one() {
         let enter = |image| World::enter_with_events(image, map, x, y, fresh_game_flags());
         let mut eu = enter(europe.image()).unwrap_or_else(|e| panic!("{map:#x}: {e}"));
         let mut jp = enter(japan.image()).unwrap();
-        assert_eq!(residents(&eu), residents(&jp), "{map:#x} on entry");
-        for _ in 0..300 {
-            eu.update(None, Presses::default()).unwrap();
-            jp.update(None, Presses::default()).unwrap();
+        assert_eq!(state(&eu), state(&jp), "{map:#x} on entry");
+        // The cues, but for the typing blips: the English pages are longer.
+        let (mut eu_cues, mut jp_cues) = (Vec::new(), Vec::new());
+        for frame in 0..300 {
+            for (world, cues) in [(&mut eu, &mut eu_cues), (&mut jp, &mut jp_cues)] {
+                let typing = world.typing();
+                world.update(None, Presses::default()).unwrap();
+                let frame_cues = world.take_cues();
+                if !typing {
+                    cues.extend(frame_cues.into_iter().map(|cue| (frame, cue)));
+                }
+            }
         }
+        assert_eq!(eu_cues, jp_cues, "{map:#x} cues");
         assert_eq!(
             eu.frozen_scripts().len(),
             jp.frozen_scripts().len(),
             "{map:#x}: {:x?}",
             eu.frozen_scripts()
         );
-        assert_eq!(residents(&eu), residents(&jp), "{map:#x} after 300 frames");
+        assert_eq!(state(&eu), state(&jp), "{map:#x} after 300 frames");
     }
 }
