@@ -11,8 +11,8 @@ use assets::graphics::{Bgr555, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{
-    ArkSprites, HouseActor, HouseFrame, PandoraSprites, RecordRefusal, ResidentPose, SpriteError,
-    SpriteFrame, SpritePixel,
+    ArkSprites, HouseActor, HouseFrame, PandoraArt, PandoraSprites, RecordRefusal, ResidentPose,
+    SpriteError, SpriteFrame, SpritePixel,
 };
 use room_core::{AnimationFrame, AnimationSet};
 use std::fmt;
@@ -303,26 +303,7 @@ impl CarryArt {
             .sprites
             .get(art)
             .ok_or(SpriteError::Invalid("no such carry art"))?;
-        let list = art
-            .list(selector)
-            .ok_or(SpriteError::Invalid("no such carry list"))?;
-        let frames = list
-            .frames()
-            .iter()
-            .map(|frame| {
-                raster(
-                    frame.composition(),
-                    art.graphics(),
-                    art.palette(),
-                    art.palette_base(),
-                    hflip,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Animation {
-            durations: list.frames().iter().map(HouseFrame::duration).collect(),
-            frames,
-        })
+        list_animation(art, selector, hflip)
     }
 }
 
@@ -344,8 +325,22 @@ pub enum Placeholder {
 /// A resident's decoded body: every sequence of their packet on demand.
 #[derive(Debug)]
 pub struct Body {
-    actor: HouseActor,
+    art: BodyArt,
 }
+
+#[derive(Debug)]
+enum BodyArt {
+    House(HouseActor),
+    /// Pandora's Box: its one list, rasterized unmirrored and mirrored.
+    Box([Animation; 2]),
+}
+
+/// Pandora's Box in `$21` (`$83:928F`): descriptor `$83:F984`, mode
+/// `$0004`, which the ordinary loader does not take; [`PandoraSprites`]
+/// decodes it with its one list, selector 3.
+const BOX_DESCRIPTOR: usize = 0x03_F984;
+const BOX_ART: u32 = 0x83_F984;
+const BOX_SELECTOR: u8 = 3;
 
 impl Body {
     /// The animation for a sequence and mirror, as a running script selects
@@ -355,30 +350,67 @@ impl Body {
     /// Refuses a selector the packet does not hold, or frames outside the
     /// qualified shape.
     pub fn animation(&self, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
-        let frames = self.actor.sequence(selector, hflip)?;
-        let rasters = frames
-            .iter()
-            .map(|frame| {
-                raster(
-                    frame.composition(),
-                    self.actor.graphics(),
-                    self.actor.palette(),
-                    self.actor.palette_base(),
-                    hflip,
-                )
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(Animation {
-            durations: frames.iter().map(HouseFrame::duration).collect(),
-            frames: rasters,
-        })
+        match &self.art {
+            BodyArt::House(actor) => animate(
+                &actor.sequence(selector, hflip)?,
+                (actor.graphics(), actor.palette(), actor.palette_base()),
+                hflip,
+            ),
+            BodyArt::Box(animations) if selector == BOX_SELECTOR => {
+                Ok(animations[usize::from(hflip)].clone())
+            }
+            BodyArt::Box(_) => Err(SpriteError::Invalid("no such box list").into()),
+        }
     }
 
     /// The header's initial selector.
     #[must_use]
     pub const fn initial(&self) -> u8 {
-        self.actor.initial()
+        match &self.art {
+            BodyArt::House(actor) => actor.initial(),
+            BodyArt::Box(_) => BOX_SELECTOR,
+        }
     }
+
+    fn pandora_box(image: &[u8]) -> Result<Self, ArtError> {
+        let sprites = PandoraSprites::from_rom(image)?;
+        let art = sprites
+            .get(BOX_ART)
+            .ok_or(SpriteError::Invalid("no box art"))?;
+        Ok(Self {
+            art: BodyArt::Box([
+                list_animation(art, BOX_SELECTOR, false)?,
+                list_animation(art, BOX_SELECTOR, true)?,
+            ]),
+        })
+    }
+}
+
+/// A Pandora art's list as rasters.
+fn list_animation(art: &PandoraArt, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
+    let list = art
+        .list(selector)
+        .ok_or(SpriteError::Invalid("no such Pandora list"))?;
+    animate(
+        list.frames(),
+        (art.graphics(), art.palette(), art.palette_base()),
+        hflip,
+    )
+}
+
+/// Frames as rasters from their graphics, palette and palette base.
+fn animate(
+    frames: &[HouseFrame],
+    (graphics, palette, base): (&[Tile4bpp], &[Bgr555; 16], u8),
+    hflip: bool,
+) -> Result<Animation, ArtError> {
+    Ok(Animation {
+        frames: frames
+            .iter()
+            .map(|frame| raster(frame.composition(), graphics, palette, base, hflip))
+            .collect::<Result<_, _>>()?,
+        durations: frames.iter().map(HouseFrame::duration).collect(),
+    })
 }
 
 /// Bodies for each resident of a map, aligned with `present`.
@@ -421,13 +453,21 @@ pub fn residents_art(
                 Some(Err(RecordRefusal::PredecessorRefused)) => {
                     Err(Placeholder::PredecessorRefused)
                 }
+                Some(Err(RecordRefusal::Invalid(_)))
+                    if resident.descriptor == Some(BOX_DESCRIPTOR) =>
+                {
+                    Body::pandora_box(image)
+                        .map_err(|error| Placeholder::Refused(error.to_string()))
+                }
                 Some(Err(RecordRefusal::Invalid(error))) => {
                     Err(Placeholder::Refused(error.to_string()))
                 }
                 Some(Ok(_)) if sets_own_art(image, resident) => Err(Placeholder::Refused(
                     "the script sets its own art base (`COP D8`)".into(),
                 )),
-                Some(Ok(actor)) => Ok(Body { actor }),
+                Some(Ok(actor)) => Ok(Body {
+                    art: BodyArt::House(actor),
+                }),
             }
         })
         .collect()

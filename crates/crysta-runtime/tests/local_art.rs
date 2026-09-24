@@ -423,3 +423,44 @@ fn every_carry_pose_and_the_flying_pots_rasterize_with_pixels() {
         assert!(flight.frames.iter().all(Raster::is_visible));
     }
 }
+
+#[test]
+fn pandoras_box_draws_its_selector_three_in_its_room() {
+    // The box `$83:928F` in `$21` has descriptor `$83:F984`, mode `$0004`:
+    // the ordinary loader refuses it, the Pandora art decodes it.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let flags = new_game();
+    let present = residents(image, 0x0021, EventFlags::Bitmap(&flags)).unwrap();
+    let art = residents_art(
+        image,
+        0x0021,
+        &present,
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
+    let index = present
+        .iter()
+        .position(|resident| resident.record == 0x03_928F)
+        .expect("present");
+    let body = art[index].as_ref().expect("the box has a body");
+    assert_eq!(body.initial(), 3);
+    for hflip in [false, true] {
+        let animation = body.animation(3, hflip).unwrap();
+        assert!(animation.frames.iter().all(Raster::is_visible));
+    }
+    assert!(body.animation(0, false).is_err(), "no other list");
+    // The running script shows that list.
+    let mut world = World::enter(image, 0x0021, 136, 368).unwrap();
+    world
+        .update(None, crysta_runtime::scene::Presses::default())
+        .unwrap();
+    let running = world
+        .residents()
+        .iter()
+        .find(|r| r.record == 0x03_928F)
+        .unwrap();
+    assert_eq!((running.selector, running.hidden), (3, false));
+}
