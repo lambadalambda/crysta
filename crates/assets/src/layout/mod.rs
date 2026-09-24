@@ -10,6 +10,8 @@
 
 use rom::Revision;
 
+mod europe;
+
 /// A ROM address in each revision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Address {
@@ -43,6 +45,20 @@ impl Address {
             Revision::Japan => Some(self.japan),
             Revision::EuropeEnglish => self.europe,
         }
+    }
+}
+
+/// The address in `image`'s revision of what sits at Japanese address
+/// `japan`, from the recorded correspondence (`tools/eu-map`); `None` for
+/// a European image when none is recorded.
+#[must_use]
+pub fn at(image: &[u8], japan: u32) -> Option<u32> {
+    match revision(image) {
+        Revision::Japan => Some(japan),
+        Revision::EuropeEnglish => europe::EUROPE
+            .binary_search_by_key(&japan, |&(from, _)| from)
+            .ok()
+            .map(|index| europe::EUROPE[index].1),
     }
 }
 
@@ -85,5 +101,16 @@ mod tests {
         // A synthetic image without a header reads the Japanese layout.
         assert_eq!(table.of(&[0; 16]), Some(0x92_C259));
         assert_eq!(per_revision(&europe, 48, 64), 64);
+    }
+
+    #[test]
+    fn the_recorded_table_relocates_a_european_image_and_is_sorted() {
+        let europe = titled(b"TERRANIGMA P");
+        assert!(europe::EUROPE.windows(2).all(|pair| pair[0].0 < pair[1].0));
+        // The COP table stays; the font moves two banks up.
+        assert_eq!(at(&europe, 0x80_83B2), Some(0x80_83B2));
+        assert_eq!(at(&europe, 0xB4_8000), Some(0xB6_8000));
+        assert_eq!(at(&europe, 0x80_0001), None, "not recorded");
+        assert_eq!(at(&[0; 16], 0x80_0001), Some(0x80_0001));
     }
 }
