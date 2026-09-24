@@ -141,7 +141,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Implement the portable event runtime](issues/portable-event-runtime.md)
 - [Complete the Crysta and Pandora vertical slice](issues/opening-vertical-slice.md)
 - [Make the Crysta slice fully playable](issues/playable-crysta-slice.md)
-- [Draw the text window as the game does](issues/native-text-window.md)
 - [Play the Crysta slice free-roam in a native app](issues/free-roam-crysta-app.md)
 - [Promote the Crysta room builder into a library](issues/crysta-room-library.md)
 - [Walk between Crysta maps through the real exit geometry](issues/crysta-map-transitions.md)

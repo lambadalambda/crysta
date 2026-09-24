@@ -52,4 +52,3 @@
 - [ ] [Open the shops in Crysta](issues/crysta-shops.md)
 - [ ] [Run the shop's talk callback](issues/shop-state-machine.md)
 - [ ] [Draw the shop display](issues/shop-display.md)
-- [ ] [Draw the text window as the game does](issues/native-text-window.md)
