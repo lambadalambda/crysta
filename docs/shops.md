@@ -75,6 +75,25 @@ the count reaching 10. After a refusal the help shows again. Sounds: port 3
 `$22` when the item or count changes, `$47` on buying. After a purchase Ark
 holds the item up for 60 frames (`COP CB $84:B4BF`, then `$84:A2E9`).
 
+The European ROM keeps the texts in bank `$92` at other addresses. Its
+shop code requests them with `COP 1C` in `$92:E3D4..E599` (the spawner is
+`$92:E2FC`). These are the programs the shop requests, before the pick by
+shop type:
+
+| Text | Japanese | European |
+|---|---|---|
+| Sold out | `$92:A1ED` | `$92:A438` |
+| Greeting | `$92:A2A0` | `$92:A53D` |
+| Help | `$92:A355` | `$92:A65E` |
+| Description suffix | `$92:A4FB` | `$92:A792` |
+| Not enough money | `$92:A541` | `$92:A79D` |
+| Too many | `$92:A65D` | `$92:A8BD` |
+| Not enough Prime Blue | `$92:A8EE` | `$92:ABAE` |
+| No free slot | `$92:A911` | `$92:ABCD` |
+| Confirm | `$92:A765` | `$92:A9E7` |
+| Thanks | `$92:A86C` | `$92:AAE0` |
+| Farewell (`$D7`) | `$92:8095` | `$92:80AF` |
+
 Not decoded: the name and price window the display actor draws (`COP 6C`,
 `$92:A1D8`, `$92:A1E1`); which child answers when flag `$D8` spawns two on
 one cell.
