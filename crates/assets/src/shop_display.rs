@@ -24,8 +24,6 @@ const ICON_TILES: u32 = 0xA2_8000;
 const ICON_PALETTES: (u32, u32) = (0xAF_E43B, 0xB1_DA31);
 /// Item names: `C9 <width>`, glyph codes, `D4` (pointers at `$92:8179`).
 const NAMES: u32 = 0x92_8179;
-/// The dialogue font (`$B4:8000`, kana `+$2000`; two-byte codes `$B5+`).
-const FONT: u32 = 0xB4_8000;
 /// Bytes one LZ packet may unpack to.
 const PACKET: usize = 0x2000;
 
@@ -145,41 +143,7 @@ pub fn name_glyphs(image: &[u8], item: u8) -> Result<(u8, Vec<[u8; 256]>), ShopE
     if head[0] != 0xC9 {
         return Err(ShopError::Invalid(start, "name without its width"));
     }
-    let (mut at, mut kana, mut glyphs) = (start + 2, false, Vec::new());
-    for _ in 0..32 {
-        let code = read(image, at, 1)?[0];
-        at += 1;
-        let source = match code {
-            0xD4 => return Ok((head[1], glyphs)),
-            0xD0 | 0xD1 => {
-                kana = code == 0xD0;
-                continue;
-            }
-            0..=0x7F => FONT + u32::from(code) * 64 + if kana { 0x2000 } else { 0 },
-            0x80..=0xBF => {
-                let code = u32::from(code & 0x3F) << 8 | u32::from(read(image, at, 1)?[0]);
-                at += 1;
-                ((0xB5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64)
-            }
-            _ => return Err(ShopError::Invalid(at - 1, "unsupported name code")),
-        };
-        glyphs.push(glyph(read(image, source, 64)?));
-    }
-    Err(ShopError::Invalid(start, "unending name"))
-}
-
-/// A 16×16 2bpp glyph (four 8×8 tiles, TL, TR, BL, BR), colour 3 cleared.
-fn glyph(source: &[u8]) -> [u8; 256] {
-    std::array::from_fn(|i| {
-        let (x, y) = (i % 16, i / 16);
-        let tile = &source[(y / 8 * 2 + x / 8) * 16..][..16];
-        let index = tile_2bpp(tile)[y % 8 * 8 + x % 8];
-        if index == 3 {
-            0
-        } else {
-            index
-        }
-    })
+    Ok((head[1], crate::labels::label_glyphs(image, start + 2)?))
 }
 
 /// An 8×8 2bpp tile's indices: planes 0 and 1 interleaved by row.

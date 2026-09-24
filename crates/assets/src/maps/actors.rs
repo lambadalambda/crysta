@@ -247,6 +247,27 @@ impl SpawnList {
         map_id: u16,
         events: super::scripts::EventFlags<'_>,
     ) -> Result<Vec<SpawnRecord>, ResolveError> {
+        Self::resolve_stream(image, map_id, events).map(|(records, _)| records)
+    }
+
+    /// Where the resolved stream ends: the byte after its `$FF`, which
+    /// `$80:F4AC` keeps at `$7F:0806` for the area title (`$85:8008`).
+    ///
+    /// # Errors
+    /// As [`Self::resolve`].
+    pub fn resolved_end(
+        image: &[u8],
+        map_id: u16,
+        events: super::scripts::EventFlags<'_>,
+    ) -> Result<usize, ResolveError> {
+        Self::resolve_stream(image, map_id, events).map(|(_, end)| end)
+    }
+
+    fn resolve_stream(
+        image: &[u8],
+        map_id: u16,
+        events: super::scripts::EventFlags<'_>,
+    ) -> Result<(Vec<SpawnRecord>, usize), ResolveError> {
         let list = Self::from_rom(image, map_id).map_err(ResolveError::Decode)?;
         let base = BANK | usize::from(list.entry);
         let mut cursor = base + 2;
@@ -274,7 +295,8 @@ impl SpawnList {
                     offset: cursor - base,
                 })?;
             match opcode {
-                0xFF => return Ok(records),
+                // The title starts right after the `$FF` byte itself.
+                0xFF => return Ok((records, cursor + 1)),
                 0x00 | 0x01 | 0xFD => records.push(SpawnRecord {
                     opcode,
                     tile_x: bytes[1],
