@@ -1409,14 +1409,15 @@ fn the_friend_steps_aside_after_the_door_breaks_and_a_press_waits_for_it() {
 
 #[test]
 fn the_item_shop_browses_refuses_sells_and_lets_ark_go() {
-    // `$1E`: the talk target `$92:CD70` stands on (39,6); Ark faces it from
-    // below. Left and Right choose (port 3 `$22`), Up the count, A buys
+    // `$1E`: the talk target `$92:CD70` stands on (39,6), behind the
+    // counter; Ark talks over it from (632,144), as natively. Left and
+    // Right choose (port 3 `$22`), Up the count, A buys
     // after the confirm (`$47`), B leaves.
     let Some(cartridge) = owned_rom() else {
         return;
     };
     let image = cartridge.image();
-    let mut world = World::enter(image, 0x001E, 632, 120).unwrap();
+    let mut world = World::enter(image, 0x001E, 632, 144).unwrap();
     world
         .update(Some(Direction::Up), Presses::default())
         .unwrap();

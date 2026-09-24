@@ -928,12 +928,8 @@ impl<'a> World<'a> {
     /// spawned, as natively the first actor hit answers. A resident on
     /// the cell that does not take interaction does not block it here,
     /// though the first actor hit would natively.
-    fn open_shop(&mut self, faced: (u16, u16)) -> bool {
-        let Some(record) = self
-            .counters
-            .iter()
-            .find(|shop| (shop.position.0 / 16, shop.position.1 / 16) == faced)
-        else {
+    fn open_shop(&mut self, at: impl Fn(&assets::shops::Shop) -> bool) -> bool {
+        let Some(record) = self.counters.iter().find(|shop| at(shop)) else {
             return false;
         };
         self.shop = Some(Shop::open(record, &self.globals.inventory));
@@ -953,21 +949,73 @@ impl<'a> World<'a> {
             (x / 16).wrapping_add_signed(dx),
             (y / 16).wrapping_add_signed(dy),
         );
-        // Natively `$87:C783` takes the first actor hit whose `+$04` has bit 8
-        // and checks only that one (`$87:93B9`); `+$04` is not modelled, so
-        // the first interactable actor on the cell stands in. It differs only
-        // where a targetable actor without interaction stands in front of an
-        // interactable one; the spear's display lacks bit 8.
-        let Some(index) = self
+        if let Some(index) = self.faced_resident(faced) {
+            return self.talk_to(index);
+        }
+        if self.open_shop(|shop| (shop.position.0 / 16, shop.position.1 / 16) == faced) {
+            return true;
+        }
+        // `$87:923F`: the probe starts at (x, y - 8) (`$87:91B1`) and tests
+        // 16 pixels ahead; a counter tile there (attribute `$2000`) carries
+        // it 32 further, onto whoever stands behind, tested against their
+        // box. The box is taken as (x - 8..x + 8, y - 16..y), which the
+        // shops' targets set (`$92:CD16`); natively each actor sets its own
+        // (`$7F:0028..002E`).
+        let (px, py) = (x, y.wrapping_sub(8));
+        let ahead = |distance: i16| {
+            (
+                px.wrapping_add_signed(dx * distance),
+                py.wrapping_add_signed(dy * distance),
+            )
+        };
+        let near = ahead(16);
+        if self.cell_attribute((near.0 / 16, near.1 / 16)) != Some(COUNTER) {
+            return false;
+        }
+        let far = ahead(48);
+        let hit = |(ox, oy): (u16, u16)| {
+            far.0.wrapping_sub(ox.wrapping_sub(8)) <= 16
+                && far.1.wrapping_sub(oy.wrapping_sub(16)) <= 16
+        };
+        let behind = self
             .residents
             .iter()
             .zip(&self.actors)
             .position(|(resident, actor)| {
-                resident.cell() == faced && actor.interactable(self.facing)
+                hit(resident.position) && actor.interactable(self.facing)
+            });
+        match behind {
+            Some(index) => self.talk_to(index),
+            None => self.open_shop(|shop| hit(shop.position)),
+        }
+    }
+
+    /// The first resident on `cell` that takes interaction.
+    ///
+    /// Natively `$87:C783` takes the first actor hit whose `+$04` has bit 8
+    /// and checks only that one (`$87:93B9`); `+$04` is not modelled, so
+    /// the first interactable actor on the cell stands in. It differs only
+    /// where a targetable actor without interaction stands in front of an
+    /// interactable one; the spear's display lacks bit 8.
+    fn faced_resident(&self, cell: (u16, u16)) -> Option<usize> {
+        self.residents
+            .iter()
+            .zip(&self.actors)
+            .position(|(resident, actor)| {
+                resident.cell() == cell && actor.interactable(self.facing)
             })
-        else {
-            return self.open_shop(faced);
-        };
+    }
+
+    /// A cell's collision attribute (the word's bits 9 and up).
+    fn cell_attribute(&self, (column, row): (u16, u16)) -> Option<u16> {
+        let (width, height) = self.dimensions();
+        (column < width && row < height).then(|| {
+            self.room.room.cells()[usize::from(row) * usize::from(width) + usize::from(column)] >> 9
+        })
+    }
+
+    /// Runs the callback of resident `index`.
+    fn talk_to(&mut self, index: usize) -> bool {
         let player = self.position();
         let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
         let mut around = surroundings(
@@ -1258,6 +1306,10 @@ impl<'a> World<'a> {
         Ok(entered)
     }
 }
+
+/// A counter tile's collision attribute (`$2000` in the cell word): the
+/// talk probe reaches over it (`$87:923F`).
+const COUNTER: u16 = 0x10;
 
 /// Port 3's sounds for leaving a map, and for a stair step.
 const EXIT_SOUND: u8 = 0x4D;
