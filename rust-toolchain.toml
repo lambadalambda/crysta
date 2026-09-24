@@ -1,5 +1,8 @@
 [toolchain]
-channel = "stable"
+# Pinned, so that CI lints and builds with what the code was written for;
+# raise it together with the fixes a newer clippy asks for.
+channel = "1.97.0"
 profile = "minimal"
+components = ["rustfmt", "clippy"]
 # The web demo (crates/crysta-web) and the Pandora preview build for it.
 targets = ["wasm32-unknown-unknown"]
