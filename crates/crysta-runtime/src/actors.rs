@@ -173,7 +173,8 @@ const POSE_MOVING: u8 = 0x81;
 /// Sets the next `COP 8F`'s repetitions, a pose, and another selector's
 /// movement streams (`$80:A1D4`).
 const REPEAT_MOVING: u8 = 0x87;
-/// The common movement resource, at `$7F:6000` from `$AB:F037`.
+/// The common movement resource, at `$7F:6000` from `$AB:F037` (European
+/// `$AE:8000`).
 const COMMON_SOURCE: usize = 0x2B_F037;
 const COMMON_SIZE: usize = 0x1A0C;
 
@@ -203,6 +204,7 @@ const SOUND_PORT3: u8 = 0x36;
 /// for each shop record of the map, then deletes itself. The world keeps
 /// the targets ([`crate::shop`]), so the spawner just ends.
 pub const SHOP_SPAWNER: u32 = 0x92_CC8A;
+
 const SOUND_PORT2: u8 = 0x37;
 const SOUND_WORD: u8 = 0x38;
 /// Branches on the player inside a rectangle of cells around the actor;
@@ -1211,7 +1213,7 @@ impl Actor {
         };
         if self.resources[slot].is_none() {
             let (source, size) = if slot == 0 {
-                (COMMON_SOURCE, COMMON_SIZE)
+                (assets::layout::offset(image, COMMON_SOURCE)?, COMMON_SIZE)
             } else {
                 let pointer = image.get(self.descriptor? + 5..self.descriptor? + 8)?;
                 (assets::maps::actors::rom_offset(pointer)?, 0x2000)

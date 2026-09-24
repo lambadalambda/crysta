@@ -5,8 +5,11 @@
 //! times by `class & 3`. Only the class-0 movement row on the common `$6000`
 //! base is admitted, which moves 0.5 px per tick. Anything else keeps the
 //! actor's approximate projection.
+use super::COMMON_SOURCE;
 use assets::compression::decode;
+use assets::layout;
 use assets::maps::actors::rom_offset as offset;
+use assets::maps::scripts::unpack_pointer;
 use room_core::Direction;
 
 /// Ticks of one COP26 action, by the source chain of one resident.
@@ -166,14 +169,28 @@ pub(super) fn common_base(image: &[u8], descriptor: usize) -> bool {
 /// 1, 0, 1, ... (half a pixel a frame); `$70`/`$78`/`$79` one pixel every
 /// frame; `$80`/`$88`/`$89` two.
 pub(super) fn common_streams(image: &[u8]) -> bool {
-    // Packed $09F037, base bank $98, resolves to $AB:F037; destination
-    // operand 2 is $7F:6000. No relocation here.
-    for site in [0x18_817D, 0x18_8272] {
-        if image.get(site..site + 7) != Some(&[1, 1, 2, 0, 0x37, 0xF0, 9]) {
+    // Packed $09F037, base bank $98, resolves to $AB:F037 (European: packed
+    // $0A0000 from bank $9A, $AE:8000); destination operand 2 is $7F:6000.
+    let Some(source) = layout::offset(image, COMMON_SOURCE) else {
+        return false;
+    };
+    for site in [0x98_817D, 0x98_8272] {
+        let Some(at) = layout::at(image, site) else {
+            return false;
+        };
+        let [_, _, bank, _] = at.to_le_bytes();
+        let at = (at & 0x3F_FFFF) as usize;
+        let Some(&[1, 1, 2, 0, low, high, increment]) = image.get(at..at + 7) else {
+            return false;
+        };
+        let target = unpack_pointer([low, high, increment], bank)
+            .ok()
+            .map(|pointer| pointer.normalized().value() as usize);
+        if target != Some(source) {
             return false;
         }
     }
-    let Some(common) = decode(image.get(0x2B_F037..).unwrap_or(&[]), 0x1A0C)
+    let Some(common) = decode(image.get(source..).unwrap_or(&[]), 0x1A0C)
         .ok()
         .filter(|packet| packet.data.len() == 0x1A0C)
         .map(|packet| packet.data)
