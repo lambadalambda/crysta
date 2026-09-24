@@ -47,6 +47,15 @@ class Addresses(unittest.TestCase):
         self.assertTrue(found[0x12_C5E7][0][2])
 
 
+    def test_scan_skips_the_generated_table(self):
+        with tempfile.TemporaryDirectory() as root:
+            folder = os.path.join(root, 'crates', 'assets', 'src', 'layout')
+            os.makedirs(folder)
+            with open(os.path.join(folder, 'europe.rs'), 'w', encoding='utf-8') as handle:
+                handle.write('    (0x83_EDF8, 0x83_EDA0),\n')
+            self.assertEqual(addresses.scan(root), {})
+
+
 class Packets(unittest.TestCase):
     def test_decodes_literals_copies_and_terminator(self):
         # Header 00, length 6, first byte 'a'. Control C5 = 1,1 (two
@@ -120,6 +129,7 @@ class References(unittest.TestCase):
         from collections import Counter
         self.assertEqual(eumap.verdict(Counter({1: 2, 2: 2})), (None, 0))
         self.assertEqual(eumap.verdict(Counter({1: 3, 2: 2})), (1, 3))
+
 
 
 if __name__ == '__main__':

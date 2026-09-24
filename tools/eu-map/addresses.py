@@ -9,6 +9,8 @@ import re
 
 SCOPE = ('crates/assets/src', 'crates/crysta-runtime/src', 'crates/crysta-app/src',
          'crates/room-core/src')
+# The table emit.py writes: both revisions' addresses, not uses.
+GENERATED = os.path.join('crates', 'assets', 'src', 'layout', 'europe.rs')
 HEX = re.compile(r'\b0x([0-9A-Fa-f_]{5,9})\b')
 # Masks, sizes and bank-OR constants: never an address.
 NOT_ADDRESSES = {0x3F_FFFF, 0xFF_0000, 0x40_0000, 0x80_0000, 0xFF_FFFF}
@@ -47,9 +49,9 @@ def scan(root):
     for base in SCOPE:
         for folder, _, files in os.walk(os.path.join(root, base)):
             for name in sorted(files):
-                if not name.endswith('.rs'):
-                    continue
                 path = os.path.join(folder, name)
+                if not name.endswith('.rs') or os.path.relpath(path, root) == GENERATED:
+                    continue
                 with open(path, encoding='utf-8') as handle:
                     lines = handle.readlines()
                 test_from = test_start(name, lines)
