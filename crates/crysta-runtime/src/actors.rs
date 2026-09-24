@@ -205,6 +205,11 @@ const SOUND_PORT3: u8 = 0x36;
 /// the targets ([`crate::shop`]), so the spawner just ends.
 pub const SHOP_SPAWNER: u32 = 0x92_CC8A;
 
+/// Whether `script` is the shops' spawner in `image`'s revision
+/// (European `$92:E2FC`).
+pub(crate) fn is_shop_spawner(image: &[u8], script: u32) -> bool {
+    assets::layout::at(image, SHOP_SPAWNER) == Some(script)
+}
 const SOUND_PORT2: u8 = 0x37;
 const SOUND_WORD: u8 = 0x38;
 /// Branches on the player inside a rectangle of cells around the actor;
@@ -557,7 +562,14 @@ impl Actor {
         resident: &crate::residents::Resident,
         seed: u32,
     ) -> Self {
-        let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
+        let script = resident.script.map(|script| {
+            if is_shop_spawner(image, script) {
+                SHOP_SPAWNER
+            } else {
+                script
+            }
+        });
+        let mut actor = Self::new(resident.position, script, resident.initial, seed);
         actor.map = map;
         actor.parameter = image.get(resident.record + 3).copied().unwrap_or(0);
         actor.descriptor = resident.descriptor;

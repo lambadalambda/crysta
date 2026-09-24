@@ -5,7 +5,7 @@
 //! player into the next one. Two exact return records additionally own the
 //! player through measured initialized-to-free arrival profiles.
 
-use crate::actors::{Actor, Surroundings, Wait, SHOP_SPAWNER};
+use crate::actors::{is_shop_spawner, Actor, Surroundings, Wait};
 use crate::audio::{map_selection, Audio, Cue};
 use crate::plane::Plane;
 use crate::residents::{residents, Resident};
@@ -984,11 +984,10 @@ impl<'a> World<'a> {
     /// The shops `$92:CC8A` spawns here: the records for this map whose
     /// flag is set, when the map runs the spawner.
     fn shop_counters(&self) -> Vec<assets::shops::Shop> {
-        if !self
-            .residents
-            .iter()
-            .any(|r| r.script == Some(SHOP_SPAWNER))
-        {
+        if !self.residents.iter().any(|r| {
+            r.script
+                .is_some_and(|script| is_shop_spawner(self.image, script))
+        }) {
             return Vec::new();
         }
         let flags = EventFlags::Bitmap(&self.globals.events);
