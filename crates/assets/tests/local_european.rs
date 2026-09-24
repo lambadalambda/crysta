@@ -125,3 +125,23 @@ fn the_shops_are_the_japanese_ones_placed_by_the_european_spawner() {
         assets::shops::prime_blue_cost(japan.image(), 5)
     );
 }
+
+#[test]
+fn the_slice_load_patches_are_the_japanese_ones() {
+    use assets::maps::flag_patches::for_map;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    for map in SLICE {
+        let eu = for_map(europe.image(), map, |_| true).unwrap();
+        assert_eq!(
+            eu,
+            for_map(japan.image(), map, |_| true).unwrap(),
+            "{map:x}"
+        );
+    }
+    // C's stairs (`$292`) reopen from the European table too.
+    assert!(!for_map(europe.image(), 0x0C, |flag| flag == 0x292)
+        .unwrap()
+        .is_empty());
+}

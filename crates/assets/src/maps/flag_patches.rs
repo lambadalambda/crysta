@@ -8,6 +8,7 @@
 //! bit 15 set. This is what reopens C's stairs (`$292`) after the shared
 //! layer is decoded again.
 
+/// European `$99:D4E7`, the operand at `$8D:8FC9`.
 const TABLE: usize = 0x16_CD9D;
 /// The flag of the first primary entry.
 const FIRST_FLAG: u16 = 0x280;
@@ -53,11 +54,12 @@ pub struct FlagPatch {
 /// does not decode within its bound.
 #[must_use]
 pub fn for_map(image: &[u8], map: u16, flag: impl Fn(u16) -> bool) -> Option<Vec<FlagPatch>> {
+    let table = crate::layout::offset(image, TABLE)?;
     let mut patches = Vec::new();
     let mut primary = None;
     let mut applying = false;
     for index in 0..MAX_ENTRIES {
-        let entry = image.get(TABLE + index * 8..TABLE + index * 8 + 8)?;
+        let entry = image.get(table + index * 8..table + index * 8 + 8)?;
         let head = u16::from_le_bytes([entry[0], entry[1]]);
         if head & 0x8000 != 0 {
             return Some(patches);
