@@ -1,0 +1,89 @@
+//! ROM addresses per revision ([ADR 0004](../../../docs/adr/0004-european-executable.md)).
+//!
+//! Each address the decoders read is an [`Address`]: its Japanese value, the
+//! reference, and its European one once the correspondence is recorded
+//! (`tools/eu-map`, `docs/european-text.md`). An image names its revision by
+//! its header ([`rom::Revision::of_image`]); an image that names none, such
+//! as a synthetic test image, reads the Japanese layout. An address with no
+//! European value refuses the European image rather than read the wrong
+//! bytes.
+
+use rom::Revision;
+
+/// A ROM address in each revision.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Address {
+    japan: u32,
+    europe: Option<u32>,
+}
+
+impl Address {
+    /// An address known in both revisions.
+    #[must_use]
+    pub const fn both(japan: u32, europe: u32) -> Self {
+        Self {
+            japan,
+            europe: Some(europe),
+        }
+    }
+
+    /// An address whose European value is not recorded yet.
+    #[must_use]
+    pub const fn japan(japan: u32) -> Self {
+        Self {
+            japan,
+            europe: None,
+        }
+    }
+
+    /// The address in `image`'s revision, or `None` when unknown there.
+    #[must_use]
+    pub fn of(self, image: &[u8]) -> Option<u32> {
+        match revision(image) {
+            Revision::Japan => Some(self.japan),
+            Revision::EuropeEnglish => self.europe,
+        }
+    }
+}
+
+/// The revision whose layout `image` reads: its header's, else Japanese.
+#[must_use]
+pub fn revision(image: &[u8]) -> Revision {
+    Revision::of_image(image).unwrap_or(Revision::Japan)
+}
+
+/// A value that differs by revision, not an address: a window's size, a
+/// stride.
+#[must_use]
+pub fn per_revision<T>(image: &[u8], japan: T, europe: T) -> T {
+    match revision(image) {
+        Revision::Japan => japan,
+        Revision::EuropeEnglish => europe,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn titled(title: &[u8]) -> Vec<u8> {
+        let mut image = vec![0; 0x1_0000];
+        image[0xFFC0..0xFFC0 + 21].fill(b' ');
+        image[0xFFC0..0xFFC0 + title.len()].copy_from_slice(title);
+        image
+    }
+
+    #[test]
+    fn an_address_follows_the_images_revision_and_refuses_an_unknown_one() {
+        let font = Address::both(0xB4_8000, 0xB6_8000);
+        let table = Address::japan(0x92_C259);
+        let europe = titled(b"TERRANIGMA P");
+        assert_eq!(font.of(&europe), Some(0xB6_8000));
+        assert_eq!(table.of(&europe), None);
+        let japan = titled(b"TENCHI-JPN");
+        assert_eq!(font.of(&japan), Some(0xB4_8000));
+        // A synthetic image without a header reads the Japanese layout.
+        assert_eq!(table.of(&[0; 16]), Some(0x92_C259));
+        assert_eq!(per_revision(&europe, 48, 64), 64);
+    }
+}
