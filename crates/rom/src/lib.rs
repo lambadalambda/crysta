@@ -76,6 +76,18 @@ impl Revision {
             Self::EuropeEnglish => "TERRANIGMA P",
         }
     }
+
+    /// The revision a normalized image's header names, by its internal
+    /// title: a cheap tell for code that holds only the image bytes, which
+    /// [`Rom::load`] authenticated. Not an authentication.
+    #[must_use]
+    pub fn of_image(image: &[u8]) -> Option<Self> {
+        let header = image.get(0xFFC0..0xFFC0 + 21)?;
+        Self::ALL.into_iter().find(|revision| {
+            let title = revision.internal_title().as_bytes();
+            header.starts_with(title) && header[title.len()] == b' '
+        })
+    }
 }
 
 fn hex_to_bytes(s: &str) -> [u8; 32] {
@@ -306,6 +318,19 @@ impl Rom {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn an_image_names_its_revision_by_its_header_title() {
+        for revision in Revision::ALL {
+            let mut image = synthetic_image(0x2_0000);
+            let title = revision.internal_title().as_bytes();
+            image[0xFFC0..0xFFC0 + title.len()].copy_from_slice(title);
+            image[0xFFC0 + title.len()] = b' ';
+            assert_eq!(Revision::of_image(&image), Some(revision));
+        }
+        assert_eq!(Revision::of_image(&synthetic_image(0x2_0000)), None);
+        assert_eq!(Revision::of_image(&[]), None);
+    }
 
     /// A deterministic synthetic image of `size` bytes with a plausible SNES
     /// internal header at `0xFFC0`.
