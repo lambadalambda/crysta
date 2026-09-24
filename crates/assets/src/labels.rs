@@ -9,6 +9,7 @@
 //! `$B0:DE49` (`DE 03 04`, text `$85:8000`), each letter 4 frames after the
 //! one before.
 
+use crate::graphics::Bgr555;
 use crate::maps::actors::SpawnList;
 use crate::maps::scripts::EventFlags;
 use crate::shops::{read, ShopError};
@@ -30,6 +31,20 @@ const PITCH: i32 = 12;
 
 /// A 16×16 glyph: 0 clear, 1 and 2 drawn with OBJ palette 2's colours.
 pub type Glyph = [u8; 256];
+
+/// `$B2:8B58`: OBJ palette 2, the labels' colours (`$86:C3B8` copies it).
+const PALETTE: u32 = 0xB2_8B58;
+
+/// The labels' 16 colours (OBJ palette 2).
+///
+/// # Errors
+/// Refuses a read outside the image.
+pub fn label_palette(image: &[u8]) -> Result<[Bgr555; 16], ShopError> {
+    let bytes = read(image, PALETTE, 32)?;
+    Ok(std::array::from_fn(|i| {
+        Bgr555::new(u16::from_le_bytes([bytes[i * 2], bytes[i * 2 + 1]]))
+    }))
+}
 
 /// A label's glyphs, from `at` to its `D4`: glyph codes, the katakana
 /// switches `D0`/`D1`, and `E4 nn` calls.

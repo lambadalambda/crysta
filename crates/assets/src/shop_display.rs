@@ -9,8 +9,6 @@ use crate::shops::{read, ShopError};
 /// `$A9:F02F`: the sprite sheet `$85:A48D` unpacks; tiles `$40..$5F` sit
 /// at `$800` (VRAM `$4200` onward).
 const SPRITES: (u32, usize) = (0xA9_F02F, 0x800);
-/// `$B2:8B58`: OBJ palette 2 (the coin, the names).
-const SPRITE_PALETTE: u32 = 0xB2_8B58;
 /// `$A9:9000`: BG3's 2bpp characters, from the map's resource list.
 const PANEL: u32 = 0xA9_9000;
 /// `$B2:8B78`: BG3's eight 4-colour palettes.
@@ -83,7 +81,7 @@ impl ShopArt {
         count_palette[14] = Bgr555::new(0x7FFF);
         Ok(Self {
             sprites,
-            sprite_palette: colours(image, SPRITE_PALETTE)?,
+            sprite_palette: crate::labels::label_palette(image)?,
             count_palette,
             panel,
             panel_palette: colours(image, PANEL_PALETTE)?,
