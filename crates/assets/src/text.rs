@@ -2,6 +2,7 @@
 //!
 //! Pages retain native two-bit pixels (house background 3; Pandora may use 0). The caller
 //! owns presentation and acknowledgement/progression. See `docs/house-dialogue.md`.
+use crate::layout::{per_revision, Address};
 use std::borrow::Cow;
 use std::fmt;
 
@@ -316,7 +317,10 @@ fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError>
     if ![0, 1, 0x0A].contains(&catalog) {
         return Err(invalid(0, "unsupported choice catalog"));
     }
-    let pointer = bytes(image, 0x92_c259 + u32::from(catalog) * 2, 2)?;
+    let table = CHOICES
+        .of(image)
+        .ok_or_else(|| invalid(0, "no choices in this revision"))?;
+    let pointer = bytes(image, table + u32::from(catalog) * 2, 2)?;
     let base = u16::from_le_bytes([pointer[0], pointer[1]]);
     let mut options = Vec::new();
     for index in 0..2_u8 {
@@ -325,7 +329,7 @@ fn decode_choice(image: &[u8], catalog: u8) -> Result<DialogueChoice, TextError>
         let mut tile_offset = u16::from(record[0] & 0x7f) * 64 + u16::from(record[1]);
         if record[0] & 0x80 == 0 {
             tile_offset = tile_offset
-                .checked_sub(0x0504)
+                .checked_sub(per_revision(image, 0x0504, 0x04C4))
                 .ok_or_else(|| invalid(source, "choice outside standard window"))?;
         }
         let position = [tile_offset % 64 * 4, tile_offset / 64 * 8];
@@ -394,7 +398,7 @@ impl Decoder<'_> {
         let value = if (0x610..0x616).contains(&self.pc) {
             // $878C97..8CB6 initializes the default name with six LDA #byte / STA
             // absolute pairs. Read the immediates, not a copied string or capture.
-            let source = 0x87_8c99 + (self.pc - 0x610) * 5;
+            let source = self.address(DEFAULT_NAME)? + (self.pc - 0x610) * 5;
             let instruction = bytes(self.image, source, 5)?;
             let target = u16::from_le_bytes([instruction[3], instruction[4]]);
             if instruction[0] != 0xa9 || instruction[2] != 0x8d || u32::from(target) != self.pc {
@@ -490,7 +494,7 @@ impl Decoder<'_> {
             return Err(invalid(at, "unacknowledged page clear"));
         }
         if command != 0xc0 {
-            self.dimensions = [224, 48];
+            self.dimensions = standard(self.image);
         }
         // `$C0`, `$C1` and `$DA` reset the speaker's colour.
         self.speaker = SPEAKER;
@@ -551,6 +555,25 @@ impl Decoder<'_> {
         )?;
         self.enter(bank | u32::from(u16::from_le_bytes([entry[0], entry[1]])))
     }
+    /// Whether the image is the European one: its dictionary calls, and no
+    /// katakana.
+    fn europe(&self) -> bool {
+        per_revision(self.image, false, true)
+    }
+    /// This revision's value of `address`.
+    fn address(&self, address: Address) -> Result<u32, TextError> {
+        address
+            .of(self.image)
+            .ok_or_else(|| invalid(self.pc, "no address in this revision"))
+    }
+    /// The European dictionary calls: `$E4`/`$E5 nn` word `nn` of
+    /// `$92:C793`, `$E6 nn` of `$92:D2BB`, returning at `$D4` (`$85:9F62`).
+    fn dictionary(&mut self, command: u8) -> Result<(), TextError> {
+        let index = self.next()?;
+        let table = EUROPEAN_WORDS[usize::from(command == 0xe6)];
+        let pointer = bytes(self.image, table + u32::from(index) * 2, 2)?;
+        self.enter(0x92_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
+    }
     fn label_call(&mut self, at: u32) -> Result<(), TextError> {
         let index = self.next()?;
         if ![0x06, 0x25].contains(&index) {
@@ -581,7 +604,7 @@ impl Decoder<'_> {
         if index >= 25 {
             return Err(invalid(self.pc - 1, "text subroutine outside table"));
         }
-        let pointer = bytes(self.image, 0x92_c447 + u32::from(index) * 2, 2)?;
+        let pointer = bytes(self.image, self.address(NAMES)? + u32::from(index) * 2, 2)?;
         let address = u32::from(u16::from_le_bytes([pointer[0], pointer[1]]));
         let destination = if index == 0 && address == 0x610 {
             address
@@ -595,9 +618,24 @@ impl Decoder<'_> {
 }
 /// Colour 5 as a standard window opens: the default speaker yellow.
 const SPEAKER: u16 = 0x1B9F;
+/// The font: single-byte glyphs from here, katakana `+$2000`
+/// (`docs/european-text.md`).
+const FONT: Address = Address::both(0xB4_8000, 0xB6_8000);
+/// `$D2`'s table of names and speaker prefixes (`$85:9C7A`).
+const NAMES: Address = Address::both(0x92_C447, 0x92_C5CD);
+/// The default name's initialization, five bytes an `LDA #`/`STA` pair.
+const DEFAULT_NAME: Address = Address::both(0x87_8C99, 0x87_8C8E);
+/// The choice catalogs' records.
+const CHOICES: Address = Address::both(0x92_C259, 0x92_C407);
+/// The European dictionaries: `$E4`/`$E5` and `$E6` call word `nn`.
+const EUROPEAN_WORDS: [u32; 2] = [0x92_C793, 0x92_D2BB];
 
-fn empty_page() -> DialoguePage {
-    blank_page([224, 48], false, Placement::Bottom)
+fn empty_page(image: &[u8]) -> DialoguePage {
+    blank_page(standard(image), false, Placement::Bottom)
+}
+/// The standard window's content: three lines of text, four in European.
+fn standard(image: &[u8]) -> [u16; 2] {
+    [224, per_revision(image, 48, 64)]
 }
 fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> DialoguePage {
     let background_index = if transparent { 0 } else { 3 };
@@ -659,13 +697,13 @@ fn decode_reading(
         pandora,
         read,
         transparent: false,
-        dimensions: [224, 48],
+        dimensions: standard(image),
         pc: source,
         stack: Vec::new(),
         kana: false,
         position: [0, 0],
         placement: Placement::Bottom,
-        page: empty_page(),
+        page: empty_page(image),
         pages: Vec::new(),
         tick: 0,
         speed: 1,
@@ -676,10 +714,17 @@ fn decode_reading(
     for _ in 0..4096 {
         let at = d.pc;
         match d.next()? {
-            c @ 0..=0x7f => d.glyph(
-                at,
-                0xb4_8000 + u32::from(c) * 64 + if d.kana { 0x2000 } else { 0 },
-            )?,
+            c @ 0..=0x7f => {
+                let font = d.address(FONT)?;
+                d.glyph(
+                    at,
+                    font + u32::from(c) * 64 + if d.kana { 0x2000 } else { 0 },
+                )?;
+            }
+            // The European font has no katakana or two-byte glyphs.
+            0x80..=0xbf | 0xd0 if d.europe() => {
+                return Err(invalid(at, "no such glyph in the European font"))
+            }
             c @ 0x80..=0xbf => {
                 let code = (u32::from(c & 0x3f) << 8) | u32::from(d.next()?);
                 d.glyph(
@@ -751,6 +796,7 @@ fn decode_reading(
                 let destination = pandora::default_button_source(d.image, mask)?;
                 d.enter(destination)?;
             }
+            command @ 0xe4..=0xe6 if d.europe() => d.dictionary(command)?,
             // $859725 calls the bank-$92 item-label pointer table, returning via D4.
             0xe4 if d.pandora => d.label_call(at)?,
             _ => return Err(invalid(at, "unsupported text command (including choices)")),

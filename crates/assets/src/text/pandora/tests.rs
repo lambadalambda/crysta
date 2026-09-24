@@ -11,7 +11,7 @@ fn pandora_loader_authenticates_before_decoding() {
 fn logical_keys_are_source_scoped_ordered_and_bounded() {
     let request = DialogueRequest {
         source: 0x88_b758,
-        pages: vec![super::super::empty_page(); 4],
+        pages: vec![super::super::empty_page(&[]); 4],
         choice_catalog: None,
     };
     assert_eq!(request.source(), 0x88_b758);
