@@ -25,10 +25,15 @@ There is no sell. The keys:
 - L: the item's description (table `$92:8E3A`) and the suffix `$92:A4FB`.
 - A: buy (`$92:CE1D`). B: leave (`$92:CEC8`, text `$92:8095`).
 
-Ark holds the chosen item over his head: `JSL $84:D6DB` sets the pose
-(`$C3B7` hold, `$BFDF` release), `$84:D628` loads its tiles to VRAM `$46A0`,
-`$84:C278` its palette (`$B1:DA31`, `$AF:E43B`) to `$7F:07F0`; `$84:C29F`
-darkens it when the item cannot be bought.
+The display (native capture, `$1E`): the item's name in 16×16 sprites
+above the counter, its icon, "×count=", a coin and the price in BG3's
+8×16 digits, and a money bag with the money below. `$84:D628` loads the
+icon's tiles to VRAM `$46A0`, `$84:C278` its palette (`$B1:DA31`,
+`$AF:E43B`) to `$7F:07F0`; `$84:C29F` halves the icon's colours when the
+item costs more than the money. Ark holds the item up only after a
+purchase, for 60 frames (`JSL $84:D6DB`, `$C3B7` hold, `$BFDF` release).
+The greeting shows whole (speed 0); L shows the description only while it
+is held; B leaves without a text (`$92:8095` only closes the window).
 
 ## Data
 
