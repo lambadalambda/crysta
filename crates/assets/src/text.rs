@@ -2,6 +2,7 @@
 //!
 //! Pages retain native two-bit pixels (house background 3; Pandora may use 0). The caller
 //! owns presentation and acknowledgement/progression. See `docs/house-dialogue.md`.
+use std::borrow::Cow;
 use std::fmt;
 
 pub mod pandora;
@@ -152,11 +153,12 @@ impl DialoguePage {
         self.duration
     }
     /// The page with only its first `glyphs` glyphs drawn, as the
-    /// typewriter shows it; `image` supplies the font.
+    /// typewriter shows it; `image` supplies the font. A page typed out is
+    /// borrowed, not copied.
     #[must_use]
-    pub fn typed(&self, image: &[u8], glyphs: usize) -> Vec<u8> {
+    pub fn typed(&self, image: &[u8], glyphs: usize) -> Cow<'_, [u8]> {
         if glyphs >= self.glyphs.len() {
-            return self.pixels.clone();
+            return Cow::Borrowed(&self.pixels);
         }
         let width = usize::from(self.dimensions[0]);
         let transparent = self.background_index == 0;
@@ -165,7 +167,7 @@ impl DialoguePage {
             // Decoding drew each glyph once already, so none fails here.
             let _ = blit(&mut pixels, width, image, glyph, transparent);
         }
-        pixels
+        Cow::Owned(pixels)
     }
     /// Where the native engine opened the window this page is shown in.
     #[must_use]

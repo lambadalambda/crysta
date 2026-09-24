@@ -785,6 +785,10 @@ fn pages_type_one_glyph_a_frame_with_their_blip() {
                 .all(|&pixel| pixel == page.background_index()));
             let last = glyphs.last().unwrap();
             let width = usize::from(page.width());
+            assert!(matches!(
+                page.typed(image, glyphs.len()),
+                std::borrow::Cow::Borrowed(_)
+            ));
             let partial = page.typed(image, glyphs.len() - 1);
             for (i, (a, b)) in partial.iter().zip(page.indexed()).enumerate() {
                 let (x, y) = (
