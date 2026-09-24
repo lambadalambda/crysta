@@ -1487,3 +1487,37 @@ fn the_item_shop_browses_refuses_sells_and_lets_ark_go() {
     frames_until(&mut world, 60, |world| !world.in_scene());
     assert!(world.shop().is_none());
 }
+
+#[test]
+fn a_double_tap_dashes_and_a_release_brakes_with_its_sound() {
+    // Native probe from the town: 3, 2, 2 pixels a frame after a still
+    // frame; released, 8 frames on, then a 15-pixel brake (port 3 `$0D`).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter(image, 0x000A, 538, 815).unwrap();
+    settle(&mut world);
+    cues(&mut world);
+    let right = Some(Direction::Right);
+    for direction in [right, None, None] {
+        world.update(direction, Presses::default()).unwrap();
+    }
+    let start = world.position().0;
+    world.update(right, Presses::default()).unwrap();
+    assert_eq!(world.position().0, start, "the still setup frame");
+    for _ in 0..6 {
+        world.update(right, Presses::default()).unwrap();
+    }
+    assert_eq!(world.position().0, start + 14, "3, 2, 2 twice");
+    let pose = world.run_pose().unwrap();
+    assert_eq!(
+        (pose.0, pose.1),
+        (assets::sprites::PandoraRunMotion::Dashing, 3)
+    );
+    for _ in 0..8 + 1 + 16 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.run_pose().is_none(), "standing again");
+    assert!(cues(&mut world).1.contains(&0x0D00), "the brake's sound");
+}

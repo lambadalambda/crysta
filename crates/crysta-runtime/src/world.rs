@@ -16,7 +16,9 @@ use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::flag_patches::{self, Patch};
 use assets::maps::scripts::EventFlags;
+use assets::sprites::PandoraRunMotion;
 use room_core::arrival::{Arrival, ReturnRoute};
+use room_core::run::Run;
 use room_core::{
     AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
 };
@@ -78,6 +80,11 @@ pub struct World<'a> {
     arriving: Option<transition::Arriving>,
     /// A script transfer's fades ([`fade`]).
     fading: Option<fade::Fading>,
+    /// Ark's dash or brake, frames into its present motion, and whether
+    /// this frame's walk ran it.
+    run: Option<Run>,
+    run_age: u16,
+    ran: bool,
     /// The shops' talk targets here, and the shop open ([`crate::shop`]).
     counters: Vec<assets::shops::Shop>,
     shop: Option<Shop>,
@@ -298,6 +305,9 @@ impl<'a> World<'a> {
             leaving: None,
             arriving: None,
             fading: None,
+            run: None,
+            run_age: 0,
+            ran: false,
             counters: Vec::new(),
             shop: None,
             dark: 0,
@@ -355,6 +365,40 @@ impl<'a> World<'a> {
         }
         self.facing = direction;
         self.animation = AnimationState::standing(direction);
+    }
+
+    /// Ark's run pose while he dashes or brakes: the motion, the facing
+    /// (0 Down, 1 Up, 2 Left, 3 Right) and frames into it.
+    #[must_use]
+    pub const fn run_pose(&self) -> Option<(PandoraRunMotion, u8, u16)> {
+        let (motion, direction) = match self.run {
+            Some(Run::Dash { direction, .. }) => (PandoraRunMotion::Dashing, direction),
+            Some(Run::Brake { direction, .. }) => (PandoraRunMotion::Braking, direction),
+            None => return None,
+        };
+        Some((motion, direction as u8, self.run_age))
+    }
+
+    /// Faces the run and counts frames into its motion, from 0 when it
+    /// starts, brakes or turns.
+    fn track_run(&mut self) {
+        match self.run {
+            Some(Run::Dash {
+                direction, frame, ..
+            }) => {
+                self.facing = direction;
+                self.run_age = if frame == 0 {
+                    0
+                } else {
+                    self.run_age.wrapping_add(1)
+                };
+            }
+            Some(Run::Brake { direction, frame }) => {
+                self.facing = direction;
+                self.run_age = u16::from(frame);
+            }
+            None => self.run_age = 0,
+        }
     }
 
     /// The player's current ordinary frame.
@@ -433,7 +477,20 @@ impl<'a> World<'a> {
         if let Some(direction) = direction {
             self.facing = direction;
         }
-        if let Err(refused) = self.walking.step(&self.room.room, FrameInput { direction }) {
+        let input = FrameInput { direction };
+        if self.animate {
+            // The frame API runs: a double tap dashes (`room_core::run`).
+            match room_core::run::step(&mut self.walking, &mut self.run, &self.room.room, input) {
+                Ok(step) => {
+                    self.ran = true;
+                    if step.braked {
+                        self.globals.audio.sound_port3(BRAKE_SOUND);
+                    }
+                    self.track_run();
+                }
+                Err(refused) => return Ok(Step::Refused(refused)),
+            }
+        } else if let Err(refused) = self.walking.step(&self.room.room, input) {
             return Ok(Step::Refused(refused));
         }
         self.animation.advance(self.walking.active_direction());
@@ -469,6 +526,7 @@ impl<'a> World<'a> {
         if matches!(step, Step::Refused(_)) {
             let (x, y) = self.position();
             self.walking = WalkingState::new(x, y);
+            self.run = None;
             self.animation = AnimationState::standing(self.facing);
             self.run_actors()?;
         }
@@ -705,8 +763,15 @@ impl<'a> World<'a> {
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
         self.animate = true;
+        self.ran = false;
         let steps = self.frame(direction, presses);
         self.animate = false;
+        // Another path took the player this frame (a lift, a scene, a door,
+        // a contact, an exit, a fade): the dash ends.
+        if !self.ran {
+            self.run = None;
+            self.run_age = 0;
+        }
         let steps = steps?;
         // A transfer a script queued this frame starts fading out.
         self.queue_transfer();
@@ -827,6 +892,7 @@ impl<'a> World<'a> {
         self.leaving = None;
         self.arriving = None;
         self.fading = None;
+        self.run = None;
         self.dark = 0;
         self.globals.transfer = None;
     }
@@ -1307,6 +1373,9 @@ impl<'a> World<'a> {
     }
 }
 
+/// Port 3's sound as a brake starts (`COP 36 0D`).
+const BRAKE_SOUND: u8 = 0x0D;
+
 /// A counter tile's collision attribute (`$2000` in the cell word): the
 /// talk probe reaches over it (`$87:923F`).
 const COUNTER: u16 = 0x10;
@@ -1550,6 +1619,9 @@ mod tests {
             leaving: None,
             arriving: None,
             fading: None,
+            run: None,
+            run_age: 0,
+            ran: false,
             counters: Vec::new(),
             shop: None,
             dark: 0,

@@ -195,10 +195,29 @@ animation/stream. Observed onset outputs are zero on setup, then signed
 `quick` reproduces Left setup at completed **1607**, output **−3 at 1608**.
 The checker verifies this onset signature and cleared history, but **does not
 validate accelerated collision, sustained trajectory, termination, or recovery**.
-No whole action system is necessary to reject this boundary correctly. If dash
-is wanted next, investigate a small mode/phase state plus cancellation and
-recovery rules, retaining the helper's consumed-history semantics; do not assume
-walking release behavior or extrapolate three samples to a complete dash model.
+No whole action system is necessary to reject this boundary correctly.
+
+### Dash
+
+The frame API models the dash (`room_core::run`, 2026-09-24) from a native
+probe run in the town (map `$0A`, from (538,815)); the replay path above keeps
+rejecting the trigger. Measured:
+
+- It holds while the direction is held (`COP 02 08 00` … `COP 61`, `$84:90FC`),
+  moving **3,2,2** after the still setup frame, with no time limit.
+- Released, it runs on for **8 frames** of grace (`COP 02 08`/`COP 03`); the same
+  direction resumes it, a perpendicular one turns it, the opposite one brakes
+  the next frame (`COP 2B` → `$84:8A88`).
+- The brake (`$84:A223/A231/A23F/A246`) slides **2,2,1,2,1,2,1,2,1,0,0,1,0,0,0,0**
+  over 16 frames with port 3 sound `$0D`; a direction from its fifth frame walks
+  off (`COP C1 04`).
+- A wall ends it (`$80:E6BD` → `$80:E70A`): a walk in the held direction with
+  the window re-armed to 11, else a stand.
+- Animation: dash lists 23/24/25 of resource 1 (6 records of 6 frames), brake
+  lists 9/10/11 of resource 0 (one of 16).
+
+Not modelled: diagonal dashes (streams `$16`/`$17`), the dash attack (A/L) and
+the dash jump (B).
 
 ## Revisit route and measurements
 
@@ -285,9 +304,9 @@ with an expected filename set for both boots; minor report wording was corrected
 ## Remaining unsupported behavior
 
 Reject diagonals, opposing simultaneous cardinals, and all non-direction actions
-(attack, jump, interaction, menus, etc.) under this profile. Dash onset is now
-recognized precisely for the bounded ordinary histories, but dash movement,
-braking, direction change while dashing, stop/recovery, and chained actions remain
+(attack, jump, interaction, menus, etc.) under this profile. Dash onset is
+recognized precisely for the bounded ordinary histories; the dash itself is
+modelled only on the frame API (see "Dash"), and chained actions remain
 unsupported. Other player/controller modes, actors/events, pause histories,
 transitions and post-transition history, arbitrary loaded snapshots, room/map
 boundaries, mixed corners, unknown/flagged terrain and other materials are not

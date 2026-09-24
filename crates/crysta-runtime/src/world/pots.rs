@@ -134,12 +134,7 @@ impl World<'_> {
         };
         Some(Carry {
             motion,
-            facing: match state.facing() {
-                Direction::Down => 0,
-                Direction::Up => 1,
-                Direction::Left => 2,
-                Direction::Right => 3,
-            },
+            facing: state.facing() as u8,
             tick: state.phase_tick(),
         })
     }

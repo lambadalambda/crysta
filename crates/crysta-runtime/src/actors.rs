@@ -833,7 +833,7 @@ impl Actor {
         self.callback.is_some()
             && !matches!(self.state, State::Frozen | State::Gone)
             && (self.interaction & INTERACT_ANY_SIDE != 0
-                || (self.interaction & INTERACT_FACING != 0 && opposite(facing) == self.facing))
+                || (self.interaction & INTERACT_FACING != 0 && facing.opposite() == self.facing))
     }
 
     /// Runs the registered callback as the dispatcher does, as a subroutine
@@ -1810,7 +1810,7 @@ impl Actor {
             return true;
         }
         // `$8DC2`: the actor's facing is the player's, reversed.
-        let facing = opposite(around.facing);
+        let facing = around.facing.opposite();
         self.facing = facing;
         let (offset, flip) = standing_pose(facing);
         let (selector, hflip) = match base {
@@ -2347,15 +2347,6 @@ fn long(bytes: &[u8]) -> Option<usize> {
 
 /// The facing that looks back at `facing`; `$8DC2`'s `EOR #1` on the game's
 /// 0 down, 1 up, 2 left, 3 right.
-const fn opposite(facing: Direction) -> Direction {
-    match facing {
-        Direction::Down => Direction::Up,
-        Direction::Up => Direction::Down,
-        Direction::Left => Direction::Right,
-        Direction::Right => Direction::Left,
-    }
-}
-
 /// The facings a player at `player` may hold to be looking at an actor at
 /// `actor`, as `$80:8D2B`..`$8DB5` classifies their offset; both `None`
 /// when the player is not beside them.
