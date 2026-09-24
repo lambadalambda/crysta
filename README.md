@@ -1,7 +1,11 @@
-# Terranigma
+# Crysta
 
 A ROM-free reverse-engineering and portable reimplementation project for
 *Terranigma* / *Tenchi Souzou*.
+
+**Try it:** <https://lambadalambda.github.io/crysta/> plays the first town,
+Crysta, in the browser from your own Japanese ROM (*Tenchi Souzou (Japan)*).
+The file stays on your computer; the page does not upload or store it.
 
 The long-term goal is a deterministic, maintainable game core that can run on
 native platforms and the web while preserving an optional behaviorally faithful

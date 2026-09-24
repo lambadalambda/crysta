@@ -14,7 +14,7 @@ description = "Native macOS window, renderer and gamepad for the Crysta slice"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
-repository = "https://github.com/lainsoykaf/terranigma"
+repository = "https://github.com/lambadalambda/crysta"
 
 [features]
 default = ["native"]
