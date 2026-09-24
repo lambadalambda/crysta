@@ -105,7 +105,7 @@ jp_address	eu_address	kind	method	confidence	note
 83:EDEB	83:ED93	script	exact	high	run 0xc bytes +table +shape; test; crates/assets/src/sprites/house_tests.rs:470 (+1)
 83:EDED	83:ED95	script	estimate	low	anchors disagree; test; crates/crysta-runtime/src/actors/cadence.rs:406
 83:EDEE	83:ED89	script	exact	high	run 0xc bytes; test; crates/crysta-runtime/src/actors/cadence.rs:395 (+2)
-83:EDF8	83:ED93	sprite	exact	high	run 0xc bytes; code; crates/assets/src/sprites/pandora.rs:299 (+1)
+83:EDF8	83:EDA0	sprite	hand	high	the C spawn $83:8C30 names it (the run matched the descriptor before); code; crates/assets/src/sprites/pandora.rs:299 (+1)
 83:F8A8	83:F850	sprite	exact	high	run 0xc bytes +table; code; crates/assets/src/sprites/pandora.rs:301 (+4)
 83:F8C0	83:F868	sprite	exact	high	local block 10 bytes +table; code; crates/assets/src/sprites/pandora.rs:300 (+2)
 83:F984	83:F92C	sprite	exact	high	local block 7 bytes (one side) +table; code; crates/assets/src/sprites/pandora.rs:406 (+5)

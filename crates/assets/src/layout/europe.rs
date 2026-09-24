@@ -105,7 +105,7 @@ pub(super) const EUROPE: &[(u32, u32)] = &[
     (0x83_ED7F, 0x83_ED27), // sprite, exact, high
     (0x83_EDEB, 0x83_ED93), // script, exact, high
     (0x83_EDEE, 0x83_ED89), // script, exact, high
-    (0x83_EDF8, 0x83_ED93), // sprite, exact, high
+    (0x83_EDF8, 0x83_EDA0), // sprite, hand, high
     (0x83_F8A8, 0x83_F850), // sprite, exact, high
     (0x83_F8C0, 0x83_F868), // sprite, exact, high
     (0x83_F984, 0x83_F92C), // sprite, exact, high
