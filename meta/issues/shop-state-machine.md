@@ -7,7 +7,7 @@ confirm choice, the refusals, the sounds and the purchase.
 
 ## Dependencies
 
-- [Decode the shop stock and item names](shop-data.md)
+- [Decode the shop stock](shop-data.md)
 - [Decode the shop texts' indexed controls](shop-text.md)
 - [Keep money, Prime Blue and the inventory](money-and-inventory.md)
 

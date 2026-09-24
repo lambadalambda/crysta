@@ -5,5 +5,6 @@ pub mod cpu;
 pub mod graphics;
 
 pub mod maps;
+pub mod shops;
 pub mod sprites;
 pub mod text;

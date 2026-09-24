@@ -26,7 +26,7 @@ to buy.
 
 ## Sub-issues
 
-1. [Decode the shop stock and item names](shop-data.md)
+1. [Decode the shop stock](shop-data.md)
 2. [Decode the shop texts' indexed controls](shop-text.md)
 3. [Keep money, Prime Blue and the inventory](money-and-inventory.md)
 4. [Run the shop's talk callback](shop-state-machine.md)
