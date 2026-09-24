@@ -1,9 +1,13 @@
 //! The art of a shop's display ([notes](../../../docs/shops.md)): the
 //! sprite sheet of the count row and coin, the BG3 characters of the price
 //! and the money, their palettes, an item's icon and its name.
+//!
+//! The addresses are the Japanese ones; the European ROM holds the same
+//! bytes elsewhere ([`crate::layout::at`]), and its names in English.
 
 use crate::compression;
 use crate::graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp};
+use crate::labels::located;
 use crate::shops::{read, ShopError};
 
 /// `$A9:F02F`: the sprite sheet `$85:A48D` unpacks; tiles `$40..$5F` sit
@@ -14,7 +18,8 @@ const PANEL: u32 = 0xA9_9000;
 /// `$B2:8B78`: BG3's eight 4-colour palettes.
 const PANEL_PALETTE: u32 = 0xB2_8B78;
 /// The icon's tile index path (`$84:D628`): `$A8:8000` by item, then
-/// `+$8002`, then `+$8016`; tiles from `$A2:8000`, 32 bytes each.
+/// `+$8002`, then `+$8016` in the same bank; tiles from `$A2:8000`, 32
+/// bytes each.
 const ICON_INDEX: u32 = 0xA8_8000;
 const ICON_TILES: u32 = 0xA2_8000;
 /// The icon's 8 colours (`$84:C278`): `$AF:E43B` by the byte at
@@ -64,14 +69,14 @@ impl ShopArt {
     /// # Errors
     /// Refuses a packet or palette outside the image or malformed.
     pub fn from_rom(image: &[u8]) -> Result<Self, ShopError> {
-        let sheet = packet(image, SPRITES.0)?;
+        let sheet = packet(image, located(image, SPRITES.0)?)?;
         let sprites = sheet
             .get(SPRITES.1..SPRITES.1 + 32 * 32)
             .ok_or(ShopError::Invalid(SPRITES.0, "short sprite sheet"))
             .and_then(|bytes| {
                 decode_tiles_4bpp(bytes).map_err(|_| ShopError::Invalid(SPRITES.0, "tiles"))
             })?;
-        let panel = packet(image, PANEL)?
+        let panel = packet(image, located(image, PANEL)?)?
             .get(..0x60 * 16)
             .ok_or(ShopError::Invalid(PANEL, "short panel characters"))?
             .chunks_exact(16)
@@ -84,7 +89,7 @@ impl ShopArt {
             sprite_palette: crate::labels::label_palette(image)?,
             count_palette,
             panel,
-            panel_palette: colours(image, PANEL_PALETTE)?,
+            panel_palette: colours(image, located(image, PANEL_PALETTE)?)?,
         })
     }
 }
@@ -95,16 +100,15 @@ impl ShopArt {
 /// # Errors
 /// Refuses reads outside the image.
 pub fn item_icon(image: &[u8], item: u8) -> Result<([Tile4bpp; 4], [Bgr555; 8]), ShopError> {
-    let first = word(image, ICON_INDEX + u32::from(item) * 2)?;
-    let second = word(
-        image,
-        0xA8_0000 | u32::from(first).wrapping_add(0x8002) & 0xFFFF,
-    )?;
+    let index = located(image, ICON_INDEX)?;
+    let bank = index & 0xFF_0000;
+    let first = word(image, index + u32::from(item) * 2)?;
+    let second = word(image, bank | u32::from(first).wrapping_add(0x8002) & 0xFFFF)?;
     let tile = word(
         image,
-        0xA8_0000 | u32::from(second).wrapping_add(0x8016) & 0xFFFF,
+        bank | u32::from(second).wrapping_add(0x8016) & 0xFFFF,
     )? & 0x1FF;
-    let source = ICON_TILES + u32::from(tile) * 32;
+    let source = located(image, ICON_TILES)? + u32::from(tile) * 32;
     let mut tiles = Vec::with_capacity(4);
     for row in [source, source + 0x200] {
         tiles.extend(
@@ -112,8 +116,12 @@ pub fn item_icon(image: &[u8], item: u8) -> Result<([Tile4bpp; 4], [Bgr555; 8]),
                 .map_err(|_| ShopError::Invalid(row, "icon tiles"))?,
         );
     }
-    let entry = read(image, ICON_PALETTES.1 + u32::from(item), 1)?[0];
-    let palette = read(image, ICON_PALETTES.0 + u32::from(entry) * 32, 16)?;
+    let entry = read(image, located(image, ICON_PALETTES.1)? + u32::from(item), 1)?[0];
+    let palette = read(
+        image,
+        located(image, ICON_PALETTES.0)? + u32::from(entry) * 32,
+        16,
+    )?;
     Ok((
         [tiles[0], tiles[1], tiles[2], tiles[3]],
         std::array::from_fn(|i| {
@@ -136,7 +144,8 @@ pub const fn halve(colour: Bgr555) -> Bgr555 {
 /// Refuses a name that leaves the image, does not end, or holds a code
 /// other than glyphs and the kana switches.
 pub fn name_glyphs(image: &[u8], item: u8) -> Result<(u8, Vec<[u8; 256]>), ShopError> {
-    let start = 0x92_0000 | u32::from(word(image, NAMES + u32::from(item) * 2)?);
+    let names = located(image, NAMES)?;
+    let start = names & 0xFF_0000 | u32::from(word(image, names + u32::from(item) * 2)?);
     let head = read(image, start, 2)?;
     if head[0] != 0xC9 {
         return Err(ShopError::Invalid(start, "name without its width"));

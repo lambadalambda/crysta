@@ -189,6 +189,7 @@ fn label_text(image: &[u8], glyphs: &[assets::labels::Glyph]) -> String {
     glyphs
         .iter()
         .map(|glyph| match font.iter().position(|shape| shape == glyph) {
+            _ if glyph.iter().all(|&pixel| pixel == 0) => ' ',
             Some(0x76) => '\'',
             Some(code) => transcribe(u8::try_from(code).unwrap()),
             None => '#',
@@ -228,4 +229,28 @@ fn the_slices_titles_decode_in_english() {
         TitleMotion::from_rom(image).unwrap(),
         TitleMotion::from_rom(japan.image()).unwrap()
     );
+}
+
+#[test]
+fn the_shop_display_is_the_japanese_art_with_english_names() {
+    use assets::shop_display::{item_icon, name_glyphs, ShopArt};
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let (eu, jp) = (europe.image(), japan.image());
+    assert_eq!(
+        ShopArt::from_rom(eu).unwrap(),
+        ShopArt::from_rom(jp).unwrap()
+    );
+    for item in [0x10, 0x11, 0x13, 0x30, 0x32] {
+        assert_eq!(item_icon(eu, item).unwrap(), item_icon(jp, item).unwrap());
+    }
+    let name = |item| {
+        let (width, glyphs) = name_glyphs(eu, item).unwrap();
+        (width, label_text(eu, &glyphs))
+    };
+    assert_eq!(name(0x10), (5, "S.Bulb".to_owned()));
+    assert_eq!(name(0x13), (9, "P. Cure".to_owned()));
+    // "Crystal " is a dictionary word (`E5 0A`).
+    assert_eq!(name(0x32), (3, "Crystal Thread".to_owned()));
 }
