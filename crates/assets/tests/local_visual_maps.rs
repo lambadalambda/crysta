@@ -319,3 +319,49 @@ fn the_towns_second_layer_holds_the_crystal_clouds() {
     }
     assert!(assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x000B).is_err());
 }
+
+#[test]
+fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_model() {
+    use assets::graphics::Bgr555;
+    use assets::maps::actors::SpawnList;
+    use assets::maps::scripts::EventFlags;
+    use assets::maps::visual::{
+        crysta_animation::CrystaAnimation, scene_animation::SceneAnimation,
+    };
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let image = rom.image();
+    let mut events = vec![0u8; 512];
+    for flag in [32usize, 251, 0x20] {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    let animation = |map| {
+        let records = SpawnList::resolve(image, map, EventFlags::Bitmap(&events)).unwrap();
+        SceneAnimation::from_records(image, &records).unwrap()
+    };
+    let animated: Vec<u16> = (0x0Au16..=0x21)
+        .chain(0x41..=0x44)
+        .filter(|&map| !animation(map).is_empty())
+        .collect();
+    assert_eq!(
+        animated,
+        [
+            0x0A, 0x0F, 0x10, 0x11, 0x13, 0x14, 0x15, 0x18, 0x1B, 0x1C, 0x1F, 0x41, 0x42, 0x43,
+            0x44
+        ]
+    );
+    let town = animation(0x0A);
+    let qualified = CrystaAnimation::from_rom(image).unwrap();
+    let scene = StaticBackground::from_rom(image, 0x0A).unwrap();
+    for age in (3..2000).step_by(7) {
+        let (mut tiles, mut palette) = (scene.tiles().to_vec(), *scene.palette());
+        town.apply(age, &mut tiles, &mut palette);
+        let (mut want_tiles, mut want_palette) = (scene.tiles().to_vec(), *scene.palette());
+        qualified
+            .apply(age, &mut want_tiles, &mut want_palette)
+            .unwrap();
+        assert!(tiles == want_tiles && palette == want_palette, "age {age}");
+    }
+    let _: Bgr555 = scene.palette()[0];
+}
