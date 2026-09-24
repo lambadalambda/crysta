@@ -71,7 +71,8 @@ impl PandoraArt {
     pub const fn source_id(&self) -> u32 {
         self.id
     }
-    /// Source-indexed graphics identity (not OAM name-select or dynamic slot).
+    /// Source-indexed graphics identity (not OAM name-select or dynamic slot),
+    /// in the image's own revision, unlike [`Self::source_id`].
     #[must_use]
     pub const fn graphics_key(&self) -> PandoraGraphicsKey {
         self.graphics_key
@@ -300,8 +301,17 @@ const DESCRIPTORS: &[(u32, u32, &[u8])] = &[
     (0x83_f8c0, 0x83_f8c0, &[1, 3, 4, 11]), // opening guide
     (0x83_f8a8, 0x83_f8a8, &[3]),           // tour guide
 ];
+/// The image offset in `image`'s revision of normalized Japanese offset
+/// `japan` ([`crate::layout::offset`]); the art keeps its Japanese identity.
+pub(super) fn located(image: &[u8], japan: usize) -> Result<usize, SpriteError> {
+    crate::layout::offset(image, japan).ok_or(SpriteError::Invalid("unrecorded Pandora source"))
+}
+/// The image offset in `image`'s revision of Japanese CPU address `id`.
+pub(super) fn source(image: &[u8], id: u32) -> Result<usize, SpriteError> {
+    located(image, pointer(&id.to_le_bytes()[..3])?)
+}
 fn descriptor_parts(loader: &mut Loader<'_>, id: u32) -> Result<(u32, usize), SpriteError> {
-    let at = pointer(&id.to_le_bytes()[..3])?;
+    let at = source(loader.image, id)?;
     let prefix = loader.read(at, 5)?;
     let mode = word(prefix, 3);
     if ![0, 0x20, 0x22, 0x23, 0xa3].contains(&mode) {
@@ -321,6 +331,8 @@ fn descriptor_graphics(loader: &mut Loader<'_>, id: u32) -> Result<Arc<Graphics>
             "unsupported Pandora graphics transfer",
         ));
     }
+    // The graphics and palette tables `$80:FDA4`, `$80:FC72` stay in place;
+    // the European entries point two banks up.
     let cpu = cpu(loader.read(0xfda4 + usize::from(transfer[3]), 3)?);
     loader.graphics(cpu)
 }
@@ -376,11 +388,15 @@ fn ark_art(
     selectors: &[u8],
 ) -> Result<PandoraArt, SpriteError> {
     let table = 0xa24f + usize::from(resource) * 6;
-    let entry = loader.read(table, 6)?;
+    let entry = loader.read(
+        located(loader.image, 0xa24f)? + usize::from(resource) * 6,
+        6,
+    )?;
     let base_cpu = cpu(&entry[..3]);
     let gfx_cpu = cpu(&entry[3..]);
     let gfx = pointer(&entry[3..])?;
     let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(loader.read(gfx, 0x4000)?)?.into();
+    // Ark's palette COP `$80:F941` stays in place too.
     let cop = loader.read(0xf941, 7)?;
     if cop[..2] != [2, 0x5a] || cop[5..] != [128, 16] {
         return Err(SpriteError::Invalid("changed Pandora Ark palette COP"));
@@ -402,8 +418,10 @@ fn ark_art(
 #[path = "pandora_tests.rs"]
 mod tests;
 
+/// Pandora's Box's descriptor, its art's identity.
+const BOX: u32 = 0x83_f984;
 fn box_art(loader: &mut Loader<'_>) -> Result<PandoraArt, SpriteError> {
-    let d = loader.read(0x3_f984, 23)?;
+    let d = loader.read(source(loader.image, BOX)?, 23)?;
     if d[3..5] != [4, 0] || d[8] != 0x40 || d[12..17] != [4, 2, 8, 0x30, 0x30] || d[17] != 0x10 {
         return Err(SpriteError::Invalid("changed Pandora box descriptor"));
     }
@@ -428,7 +446,7 @@ fn box_art(loader: &mut Loader<'_>) -> Result<PandoraArt, SpriteError> {
         graphics.len(),
     )?];
     Ok(PandoraArt {
-        id: 0x83_f984,
+        id: BOX,
         graphics_key: PandoraGraphicsKey::Compressed(gfx_cpu),
         graphics,
         palette_base: 192,
@@ -466,7 +484,7 @@ fn direct_lists(
     Ok(lists)
 }
 fn tour_object(loader: &mut Loader<'_>) -> Result<PandoraArt, SpriteError> {
-    let b = loader.read(0x9_d9fe, 16)?;
+    let b = loader.read(located(loader.image, 0x9_d9fe)?, 16)?;
     if b[..6] != [2, 0xb2, 0xf8, 0xff, 2, 0xd8] || b[9..] != [2, 0x48, 0x42, 0x82, 2, 0x80, 8] {
         return Err(SpriteError::Invalid("changed tour object script"));
     }
@@ -499,24 +517,34 @@ fn object_list(
         lists,
     })
 }
-fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
+/// The held records of FA and FB in C, the pots' art identities.
+const POTS: [u32; 2] = [0x96_e1a6, 0x96_e1ab];
+/// The common object palette and metatile definitions C loads for its pots:
+/// the palette's image offset and the definitions.
+fn pot_common(loader: &mut Loader<'_>) -> Result<(usize, Arc<[u8]>), SpriteError> {
+    let image = loader.image;
     // Follow C's deferred common source loads, but decode only the metatile
     // definitions and palette needed by FA/FB. No map raster dependency/VM.
-    if loader.read(0x6_959c + 0xc * 3, 3)? != [0x46, 0x84, 0x98]
-        || loader.read(0x18_8446, 5)? != [8, 0xfa, 1, 0, 0]
-        || loader.read(0x6_a28f, 3)? != [5, 0x84, 0x98]
+    // The loads sit in the map-script bank (`$98`, European `$9A`), which
+    // their packed pointers name.
+    let pal_load = located(image, 0x18_8405)?;
+    let bank =
+        u8::try_from(pal_load >> 16 | 0x80).map_err(|_| SpriteError::Invalid("pot script bank"))?;
+    if loader.read(located(image, 0x6_959c)? + 0xc * 3, 3)? != [0x46, 0x84, bank]
+        || loader.read(located(image, 0x18_8446)?, 5)? != [8, 0xfa, 1, 0, 0]
+        || loader.read(located(image, 0x6_a28f)?, 3)? != [5, 0x84, bank]
     {
         return Err(SpriteError::Invalid(
             "changed C common object palette dependency",
         ));
     }
-    let pal_load = loader.read(0x18_8405, 7)?;
-    let def_load = loader.read(0x18_8427, 8)?;
+    let pal_load = loader.read(pal_load, 7)?;
+    let def_load = loader.read(located(image, 0x18_8427)?, 8)?;
     if pal_load[..4] != [0x40, 0, 0x60, 0x20] || def_load[..5] != [0x20, 0, 0x40, 0, 1] {
         return Err(SpriteError::Invalid("changed pot palette/definition loads"));
     }
     let unpack = |p: &[u8]| {
-        crate::maps::scripts::unpack_pointer([p[0], p[1], p[2]], 0x98)
+        crate::maps::scripts::unpack_pointer([p[0], p[1], p[2]], bank)
             .map(rom::RuntimeRomAddress::value)
             .map_err(|_| SpriteError::Invalid("pot packed source pointer"))
     };
@@ -525,33 +553,50 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
     if definitions.bytes.len() != 0x1000 {
         return Err(SpriteError::Invalid("pot definition extent"));
     }
+    Ok((palette_pointer, definitions.bytes))
+}
+fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
+    let image = loader.image;
+    let (palette_pointer, definitions) = pot_common(loader)?;
     // Map-indexed held records: first matching source map entry, not WRAM $098A.
     let mut record = None;
+    let records = located(image, 0x16_ddbd)?;
     for i in 0..256 {
-        let entry = loader.read(0x16_ddbd + i * 4, 4)?;
+        let entry = loader.read(records + i * 4, 4)?;
         if word(entry, 0) & 0x8000 != 0 {
             break;
         }
         if word(entry, 0) == 0xc {
-            record = Some(0x16_0000 + usize::from(word(entry, 2)));
+            record = Some((records & 0x3f_0000) + usize::from(word(entry, 2)));
             break;
         }
     }
     let record = record.ok_or(SpriteError::Invalid("missing C held source records"))?;
-    let script = loader.read(0x7_973d, 0x8d)?;
-    // Source animation list and queued transfer operands from the lift consumer.
-    if script[0x36..0x39] != [0x69, 0, 0x80] || script[0x51..0x54] != [0xa9, 0xa4, 1] {
+    let script = loader.read(located(image, 0x7_973d)?, 0x8d)?;
+    // Source animation list and queued transfer operands from the lift
+    // consumer: `LDA #bank`, `ADC #table` (`$B0:8000`, European `$B2:87D9`),
+    // `LDA #graphics bank`.
+    if script[0x25] != 0xa9
+        || script[0x36] != 0x69
+        || script[0x51..0x54] != [0xa9, crate::layout::per_revision(image, 0xa4, 0xa6), 1]
+    {
         return Err(SpriteError::Invalid("changed pot upload source"));
     }
+    let table = (usize::from(script[0x26] & 63) << 16) | usize::from(word(script, 0x37));
+    let sheet = crate::layout::at(image, 0xa2_c000)
+        .ok_or(SpriteError::Invalid("unrecorded Pandora source"))?;
     let mut arts = Vec::new();
-    for (i, tile_id) in [0xfa_usize, 0xfb].into_iter().enumerate() {
+    for ((i, tile_id), id) in [0xfa_usize, 0xfb].into_iter().enumerate().zip(POTS) {
         let at = record + i * 5;
+        if source(image, id)? != at {
+            return Err(SpriteError::Invalid("changed C held source records"));
+        }
         let held = loader.read(at, 5)?;
         let selector = held[2];
-        let entry = loader.read(0x30_8000 + usize::from(selector) * 2, 2)?;
-        let seq = 0x30_8000 + usize::from(word(entry, 0));
+        let entry = loader.read(table + usize::from(selector) * 2, 2)?;
+        let seq = table + usize::from(word(entry, 0));
         let list = loader.read(seq, 6)?;
-        let anchor = 0x30_8000 + usize::from(word(list, 2));
+        let anchor = table + usize::from(word(list, 2));
         let first = loader.read(anchor, 24)?;
         let tile = word(first, 22) & 511;
         let graphics_base =
@@ -562,7 +607,7 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
         planar[0x6a * 32..0x6c * 32].copy_from_slice(loader.read(top, 64)?);
         planar[0x7a * 32..0x7c * 32].copy_from_slice(loader.read(bottom, 64)?);
         let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(&planar)?.into();
-        let pal = usize::from((word(&definitions.bytes, tile_id * 8) >> 10) & 7);
+        let pal = usize::from((word(&definitions, tile_id * 8) >> 10) & 7);
         if pal < 2 {
             return Err(SpriteError::Invalid("pot palette outside common load"));
         }
@@ -575,7 +620,7 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
         }
         let lists = direct_lists(
             loader,
-            0xa2_c000,
+            sheet,
             &[25, 26, 29, 30, 43, 44, 45, 46, 47, 48, 60],
             240,
             256,
@@ -590,7 +635,7 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
             }
         }
         arts.push(PandoraArt {
-            id: cpu_address(at)?,
+            id,
             graphics_key: PandoraGraphicsKey::HeldTile {
                 top: cpu_address(top)?,
                 bottom: cpu_address(bottom)?,
@@ -703,21 +748,21 @@ fn carry_program(loader: &mut Loader<'_>) -> Result<(), SpriteError> {
         (0x4_be88, 25, 3),
         (0x4_be98, 26, 3),
     ] {
-        if loader.read(at, 5)? != [2, 0x84, selector, 0, resource] {
+        if loader.read(located(loader.image, at)?, 5)? != [2, 0x84, selector, 0, resource] {
             return Err(SpriteError::Invalid("changed Ark carry source selection"));
         }
     }
     for (at, selector) in [(0x4_b509, 9), (0x4_b51a, 10), (0x4_b52f, 11)] {
-        if loader.read(at, 4)? != [2, 0x83, selector, 1] {
+        if loader.read(located(loader.image, at)?, 4)? != [2, 0x83, selector, 1] {
             return Err(SpriteError::Invalid(
                 "changed Ark held-walk source selection",
             ));
         }
     }
     // Release changes to selector $3C, then applies the projectile's source path.
-    if loader.read(0x4_c701, 7)? != [0xa9, 0x3c, 0, 0x9f, 8, 0, 0x7f] {
+    if loader.read(located(loader.image, 0x4_c701)?, 7)? != [0xa9, 0x3c, 0, 0x9f, 8, 0, 0x7f] {
         return Err(SpriteError::Invalid("changed flying pot selector"));
     }
-    loader.read(0x4_c2b8, 0x520)?; // bounded lift/held/throw consumer, not executed
+    loader.read(located(loader.image, 0x4_c2b8)?, 0x520)?; // bounded lift/held/throw consumer, not executed
     Ok(())
 }

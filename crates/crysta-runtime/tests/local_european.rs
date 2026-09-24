@@ -159,3 +159,65 @@ fn the_slice_art_is_the_japanese_art() {
         }
     }
 }
+
+#[test]
+fn the_pandora_art_is_the_japanese_art_under_the_japanese_keys() {
+    use assets::sprites::{PandoraArt, PandoraCarryMotion, PandoraRunMotion, PandoraSprites};
+    use crysta_runtime::art::CarryArt;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let (eu, jp) = (
+        PandoraSprites::from_rom(europe.image()).unwrap(),
+        PandoraSprites::from_rom(japan.image()).unwrap(),
+    );
+    // The phases and motions name their sources by the Japanese addresses.
+    assert_eq!(format!("{:?}", eu.phases()), format!("{:?}", jp.phases()));
+    assert_eq!(format!("{:?}", eu.motions()), format!("{:?}", jp.motions()));
+    let ids = |sprites: &PandoraSprites| {
+        sprites
+            .art()
+            .iter()
+            .map(PandoraArt::source_id)
+            .collect::<Vec<_>>()
+    };
+    assert_eq!(ids(&eu), ids(&jp));
+    let (eu_art, jp_art) = (
+        CarryArt::from_rom(europe.image()).unwrap(),
+        CarryArt::from_rom(japan.image()).unwrap(),
+    );
+    let same = |art: u32, selector: u8, hflip: bool| {
+        let eu = eu_art.animation(art, selector, hflip);
+        let jp = jp_art.animation(art, selector, hflip).unwrap();
+        assert!(
+            eu.as_ref().is_ok_and(|eu| *eu == jp),
+            "{art:#x} list {selector} {hflip}: {:?}",
+            eu.err()
+        );
+    };
+    for art in jp.art() {
+        for list in art.lists() {
+            for hflip in [false, true] {
+                same(art.source_id(), list.selector(), hflip);
+            }
+        }
+    }
+    for facing in 0..4 {
+        for motion in [PandoraRunMotion::Dashing, PandoraRunMotion::Braking] {
+            let (art, selector, hflip) = PandoraSprites::run_pose(motion, facing).unwrap();
+            same(art, selector, hflip);
+        }
+        for motion in [
+            PandoraCarryMotion::Lifting,
+            PandoraCarryMotion::Standing,
+            PandoraCarryMotion::Walking,
+            PandoraCarryMotion::Throwing,
+        ] {
+            let pose = PandoraSprites::carry_pose(motion, facing).unwrap();
+            same(pose.ark_art, pose.ark_selector, pose.ark_hflip);
+            for pot in [0x96_E1A6, 0x96_E1AB] {
+                same(pot, pose.pot_selector, pose.pot_hflip);
+            }
+        }
+    }
+}

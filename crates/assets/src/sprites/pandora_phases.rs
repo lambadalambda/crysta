@@ -1,5 +1,5 @@
 //! Finite source endpoints. These are not elapsed-time snapshots or NPC AI.
-use super::{cpu, cpu_address, pointer, Loader, SpriteError};
+use super::{cpu, cpu_address, located, pointer, source, Loader, SpriteError};
 
 /// One source instance in a parent-selected phase. Bounds are visual, not collision.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,15 +77,16 @@ fn spawn(
     selector: u8,
     rank: u8,
 ) -> Result<PandoraActorPhase, SpriteError> {
-    let at = pointer(&id.to_le_bytes()[..3])?;
-    let b = loader.read(at, 10)?;
+    // Records, descriptors and instructions are named by their Japanese
+    // addresses in either revision; only the reads relocate.
+    let b = loader.read(source(loader.image, id)?, 10)?;
     if b[0] > 1 {
         return Err(SpriteError::Invalid("changed Pandora visual spawn"));
     }
     let header = pointer(&b[4..7])?;
     loader.read(header, 5)?;
     let descriptor = cpu(&b[7..]);
-    if descriptor != 0 && descriptor != art {
+    if descriptor != 0 && Some(descriptor) != crate::layout::at(loader.image, art) {
         return Err(SpriteError::Invalid("changed Pandora spawn descriptor"));
     }
     Ok(PandoraActorPhase {
@@ -104,7 +105,7 @@ fn cop13(
     actor: &mut PandoraActorPhase,
     at: usize,
 ) -> Result<(), SpriteError> {
-    let b = loader.read(at, 5)?;
+    let b = loader.read(located(loader.image, at)?, 5)?;
     if b[..2] != [2, 0x13] {
         return Err(SpriteError::Invalid("changed Pandora relocation COP"));
     }
@@ -175,7 +176,7 @@ pub(super) fn phases(loader: &mut Loader<'_>) -> Result<Vec<PandoraPhase>, Sprit
     c[3].hflip = true;
     result.push(phase("c-entry", 0xc, c.clone(), &[ScriptedMotion]));
     // COP39 changes X to a tile-center endpoint. The source Y remains COP13's.
-    let b = loader.read(0x8_9b01, 5)?;
+    let b = loader.read(located(loader.image, 0x8_9b01)?, 5)?;
     if b[..4] != [2, 0x39, 5, 0x70] {
         return Err(SpriteError::Invalid("changed C approach"));
     }
@@ -255,7 +256,7 @@ pub(super) fn phases(loader: &mut Loader<'_>) -> Result<Vec<PandoraPhase>, Sprit
         &[],
     ));
     let mut guide = spawn(loader, 0x83_9530, 0x83_f8a8, 3, 0)?;
-    if loader.read(0x9_d2c1, 3)? != [2, 0xba, 0x30] {
+    if loader.read(located(loader.image, 0x9_d2c1)?, 3)? != [2, 0xba, 0x30] {
         return Err(SpriteError::Invalid("changed tour priority"));
     }
     guide.priority_override = Some(3);
@@ -269,7 +270,7 @@ pub(super) fn phases(loader: &mut Loader<'_>) -> Result<Vec<PandoraPhase>, Sprit
         (0x9_d376, "tour-41-6"),
         (0x9_d390, "tour-41-7"),
     ] {
-        let b = loader.read(at, 7)?;
+        let b = loader.read(located(loader.image, at)?, 7)?;
         if b[..3] != [2, 0xed, 3] {
             return Err(SpriteError::Invalid("changed tour motion"));
         }
@@ -293,7 +294,7 @@ pub(super) fn phases(loader: &mut Loader<'_>) -> Result<Vec<PandoraPhase>, Sprit
         let mut actors = vec![guide];
         if map == 0x42 {
             let mut object = spawn(loader, 0x83_957c, 0x89_d9f9, 8, 0)?;
-            let b = loader.read(0x9_d9fe, 4)?;
+            let b = loader.read(located(loader.image, 0x9_d9fe)?, 4)?;
             if b[..2] != [2, 0xb2] {
                 return Err(SpriteError::Invalid("changed tour object Y"));
             }
@@ -370,7 +371,7 @@ pub(super) fn motions(
             .ok_or(SpriteError::Invalid("missing C source actor"))?
             .position;
         for (index, &(id, at)) in segments.iter().enumerate() {
-            let bytes = loader.read(at, 5)?;
+            let bytes = loader.read(located(loader.image, at)?, 5)?;
             if bytes[0] != 2 || ![0x39, 0x3a].contains(&bytes[1]) {
                 return Err(SpriteError::Invalid("changed C departure motion"));
             }
@@ -401,7 +402,7 @@ pub(super) fn motions(
         (0x9_d2ad, 0x103),
         (0x9_dc78, 0x93),
     ] {
-        loader.read(at, len)?;
+        loader.read(located(loader.image, at)?, len)?;
     }
     Ok(result)
 }
