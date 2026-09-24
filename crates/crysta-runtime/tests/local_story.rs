@@ -1102,10 +1102,15 @@ fn a_door_walks_ark_out_and_in_with_the_fades() {
     );
     assert_eq!(world.position(), (120, 608), "native spawn");
     let mut brightness = Vec::new();
+    let mut arrived = Vec::new();
     while world.in_transition() {
         world.update(None, Presses::default()).unwrap();
         brightness.push(world.brightness());
+        arrived.push(world.since_arrival());
     }
+    // The title's clock starts with the fade in, after the dark.
+    assert!(arrived[..18].iter().all(|&frames| frames == 0));
+    assert_eq!(arrived[18], 1);
     assert_eq!(world.position(), (120, 625), "native rest");
     // Dark for the load's 18 native frames, then the fade in.
     assert!(brightness[..18].iter().all(|&level| level == 0));

@@ -90,6 +90,8 @@ pub struct World<'a> {
     shop: Option<Shop>,
     /// Dark frames left of the last load ([`transition::dark_frames`]).
     dark: u16,
+    /// Frames since the arrival's fade began, which times the area title.
+    arrived: u32,
     /// The brightness since the last load, which the fade-in raises a step
     /// a frame.
     dawn: u8,
@@ -311,6 +313,7 @@ impl<'a> World<'a> {
             counters: Vec::new(),
             shop: None,
             dark: 0,
+            arrived: 0,
             dawn: 15,
             animate: false,
         })
@@ -795,6 +798,7 @@ impl<'a> World<'a> {
             self.dark -= 1;
             return Ok((Step::Stayed, None));
         }
+        self.arrived = self.arrived.saturating_add(1);
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
             self.globals.audio.sound_port3(blip);
@@ -942,6 +946,13 @@ impl<'a> World<'a> {
     #[must_use]
     pub const fn in_scene(&self) -> bool {
         self.scene.is_some() || self.shop.is_some()
+    }
+
+    /// Frames since the arrival's fade began after the last load: 1 on its
+    /// first frame. The area title (`$85:8008`) types from then.
+    #[must_use]
+    pub const fn since_arrival(&self) -> u32 {
+        self.arrived
     }
 
     /// The shop the player is in, if any.
@@ -1625,6 +1636,7 @@ mod tests {
             counters: Vec::new(),
             shop: None,
             dark: 0,
+            arrived: 0,
             dawn: 15,
             animate: false,
         }
