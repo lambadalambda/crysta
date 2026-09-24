@@ -53,7 +53,6 @@
 - [ ] [Run the shop's talk callback](issues/shop-state-machine.md)
 - [ ] [Draw the shop display](issues/shop-display.md)
 - [ ] [Port the slice to the European English ROM](issues/european-port.md)
-- [ ] [Map the European ROM to the Japanese one](issues/european-address-map.md)
 - [ ] [Read every ROM address through a per-revision layout](issues/revision-layout.md)
 - [ ] [Decode the European text engine, font and windows](issues/european-text.md)
 - [ ] [Run the European version at its own timing and sound](issues/european-timing.md)

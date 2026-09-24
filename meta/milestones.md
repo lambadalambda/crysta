@@ -228,7 +228,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Add accessibility and control enhancements](issues/accessibility-control-enhancements.md)
 - [Support additional localizations and opt-in fixes or mods](issues/localization-fixes-mods.md)
 - [Port the slice to the European English ROM](issues/european-port.md)
-- [Map the European ROM to the Japanese one](issues/european-address-map.md)
 - [Read every ROM address through a per-revision layout](issues/revision-layout.md)
 - [Decode the European text engine, font and windows](issues/european-text.md)
 - [Run the European version at its own timing and sound](issues/european-timing.md)

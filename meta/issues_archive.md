@@ -128,3 +128,4 @@
 - [x] [Let Ark run](issues/running.md)
 - [x] [Show the area titles](issues/area-titles.md)
 - [x] [Draw the text window as the game does](issues/native-text-window.md)
+- [x] [Map the European ROM to the Japanese one](issues/european-address-map.md)
