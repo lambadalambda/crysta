@@ -300,12 +300,14 @@ impl Machine<'_> {
         let target =
             usize::from(bytes[0]) | usize::from(bytes[1]) << 8 | usize::from(bytes[2] & 0x7F) << 16;
         let target = target & 0x3F_FFFF;
-        if !CALLS.contains(&target) {
+        // Named in the image's revision; one unrecorded matches nothing.
+        let named = |call: usize| assets::layout::offset(self.image, call) == Some(target);
+        if !CALLS.into_iter().any(named) {
             return None;
         }
         self.a = None;
         (self.zero, self.negative, self.carry) = (None, None, None);
-        if target == CLOBBERS_X {
+        if named(CLOBBERS_X) {
             self.x = false;
         }
         Some(self.pc + 4)

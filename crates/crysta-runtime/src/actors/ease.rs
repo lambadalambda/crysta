@@ -72,7 +72,8 @@ impl Ease {
                 side(self.middle.1, self.half.1 & 0xFF, self.toward.1),
             )
         } else {
-            let cosine = i8::from_ne_bytes([*image.get(COSINE + usize::from(self.phase & 0xFF))?]);
+            let table = assets::layout::offset(image, COSINE)?;
+            let cosine = i8::from_ne_bytes([*image.get(table + usize::from(self.phase & 0xFF))?]);
             (
                 self.middle
                     .0
