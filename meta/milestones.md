@@ -155,7 +155,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
 - [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
 - [Open the shops in Crysta](issues/crysta-shops.md)
-- [Keep money, Prime Blue and the inventory](issues/money-and-inventory.md)
 - [Run the shop's talk callback](issues/shop-state-machine.md)
 - [Draw the shop display](issues/shop-display.md)
 

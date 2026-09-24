@@ -122,3 +122,4 @@
 - [x] [Complete the town's residents](issues/town-residents-complete.md)
 - [x] [Decode the shop stock](issues/shop-data.md)
 - [x] [Decode the shop texts' indexed controls](issues/shop-text.md)
+- [x] [Keep money, Prime Blue and the inventory](issues/money-and-inventory.md)
