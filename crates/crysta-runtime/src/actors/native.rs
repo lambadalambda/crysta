@@ -32,8 +32,9 @@ const SCRATCH: [(u16, u16); 3] = [
 /// `$11` does (`$88:A9EF`); the world keeps it in the scratch words.
 pub const PLAYER_ACTION: u16 = 0x097C;
 /// Engine words runs may read but not write: the player's action word,
-/// and the money (`$07ED`, BCD, `$8D:95A8`), which a resident in `$1D`
-/// tests (`$88:C7ED`); the slice has no money, so it reads 0.
+/// and the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
+/// the Prime Blue shop `$1D` tests (`$88:C7ED`); the slice has none, so it
+/// reads 0.
 const READABLE: [u16; 2] = [PLAYER_ACTION, 0x07ED];
 
 /// Instructions one run may take: the freezing's whitening loops 37 times.
@@ -344,7 +345,7 @@ mod tests {
         // The word is read, never written.
         let store = image(&[0xA9, 0x01, 0x00, 0x8D, 0x7C, 0x09, 0x02]);
         assert_eq!(run(&store, AT, &mut words), None);
-        // No money: LDA $07ED; BNE +9 falls through to the COP.
+        // No Prime Blue: LDA $07ED; BNE +9 falls through to the COP.
         let broke = image(&[0xAD, 0xED, 0x07, 0xD0, 0x09, 0x02, 0x3B]);
         assert_eq!(run(&broke, AT, &mut words), Some(AT + 5));
     }

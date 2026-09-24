@@ -93,8 +93,8 @@ through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
 mismatch branch: the runtime's Ark only stands and walks. Short runs that
 only use script scratch words (`$0440`, `$04BC..$04C3`: `STZ`, `STA`,
 `LDA`, `INC`, `DEC`, `CMP`, `TSB`/`TRB` and branches) execute; they may also
-read the player's action word `$097C` and the money `$07ED` (0: the slice
-has none) and test bits with `BIT #`, as the tour's guide and
+read the player's action word `$097C` and the Prime Blue count `$07ED` (0:
+the slice has none; money is `$0694`/`$0696`) and test bits with `BIT #`, as the tour's guide and
 controller take turns through `$04BC`; the words outlive map loads. Such a
 run may also narrow the accumulator, write PPU registers, push and pull, and
 call the palette routines `$8D:A8EA`/`AA96`/`A8FD` and the nested frame
