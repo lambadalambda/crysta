@@ -243,6 +243,21 @@ impl HouseDialogue {
         decode_profile(image, source, true)
     }
 
+    /// As [`Self::decode_at`], resolving the indexed calls (`$CE`) through
+    /// `read`, the engine byte at an address: the shop texts pick their
+    /// parts by the shop type (`$0DE8`) and the item (`$0DD0`).
+    ///
+    /// # Errors
+    /// As [`Self::decode_at`], and an indexed call whose byte `read` does
+    /// not know.
+    pub fn decode_reading(
+        image: &[u8],
+        source: u32,
+        read: impl Fn(u16) -> Option<u8>,
+    ) -> Result<Vec<DialoguePage>, TextError> {
+        decode_reading(image, source, true, &read)
+    }
+
     /// Source-ID lookup. Page index is a stable zero-based key within the text ID;
     /// hosts can assign sequential numeric page keys scoped to the ROM identity.
     #[must_use]
@@ -336,6 +351,8 @@ fn glyph_pixels(source: &[u8]) -> Result<[u8; 256], TextError> {
 struct Decoder<'a> {
     image: &'a [u8],
     pandora: bool,
+    /// Engine bytes the indexed calls read.
+    read: &'a dyn Fn(u16) -> Option<u8>,
     transparent: bool,
     dimensions: [u16; 2],
     pc: u32,
@@ -478,6 +495,21 @@ impl Decoder<'_> {
         self.clear();
         Ok(())
     }
+    /// `$85:9B93`: calls entry `[address]` of a table in the text's bank,
+    /// returning after the four operand bytes.
+    fn indexed_call(&mut self, at: u32) -> Result<(), TextError> {
+        let address = self.word()?;
+        let table = self.word()?;
+        let index =
+            (self.read)(address).ok_or_else(|| invalid(at, "unresolved indexed text call"))?;
+        let bank = at & 0xff_0000;
+        let entry = bytes(
+            self.image,
+            bank | (u32::from(table) + u32::from(index) * 2),
+            2,
+        )?;
+        self.enter(bank | u32::from(u16::from_le_bytes([entry[0], entry[1]])))
+    }
     fn label_call(&mut self, at: u32) -> Result<(), TextError> {
         let index = self.next()?;
         if ![0x06, 0x25].contains(&index) {
@@ -568,9 +600,18 @@ fn decode_profile(
     source: u32,
     pandora: bool,
 ) -> Result<Vec<DialoguePage>, TextError> {
+    decode_reading(image, source, pandora, &|_| None)
+}
+fn decode_reading(
+    image: &[u8],
+    source: u32,
+    pandora: bool,
+    read: &dyn Fn(u16) -> Option<u8>,
+) -> Result<Vec<DialoguePage>, TextError> {
     let mut d = Decoder {
         image,
         pandora,
+        read,
         transparent: false,
         dimensions: [224, 48],
         pc: source,
@@ -608,8 +649,10 @@ fn decode_profile(
                 _ => return Err(invalid(at, "unsupported font transformation")),
             },
             command @ (0xc5 | 0xc7 | 0xc8) => d.timing(command)?,
+            // Text palettes 0, 1 and 2 (`$0DBA`); 2 draws the shop's item
+            // names. Pages keep indices, not the palette.
             0xc6 => {
-                if ![0, 4].contains(&d.next()?) {
+                if ![0, 4, 8].contains(&d.next()?) {
                     return Err(invalid(at, "unsupported text palette"));
                 }
                 d.position[0] = d.position[0].next_multiple_of(8);
@@ -626,6 +669,7 @@ fn decode_profile(
                 let destination = address | (u32::from(d.next()?) << 16);
                 d.enter(destination)?;
             }
+            0xce => d.indexed_call(at)?,
             0xcf => {
                 if d.position[1] + 16 >= d.dimensions[1] {
                     return Err(invalid(at, "unsupported text scrolling"));
