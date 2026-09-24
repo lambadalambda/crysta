@@ -83,3 +83,14 @@ fn the_slice_backgrounds_are_the_japanese_ones_moved() {
         assert_eq!(eu.palette(), jp.palette(), "{map:x}");
     }
 }
+
+#[test]
+fn the_box_guides_pages_decode() {
+    let Some(rom) = european() else {
+        return;
+    };
+    // The guide's first page in `$44` (`COP 1B` at `$89:CD94`), with the
+    // Pandora profile's button and label calls.
+    let pages = HouseDialogue::decode_at(rom.image(), 0x89_D156).unwrap();
+    assert!(!pages.is_empty());
+}

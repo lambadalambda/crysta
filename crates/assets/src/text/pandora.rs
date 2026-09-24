@@ -175,7 +175,10 @@ pub(super) fn default_button_source(image: &[u8], mask: u16) -> Result<u32, Text
         .into_iter()
         .enumerate()
     {
-        let source = 0x85_bef7 + u32::try_from(index).unwrap() * 6;
+        // European `$85:BF8F`, the same six stores.
+        let start = crate::layout::at(image, 0x85_bef7)
+            .ok_or_else(|| invalid(0x85_bef7, "unrecorded default controller initialization"))?;
+        let source = start + u32::try_from(index).unwrap() * 6;
         let code = super::bytes(image, source, 6)?;
         if code[0] != 0xa9 || code[3] != 0x8d || u16::from_le_bytes([code[4], code[5]]) != target {
             return Err(invalid(source, "changed default controller initialization"));
@@ -186,7 +189,10 @@ pub(super) fn default_button_source(image: &[u8], mask: u16) -> Result<u32, Text
         .iter()
         .position(|value| *value == mask)
         .ok_or_else(|| invalid(0x85_96be, "unsupported default controller label"))?;
-    let source = 0x85_970d + u32::try_from(index).unwrap() * 2;
+    // European `$85:975D`, the operand of `LDA $85975D,X` at `$85:974A`.
+    let labels = crate::layout::at(image, 0x85_970d)
+        .ok_or_else(|| invalid(0x85_970d, "unrecorded controller label table"))?;
+    let source = labels + u32::try_from(index).unwrap() * 2;
     let pointer = super::bytes(image, source, 2)?;
     Ok(0x85_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
 }
