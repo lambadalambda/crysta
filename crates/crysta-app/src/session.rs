@@ -396,7 +396,7 @@ impl Session {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
         clouds.add_clouds(frame, camera, self.background_clock.tick());
-        frame::mask_outside(frame, camera, region.bounds);
+        frame::extend_edges(frame, camera, region.bounds);
         frame::dim(frame, world.brightness());
         draw_dialogue(frame, world, position, camera);
         camera

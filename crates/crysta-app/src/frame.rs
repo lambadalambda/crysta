@@ -100,18 +100,36 @@ pub fn world_camera(player: (u16, u16), width: usize) -> (i32, i32) {
     )
 }
 
-/// Blanks every pixel whose layer position is outside `bounds`, so a wide
-/// view never shows a neighbouring room.
-pub fn mask_outside(canvas: &mut Canvas, camera: (i32, i32), bounds: [u16; 4]) {
+/// Fills every pixel whose layer position is outside `bounds` with the
+/// nearest pixel inside: a wide view of a narrow room extends the room's
+/// edge colour rather than showing a neighbouring room, or black bars that
+/// do not match its own dark surround. A view that sees none of the region
+/// is blanked.
+pub fn extend_edges(canvas: &mut Canvas, camera: (i32, i32), bounds: [u16; 4]) {
     let [left, top, right, bottom] = bounds.map(i32::from);
-    for (row, line) in canvas.pixels.chunks_mut(canvas.width).enumerate() {
-        let y = camera.1 + signed(row);
-        for (column, pixel) in line.iter_mut().enumerate() {
-            let x = camera.0 + signed(column);
-            if !(left..right).contains(&x) || !(top..bottom).contains(&y) {
-                *pixel = 0;
-            }
-        }
+    let (width, height) = (
+        signed(canvas.width),
+        signed(canvas.pixels.len() / canvas.width),
+    );
+    // The region's visible part, in screen coordinates.
+    let (first_column, last_column) = ((left - camera.0).max(0), (right - camera.0).min(width) - 1);
+    let (first_row, last_row) = ((top - camera.1).max(0), (bottom - camera.1).min(height) - 1);
+    if first_column > last_column || first_row > last_row {
+        canvas.pixels.fill(0);
+        return;
+    }
+    let index = |value: i32| usize::try_from(value).unwrap_or(0);
+    for row in first_row..=last_row {
+        let line = &mut canvas.pixels[index(row) * canvas.width..][..canvas.width];
+        let (edge_left, edge_right) = (line[index(first_column)], line[index(last_column)]);
+        line[..index(first_column)].fill(edge_left);
+        line[index(last_column) + 1..].fill(edge_right);
+    }
+    for row in (0..height).filter(|row| !(first_row..=last_row).contains(row)) {
+        let source = index(row.clamp(first_row, last_row)) * canvas.width;
+        canvas
+            .pixels
+            .copy_within(source..source + canvas.width, index(row) * canvas.width);
     }
 }
 
@@ -427,24 +445,37 @@ mod tests {
     }
 
     #[test]
-    fn everything_outside_the_region_is_blanked() {
+    fn outside_the_region_the_nearest_edge_pixel_repeats() {
+        // A 256-wide room in a 400-wide view: each row's edge colours fill
+        // the sides.
         let mut canvas = filled(WIDE_WIDTH, 0x00AB_CDEF);
-        mask_outside(&mut canvas, (-72, 256), [0, 256, 256, 512]);
+        for line in canvas.pixels.chunks_mut(WIDE_WIDTH) {
+            line[72] = 1;
+            line[327] = 2;
+        }
+        extend_edges(&mut canvas, (-72, 256), [0, 256, 256, 512]);
         for y in [0, VIEW_HEIGHT - 1] {
             let row = &canvas.pixels[y * WIDE_WIDTH..(y + 1) * WIDE_WIDTH];
-            assert!(row[..72].iter().all(|pixel| *pixel == 0));
-            assert!(row[72..328].iter().all(|pixel| *pixel == 0x00AB_CDEF));
-            assert!(row[328..].iter().all(|pixel| *pixel == 0));
+            assert!(row[..=72].iter().all(|pixel| *pixel == 1));
+            assert!(row[73..327].iter().all(|pixel| *pixel == 0x00AB_CDEF));
+            assert!(row[327..].iter().all(|pixel| *pixel == 2));
         }
-        // Rows past the region's bottom go too; a classic view inside it is untouched.
+        // Rows past the region's bottom repeat its last row; a classic view
+        // inside it is untouched.
         let mut canvas = filled(CLASSIC_WIDTH, 1);
-        mask_outside(&mut canvas, (0, 400), [0, 256, 256, 512]);
-        let (inside, below) = canvas.pixels.split_at(112 * CLASSIC_WIDTH);
-        assert!(inside.iter().all(|pixel| *pixel == 1));
-        assert!(below.iter().all(|pixel| *pixel == 0));
+        canvas.pixels[111 * CLASSIC_WIDTH] = 3;
+        extend_edges(&mut canvas, (0, 400), [0, 256, 256, 512]);
+        for y in 112..VIEW_HEIGHT {
+            assert_eq!(canvas.pixels[y * CLASSIC_WIDTH], 3);
+            assert_eq!(canvas.pixels[y * CLASSIC_WIDTH + 1], 1);
+        }
         let mut canvas = filled(CLASSIC_WIDTH, 1);
-        mask_outside(&mut canvas, (0, 256), [0, 256, 256, 512]);
+        extend_edges(&mut canvas, (0, 256), [0, 256, 256, 512]);
         assert!(canvas.pixels.iter().all(|pixel| *pixel == 1));
+        // A view that sees nothing of the region is dark.
+        let mut canvas = filled(CLASSIC_WIDTH, 1);
+        extend_edges(&mut canvas, (0, 600), [0, 256, 256, 512]);
+        assert!(canvas.pixels.iter().all(|pixel| *pixel == 0));
     }
 
     #[test]
