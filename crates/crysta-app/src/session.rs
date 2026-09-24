@@ -3,6 +3,7 @@
 
 use crate::{background, frame};
 use assets::sprites::{PandoraCarryMotion, PandoraSprites};
+use assets::text::window::WindowArt;
 use crysta_runtime::art::{
     residents_art, Animation, ArkAtlas, Body, CarryArt, Placeholder, Raster,
 };
@@ -67,6 +68,8 @@ pub struct Session {
     pub shop_art: crate::shop::ShopArtCache,
     /// The area titles.
     pub titles: crate::title::Titles,
+    /// The text window's art.
+    pub window_art: WindowArt,
     /// The direction held last frame, so a new one reads as a press.
     pub last_direction: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
@@ -106,6 +109,7 @@ impl Session {
             carry_frames: HashMap::new(),
             shop_art: crate::shop::ShopArtCache::default(),
             titles: crate::title::Titles::default(),
+            window_art: WindowArt::from_rom(image).expect("the text window's art"),
             last_direction: None,
             tick: 0,
             last_step: None,
@@ -459,7 +463,13 @@ impl Session {
         let world = &self.world;
         frame::tint(frame, screen.tint);
         frame::dim(frame, screen.brightness);
-        draw_dialogue(frame, world, position, camera, self.image);
+        draw_dialogue(
+            frame,
+            world,
+            (position, camera),
+            (self.image, &self.window_art),
+            self.tick,
+        );
         camera
     }
 }
@@ -492,20 +502,20 @@ impl Session {
 fn draw_dialogue(
     frame: &mut Canvas,
     world: &World<'_>,
-    position: (u16, u16),
-    camera: (i32, i32),
-    image: &[u8],
+    (position, camera): ((u16, u16), (i32, i32)),
+    (image, art): (&[u8], &WindowArt),
+    tick: u64,
 ) {
-    if let Some(view) = world.dialogue() {
-        let page = view.page;
-        let dimensions = (usize::from(page.width()), usize::from(page.height()));
-        let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
-        let origin = frame::page_origin(page.placement(), dimensions, player_screen_y, frame.width);
-        // As much of the page as has typed out.
-        let typed = page.typed(image, view.glyphs);
-        frame::draw_page(frame, &typed, dimensions, page.background_index(), origin);
-        if let Some(cursor) = view.cursor {
-            frame::draw_cursor(frame, origin, cursor);
-        }
+    let Some(view) = world.dialogue() else {
+        return;
+    };
+    let page = view.page;
+    let player_screen_y = usize::try_from(i32::from(position.1) - camera.1).unwrap_or(0);
+    let origin = crate::window::content_origin(page.placement(), player_screen_y, frame.width);
+    // As much of the page as has typed out.
+    let typed = page.typed(image, view.glyphs);
+    crate::window::draw_window(frame, art, page, (&typed, view.glyphs), origin, tick);
+    if let Some(cursor) = view.cursor {
+        crate::window::draw_cursor(frame, art, origin, cursor);
     }
 }
