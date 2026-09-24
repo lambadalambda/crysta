@@ -666,15 +666,23 @@ impl<'a> Loader<'a> {
         Ok(g)
     }
     fn room_list(&mut self, map: u16) -> Result<usize, SpriteError> {
-        let (xy, targets) = match map {
-            11 => ([8, 13], [0xea28_u16, 0x8bdf]),
-            12 => ([8, 22], [0xea34, 0x8c72]),
-            13 => ([7, 39], [0xea5e, 0x8ce2]),
-            15 => ([19, 7], [0xea6f, 0x8d58]),
-            16 => ([24, 6], [0xea85, 0x8daf]),
-            17 => ([13, 27], [0xeaa0, 0x8e0e]),
+        // The branch targets in bank `$83`, Japanese then European: the
+        // European records at each are the Japanese ones with their pointers
+        // moved (checked byte for byte against the Japanese ROM).
+        let (xy, japan, europe) = match map {
+            11 => (
+                [8, 13],
+                [0xea28_u16, 0x8bdf, 0x8bba],
+                [0xe9d1, 0x8be7, 0x8bc2],
+            ),
+            12 => ([8, 22], [0xea34, 0x8c72, 0x8c4d], [0xe9dd, 0x8c7a, 0x8c55]),
+            13 => ([7, 39], [0xea5e, 0x8ce2, 0], [0xea07, 0x8cea, 0]),
+            15 => ([19, 7], [0xea6f, 0x8d58, 0], [0xea17, 0x8d60, 0]),
+            16 => ([24, 6], [0xea85, 0x8daf, 0], [0xea2d, 0x8db7, 0]),
+            17 => ([13, 27], [0xeaa0, 0x8e0e, 0], [0xea48, 0x8e16, 0]),
             _ => return Err(SpriteError::Invalid("unqualified house room")),
         };
+        let targets = crate::layout::per_revision(self.image, japan, europe);
         let index = usize::from(map) * 2;
         if self.read(0x2_8000 + index, 2)? != [0, 0] {
             return Err(SpriteError::Invalid("changed house actor table branch"));
@@ -688,7 +696,7 @@ impl<'a> Loader<'a> {
         }
         if map == 11 || map == 12 {
             prefix.extend([0xfa, 0xba, 0x10, 0xbb, 0]);
-            prefix.extend((if map == 11 { 0x8bba_u16 } else { 0x8c4d }).to_le_bytes());
+            prefix.extend(targets[2].to_le_bytes());
         }
         if self.read(list, prefix.len())? != prefix {
             return Err(SpriteError::Invalid("changed house ordinary spawn prefix"));
