@@ -398,3 +398,56 @@ fn every_european_shop_text_decodes_as_the_japanese_one() {
     assert_eq!(farewell(&europe, 0x12_80AF), 0xD7, "closes the window");
     assert_eq!(farewell(&japan, 0x12_8095), 0xD7);
 }
+
+#[test]
+fn the_elders_question_opens_and_either_answer_continues() {
+    // The European Elder asks catalog 2 ("Apologize"); the story goes on as
+    // the Japanese one: `$26` set, the pad free again.
+    use room_core::Direction;
+    let Some(rom) = european() else {
+        return;
+    };
+    let image = rom.image();
+    let a = Presses {
+        confirm: true,
+        ..Presses::NONE
+    };
+    for answer in [
+        a,
+        Presses {
+            cancel: true,
+            ..Presses::NONE
+        },
+    ] {
+        let events = crysta_runtime::world::new_game_flags();
+        let mut world = World::enter_with_events(image, 0x0B, 120, 128, events).unwrap();
+        world.face(Direction::Up);
+        let (mut talked, mut asked) = (false, false);
+        for frame in 0..4000 {
+            let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
+            let choosing = world.dialogue().and_then(|view| view.cursor).is_some();
+            let press = if choosing {
+                asked = true;
+                answer
+            } else if reading && frame % 2 == 0 {
+                a
+            } else if !reading && !talked && frame > 400 {
+                talked = true;
+                a
+            } else {
+                Presses::NONE
+            };
+            world.update(None, press).unwrap();
+            assert!(
+                world.frozen_scripts().is_empty(),
+                "{:x?}",
+                world.frozen_scripts()
+            );
+            if asked && !world.in_scene() && world.dialogue().is_none() && !world.pad_locked() {
+                break;
+            }
+        }
+        assert!(asked, "the question opened");
+        assert!(world.events()[0x26 / 8] & (1 << (0x26 % 8)) != 0, "$26 set");
+    }
+}
