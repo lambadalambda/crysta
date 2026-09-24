@@ -75,7 +75,7 @@ impl ShopArt {
             .get(..0x60 * 16)
             .ok_or(ShopError::Invalid(PANEL, "short panel characters"))?
             .chunks_exact(16)
-            .map(tile_2bpp)
+            .map(crate::graphics::decode_tile_2bpp)
             .collect();
         let mut count_palette = [Bgr555::new(0); 16];
         count_palette[14] = Bgr555::new(0x7FFF);
@@ -144,14 +144,6 @@ pub fn name_glyphs(image: &[u8], item: u8) -> Result<(u8, Vec<[u8; 256]>), ShopE
     Ok((head[1], crate::labels::label_glyphs(image, start + 2)?))
 }
 
-/// An 8×8 2bpp tile's indices: planes 0 and 1 interleaved by row.
-fn tile_2bpp(bytes: &[u8]) -> [u8; 64] {
-    std::array::from_fn(|i| {
-        let (x, y) = (i % 8, i / 8);
-        (bytes[y * 2] >> (7 - x) & 1) | (bytes[y * 2 + 1] >> (7 - x) & 1) << 1
-    })
-}
-
 fn packet(image: &[u8], at: u32) -> Result<Vec<u8>, ShopError> {
     let start = usize::try_from(at & 0x3F_FFFF).map_err(|_| ShopError::Truncated(at))?;
     let input = image.get(start..).ok_or(ShopError::Truncated(at))?;
@@ -175,15 +167,6 @@ fn word(image: &[u8], at: u32) -> Result<u16, ShopError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_2bpp_row_reads_plane_0_then_plane_1() {
-        let mut bytes = [0; 16];
-        bytes[0] = 0b1000_0001;
-        bytes[1] = 0b1000_0000;
-        let tile = tile_2bpp(&bytes);
-        assert_eq!(&tile[..8], &[3, 0, 0, 0, 0, 0, 0, 1]);
-    }
 
     #[test]
     fn halving_drops_each_channels_low_bit() {

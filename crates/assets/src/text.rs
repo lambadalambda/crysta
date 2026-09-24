@@ -8,6 +8,7 @@ use std::fmt;
 pub mod pandora;
 #[cfg(test)]
 mod tests;
+pub mod window;
 
 /// The entry greeting, not the progression conversation.
 pub const ENTRY_TEXT: u32 = 0x88_8fda;
@@ -92,6 +93,9 @@ pub struct DialogueGlyph {
     /// The blip it sounds on port 3 (`$0DC6`, `$28` by default, set by
     /// `$C7`), or `None` while `$C7 FF` mutes it (`$85:9930`, `$85:9EE8`).
     pub sound: Option<u8>,
+    /// Its text palette (`$0DBA`): 0 by default, 1 after `$C6 04` (a
+    /// speaker's name), 2 after `$C6 08`; `$DC` resets it.
+    pub palette: u8,
 }
 
 /// Immutable, precomposed page. Host bitmap presentation requires no original CPU.
@@ -107,8 +111,16 @@ pub struct DialoguePage {
     /// Frames the page takes to type out, pauses after its last glyph
     /// included.
     duration: u16,
+    /// Colour 5, palette 1's first: the speaker's colour.
+    speaker: u16,
 }
 impl DialoguePage {
+    /// The speaker's colour (colour 5): `$1B9F` as a window opens, or what
+    /// `$CA 05` wrote (`$7F:060A`).
+    #[must_use]
+    pub const fn speaker(&self) -> crate::graphics::Bgr555 {
+        crate::graphics::Bgr555::new(self.speaker)
+    }
     /// Content width, without native frame/window effects.
     #[must_use]
     pub const fn width(&self) -> u16 {
@@ -342,11 +354,7 @@ fn glyph_pixels(source: &[u8]) -> Result<[u8; 256], TextError> {
     if source.len() != 64 {
         return Err(invalid(0, "glyph must contain 64 bytes"));
     }
-    Ok(std::array::from_fn(|i| {
-        let (x, y) = (i % 16, i / 16);
-        let at = (y / 8 * 2 + x / 8) * 16 + y % 8 * 2;
-        ((source[at] >> (7 - x % 8)) & 1) | (((source[at + 1] >> (7 - x % 8)) & 1) << 1)
-    }))
+    Ok(crate::graphics::decode_glyph_2bpp(source))
 }
 
 struct Decoder<'a> {
@@ -369,6 +377,9 @@ struct Decoder<'a> {
     speed: u16,
     /// The blip, `None` while muted, and the one unmuting restores.
     blip: (Option<u8>, u8),
+    /// The glyphs' text palette, and colour 5.
+    palette: u8,
+    speaker: u16,
 }
 impl Decoder<'_> {
     fn next(&mut self) -> Result<u8, TextError> {
@@ -427,6 +438,7 @@ impl Decoder<'_> {
             position: self.position,
             tick: self.tick,
             sound: self.blip.0,
+            palette: self.palette,
         };
         blit(
             &mut self.page.pixels,
@@ -449,6 +461,7 @@ impl Decoder<'_> {
         }
         self.page.boundary_source = source;
         self.page.acknowledgement = action;
+        self.page.speaker = self.speaker;
         // A glyph at speed 0 shows on the tick it shares with the one before.
         let last = self.page.glyphs.last().map_or(0, |glyph| glyph.tick + 1);
         self.page.duration = self.tick.max(last);
@@ -470,6 +483,8 @@ impl Decoder<'_> {
         if command != 0xc0 {
             self.dimensions = [224, 48];
         }
+        // `$C0`, `$C1` and `$DA` reset the speaker's colour.
+        self.speaker = SPEAKER;
         self.placement = if command == 0xda {
             Placement::AwayFromPlayer
         } else {
@@ -494,6 +509,22 @@ impl Decoder<'_> {
         self.dimensions = [u16::from(width) * 8, u16::from(height / 2) * 16];
         self.placement = Placement::Tile { column, row };
         self.clear();
+        Ok(())
+    }
+    /// `$C6 nn` selects text palette `nn / 4` (0, 1 a speaker's name, 2 the
+    /// shop's names); `$DC` returns to palette 0. Both flush a pending
+    /// half-tile. Pages keep indices; each glyph keeps its palette.
+    fn text_palette(&mut self, at: u32, command: u8) -> Result<(), TextError> {
+        self.palette = if command == 0xdc {
+            0
+        } else {
+            let palette = self.next()?;
+            if ![0, 4, 8].contains(&palette) {
+                return Err(invalid(at, "unsupported text palette"));
+            }
+            palette >> 2
+        };
+        self.position[0] = self.position[0].next_multiple_of(8);
         Ok(())
     }
     /// `$85:9B93`: calls entry `[address]` of a table in the text's bank,
@@ -553,6 +584,9 @@ impl Decoder<'_> {
         self.enter(destination)
     }
 }
+/// Colour 5 as a standard window opens: the default speaker yellow.
+const SPEAKER: u16 = 0x1B9F;
+
 fn empty_page() -> DialoguePage {
     blank_page([224, 48], false, Placement::Bottom)
 }
@@ -567,6 +601,7 @@ fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> 
         acknowledgement: Acknowledgement::End,
         placement,
         duration: 0,
+        speaker: SPEAKER,
     }
 }
 /// Draws a glyph into a page's pixels, `transparent` clearing its colour 3
@@ -625,6 +660,8 @@ fn decode_reading(
         tick: 0,
         speed: 1,
         blip: (Some(0x28), 0x28),
+        palette: 0,
+        speaker: SPEAKER,
     };
     for _ in 0..4096 {
         let at = d.pc;
@@ -650,19 +687,13 @@ fn decode_reading(
                 _ => return Err(invalid(at, "unsupported font transformation")),
             },
             command @ (0xc5 | 0xc7 | 0xc8) => d.timing(command)?,
-            // Text palettes 0, 1 and 2 (`$0DBA`); 2 draws the shop's item
-            // names. Pages keep indices, not the palette.
-            0xc6 => {
-                if ![0, 4, 8].contains(&d.next()?) {
-                    return Err(invalid(at, "unsupported text palette"));
-                }
-                d.position[0] = d.position[0].next_multiple_of(8);
-            }
+            command @ (0xc6 | 0xdc) => d.text_palette(at, command)?,
             0xca => {
                 if d.next()? != 5 {
                     return Err(invalid(at, "unsupported text memory write"));
                 }
-                d.word()?; // qualified speaker color at $7F060A, not event/progression RAM
+                // The speaker's colour at `$7F:060A`, not event RAM.
+                d.speaker = d.word()?;
             }
             // $859A13/$859ECA save the banked return after a three-byte pointer.
             0xcc => {
@@ -712,8 +743,6 @@ fn decode_reading(
             }
             // $859725 calls the bank-$92 item-label pointer table, returning via D4.
             0xe4 if d.pandora => d.label_call(at)?,
-            // Palette changes flush a pending half-tile even without color effects.
-            0xdc => d.position[0] = d.position[0].next_multiple_of(8),
             _ => return Err(invalid(at, "unsupported text command (including choices)")),
         }
     }

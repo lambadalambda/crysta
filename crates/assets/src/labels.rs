@@ -110,19 +110,9 @@ pub fn area_title(
     Ok((!glyphs.is_empty()).then_some(glyphs))
 }
 
-/// A 16×16 2bpp glyph (tiles TL, TR, BL, BR), colour 3 cleared.
+/// A 16×16 glyph with colour 3 cleared.
 fn glyph(source: &[u8]) -> Glyph {
-    std::array::from_fn(|i| {
-        let (x, y) = (i % 16, i / 16);
-        let tile = &source[(y / 8 * 2 + x / 8) * 16..][..16];
-        let (row, bit) = (y % 8 * 2, 7 - x % 8);
-        let index = (tile[row] >> bit & 1) | (tile[row + 1] >> bit & 1) << 1;
-        if index == 3 {
-            0
-        } else {
-            index
-        }
-    })
+    crate::graphics::decode_glyph_2bpp(source).map(|index| if index == 3 { 0 } else { index })
 }
 
 /// The titles' letter motion: two scripts of (frames, velocity) per axis.

@@ -809,3 +809,24 @@ fn pages_type_one_glyph_a_frame_with_their_blip() {
     );
     assert!(sounds.contains(&Some(0x28)));
 }
+
+#[test]
+fn the_window_art_decodes_its_frame_shading_and_prompt() {
+    use assets::text::window::WindowArt;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let art = WindowArt::from_rom(cartridge.image()).unwrap();
+    // Frame tiles `$10..$17` draw; the interior `$20` is all colour 3.
+    assert!(art.frame.iter().all(|tile| tile.iter().any(|&p| p != 0)));
+    assert!(art.interior.iter().all(|&p| p == 3));
+    // Palette 0: white and the edge; palette 1: the speaker yellow.
+    assert_eq!(art.colours[1].raw(), 0x7FFF);
+    assert_eq!(art.colours[2].raw(), 0x10C6);
+    assert_eq!(art.colours[5].raw(), 0x1B9F);
+    // The blue shading, 8 at the top of each 32 lines, 13 in the middle.
+    assert_eq!(art.shade(0).raw() >> 10, 8);
+    assert_eq!(art.shade(16).raw() >> 10, 13);
+    assert_eq!(art.shade(32), art.shade(0));
+    assert_eq!(art.prompt.len(), 4);
+}

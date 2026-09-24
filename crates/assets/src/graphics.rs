@@ -93,6 +93,27 @@ impl Tile4bpp {
     }
 }
 
+/// An 8×8 2bpp tile's indices, row-major: planes 0 and 1 interleaved by
+/// row. `bytes` holds at least 16 bytes.
+#[must_use]
+pub fn decode_tile_2bpp(bytes: &[u8]) -> [u8; 64] {
+    std::array::from_fn(|i| {
+        let (x, y) = (i % 8, i / 8);
+        (bytes[y * 2] >> (7 - x) & 1) | (bytes[y * 2 + 1] >> (7 - x) & 1) << 1
+    })
+}
+
+/// A 16×16 2bpp glyph's indices, row-major, from its four tiles (top-left,
+/// top-right, bottom-left, bottom-right), as the dialogue font keeps them.
+/// `bytes` holds at least 64 bytes.
+#[must_use]
+pub fn decode_glyph_2bpp(bytes: &[u8]) -> [u8; 256] {
+    std::array::from_fn(|i| {
+        let (x, y) = (i % 16, i / 16);
+        decode_tile_2bpp(&bytes[(y / 8 * 2 + x / 8) * 16..])[y % 8 * 8 + x % 8]
+    })
+}
+
 /// Decodes consecutive 32-byte tiles without ignoring any trailing bytes.
 /// Empty input represents an empty tile set; allocation is proportional to input.
 ///

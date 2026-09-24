@@ -235,3 +235,17 @@ fn source_label_tables_return_without_extra_acknowledgements() {
     assert_eq!(pages[0].glyphs().len(), 3);
     assert_eq!(pages[0].boundary_source(), 0x88_8006);
 }
+
+#[test]
+fn a_speakers_name_keeps_its_palette_and_colour() {
+    // Elle's pages (`$89:80B1`): `C6 04`, `CA 05 5E3F`, her name, then `DC`.
+    let image = synthetic(&[0xc1, 0xc6, 4, 0xca, 5, 0x3f, 0x5e, 0x21, 0xdc, 0x22, 0xd3]);
+    let pages = super::super::decode_profile(&image, 0x88_8000, true).unwrap();
+    let palettes: Vec<u8> = pages[0]
+        .glyphs()
+        .iter()
+        .map(|glyph| glyph.palette)
+        .collect();
+    assert_eq!(palettes, [1, 0]);
+    assert_eq!(pages[0].speaker().raw(), 0x5E3F);
+}
