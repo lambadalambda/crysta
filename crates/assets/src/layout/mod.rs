@@ -62,6 +62,23 @@ pub fn at(image: &[u8], japan: u32) -> Option<u32> {
     }
 }
 
+/// The image offset in `image`'s revision of what sits at normalized
+/// Japanese image offset `japan` ([`at`] for either `HiROM` window that
+/// maps it); `None` for a European image when none is recorded.
+#[must_use]
+pub fn offset(image: &[u8], japan: usize) -> Option<usize> {
+    let japan = u32::try_from(japan)
+        .ok()
+        .filter(|&offset| offset < 0x40_0000)?;
+    match revision(image) {
+        Revision::Japan => Some(japan),
+        Revision::EuropeEnglish => {
+            at(image, 0xC0_0000 | japan).or_else(|| at(image, 0x80_0000 | japan))
+        }
+    }
+    .map(|address| (address & 0x3F_FFFF) as usize)
+}
+
 /// The revision whose layout `image` reads: its header's, else Japanese.
 #[must_use]
 pub fn revision(image: &[u8]) -> Revision {
@@ -112,5 +129,10 @@ mod tests {
         assert_eq!(at(&europe, 0xB4_8000), Some(0xB6_8000));
         assert_eq!(at(&europe, 0x80_0001), None, "not recorded");
         assert_eq!(at(&[0; 16], 0x80_0001), Some(0x80_0001));
+        // Offsets resolve through either window that maps them.
+        assert_eq!(offset(&europe, 0x34_8000), Some(0x36_8000));
+        assert_eq!(offset(&europe, 0x0C_2B2C), Some(0x0E_2B2C));
+        assert_eq!(offset(&europe, 0x00_0001), None);
+        assert_eq!(offset(&[0; 16], 0x00_0001), Some(1));
     }
 }
