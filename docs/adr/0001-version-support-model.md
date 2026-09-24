@@ -1,6 +1,7 @@
 # ROM Revision and Version-Support Model
 
-Status: decided 2026-08-25. This is an architecture decision record for
+Status: decided 2026-08-25; the European executable row is superseded by
+[ADR 0004](0004-european-executable.md) (2026-09-24). This is an architecture decision record for
 [the version-support issue](../../meta/issues/define-version-support-model.md).
 
 ## Decision
