@@ -8,6 +8,13 @@ cd "$(dirname "$0")/../.."
 : "${CC_wasm32_unknown_unknown:=$(brew --prefix llvm 2>/dev/null || echo /usr)/bin/clang}"
 : "${AR_wasm32_unknown_unknown:=$(dirname "$CC_wasm32_unknown_unknown")/llvm-ar}"
 export CC_wasm32_unknown_unknown AR_wasm32_unknown_unknown
+# The Rust that cargo runs here must have the wasm32 standard library.
+if [ ! -d "$(rustc --print sysroot)/lib/rustlib/wasm32-unknown-unknown" ]; then
+  echo "$(command -v rustc) has no wasm32-unknown-unknown target." >&2
+  echo 'Add it (rustup target add wasm32-unknown-unknown), or put a rustup' >&2
+  echo 'toolchain that has it first on PATH.' >&2
+  exit 1
+fi
 site=${1:-local/crysta-web/site}
 cargo build --release --locked --manifest-path crates/crysta-web/Cargo.toml \
   --target wasm32-unknown-unknown
