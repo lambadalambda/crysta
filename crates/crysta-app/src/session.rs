@@ -201,7 +201,7 @@ impl Session {
     pub fn ensure_background(&mut self, cartridge: &rom::Rom) {
         let map = self.world.map();
         if let std::collections::hash_map::Entry::Vacant(slot) = self.backgrounds.entry(map) {
-            let Ok(decoded) = background::load(cartridge, map) else {
+            let Ok(decoded) = background::load(cartridge, map, self.world.spawn_events()) else {
                 return;
             };
             slot.insert(decoded);

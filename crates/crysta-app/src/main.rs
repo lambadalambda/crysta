@@ -722,7 +722,10 @@ mod session_tests {
             assert!(inside.iter().filter(|(_, pixel)| **pixel != 0).count() > inside.len() / 2);
         }
         for map in 0xA..=0x21 {
-            assert!(background::load(&rom, map).is_ok(), "map {map:#x}");
+            assert!(
+                background::load(&rom, map, &crysta_runtime::world::new_game_flags()).is_ok(),
+                "map {map:#x}"
+            );
         }
     }
 

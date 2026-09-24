@@ -1,7 +1,9 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
+use assets::maps::actors::SpawnList;
+use assets::maps::scripts::EventFlags;
 use assets::maps::visual::{
-    camera::CameraRegion, crysta_animation::CrystaAnimation, SecondLayer, StaticBackground,
+    camera::CameraRegion, scene_animation::SceneAnimation, SecondLayer, StaticBackground,
 };
 
 /// Presentation age since entry, advanced by host simulation updates, not redraws.
@@ -60,8 +62,10 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
     })
 }
 
-/// Load the static baseline without changing the inspector's export policy.
-pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
+/// Load the static baseline without changing the inspector's export policy,
+/// with the animation the map's service actors play under `events`, the
+/// flags its spawn list ran with.
+pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackground, String> {
     if crysta_runtime::WORLD_MAPS.contains(&map) {
         return load_world(cartridge, map);
     }
@@ -74,13 +78,19 @@ pub fn load(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> 
     if usize::from(right) > background.width || usize::from(bottom) > background.height {
         return Err("camera region outside the decoded layer".into());
     }
-    let animation = if map == 0xA {
-        let color = exterior_backdrop(cartridge.image(), &scene)?;
+    let image = cartridge.image();
+    let backdrop = if map == 0xA {
+        let color = exterior_backdrop(image, &scene)?;
         composite_backdrop(&mut background.pixels, &indices, color)?;
-        Some(AnimatedExterior::new(cartridge.image(), scene, color)?)
+        Some(color)
     } else {
         None
     };
+    let source = SpawnList::resolve(image, map, EventFlags::Bitmap(events))
+        .ok()
+        .and_then(|records| SceneAnimation::from_records(image, &records).ok())
+        .filter(|source| !source.is_empty());
+    let animation = source.map(|source| Animated::new(image, map, scene, source, backdrop));
     Ok(CachedBackground {
         frame: background,
         region,
@@ -144,7 +154,7 @@ pub struct CachedBackground {
     pub frame: crate::frame::Background,
     /// The part of the shared layer this map's camera may show.
     pub region: CameraRegion,
-    animation: Option<AnimatedExterior>,
+    animation: Option<Animated>,
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
@@ -233,7 +243,10 @@ impl CachedBackground {
                 .iter()
                 .filter(|cell| !self.patches.drawn.contains(cell)),
         );
-        let backdrop = self.animation.as_ref().map(|animation| animation.backdrop);
+        let backdrop = self
+            .animation
+            .as_ref()
+            .and_then(|animation| animation.backdrop);
         for (column, row, tile) in redraw {
             let at = (usize::from(column), usize::from(row));
             draw_metatile(scene, &mut self.frame, at, tile, backdrop);
@@ -249,16 +262,20 @@ impl CachedBackground {
     }
 }
 
-struct AnimatedExterior {
+/// A map's animated tiles and colours, redrawn into its background.
+struct Animated {
     scene: StaticBackground,
-    source: CrystaAnimation,
+    source: SceneAnimation,
     tiles: Vec<Tile4bpp>,
     palette: [Bgr555; 128],
-    backdrop: u32,
-    // Map cell index and bitmask of source phase-key slots it depends on.
-    cells: Vec<(usize, u8)>,
-    key: Option<[Option<u64>; 7]>,
-    /// The crystal clouds; `None` when the second layer does not decode.
+    /// The town's backdrop behind transparent pixels; rooms keep the
+    /// static export's colour 0.
+    backdrop: Option<u32>,
+    /// Cells drawn from an animated tile or palette.
+    cells: Vec<usize>,
+    key: Option<Vec<Option<u64>>>,
+    /// The town's crystal clouds; `None` elsewhere or when the second
+    /// layer does not decode.
     clouds: Option<SecondLayer>,
 }
 
@@ -269,26 +286,24 @@ fn add(main: u32, sub: u32) -> u32 {
     channel(16) | channel(8) | channel(0)
 }
 
-impl AnimatedExterior {
-    fn new(image: &[u8], scene: StaticBackground, backdrop: u32) -> Result<Self, String> {
-        let source = CrystaAnimation::from_rom(image).map_err(|error| error.to_string())?;
-        let masks: Vec<u8> = scene
+impl Animated {
+    fn new(
+        image: &[u8],
+        map: u16,
+        scene: StaticBackground,
+        source: SceneAnimation,
+        backdrop: Option<u32>,
+    ) -> Self {
+        let tiles: std::collections::HashSet<usize> = source.tiles().collect();
+        let rows: std::collections::HashSet<usize> =
+            source.colors().map(|color| color / 16).collect();
+        let animated: Vec<bool> = scene
             .metatiles()
             .iter()
             .map(|words| {
-                words.iter().fold(0, |mask, word| {
-                    // CrystaAnimation::phase_key documents these disjoint destinations.
-                    let graphics = match word.tile_index() {
-                        9..=12 => 1,
-                        tile @ 496..=511 => 1 << (1 + (tile - 496) / 4),
-                        _ => 0,
-                    };
-                    let palette = match word.palette() {
-                        6 => 1 << 5,
-                        7 => 1 << 6,
-                        _ => 0,
-                    };
-                    mask | graphics | palette
+                words.iter().any(|word| {
+                    tiles.contains(&usize::from(word.tile_index()))
+                        || rows.contains(&usize::from(word.palette()))
                 })
             })
             .collect();
@@ -297,61 +312,53 @@ impl AnimatedExterior {
             .cells()
             .iter()
             .enumerate()
-            .filter_map(|(i, cell)| {
-                let mask = masks[usize::from(cell.raw() & 511)];
-                (mask != 0).then_some((i, mask))
-            })
+            .filter(|(_, cell)| animated.get(usize::from(cell.raw() & 511)) == Some(&true))
+            .map(|(i, _)| i)
             .collect();
-        Ok(Self {
+        Self {
             tiles: scene.tiles().to_vec(),
             palette: *scene.palette(),
+            clouds: (map == 0x000A)
+                .then(|| SecondLayer::from_rom(image, map).ok())
+                .flatten(),
             scene,
             source,
             backdrop,
             cells,
             key: None,
-            clouds: SecondLayer::from_rom(image, 0x000A).ok(),
-        })
+        }
     }
 
     fn update(&mut self, age: u64, frame: &mut crate::frame::Background) {
         let key = self.source.phase_key(age);
-        let changed = (0..7).fold(0u8, |mask, i| {
-            mask | if self.key.is_none_or(|old| old[i] != key[i]) {
-                1 << i
-            } else {
-                0
-            }
-        });
-        if changed == 0 {
+        if self.key.as_ref() == Some(&key) {
             return;
         }
-        // Reset before random seeking, including re-entry into startup ages0..2.
-        // Only 768 tiles; no ROM decode, allocation or elapsed-frame replay here.
         self.tiles.copy_from_slice(self.scene.tiles());
         self.palette = *self.scene.palette();
-        self.source
-            .apply(age, &mut self.tiles, &mut self.palette)
-            .expect("validated animation destination extents");
+        self.source.apply(age, &mut self.tiles, &mut self.palette);
         let width = self.scene.layer().width();
-        for &(cell, dependencies) in &self.cells {
-            if dependencies & changed == 0 {
-                continue;
-            }
+        for &cell in &self.cells {
             let words =
                 &self.scene.metatiles()[usize::from(self.scene.layer().cells()[cell].raw() & 511)];
+            let (column, row) = (cell % width * 16, cell / width * 16);
             for y in 0..16 {
                 for x in 0..16 {
                     let (color, high) = match graphics::sample_metatile(words, &self.tiles, x, y)
                         .expect("validated map definitions and tile extents")
                     {
-                        IndexedPixel::Transparent => (self.backdrop, false),
+                        IndexedPixel::Transparent => (
+                            self.backdrop.unwrap_or_else(|| {
+                                static_rgb(0, &self.scene, (column + x, row + y))
+                            }),
+                            false,
+                        ),
                         IndexedPixel::Opaque {
                             palette_index,
                             priority,
                         } => (rgb(self.palette[usize::from(palette_index)]), priority),
                     };
-                    let offset = (cell / width * 16 + y) * frame.width + cell % width * 16 + x;
+                    let offset = (row + y) * frame.width + column + x;
                     frame.pixels[offset] = color;
                     frame.high[offset] = high;
                 }
@@ -463,9 +470,10 @@ mod tests {
     fn dirty_updates_match_full_source_render_including_wrap_and_reentry() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
         let rom = rom::Rom::load(&bytes).unwrap();
-        let mut cached = load(&rom, 0xA).unwrap();
+        let mut cached = load(&rom, 0xA, &crysta_runtime::world::new_game_flags()).unwrap();
         let base = StaticBackground::from_rom(rom.image(), 0xA).unwrap();
-        let source = CrystaAnimation::from_rom(rom.image()).unwrap();
+        let source =
+            assets::maps::visual::crysta_animation::CrystaAnimation::from_rom(rom.image()).unwrap();
         let backdrop = exterior_backdrop(rom.image(), &base).unwrap();
         for age in [0, 1, 2, 8, 42, 64, 528, 3, 2, 1, 1, 0] {
             cached.update(age);
@@ -499,7 +507,7 @@ mod tests {
             }
         }
         // A non-exterior map remains byte-for-byte the existing static baseline.
-        let mut indoor = load(&rom, 0xB).unwrap();
+        let mut indoor = load(&rom, 0xB, &crysta_runtime::world::new_game_flags()).unwrap();
         let original = indoor.frame.pixels.clone();
         indoor.update(100);
         assert_eq!(indoor.frame.pixels, original);
@@ -564,7 +572,7 @@ mod patch_tests {
     fn a_patched_cell_is_redrawn_and_restored() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
         let rom = rom::Rom::load(&bytes).unwrap();
-        let mut cached = super::load(&rom, 0xC).unwrap();
+        let mut cached = super::load(&rom, 0xC, &crysta_runtime::world::new_game_flags()).unwrap();
         let cell = |cached: &super::CachedBackground| {
             let frame = &cached.frame;
             (0..16)
@@ -587,12 +595,15 @@ mod patch_tests {
         let rom = rom::Rom::load(&bytes).unwrap();
         let exported = map_inspector::render_static_background(&rom, 0xF).unwrap();
         let reference = crate::frame::decode_bmp(&exported.bitmap).unwrap();
-        let loaded = super::load(&rom, 0xF).unwrap();
+        let loaded = super::load(&rom, 0xF, &crysta_runtime::world::new_game_flags()).unwrap();
         assert_eq!(loaded.frame.pixels, reference.pixels);
         let priorities: Vec<bool> = exported.priorities.iter().map(|bit| *bit != 0).collect();
         assert_eq!(loaded.frame.high, priorities);
         for map in 0x41..=0x44 {
-            assert!(super::load(&rom, map).is_ok(), "map {map:#x}");
+            assert!(
+                super::load(&rom, map, &crysta_runtime::world::new_game_flags()).is_ok(),
+                "map {map:#x}"
+            );
         }
     }
 
@@ -601,7 +612,7 @@ mod patch_tests {
     fn the_underworld_loads_as_its_flat_mode_7_plane() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
         let rom = rom::Rom::load(&bytes).unwrap();
-        let loaded = super::load(&rom, 0x3).unwrap();
+        let loaded = super::load(&rom, 0x3, &crysta_runtime::world::new_game_flags()).unwrap();
         assert!(loaded.world);
         assert_eq!((loaded.frame.width, loaded.frame.height), (1024, 1024));
         assert_eq!(loaded.region.bounds, [0, 0, 1024, 1024]);
