@@ -7,20 +7,30 @@
 //! unless flag `$14` is set or it is empty (`D4`). Its letters then fly in
 //! from the upper right, hold, and fly away to the upper left: effect 3 of
 //! `$B0:DE49` (`DE 03 04`, text `$85:8000`), each letter 4 frames after the
-//! one before.
+//! one before. The European engine is the same with its own font, palette,
+//! effect scripts and dictionary calls (`docs/european-text.md`).
 
 use crate::graphics::Bgr555;
+use crate::layout::{self, per_revision};
 use crate::maps::actors::SpawnList;
 use crate::maps::scripts::EventFlags;
 use crate::shops::{read, ShopError};
 
-/// The dialogue font (`$B4:8000`, katakana `+$2000`; two-byte codes `$B5+`).
+/// The dialogue font (`$B4:8000`, katakana `+$2000`), European `$B6:8000`.
 const FONT: u32 = 0xB4_8000;
+/// The two-byte codes' first font bank: `$B5`, European `$B6` (`ADC #$00B6`
+/// at `$85:86E9`).
+const WIDE_FONT_BANKS: (u32, u32) = (0xB5, 0xB6);
 /// `E4 nn` calls label `nn` of this table in bank `$92`, returning at `D4`.
-const LABELS: u32 = 0x92_C5E7;
+/// The European engine calls its dictionaries instead: `E4`/`E5` word `nn`
+/// of `$92:C793`, `E6` of `$92:D2BB` (`$85:8D01`, `$85:8D25`, `$85:8D49`),
+/// the text engine's.
+const LABELS: (u32, u32) = (0x92_C5E7, 0x92_C793);
+const EUROPEAN_WORDS: u32 = 0x92_D2BB;
 /// Flag `$14` hides the titles (`COP 08 $8014`).
 const NO_TITLES: u16 = 0x14;
-/// The effect scripts (`$B0:DE49`), and the titles' effect.
+/// The effect scripts (`$B0:DE49`, European `$B2:E26C`), and the titles'
+/// effect.
 const EFFECTS: u32 = 0xB0_DE49;
 const TITLE_EFFECT: u32 = 3;
 /// Frames between one letter's start and the next's.
@@ -32,27 +42,38 @@ const PITCH: i32 = 12;
 /// A 16×16 glyph: 0 clear, 1 and 2 drawn with OBJ palette 2's colours.
 pub type Glyph = [u8; 256];
 
-/// `$B2:8B58`: OBJ palette 2, the labels' colours (`$86:C3B8` copies it).
+/// `$B2:8B58`: OBJ palette 2, the labels' colours (`$86:C3B8` copies it);
+/// European `$B4:90BB`.
 const PALETTE: u32 = 0xB2_8B58;
+
+/// The address in `image`'s revision of what sits at Japanese `japan`
+/// ([`layout::at`]).
+pub(crate) fn located(image: &[u8], japan: u32) -> Result<u32, ShopError> {
+    layout::at(image, japan).ok_or(ShopError::Invalid(japan, "unrecorded in this revision"))
+}
 
 /// The labels' 16 colours (OBJ palette 2).
 ///
 /// # Errors
 /// Refuses a read outside the image.
 pub fn label_palette(image: &[u8]) -> Result<[Bgr555; 16], ShopError> {
-    let bytes = read(image, PALETTE, 32)?;
+    let bytes = read(image, located(image, PALETTE)?, 32)?;
     Ok(std::array::from_fn(|i| {
         Bgr555::new(u16::from_le_bytes([bytes[i * 2], bytes[i * 2 + 1]]))
     }))
 }
 
 /// A label's glyphs, from `at` to its `D4`: glyph codes, the katakana
-/// switches `D0`/`D1`, and `E4 nn` calls.
+/// switches `D0`/`D1`, and `E4 nn` calls (European `E4`-`E6`).
 ///
 /// # Errors
 /// Refuses a label that leaves the image, does not end, or holds another
 /// code.
 pub fn label_glyphs(image: &[u8], at: u32) -> Result<Vec<Glyph>, ShopError> {
+    let font = located(image, FONT)?;
+    let europe = per_revision(image, false, true);
+    let labels = per_revision(image, LABELS.0, LABELS.1);
+    let wide_bank = per_revision(image, WIDE_FONT_BANKS.0, WIDE_FONT_BANKS.1);
     let mut glyphs = Vec::new();
     let (mut at, mut kana, mut returns) = (at, false, Vec::new());
     for _ in 0..64 {
@@ -70,18 +91,19 @@ pub fn label_glyphs(image: &[u8], at: u32) -> Result<Vec<Glyph>, ShopError> {
                 kana = code == 0xD0;
                 continue;
             }
-            0xE4 if returns.len() < 4 => {
+            0xE4..=0xE6 if returns.len() < 4 && (europe || code == 0xE4) => {
                 let index = read(image, at, 1)?[0];
                 returns.push(at + 1);
-                let pointer = read(image, LABELS + u32::from(index) * 2, 2)?;
+                let table = if code == 0xE6 { EUROPEAN_WORDS } else { labels };
+                let pointer = read(image, table + u32::from(index) * 2, 2)?;
                 at = 0x92_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]]));
                 continue;
             }
-            0..=0x7F => FONT + u32::from(code) * 64 + if kana { 0x2000 } else { 0 },
+            0..=0x7F => font + u32::from(code) * 64 + if kana { 0x2000 } else { 0 },
             0x80..=0xBF => {
                 let code = u32::from(code & 0x3F) << 8 | u32::from(read(image, at, 1)?[0]);
                 at += 1;
-                ((0xB5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64)
+                ((wide_bank + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64)
             }
             _ => return Err(ShopError::Invalid(at - 1, "unsupported label code")),
         };
@@ -129,9 +151,10 @@ impl TitleMotion {
     /// # Errors
     /// Refuses scripts outside the image or unending.
     pub fn from_rom(image: &[u8]) -> Result<Self, ShopError> {
+        let effects = located(image, EFFECTS)?;
         let script = |axis: u32| -> Result<Vec<(u16, i16)>, ShopError> {
-            let offset = read(image, EFFECTS + (TITLE_EFFECT * 2 + axis) * 2, 2)?;
-            let start = EFFECTS + u32::from(u16::from_le_bytes([offset[0], offset[1]]));
+            let offset = read(image, effects + (TITLE_EFFECT * 2 + axis) * 2, 2)?;
+            let start = effects + u32::from(u16::from_le_bytes([offset[0], offset[1]]));
             let mut steps = Vec::new();
             for index in 0..64 {
                 let pair = read(image, start + 2 + index * 4, 4)?;

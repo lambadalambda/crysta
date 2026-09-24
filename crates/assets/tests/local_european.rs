@@ -169,3 +169,63 @@ fn arks_frames_are_the_japanese_ones() {
         (jp.graphics(0), jp.graphics(1), jp.palette())
     );
 }
+
+/// A label's glyphs as text: each glyph matched against the European
+/// font's single-byte codes, colour 3 cleared as the labels draw them.
+fn label_text(image: &[u8], glyphs: &[assets::labels::Glyph]) -> String {
+    let base = assets::layout::offset(image, 0x34_8000).unwrap();
+    let font: Vec<[u8; 256]> = (0..0x80)
+        .map(|code| {
+            let at = base + code * 64;
+            assets::graphics::decode_glyph_2bpp(&image[at..at + 64]).map(|index| {
+                if index == 3 {
+                    0
+                } else {
+                    index
+                }
+            })
+        })
+        .collect();
+    glyphs
+        .iter()
+        .map(|glyph| match font.iter().position(|shape| shape == glyph) {
+            Some(0x76) => '\'',
+            Some(code) => transcribe(u8::try_from(code).unwrap()),
+            None => '#',
+        })
+        .collect()
+}
+
+#[test]
+fn the_slices_titles_decode_in_english() {
+    use assets::labels::{area_title, label_palette, TitleMotion};
+    use assets::maps::scripts::EventFlags;
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let image = europe.image();
+    let flags = vec![0u8; 512];
+    let title = |map| {
+        area_title(image, map, EventFlags::Bitmap(&flags))
+            .unwrap_or_else(|e| panic!("{map:x}: {e:?}"))
+            .map(|glyphs| label_text(image, &glyphs))
+    };
+    assert_eq!(title(0x0A).as_deref(), Some("Crysta"));
+    assert_eq!(title(0x0D).as_deref(), Some("Elder's"));
+    assert_eq!(title(0x1E).as_deref(), Some("Merchant"));
+    assert_eq!(title(0x41).as_deref(), Some("Center"));
+    // The same rooms carry titles as in Japanese.
+    for map in SLICE {
+        let japanese = area_title(japan.image(), map, EventFlags::Bitmap(&flags)).unwrap();
+        assert_eq!(title(map).is_some(), japanese.is_some(), "{map:x}");
+    }
+    // The palette and the letters' motion are the Japanese ones, moved.
+    assert_eq!(
+        label_palette(image).unwrap(),
+        label_palette(japan.image()).unwrap()
+    );
+    assert_eq!(
+        TitleMotion::from_rom(image).unwrap(),
+        TitleMotion::from_rom(japan.image()).unwrap()
+    );
+}
