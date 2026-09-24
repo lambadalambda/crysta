@@ -58,6 +58,7 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
             vertical_extent: edge(height),
         },
         animation: None,
+        second: None,
         patches: Patches::default(),
         world: true,
     })
@@ -96,11 +97,17 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
             .ok()
         })
         .filter(|source| !source.is_empty());
-    let animation = source.map(|source| Animated::new(image, map, scene, source, backdrop));
+    let second = SecondLayer::from_rom(image, map).ok().map(|layer| Second {
+        layer,
+        tiles: scene.tiles().to_vec(),
+        palette: *scene.palette(),
+    });
+    let animation = source.map(|source| Animated::new(scene, source, backdrop));
     Ok(CachedBackground {
         frame: background,
         region,
         animation,
+        second,
         patches: Patches::default(),
         world: false,
     })
@@ -161,29 +168,44 @@ pub struct CachedBackground {
     /// The part of the shared layer this map's camera may show.
     pub region: CameraRegion,
     animation: Option<Animated>,
+    /// The second layer: the town's clouds, the rooms' light rays.
+    second: Option<Second>,
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
 }
 
 impl CachedBackground {
-    /// Adds the town's crystal clouds onto the view (`$0A`'s second layer,
-    /// `docs/house-exterior.md`): a subscreen layer the scene adds to the
-    /// main screen (`CGADSUB $33`), drawn from the animated tiles and colors.
-    /// It scrolls with the camera and drifts a pixel left and down every
-    /// three frames (`$086C`/`$086E` = `$02FF`/`$0201`, native town
-    /// checkpoints: 80 pixels over 241 frames). Added over the sprites too,
-    /// as in the game.
-    pub fn add_clouds(&self, canvas: &mut crate::frame::Canvas, camera: (i32, i32), age: u64) {
-        let Some(animation) = &self.animation else {
+    /// Adds the second layer onto the view: a subscreen layer the scene
+    /// adds to the main screen in full, over the sprites too, as in the game
+    /// -- the town's crystal clouds (`CGADSUB $33`, `docs/house-exterior.md`)
+    /// and the rooms' light rays (`CGADSUB $21`). It scrolls with the
+    /// camera; the clouds also drift a pixel left and down every three
+    /// frames (`$086C`/`$086E` = `$02FF`/`$0201`, native town checkpoints:
+    /// 80 pixels over 241 frames). Its tiles and colours are the animated
+    /// ones where the map animates.
+    pub fn add_second_layer(
+        &self,
+        canvas: &mut crate::frame::Canvas,
+        camera: (i32, i32),
+        age: u64,
+    ) {
+        let Some(second) = &self.second else {
             return;
         };
-        let Some(clouds) = &animation.clouds else {
-            return;
-        };
-        let layer = clouds.layer();
+        let (tiles, palette) = self
+            .animation
+            .as_ref()
+            .map_or((&second.tiles[..], &second.palette), |animation| {
+                (&animation.tiles[..], &animation.palette)
+            });
+        let layer = second.layer.layer();
         let (width, height) = (layer.width() * 16, layer.height() * 16);
-        let drift = i64::try_from(age / 3).unwrap_or(0);
+        let drift = if second.layer.drifts() {
+            i64::try_from(age / 3).unwrap_or(0)
+        } else {
+            0
+        };
         let wrap = |at: i64, extent: usize| {
             usize::try_from(at.rem_euclid(i64::try_from(extent).unwrap_or(1))).unwrap_or(0)
         };
@@ -202,12 +224,12 @@ impl CachedBackground {
                     continue;
                 }
                 if let Ok(IndexedPixel::Opaque { palette_index, .. }) = graphics::sample_metatile(
-                    &clouds.metatiles()[cell],
-                    &animation.tiles,
+                    &second.layer.metatiles()[cell],
+                    tiles,
                     x % 16,
                     y % 16,
                 ) {
-                    *pixel = add(*pixel, rgb(animation.palette[usize::from(palette_index)]));
+                    *pixel = add(*pixel, rgb(palette[usize::from(palette_index)]));
                 }
             }
         }
@@ -280,9 +302,14 @@ struct Animated {
     /// Cells drawn from an animated tile or palette.
     cells: Vec<usize>,
     key: Option<Vec<Option<u64>>>,
-    /// The town's crystal clouds; `None` elsewhere or when the second
-    /// layer does not decode.
-    clouds: Option<SecondLayer>,
+}
+
+/// A map's second layer with the static tiles and colours it draws from
+/// where nothing animates them.
+struct Second {
+    layer: SecondLayer,
+    tiles: Vec<Tile4bpp>,
+    palette: [Bgr555; 128],
 }
 
 /// The SNES's colour addition: each channel saturates.
@@ -293,13 +320,7 @@ fn add(main: u32, sub: u32) -> u32 {
 }
 
 impl Animated {
-    fn new(
-        image: &[u8],
-        map: u16,
-        scene: StaticBackground,
-        source: SceneAnimation,
-        backdrop: Option<u32>,
-    ) -> Self {
+    fn new(scene: StaticBackground, source: SceneAnimation, backdrop: Option<u32>) -> Self {
         let tiles: std::collections::HashSet<usize> = source.tiles().collect();
         let rows: std::collections::HashSet<usize> =
             source.colors().map(|color| color / 16).collect();
@@ -324,9 +345,6 @@ impl Animated {
         Self {
             tiles: scene.tiles().to_vec(),
             palette: *scene.palette(),
-            clouds: (map == 0x000A)
-                .then(|| SecondLayer::from_rom(image, map).ok())
-                .flatten(),
             scene,
             source,
             backdrop,

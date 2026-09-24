@@ -444,7 +444,7 @@ impl Session {
         if let Some((at, raster)) = pot {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
-        clouds.add_clouds(frame, camera, self.background_clock.tick());
+        clouds.add_second_layer(frame, camera, self.background_clock.tick());
         frame::extend_edges(frame, camera, region.bounds);
         if let Some(display) = world.shop().and_then(crysta_runtime::shop::Shop::display) {
             let on_screen = |(x, y): (u16, u16)| (i32::from(x) - camera.0, i32::from(y) - camera.1);
