@@ -79,6 +79,9 @@ callback on a confirm press when nothing else owns the window.
 | `33` | `$80:918F` | — | waits for the track's load; the host loads on its own, so only the three-frame tail |
 | `36` / `37` / `38` | `$80:91E8` / `91FC` / `9210` | 1 / 1 / 2 | sound effect on port 3 (`$04B7`), port 2 (`$04B6`), both |
 | `6A` | `$80:9DD6` | 2 | cosmetic helper; stepped over |
+| `22` | `$80:8CD8` | low, high, words | jumps through the table on the spawn record's fourth byte (entity `+$26`); outside the range, past the table |
+| `B0` | `$80:A975` | 1, or `FF` with a word and a bank | picks the movement resource: 2 the common one, 0 the map's first private one (taken to be the actor's own); the `FF` form is not modelled |
+| `81` / `87` | `$80:A1B9` / `A1D4` | pose / count, pose, selector | a pose whose movement streams (`crysta_runtime::actors::motion`) move the actor through the next wait; `87` also sets the next `COP 8F`'s repetitions |
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
 | `76` / `D9` | `$80:A127` / `B501` | 2 / 1 | PPU register writes, hit profile; stepped over |
 
@@ -89,7 +92,9 @@ Code that tests the player's animation (`LDA $7F:2016,X` / `$7F:0008,X`
 through `$0DEA`, as the blue door's push test `$88:AB4C` does) takes its
 mismatch branch: the runtime's Ark only stands and walks. Short runs that
 only use script scratch words (`$0440`, `$04BC..$04C3`: `STZ`, `STA`,
-`LDA`, `INC`, `DEC`, `CMP`, `TSB`/`TRB` and branches) execute, as the tour's guide and
+`LDA`, `INC`, `DEC`, `CMP`, `TSB`/`TRB` and branches) execute; they may also
+read the player's action word `$097C` and the money `$07ED` (0: the slice
+has none) and test bits with `BIT #`, as the tour's guide and
 controller take turns through `$04BC`; the words outlive map loads. Such a
 run may also narrow the accumulator, write PPU registers, push and pull, and
 call the palette routines `$8D:A8EA`/`AA96`/`A8FD` and the nested frame

@@ -1074,6 +1074,65 @@ fn a_door_walks_ark_out_and_in_with_the_fades() {
     );
 }
 
+#[test]
+fn the_townspeople_stand_ready_and_two_of_them_walk() {
+    // Four start with `COP B0` (a movement base), two with `COP 22` on
+    // their spawn parameter. Natively (departure journey, slot `$10C0`) the
+    // walker `$389D3` stands through 64 idle poses (`$88:8369`), walks up 64
+    // px in 123 frames (`COP 87 04 04 69`, the common up stream), then hops
+    // back down 16 px four times, 47 frames apart (`COP 81 09`, its own
+    // resource `$D2:7FB1`): a 438-frame cycle.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = crysta_runtime::world::new_game_flags();
+    events[0x20 / 8] |= 1 << (0x20 % 8);
+    let mut world = World::enter_with_events(image, 0x000A, 504, 768, events).unwrap();
+    let walker = |world: &World<'_>| {
+        world
+            .residents()
+            .iter()
+            .find(|resident| resident.record == 0x03_89D3)
+            .unwrap()
+            .position
+    };
+    let (x, y) = walker(&world);
+    let mut path = Vec::new();
+    for frame in 1..=600 {
+        world.update(None, Presses::default()).unwrap();
+        if [128, 254, 267, 302, 314, 408, 568].contains(&frame) {
+            path.push((frame, walker(&world)));
+        }
+    }
+    assert_eq!(
+        path,
+        [
+            (128, (x, y)),
+            (254, (x, y - 64)),
+            (267, (x, y - 48)),
+            (302, (x, y - 48)),
+            (314, (x, y - 32)),
+            (408, (x, y)),
+            (568, (x, y - 1)),
+        ]
+    );
+    assert!(
+        world.frozen_scripts().is_empty(),
+        "{:x?}",
+        world.frozen_scripts()
+    );
+    let other = world
+        .residents()
+        .iter()
+        .find(|r| r.record == 0x03_89DD)
+        .unwrap();
+    assert!(
+        other.walking || other.position != (792, 320),
+        "the other walks too"
+    );
+}
+
 /// The story flags after the frozen return.
 fn after_the_return() -> Vec<u8> {
     let mut events = after_the_door();

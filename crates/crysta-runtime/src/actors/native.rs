@@ -28,6 +28,14 @@ const SCRATCH: [(u16, u16); 3] = [
     (0x048A, 0x048B),
 ];
 
+/// `$097C`, the player's action word: runs may read it, as a watcher in
+/// `$11` does (`$88:A9EF`); the world keeps it in the scratch words.
+pub const PLAYER_ACTION: u16 = 0x097C;
+/// Engine words runs may read but not write: the player's action word,
+/// and the money (`$07ED`, BCD, `$8D:95A8`), which a resident in `$1D`
+/// tests (`$88:C7ED`); the slice has no money, so it reads 0.
+const READABLE: [u16; 2] = [PLAYER_ACTION, 0x07ED];
+
 /// Instructions one run may take: the freezing's whitening loops 37 times.
 const STEPS: usize = 512;
 
@@ -117,8 +125,16 @@ impl Machine<'_> {
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xC9 | 0xCD | 0x0C | 0x1C if self.narrow => {
                 return None;
             }
+            0xAD if self
+                .operand()
+                .is_some_and(|address| READABLE.contains(&address)) =>
+            {
+                let address = self.operand()?;
+                self.set(words.get(&address).copied().unwrap_or(0));
+                self.pc + 3
+            }
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0x0C | 0x1C => self.memory(opcode, words)?,
-            0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A => self.accumulator(opcode, words)?,
+            0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A | 0x89 => self.accumulator(opcode, words)?,
             0x48 | 0x68 | 0xDA | 0xFA => self.stack_op(opcode)?,
             0xF0 | 0xD0 | 0x90 | 0xB0 | 0x10 | 0x30 => self.branch(opcode)?,
             0x22 => self.call()?,
@@ -196,9 +212,15 @@ impl Machine<'_> {
         Some(self.pc + 3)
     }
 
-    /// `LDA #`, `CMP #`, `CMP` a scratch word, `INC A`, `DEC A`.
+    /// `LDA #`, `CMP #`, `CMP` a scratch word, `BIT #`, `INC A`, `DEC A`.
     fn accumulator(&mut self, opcode: u8, words: &Scratch) -> Option<usize> {
         match opcode {
+            // Immediate BIT sets only Z.
+            0x89 if !self.narrow => {
+                self.zero = Some(self.a? & self.operand()? == 0);
+                Some(self.pc + 3)
+            }
+            0x89 => None,
             0xA9 => {
                 let (value, next) = if self.narrow {
                     (u16::from(*self.image.get(self.pc + 1)?), self.pc + 2)
@@ -298,6 +320,33 @@ mod tests {
         let mut image = vec![0; AT];
         image.extend_from_slice(code);
         image
+    }
+
+    #[test]
+    fn a_watcher_reads_the_players_action_word_and_tests_its_bits() {
+        // LDA $097C; BIT #$0300; BNE +2; BRA (the loop's).
+        let code = [
+            0xAD, 0x7C, 0x09, 0x89, 0x00, 0x03, 0xD0, 0x02, 0x80, 0xE5, 0x02,
+        ];
+        let watcher = image(&code);
+        let mut words = BTreeMap::new();
+        assert_eq!(
+            run(&watcher, AT, &mut words),
+            Some(AT + 8),
+            "idle: on to the BRA"
+        );
+        words.insert(PLAYER_ACTION, 0x0100);
+        assert_eq!(
+            run(&watcher, AT, &mut words),
+            Some(AT + 10),
+            "acting: past it"
+        );
+        // The word is read, never written.
+        let store = image(&[0xA9, 0x01, 0x00, 0x8D, 0x7C, 0x09, 0x02]);
+        assert_eq!(run(&store, AT, &mut words), None);
+        // No money: LDA $07ED; BNE +9 falls through to the COP.
+        let broke = image(&[0xAD, 0xED, 0x07, 0xD0, 0x09, 0x02, 0x3B]);
+        assert_eq!(run(&broke, AT, &mut words), Some(AT + 5));
     }
 
     #[test]

@@ -469,6 +469,16 @@ impl<'a> World<'a> {
     /// blocked.
     fn run_actors(&mut self) -> Result<(), WorldError> {
         let (x, y) = self.position();
+        // The player's action word as runs read it: only a forced action
+        // (`$0810`) is modelled; Ark never attacks or jumps here.
+        self.globals.scratch.insert(
+            crate::actors::PLAYER_ACTION,
+            if self.globals.player_action {
+                0x0810
+            } else {
+                0
+            },
+        );
         for index in 0..self.actors.len() {
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(

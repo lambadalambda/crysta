@@ -15,8 +15,9 @@
 
 mod cadence;
 mod ease;
+mod motion;
 mod native;
-pub use native::Scratch;
+pub use native::{Scratch, PLAYER_ACTION};
 
 use crate::scene::Globals;
 use assets::maps::actor_script::{
@@ -157,6 +158,38 @@ const HIT_COOLDOWN: u16 = 16;
 /// register writes (`76`) and the hit profile (`D9`, `$7F:1022` from
 /// `$8D:BDFA`). Their operands are stepped over.
 const COSMETIC: [(u8, usize); 3] = [(0x6A, 2), (0x76, 2), (0xD9, 1)];
+/// Jumps through a table of words on the spawn parameter (entity `+$26`):
+/// operands the lowest and highest value, then a target per value; above
+/// the highest, on past the table (`$80:8CD8`). Below the lowest the
+/// handler's index wraps; no slice script reaches that, and here it goes
+/// on past the table too.
+const SWITCH: u8 = 0x22;
+/// Picks the movement resource base (`$7F:0022`, `$80:A975`): `$4000 +
+/// n << 12`, or with `FF` a word and a bank, which is not modelled.
+const SPEED: u8 = 0xB0;
+/// Selects a pose and starts the movement streams of the same selector
+/// (`$80:A1B9`).
+const POSE_MOVING: u8 = 0x81;
+/// Sets the next `COP 8F`'s repetitions, a pose, and another selector's
+/// movement streams (`$80:A1D4`).
+const REPEAT_MOVING: u8 = 0x87;
+/// The common movement resource, at `$7F:6000` from `$AB:F037`.
+const COMMON_SOURCE: usize = 0x2B_F037;
+const COMMON_SIZE: usize = 0x1A0C;
+
+/// Which movement resource an actor's streams read (`$7F:0022`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Base {
+    /// `$7F:6000`: descriptor mode `$20`, or `COP B0 02`.
+    Common,
+    /// The actor's own descriptor's resource. Natively private resources
+    /// are packed from `$7F:4000` on in load order (`$80:FB5A`); `COP B0
+    /// 00` names the first, taken here to be the actor's own, as for every
+    /// mover in the slice.
+    Own,
+    /// Anywhere else (`COP B0 FF`, other bases): no movement is modelled.
+    Unknown,
+}
 /// Music: play a track (`$80:90D4`), fade out and play one (`$80:9107`),
 /// play a selection or the map's (`$80:913C`) -- each through a worker
 /// actor the runtime does not need ([`crate::audio`]).
@@ -428,6 +461,19 @@ pub struct Actor {
     stamp: Option<(u16, u16)>,
     /// Where the script stopped at something the interpreter does not model.
     frozen_at: Option<usize>,
+    /// Entity `+$26`: the spawn record's fourth byte (`$80:F541`), which
+    /// `COP 22` switches on.
+    parameter: u8,
+    /// The movement resource the streams read: the descriptor's
+    /// (`$80:FAAF`) until `COP B0` picks another.
+    base: Base,
+    /// The descriptor the actor is built from, whose movement pointer
+    /// fills its own base.
+    descriptor: Option<usize>,
+    /// A pose's movement streams (`COP 81`/`87`), through the next wait.
+    motion: Option<motion::Motion>,
+    /// The common and the own movement resource, once read.
+    resources: [Option<motion::Resource>; 2],
     /// Further cells `COP 3D` marked.
     stamps: Vec<(u16, u16)>,
     /// `COP 65`'s hit target and return address, when the actor can be hit.
@@ -466,6 +512,11 @@ impl Actor {
             ease: None,
             call: None,
             touchable: true,
+            parameter: 0,
+            base: Base::Common,
+            descriptor: None,
+            motion: None,
+            resources: [None, None],
             pc,
             state,
             // A zero seed would stay zero.
@@ -500,6 +551,18 @@ impl Actor {
     ) -> Self {
         let mut actor = Self::new(resident.position, resident.script, resident.initial, seed);
         actor.map = map;
+        actor.parameter = image.get(resident.record + 3).copied().unwrap_or(0);
+        actor.descriptor = resident.descriptor;
+        if resident.descriptor.is_some() {
+            actor.base = if resident
+                .descriptor
+                .is_some_and(|descriptor| cadence::common_base(image, descriptor))
+            {
+                Base::Common
+            } else {
+                Base::Own
+            };
+        }
         // `$80:F5B0`: the header's last word is entity `+$06`.
         actor.interaction = resident
             .script
@@ -576,6 +639,7 @@ impl Actor {
         self.pc = target;
         self.state = State::Running;
         self.stream = None;
+        self.motion = None;
         true
     }
 
@@ -958,6 +1022,8 @@ impl Actor {
                 return self.script_service(service, operands, around)
             }
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
+            SWITCH | SPEED => return self.parameter_service(service, operands, bank, image),
+            POSE_MOVING | REPEAT_MOVING => return self.moving_pose(service, operands, image),
             PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
             | SOUND_WORD => return self.audio_service(service, operands, around),
             CALL => {
@@ -1092,23 +1158,89 @@ impl Actor {
         }
     }
 
-    /// One frame of a scripted leg; cleared once the pose wait is over.
+    /// `COP 81 pose` and `COP 87 count pose selector`: a pose that moves
+    /// by its movement streams through the next wait. Returns whether
+    /// execution continues this frame.
+    fn moving_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        let length = if service == POSE_MOVING { 1 } else { 3 };
+        let (pose, selector) = match image.get(operands..operands + length) {
+            Some(&[pose]) => (pose, pose),
+            Some(&[count, pose, selector]) => {
+                self.repeats = Some(u16::from(count));
+                (pose, selector)
+            }
+            _ => {
+                self.state = State::Frozen;
+                return false;
+            }
+        };
+        let hflip = self.hflip;
+        self.set_pose(pose, hflip);
+        self.pose_age = 0;
+        self.stream = None;
+        let list = self.pose_list(pose);
+        self.motion = self.movement(image).and_then(|resource| {
+            motion::Motion::start(
+                resource,
+                selector,
+                hflip,
+                self.interaction & 0x80 != 0,
+                list,
+            )
+        });
+        // As `COP 80`, the handlers write `+$0A` (`$80:A1CB`, `$80:A1F7`).
+        self.continuation = Some(operands + length);
+        self.pc = operands + length;
+        true
+    }
+
+    /// The movement resource at the actor's base, read once: the common
+    /// one, or its descriptor's own (bytes 5..8, `$D2:7FB1` for the town's
+    /// walkers).
+    fn movement(&mut self, image: &[u8]) -> Option<motion::Resource> {
+        let slot = match self.base {
+            Base::Common => 0,
+            Base::Own => 1,
+            Base::Unknown => return None,
+        };
+        if self.resources[slot].is_none() {
+            let (source, size) = if slot == 0 {
+                (COMMON_SOURCE, COMMON_SIZE)
+            } else {
+                let pointer = image.get(self.descriptor? + 5..self.descriptor? + 8)?;
+                (assets::maps::actors::rom_offset(pointer)?, 0x2000)
+            };
+            let packet = assets::compression::decode(image.get(source..)?, size).ok()?;
+            self.resources[slot] = Some(motion::Resource {
+                base: if slot == 0 { 0x6000 } else { 0x4000 },
+                bytes: packet.data.into(),
+            });
+        }
+        self.resources[slot].clone()
+    }
+
+    /// One frame of a scripted leg or a pose's movement; cleared once the
+    /// pose wait is over.
     fn apply_stream(&mut self) {
-        let Some((direction, applied, speed)) = self.stream else {
+        let (dx, dy) = if let Some(motion) = &mut self.motion {
+            motion.step().unwrap_or((0, 0))
+        } else if let Some((direction, applied, speed)) = self.stream {
+            let pixels = if speed == 0 {
+                i16::from(applied % 2 == 0)
+            } else {
+                speed.cast_signed()
+            };
+            self.stream = Some((direction, applied + 1, speed));
+            let (dx, dy) = delta(direction);
+            (dx * pixels, dy * pixels)
+        } else {
             return;
         };
-        let pixels = if speed == 0 {
-            i16::from(applied % 2 == 0)
-        } else {
-            speed.cast_signed()
-        };
-        let (dx, dy) = delta(direction);
         self.position = (
-            self.position.0.wrapping_add_signed(dx * pixels),
-            self.position.1.wrapping_add_signed(dy * pixels),
+            self.position.0.wrapping_add_signed(dx),
+            self.position.1.wrapping_add_signed(dy),
         );
-        self.stream = Some((direction, applied + 1, speed));
-        self.walking = true;
+        self.walking = self.stream.is_some() || (dx, dy) != (0, 0);
         let ends = match self.state {
             State::Waiting(frames) => frames <= 1,
             _ => self
@@ -1117,6 +1249,7 @@ impl Actor {
         };
         if ends {
             self.stream = None;
+            self.motion = None;
             self.walking = false;
         }
     }
@@ -1167,6 +1300,7 @@ impl Actor {
         self.set_pose(pose & 0x7F, direction == Direction::Left);
         self.pose_age = 0;
         self.stream = Some((direction, 0, speed));
+        self.motion = None;
         self.stamp = None;
         self.pc = operands + 3;
         true
@@ -1345,6 +1479,7 @@ impl Actor {
                 // The whole byte goes to `+$14`; only exactly 2 mirrors.
                 self.hflip = facing == 2;
                 self.stream = None;
+                self.motion = None;
                 self.stamp = None;
                 self.pc = operands + 3;
             }
@@ -1368,6 +1503,7 @@ impl Actor {
                 self.set_pose(pose, hflip);
                 self.pose_age = 0;
                 self.stream = None;
+                self.motion = None;
                 self.repeats = Some(u16::from(count));
                 self.pc = operands + 2;
             }
@@ -1820,6 +1956,48 @@ impl Actor {
         }
         self.pc = operands + length;
         true
+    }
+
+    /// `COP 22`'s switch on the spawn parameter and `COP B0`'s speed.
+    /// Returns whether execution continues this frame.
+    fn parameter_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        image: &[u8],
+    ) -> bool {
+        let fetched = if service == SWITCH {
+            self.switch_target(operands, bank, image)
+        } else {
+            image.get(operands).map(|&base| {
+                self.base = match base {
+                    2 => Base::Common,
+                    0 => Base::Own,
+                    _ => Base::Unknown,
+                };
+                operands + if base == 0xFF { 4 } else { 1 }
+            })
+        };
+        let Some(next) = fetched else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.pc = next;
+        true
+    }
+
+    /// Where `COP 22` goes: the table's target for the parameter, or past
+    /// the table.
+    fn switch_target(&self, operands: usize, bank: usize, image: &[u8]) -> Option<usize> {
+        let (&low, &high) = (image.get(operands)?, image.get(operands + 1)?);
+        let table = operands + 2;
+        if (low..=high).contains(&self.parameter) {
+            let target = cadence::word(image, table + usize::from(self.parameter - low) * 2)?;
+            Some(bank | usize::from(target))
+        } else {
+            Some(table + (usize::from(high.saturating_sub(low)) + 1) * 2)
+        }
     }
 
     /// `COP ED` and `COP EE`: an eased move ([`ease::Ease`]). Returns
@@ -3510,6 +3688,38 @@ mod scene_service_tests {
         assert_eq!(globals.counter(2), 0x9999);
         // Bit 6's subtraction is refused rather than guessed.
         assert!(!globals.count(0x40, 1));
+    }
+
+    #[test]
+    fn cop_22_switches_on_the_spawn_parameter_and_b0_sets_a_speed() {
+        // COP B0 02 (a speed), then COP 22 01 02 with a table of two
+        // targets: parameter 1 jumps to $8030, 2 to $8040, anything else
+        // goes on past the table to COP 8E.
+        let script: &[u8] = &[
+            2, 0xB0, 0x02, 2, 0x22, 0x01, 0x02, 0x30, 0x80, 0x40, 0x80, 2, 0x8E,
+        ];
+        for (parameter, expected) in [(1, AT + 0x30), (2, AT + 0x40), (0, AT + 11), (3, AT + 11)] {
+            let mut image = vec![0; AT + 0x200];
+            image[AT..AT + script.len()].copy_from_slice(script);
+            for at in [0x30, 0x40] {
+                image[AT + at..AT + at + 2].copy_from_slice(&[2, 0x8E]);
+            }
+            let mut globals = Globals::with_events(vec![0; 512]);
+            let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+            actor.parameter = parameter;
+            actor.tick(&mut around(&image, &mut globals));
+            assert_ne!(actor.state, State::Frozen, "parameter {parameter}");
+            // Held on the `COP 8E` there, past its two bytes.
+            assert_eq!(actor.pc, expected + 2, "parameter {parameter}");
+        }
+        // B0 FF takes a word and a byte after it.
+        let mut image = vec![0; AT + 0x200];
+        image[AT..AT + 7].copy_from_slice(&[2, 0xB0, 0xFF, 0x34, 0x12, 0x05, 2]);
+        image[AT + 7] = 0x8E;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        actor.tick(&mut around(&image, &mut globals));
+        assert_eq!(actor.pc, AT + 8);
     }
 
     #[test]
