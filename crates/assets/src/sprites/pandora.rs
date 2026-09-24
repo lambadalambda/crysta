@@ -616,6 +616,15 @@ pub enum PandoraCarryMotion {
     /// Throw windup/release; subsequent free-flight pot list is selector 60.
     Throwing,
 }
+/// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
+/// the brake that ends it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PandoraRunMotion {
+    /// Dashing: resource 1 (`$80:A255`) lists 23..25 (`COP 83 sel,01`).
+    Dashing,
+    /// Braking: resource 0 (`$80:A24F`) lists 9..11 (`COP 84 sel`).
+    Braking,
+}
 /// Explicit Ark/pot list pairing. FA and FB share composition but not graphics.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PandoraCarryPose {
@@ -631,6 +640,30 @@ pub struct PandoraCarryPose {
     pub pot_hflip: bool,
 }
 impl PandoraSprites {
+    /// Ark's run lists, apart from the Pandora art: the brake's (resource 0,
+    /// lists 9..11) and the dash's (resource 1, lists 23..25), keyed by the
+    /// same source ids as [`Self::run_pose`] names.
+    ///
+    /// # Errors
+    /// As [`Self::from_rom`] for these lists.
+    pub fn run_art(image: &[u8]) -> Result<[PandoraArt; 2], SpriteError> {
+        let mut loader = Loader::new(image);
+        Ok([
+            ark_art(&mut loader, 0, &[9, 10, 11])?,
+            ark_art(&mut loader, 1, &[23, 24, 25])?,
+        ])
+    }
+    /// Ark's art, list and mirror for a run motion and facing (0 Down, 1 Up,
+    /// 2 Left, 3 Right): one list per axis, Left mirrored.
+    #[must_use]
+    pub fn run_pose(motion: PandoraRunMotion, facing: u8) -> Option<(u32, u8, bool)> {
+        let axis = facing.min(2);
+        let (art, first) = match motion {
+            PandoraRunMotion::Dashing => (0x80_a255, 23),
+            PandoraRunMotion::Braking => (0x80_a24f, 9),
+        };
+        (facing <= 3).then_some((art, first + axis, facing == 2))
+    }
     /// Pure source pose selection for native facing 0=Down, 1=Up, 2=Left, 3=Right.
     /// Free-flight pots use list 60 after the windup; source frame anchors already
     /// include visual lift. Do not add a second hardcoded carrying Y offset.

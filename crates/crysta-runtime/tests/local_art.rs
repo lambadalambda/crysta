@@ -495,3 +495,28 @@ fn the_blue_doors_hit_target_is_not_drawn_as_a_friend() {
     // sheet's list draws in C is not decoded.
     assert!(matches!(art[index], Err(Placeholder::Invisible)));
 }
+
+#[test]
+fn every_dash_and_brake_pose_rasterizes_with_pixels() {
+    // Dash: Ark resource 1 (`$80:A255`) lists 23..25, six records of 6
+    // frames; brake: resource 0 (`$80:A24F`) lists 9..11, one of 16.
+    use assets::sprites::{PandoraRunMotion, PandoraSprites};
+    use crysta_runtime::art::CarryArt;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let art = CarryArt::from_rom(cartridge.image()).unwrap();
+    for (motion, records) in [
+        (PandoraRunMotion::Dashing, 6),
+        (PandoraRunMotion::Braking, 1),
+    ] {
+        for facing in 0..4 {
+            let (id, selector, hflip) = PandoraSprites::run_pose(motion, facing).unwrap();
+            let animation = art
+                .animation(id, selector, hflip)
+                .unwrap_or_else(|error| panic!("{motion:?} {facing}: {error}"));
+            assert_eq!(animation.frames.len(), records, "{motion:?} {facing}");
+            assert!(animation.frames.iter().all(Raster::is_visible));
+        }
+    }
+}

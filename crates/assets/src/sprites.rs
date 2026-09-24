@@ -2,7 +2,8 @@
 mod house;
 pub use house::pandora::{
     PandoraActorPhase, PandoraArt, PandoraCarryMotion, PandoraCarryPose, PandoraGraphicsKey,
-    PandoraMotion, PandoraPhase, PandoraPoseList, PandoraSceneLimit, PandoraSprites,
+    PandoraMotion, PandoraPhase, PandoraPoseList, PandoraRunMotion, PandoraSceneLimit,
+    PandoraSprites,
 };
 pub use house::{
     HouseActor, HouseFrame, HouseGraphicsKey, HousePoseKey, HouseScenes, RecordRefusal,

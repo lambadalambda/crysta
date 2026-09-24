@@ -276,6 +276,8 @@ impl Animation {
 #[derive(Debug)]
 pub struct CarryArt {
     sprites: PandoraSprites,
+    /// Ark's brake and dash lists ([`PandoraSprites::run_art`]).
+    run: [PandoraArt; 2],
 }
 
 impl CarryArt {
@@ -289,6 +291,7 @@ impl CarryArt {
     pub fn from_rom(image: &[u8]) -> Result<Self, ArtError> {
         Ok(Self {
             sprites: PandoraSprites::from_rom(image)?,
+            run: PandoraSprites::run_art(image)?,
         })
     }
 
@@ -301,8 +304,11 @@ impl CarryArt {
     pub fn animation(&self, art: u32, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
         let art = self
             .sprites
-            .get(art)
-            .ok_or(SpriteError::Invalid("no such carry art"))?;
+            .art()
+            .iter()
+            .chain(&self.run)
+            .find(|candidate| candidate.source_id() == art && candidate.list(selector).is_some())
+            .ok_or(SpriteError::Invalid("no such carry art or list"))?;
         list_animation(art, selector, hflip)
     }
 }
