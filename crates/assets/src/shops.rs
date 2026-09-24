@@ -8,9 +8,13 @@
 
 use std::fmt;
 
+use crate::layout::{self, per_revision};
+
+/// European `$99:CE26`, as `$92:E300` reads it; the stock sits in the
+/// records' bank.
 const RECORDS: u32 = 0x96_C6DC;
 const RECORD: usize = 9;
-const STOCK_BANK: u32 = 0x96_0000;
+/// European `$92:EBEF`, as `$92:E789` reads it.
 const PRIME_BLUE_COSTS: u32 = 0x92_D57D;
 /// Records and stock entries read before a table is refused as unending.
 const LIMIT: u32 = 256;
@@ -69,9 +73,13 @@ pub struct Shop {
 /// Refuses a table that leaves the image or does not end, and a price
 /// that is not BCD.
 pub fn shops(image: &[u8]) -> Result<Vec<Shop>, ShopError> {
+    let records = layout::at(image, RECORDS).ok_or(ShopError::Truncated(RECORDS))?;
+    // The spawner's row offset: `ADC #$0010` at `$92:CD10`, `#$0008` at the
+    // European `$92:E382`.
+    let row = per_revision(image, 16, 8);
     let mut shops = Vec::new();
     for index in 0..LIMIT {
-        let at = RECORDS + index * 9; // RECORD bytes
+        let at = records + index * 9; // RECORD bytes
         let record = read(image, at, RECORD)?;
         let map = word(record, 0);
         if map & 0x8000 != 0 {
@@ -84,13 +92,13 @@ pub fn shops(image: &[u8]) -> Result<Vec<Shop>, ShopError> {
             flag: (flag != 0).then_some(flag),
             position: (
                 u16::from(record[6]) * 16 + 8,
-                u16::from(record[7]) * 16 + 16,
+                u16::from(record[7]) * 16 + row,
             ),
             kind: record[8],
-            stock: stock(image, STOCK_BANK | u32::from(word(record, 4)))?,
+            stock: stock(image, (records & 0xFF_0000) | u32::from(word(record, 4)))?,
         });
     }
-    Err(ShopError::Invalid(RECORDS, "unending shop table"))
+    Err(ShopError::Invalid(records, "unending shop table"))
 }
 
 fn stock(image: &[u8], start: u32) -> Result<Vec<ShopItem>, ShopError> {
@@ -116,7 +124,9 @@ fn stock(image: &[u8], start: u32) -> Result<Vec<ShopItem>, ShopError> {
 /// # Errors
 /// Refuses a read outside the image and a cost that is not BCD.
 pub fn prime_blue_cost(image: &[u8], item: u8) -> Result<u32, ShopError> {
-    let at = PRIME_BLUE_COSTS + u32::from(item) * 2;
+    let costs =
+        layout::at(image, PRIME_BLUE_COSTS).ok_or(ShopError::Truncated(PRIME_BLUE_COSTS))?;
+    let at = costs + u32::from(item) * 2;
     bcd(word(read(image, at, 2)?, 0)).ok_or(ShopError::Invalid(at, "cost is not BCD"))
 }
 

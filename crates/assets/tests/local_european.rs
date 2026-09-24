@@ -94,3 +94,34 @@ fn the_box_guides_pages_decode() {
     let pages = HouseDialogue::decode_at(rom.image(), 0x89_D156).unwrap();
     assert!(!pages.is_empty());
 }
+
+#[test]
+fn the_shops_are_the_japanese_ones_placed_by_the_european_spawner() {
+    let (Some(europe), Some(japan)) = (european(), japanese()) else {
+        return;
+    };
+    let eu = assets::shops::shops(europe.image()).unwrap();
+    let jp = assets::shops::shops(japan.image()).unwrap();
+    assert_eq!(eu.len(), jp.len());
+    assert_eq!(eu[0].record, 0x99_CE26);
+    for (eu, jp) in eu.iter().zip(&jp) {
+        assert_eq!(
+            (eu.map, eu.flag, eu.kind, &eu.stock),
+            (jp.map, jp.flag, jp.kind, &jp.stock)
+        );
+        // `$92:E382` adds 8 to the row's pixel, the Japanese `$92:CD10` 16;
+        // one European record (map `$2D7`) also stands a cell up and left.
+        if eu.map != 0x2D7 {
+            assert_eq!(
+                eu.position,
+                (jp.position.0, jp.position.1 - 8),
+                "{:x}",
+                eu.map
+            );
+        }
+    }
+    assert_eq!(
+        assets::shops::prime_blue_cost(europe.image(), 5),
+        assets::shops::prime_blue_cost(japan.image(), 5)
+    );
+}
