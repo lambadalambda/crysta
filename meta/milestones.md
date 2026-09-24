@@ -154,6 +154,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Leave through the south gate onto the world map](issues/south-gate-world-map.md)
 - [Play the slice's music and sound effects](issues/crysta-music-and-sounds.md)
 - [Draw Yomi instead of a placeholder](issues/yomi-sprite.md)
+- [Open the shops in Crysta](issues/crysta-shops.md)
 
 <a id="m5-classic-presentation-and-chapter-1"></a>
 ## M5 — Classic presentation and Chapter 1
