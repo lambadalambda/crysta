@@ -98,14 +98,17 @@ pub fn first_background(image: &[u8], map_id: u16) -> Result<StaticBackground, V
     }
 }
 
-/// A map's second layer: the town's crystal clouds (`$0A`), which the
-/// scene drives as a subscreen layer added onto the view (see
-/// `docs/house-exterior.md`). Its tiles and colors are the first layer's,
-/// the animated `$1F0..$1FF` in palette 6.
+/// A map's second layer, a subscreen layer the scene adds onto the view:
+/// the town's crystal clouds (`$0A`, `docs/house-exterior.md`), drawn from
+/// the animated `$1F0..$1FF` in palette 6, and the rooms' light rays, from
+/// the same shared sheet (cells `$08..$24`, palette 7; the indoor profile
+/// `$96:BC1D` adds BG1 in full, `CGWSEL $82`, `CGADSUB $21`). Its tiles and
+/// colors are the first layer's.
 #[derive(Debug)]
 pub struct SecondLayer {
     layer: StaticLayer,
     metatiles: Vec<[BgTileWord; 4]>,
+    drifts: bool,
 }
 
 impl SecondLayer {
@@ -113,29 +116,37 @@ impl SecondLayer {
     /// (`20 00 40 00 02`) the map's loading script names.
     ///
     /// # Errors
-    /// Rejects maps other than the town `$0A`, a script that names either
-    /// resource other than once, and resources that do not decode.
+    /// Rejects maps outside the Crysta slice `$0A..=$21`, a script that
+    /// names either resource not with one source (the cellars name none), and
+    /// resources that do not decode.
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
-        if map_id != 0x000A {
+        if !(0x000A..=0x0021).contains(&map_id) {
             return Err(VisualMapError::Unsupported(
                 "unqualified second layer map ID",
             ));
         }
         let program = scripts::resolve_map(image, map_id, Limits::default())
             .map_err(VisualMapError::Script)?;
+        // Named once, or again with the same source (`$1E`).
         let only = |kind: ResourceKind, operand: &[u8]| {
-            let mut found = program.instructions.iter().filter_map(|i| match i.command {
-                Command::Resource { kind: k, source }
-                    if k == kind && i.bytes.get(1..1 + operand.len()) == Some(operand) =>
-                {
-                    Some(source.normalized().value() as usize)
-                }
-                _ => None,
-            });
-            match (found.next(), found.next()) {
-                (Some(offset), None) => Ok(offset),
+            let mut found: Vec<usize> = program
+                .instructions
+                .iter()
+                .filter_map(|i| match i.command {
+                    Command::Resource { kind: k, source }
+                        if k == kind && i.bytes.get(1..1 + operand.len()) == Some(operand) =>
+                    {
+                        Some(source.normalized().value() as usize)
+                    }
+                    _ => None,
+                })
+                .collect();
+            found.sort_unstable();
+            found.dedup();
+            match found[..] {
+                [offset] => Ok(offset),
                 _ => Err(VisualMapError::Unsupported(
-                    "second layer resource not named exactly once",
+                    "second layer resource not named with one source",
                 )),
             }
         };
@@ -157,7 +168,18 @@ impl SecondLayer {
                 })
             })
             .collect();
-        Ok(Self { layer, metatiles })
+        Ok(Self {
+            layer,
+            metatiles,
+            drifts: map_id == 0x000A,
+        })
+    }
+
+    /// Whether it drifts a pixel left and down every three frames, as the
+    /// town's clouds do; the rays stand still.
+    #[must_use]
+    pub const fn drifts(&self) -> bool {
+        self.drifts
     }
 
     /// The layer's cells.

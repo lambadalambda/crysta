@@ -317,7 +317,39 @@ fn the_towns_second_layer_holds_the_crystal_clouds() {
             assert_eq!(word.palette(), 6);
         }
     }
-    assert!(assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x000B).is_err());
+    assert!(clouds.drifts());
+}
+
+#[test]
+fn the_rooms_second_layer_holds_the_light_rays() {
+    // Rooms add the same shared sheet's rays (cells `$08..$24`, palette 7)
+    // onto the view, still; the cellars load no second layer.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    for map in [0x0Bu16, 0x0F, 0x12, 0x1A, 0x1E] {
+        let rays = assets::maps::visual::SecondLayer::from_rom(rom.image(), map)
+            .unwrap_or_else(|error| panic!("{map:#x}: {error}"));
+        assert!(!rays.drifts(), "{map:#x}");
+        let cells: Vec<u16> = rays
+            .layer()
+            .cells()
+            .iter()
+            .map(|cell| cell.raw() & 511)
+            .collect();
+        assert!(
+            cells.iter().any(|&cell| (0x08..=0x24).contains(&cell)),
+            "{map:#x}"
+        );
+        let word = rays.metatiles()[0x08][0];
+        assert_eq!(word.palette(), 7, "{map:#x}");
+    }
+    for map in [0x0Eu16, 0x20, 0x21, 0x41] {
+        assert!(
+            assets::maps::visual::SecondLayer::from_rom(rom.image(), map).is_err(),
+            "{map:#x}"
+        );
+    }
 }
 
 #[test]
