@@ -22,10 +22,64 @@ use crate::scene::Transfer;
 /// A transfer's fades under way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Fading {
-    /// Fading out, `frame` frames in; the map loads at the end.
-    Out { transfer: Transfer, frame: u16 },
+    /// Fading out by `mode`, `frame` frames in; `transfer` loads at the end.
+    Out {
+        mode: u8,
+        transfer: Transfer,
+        frame: u16,
+    },
     /// Fading in after the load.
     In { mode: u8, frame: u16 },
+}
+
+impl Fading {
+    /// Starts fading out for `transfer`.
+    const fn start(transfer: Transfer) -> Self {
+        Self::Out {
+            mode: transfer.mode,
+            transfer,
+            frame: 0,
+        }
+    }
+
+    /// One frame on, with a transfer a script queued meanwhile: the fade
+    /// out's last frame returns the transfer to load. A transfer queued
+    /// while fading out takes the old one's place (`COP 14` rewrites
+    /// `$047C`..`$0494`, which the load and the fade in read), the fade out
+    /// going on by its first mode; one queued while fading in waits.
+    fn tick(self, queued: &mut Option<Transfer>) -> (Option<Self>, Option<Transfer>) {
+        match self {
+            Self::Out {
+                mode,
+                transfer,
+                frame,
+            } => {
+                let transfer = queued.take().unwrap_or(transfer);
+                if frame + 1 >= out_frames(mode) {
+                    let fade_in = Self::In {
+                        mode: transfer.mode,
+                        frame: 0,
+                    };
+                    (Some(fade_in), Some(transfer))
+                } else {
+                    let next = Self::Out {
+                        mode,
+                        transfer,
+                        frame: frame + 1,
+                    };
+                    (Some(next), None)
+                }
+            }
+            Self::In { mode, frame } if frame + 1 < in_frames(mode) => (
+                Some(Self::In {
+                    mode,
+                    frame: frame + 1,
+                }),
+                None,
+            ),
+            Self::In { .. } => (None, None),
+        }
+    }
 }
 
 /// How the screen is drawn: the effects the fades set.
@@ -168,7 +222,7 @@ impl World<'_> {
     pub(super) fn queue_transfer(&mut self) {
         if self.fading.is_none() && self.leaving.is_none() && self.arriving.is_none() {
             if let Some(transfer) = self.globals.transfer.take() {
-                self.fading = Some(Fading::Out { transfer, frame: 0 });
+                self.fading = Some(Fading::start(transfer));
             }
         }
     }
@@ -183,45 +237,29 @@ impl World<'_> {
             return Ok(None);
         };
         self.run_actors()?;
-        match fading {
-            Fading::Out { transfer, frame } if frame + 1 >= out_frames(transfer.mode) => {
-                let (x, y) = transfer.position;
-                let audio = self.globals.audio.clone();
-                let mut entered = self.enter_destination(transfer.map, x, y, audio)?;
-                entered.face(self.facing);
-                entered.fading = Some(Fading::In {
-                    mode: transfer.mode,
-                    frame: 0,
-                });
-                let from = self.map;
-                *self = entered;
-                return Ok(Some(Step::Entered {
-                    from,
-                    to: transfer.map,
-                }));
-            }
-            Fading::Out { transfer, frame } => {
-                self.fading = Some(Fading::Out {
-                    transfer,
-                    frame: frame + 1,
-                });
-            }
-            Fading::In { mode, frame } if frame + 1 < in_frames(mode) => {
-                self.fading = Some(Fading::In {
-                    mode,
-                    frame: frame + 1,
-                });
-            }
-            Fading::In { .. } => {}
-        }
-        Ok(Some(Step::Stayed))
+        let (next, load) = fading.tick(&mut self.globals.transfer);
+        let Some(transfer) = load else {
+            self.fading = next;
+            return Ok(Some(Step::Stayed));
+        };
+        let (x, y) = transfer.position;
+        let audio = self.globals.audio.clone();
+        let mut entered = self.enter_destination(transfer.map, x, y, audio)?;
+        entered.face(self.facing);
+        entered.fading = next;
+        let from = self.map;
+        *self = entered;
+        Ok(Some(Step::Entered {
+            from,
+            to: transfer.map,
+        }))
     }
 
     /// How the screen is drawn now.
     #[must_use]
     pub fn screen(&self) -> Screen {
         match self.fading {
-            Some(Fading::Out { transfer, frame }) => out(transfer.mode, frame),
+            Some(Fading::Out { mode, frame, .. }) => out(mode, frame),
             Some(Fading::In { mode, frame }) => into(mode, frame),
             None => Screen::lit(self.exit_brightness()),
         }
@@ -237,6 +275,37 @@ impl World<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const fn transfer(map: u16, mode: u8) -> Transfer {
+        Transfer {
+            map,
+            position: (8, 16),
+            mode,
+        }
+    }
+
+    #[test]
+    fn a_transfer_queued_while_fading_out_replaces_the_destination() {
+        let mut fading = Fading::start(transfer(0x41, 0));
+        let mut queued = None;
+        for _ in 0..8 {
+            fading = fading.tick(&mut queued).0.unwrap();
+        }
+        queued = Some(transfer(0x42, 4));
+        let mut load = None;
+        for frame in 8..16 {
+            assert!(load.is_none(), "loaded early at {frame}");
+            let (next, loaded) = fading.tick(&mut queued);
+            (fading, load) = (next.unwrap(), loaded);
+        }
+        assert!(queued.is_none());
+        assert_eq!(load, Some(transfer(0x42, 4)), "16 frames by mode 0");
+        assert_eq!(fading, Fading::In { mode: 4, frame: 0 });
+        // One queued while fading in waits for the fade to end.
+        queued = Some(transfer(0x43, 0));
+        let (next, load) = fading.tick(&mut queued);
+        assert_eq!((next.is_some(), load, queued.is_some()), (true, None, true));
+    }
 
     fn brightness(fade: impl Fn(u16) -> Screen, frames: u16) -> Vec<u8> {
         (1..=frames).map(|frame| fade(frame).brightness).collect()
