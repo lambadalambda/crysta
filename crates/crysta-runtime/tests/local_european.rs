@@ -145,12 +145,6 @@ fn the_slice_art_is_the_japanese_art() {
         let (eu, jp) = (bodies(eu), bodies(jp));
         assert_eq!(eu.len(), jp.len(), "{map:#x}");
         for (index, (eu, jp)) in eu.iter().zip(&jp).enumerate() {
-            // Known gap: the box in `$21` is drawn from the Pandora sprite
-            // library, which reads Japanese addresses still.
-            if (map, index) == (0x21, 3) {
-                assert!(eu.is_err());
-                continue;
-            }
             assert!(
                 eu == jp,
                 "{map:#x} resident {index}: {:?}",

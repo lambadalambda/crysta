@@ -344,7 +344,8 @@ enum BodyArt {
 
 /// Pandora's Box in `$21` (`$83:928F`): descriptor `$83:F984`, mode
 /// `$0004`, which the ordinary loader does not take; [`PandoraSprites`]
-/// decodes it with its one list, selector 3.
+/// decodes it with its one list, selector 3, under the Japanese address in
+/// either revision (European `$83:F92C`).
 const BOX_DESCRIPTOR: usize = 0x03_F984;
 const BOX_ART: u32 = 0x83_F984;
 const BOX_SELECTOR: u8 = 3;
@@ -484,7 +485,8 @@ pub fn residents_art(
                     Err(Placeholder::PredecessorRefused)
                 }
                 Some(Err(RecordRefusal::Invalid(_)))
-                    if resident.descriptor == Some(BOX_DESCRIPTOR) =>
+                    if assets::layout::offset(image, BOX_DESCRIPTOR)
+                        .is_some_and(|box_| resident.descriptor == Some(box_)) =>
                 {
                     Body::pandora_box(image)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
