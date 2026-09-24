@@ -54,4 +54,3 @@
 - [ ] [Draw the shop display](issues/shop-display.md)
 - [ ] [Draw the text window as the game does](issues/native-text-window.md)
 - [ ] [Show the area titles](issues/area-titles.md)
-- [ ] [Let Ark run](issues/running.md)
