@@ -125,7 +125,8 @@ A differs substantially from indoor final composition:
   (`assets::maps::visual::SecondLayer`), onto the view with the animated
   tiles and colors; it scrolls with the camera and drifts one pixel left and
   down every three frames (`$0810`/`$0814` at the town checkpoints: 80
-  pixels over 241 frames). Its phase after the load is not matched.
+  pixels over 241 frames), added over the sprites as in the game. Its phase
+  after the load is not matched.
 - **Omitted:** subscreen/fixed-color/
   window/color-math composition; BG3 output; animation timing; transient text;
   shadows and unqualified actor output. Do not claim native-complete RGB.

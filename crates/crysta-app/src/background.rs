@@ -156,8 +156,8 @@ impl CachedBackground {
     /// main screen (`CGADSUB $33`), drawn from the animated tiles and colors.
     /// It scrolls with the camera and drifts a pixel left and down every
     /// three frames (`$086C`/`$086E` = `$02FF`/`$0201`, native town
-    /// checkpoints: 80 pixels over 241 frames). Drawn before the sprites,
-    /// which the addition leaves out.
+    /// checkpoints: 80 pixels over 241 frames). Added over the sprites too,
+    /// as in the game.
     pub fn add_clouds(&self, canvas: &mut crate::frame::Canvas, camera: (i32, i32), age: u64) {
         let Some(animation) = &self.animation else {
             return;

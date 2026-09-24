@@ -336,7 +336,7 @@ impl Session {
         let region = background.region;
         let camera = background.camera(position, frame.width);
         frame::draw_background(frame, &background.frame, camera);
-        background.add_clouds(frame, camera, self.background_clock.tick());
+        let clouds = background;
         let background = &background.frame;
         let count = residents.len();
         let mut order: Vec<(u16, usize, usize)> = residents
@@ -395,6 +395,7 @@ impl Session {
         if let Some((at, raster)) = pot {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
+        clouds.add_clouds(frame, camera, self.background_clock.tick());
         frame::mask_outside(frame, camera, region.bounds);
         frame::dim(frame, world.brightness());
         draw_dialogue(frame, world, position, camera);
