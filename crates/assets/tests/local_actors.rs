@@ -757,3 +757,51 @@ fn the_town_resolves_its_fb_compact_actors() {
     assert_eq!(scene.opcode(), 0xFB);
     assert_eq!(scene.script(), Some(0x88_84EF));
 }
+
+#[test]
+fn pages_type_one_glyph_a_frame_with_their_blip() {
+    // Every qualified page: glyph ticks never go back (a `$C8 0` speed
+    // types at once), blips are `$28` or `$25` or muted, and typing all but the last glyph changes only the
+    // last glyph's cell.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut sounds = std::collections::BTreeSet::new();
+    for source in assets::text::TEXT_SOURCES {
+        for page in assets::text::HouseDialogue::decode_at(image, source).unwrap() {
+            let glyphs = page.glyphs();
+            assert!(
+                glyphs.windows(2).all(|pair| pair[0].tick <= pair[1].tick),
+                "{source:#x}"
+            );
+            sounds.extend(glyphs.iter().map(|glyph| glyph.sound));
+            // Typing ends after the last glyph shows, and no later than its
+            // pauses allow.
+            assert!(page.duration() > glyphs.last().unwrap().tick, "{source:#x}");
+            assert!(page
+                .typed(image, 0)
+                .iter()
+                .all(|&pixel| pixel == page.background_index()));
+            let last = glyphs.last().unwrap();
+            let width = usize::from(page.width());
+            let partial = page.typed(image, glyphs.len() - 1);
+            for (i, (a, b)) in partial.iter().zip(page.indexed()).enumerate() {
+                let (x, y) = (
+                    u16::try_from(i % width).unwrap(),
+                    u16::try_from(i / width).unwrap(),
+                );
+                let inside = (last.position[0]..last.position[0] + 16).contains(&x)
+                    && (last.position[1]..last.position[1] + 16).contains(&y);
+                assert!(inside || a == b, "{source:#x} pixel {x},{y}");
+            }
+        }
+    }
+    assert!(
+        sounds
+            .iter()
+            .all(|sound| matches!(sound, None | Some(0x25 | 0x28))),
+        "{sounds:?}"
+    );
+    assert!(sounds.contains(&Some(0x28)));
+}

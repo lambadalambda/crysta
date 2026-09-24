@@ -84,6 +84,13 @@ pub struct DialogueGlyph {
     pub font_source: u32,
     /// Pixel coordinates relative to this page's content area.
     pub position: [u16; 2],
+    /// Frames after the page opens that the glyph appears: one per glyph at
+    /// the message speed (`$C8`, `$0DBE`, 1 by default: `$06A4`), plus the
+    /// pauses (`$C5`).
+    pub tick: u16,
+    /// The blip it sounds on port 3 (`$0DC6`, `$28` by default, set by
+    /// `$C7`), or `None` while `$C7 FF` mutes it (`$85:9930`, `$85:9EE8`).
+    pub sound: Option<u8>,
 }
 
 /// Immutable, precomposed page. Host bitmap presentation requires no original CPU.
@@ -96,6 +103,9 @@ pub struct DialoguePage {
     boundary_source: u32,
     acknowledgement: Acknowledgement,
     placement: Placement,
+    /// Frames the page takes to type out, pauses after its last glyph
+    /// included.
+    duration: u16,
 }
 impl DialoguePage {
     /// Content width, without native frame/window effects.
@@ -134,6 +144,28 @@ impl DialoguePage {
     #[must_use]
     pub const fn acknowledgement(&self) -> Acknowledgement {
         self.acknowledgement
+    }
+    /// Frames the page takes to type out, pauses after its last glyph
+    /// included.
+    #[must_use]
+    pub const fn duration(&self) -> u16 {
+        self.duration
+    }
+    /// The page with only its first `glyphs` glyphs drawn, as the
+    /// typewriter shows it; `image` supplies the font.
+    #[must_use]
+    pub fn typed(&self, image: &[u8], glyphs: usize) -> Vec<u8> {
+        if glyphs >= self.glyphs.len() {
+            return self.pixels.clone();
+        }
+        let width = usize::from(self.dimensions[0]);
+        let transparent = self.background_index == 0;
+        let mut pixels = vec![self.background_index; self.pixels.len()];
+        for glyph in &self.glyphs[..glyphs] {
+            // Decoding drew each glyph once already, so none fails here.
+            let _ = blit(&mut pixels, width, image, glyph, transparent);
+        }
+        pixels
     }
     /// Where the native engine opened the window this page is shown in.
     #[must_use]
@@ -311,6 +343,12 @@ struct Decoder<'a> {
     placement: Placement,
     page: DialoguePage,
     pages: Vec<DialoguePage>,
+    /// Frames into the page, frames per glyph, the blip and whether it is
+    /// muted.
+    tick: u16,
+    speed: u16,
+    /// The blip, `None` while muted, and the one unmuting restores.
+    blip: (Option<u8>, u8),
 }
 impl Decoder<'_> {
     fn next(&mut self) -> Result<u8, TextError> {
@@ -336,10 +374,26 @@ impl Decoder<'_> {
     fn word(&mut self) -> Result<u16, TextError> {
         Ok(u16::from_le_bytes([self.next()?, self.next()?]))
     }
+    /// Timing and sound: `$C5` a pause, `$C7` the blip (0 unmutes, `FF`
+    /// mutes, else picks one), `$C8` the message speed (`FF` the player's
+    /// setting, 1).
+    fn timing(&mut self, command: u8) -> Result<(), TextError> {
+        let operand = self.next()?;
+        match (command, operand) {
+            (0xc5, frames) => self.tick = self.tick.saturating_add(u16::from(frames)),
+            (0xc7, 0) => self.blip.0 = Some(self.blip.1),
+            (0xc7, 0xff) => self.blip.0 = None,
+            (0xc7, sound) => self.blip = (self.blip.0.map(|_| sound), sound),
+            (_, 0xff) => self.speed = 1,
+            (_, speed) => self.speed = u16::from(speed),
+        }
+        Ok(())
+    }
     fn clear(&mut self) {
         self.page = blank_page(self.dimensions, self.transparent, self.placement);
         self.position = [0, 0];
         self.kana = false;
+        self.tick = 0;
     }
     fn glyph(&mut self, text_source: u32, font_source: u32) -> Result<(), TextError> {
         let [x, y] = self.position.map(usize::from);
@@ -347,24 +401,22 @@ impl Decoder<'_> {
         if x + 16 > width || y + 16 > height {
             return Err(invalid(text_source, "text exceeds qualified page geometry"));
         }
-        let mut pixels = glyph_pixels(bytes(self.image, font_source, 64)?)?;
-        if self.transparent {
-            // $85947F: a' = a XOR (a AND b), b' = b XOR (a AND b).
-            for pixel in &mut pixels {
-                if *pixel == 3 {
-                    *pixel = 0;
-                }
-            }
-        }
-        for row in 0..16 {
-            self.page.pixels[(y + row) * width + x..(y + row) * width + x + 16]
-                .copy_from_slice(&pixels[row * 16..row * 16 + 16]);
-        }
-        self.page.glyphs.push(DialogueGlyph {
+        let glyph = DialogueGlyph {
             text_source,
             font_source,
             position: self.position,
-        });
+            tick: self.tick,
+            sound: self.blip.0,
+        };
+        blit(
+            &mut self.page.pixels,
+            width,
+            self.image,
+            &glyph,
+            self.transparent,
+        )?;
+        self.page.glyphs.push(glyph);
+        self.tick = self.tick.saturating_add(self.speed);
         self.position[0] += 12;
         Ok(())
     }
@@ -377,12 +429,16 @@ impl Decoder<'_> {
         }
         self.page.boundary_source = source;
         self.page.acknowledgement = action;
+        // A glyph at speed 0 shows on the tick it shares with the one before.
+        let last = self.page.glyphs.last().map_or(0, |glyph| glyph.tick + 1);
+        self.page.duration = self.tick.max(last);
         self.pages.push(std::mem::replace(
             &mut self.page,
             blank_page(self.dimensions, self.transparent, self.placement),
         ));
         self.position = [0, 0];
         self.kana = false;
+        self.tick = 0;
         Ok(())
     }
     /// `$C0`/`$C1` open the standard window; `$DA` (`$85964D`) opens it at
@@ -475,7 +531,32 @@ fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> 
         boundary_source: 0,
         acknowledgement: Acknowledgement::End,
         placement,
+        duration: 0,
     }
+}
+/// Draws a glyph into a page's pixels, `transparent` clearing its colour 3
+/// (`$85947F`: a' = a XOR (a AND b), b' = b XOR (a AND b)).
+fn blit(
+    pixels: &mut [u8],
+    width: usize,
+    image: &[u8],
+    glyph: &DialogueGlyph,
+    transparent: bool,
+) -> Result<(), TextError> {
+    let mut shape = glyph_pixels(bytes(image, glyph.font_source, 64)?)?;
+    if transparent {
+        for pixel in &mut shape {
+            if *pixel == 3 {
+                *pixel = 0;
+            }
+        }
+    }
+    let [x, y] = glyph.position.map(usize::from);
+    for row in 0..16 {
+        pixels[(y + row) * width + x..(y + row) * width + x + 16]
+            .copy_from_slice(&shape[row * 16..row * 16 + 16]);
+    }
+    Ok(())
 }
 fn decode(image: &[u8], source: u32) -> Result<Vec<DialoguePage>, TextError> {
     decode_profile(image, source, false)
@@ -497,6 +578,9 @@ fn decode_profile(
         placement: Placement::Bottom,
         page: empty_page(),
         pages: Vec::new(),
+        tick: 0,
+        speed: 1,
+        blip: (Some(0x28), 0x28),
     };
     for _ in 0..4096 {
         let at = d.pc;
@@ -521,10 +605,7 @@ fn decode_profile(
                 0 => d.transparent = true,
                 _ => return Err(invalid(at, "unsupported font transformation")),
             },
-            // Timing/sound controls do not change content or acknowledgements.
-            0xc5 | 0xc7 | 0xc8 => {
-                d.next()?;
-            }
+            command @ (0xc5 | 0xc7 | 0xc8) => d.timing(command)?,
             0xc6 => {
                 if ![0, 4].contains(&d.next()?) {
                     return Err(invalid(at, "unsupported text palette"));
