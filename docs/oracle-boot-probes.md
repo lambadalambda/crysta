@@ -16,11 +16,11 @@ All timings are frame counts from hard reset with the input edges shown.
 
 | Frame | Input | Observed |
 | --- | --- | --- |
-| 0–399 | — | Title screen (state `0x0450` = 163) |
+| 0–399 | — | Title screen (`0x0450` = 163) |
 | 400 | Start press (8 frames) | Title dismissed; map 4 (name entry, has "NAME" header on EU) at ~449 |
 | 1500 | A press | Needed: without it, later Start does nothing; selects a kana cell |
 | 1800 | Start press | Name accepted, map 41 (`0x29`) at ~1882, ~95 frames, then map 15 (`0x0F`) at ~2946 |
-| 2946+ | any | **Stall**: state `0x0450` = 170, player frozen at (304,112) |
+| 2946+ | any | **Stall**: `0x0450` = 170, player frozen at (304,112) |
 
 The name buffer already holds the default name before any input
 (`D0 3B 73 42 D1 D4` = アーク in the game's 2-byte encoding).
@@ -92,7 +92,8 @@ vendored core remains at upstream commit `9db90b8`.
 
 ## Reusable RAM symbols (probe-derived)
 
-- `0x0450` program state, `0x047E` current map, `0x0480` map × 2,
+- `0x0450` the current track's bank byte (`LDA $96:F2A2,X`; not a program
+  state, see `docs/european-timing.md`), `0x047E` current map, `0x0480` map × 2,
   `0x0482` pending map, `0x0488` room-change timer, `0x0456` button mirror
   (A = 0x80), `0x0920` secondary input mirror, `0x0DC8` menu cursor,
   `0x06A4` text speed.
