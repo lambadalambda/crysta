@@ -31,7 +31,8 @@ Doors and stairs move Ark to the next map at once: no walk out, fade or stair wa
   the view.
 - Story tests pin C to D (16 frames out, (120,608) to (120,625), the fade
   levels) and every stair spawn and rest on the native route.
-- Gaps: script transfers (`COP 14`) still load at once, without their
-  modes' fades (the box's mosaic); sideways doors reuse the vertical door's
+- Script transfers (`COP 14`) fade by their mode (2026-09-24,
+  `world/fade.rs`): mosaic for the box's tour, white for entering the box.
+- Gaps: sideways doors reuse the vertical door's
   pattern; the loads' own dark frames are skipped; the stepping API keeps
   its instant legacy placement for route discovery.
