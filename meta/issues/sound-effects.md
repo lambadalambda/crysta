@@ -33,6 +33,6 @@ the player's actions request sound effects; the runtime steps over them.
 - Modelled by hand: exits `$4D`, stair landings `$17`, wooden doors `$1A`,
   pot lift `$11`, break `$12` and door hit `$13` (native route
   `route-audio.log`).
-- Gaps: the text window's blips (`$28`/`$25` on port 3, from `$09B3`) are
-  not played, since pages appear whole; the door's hit follows the break at
+- Gaps: the text window's blips (`$28`/`$25` on port 3, from `$09B3`) now
+  play as pages type out (2026-09-24); the door's hit follows the break at
   once rather than four frames later.

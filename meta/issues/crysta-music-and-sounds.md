@@ -41,4 +41,6 @@ in scenes, and plays sound effects from scripts and the player code.
 
 - The three sub-issues are done (2026-09-23): the runtime cues tracks and
   sound effects (`crysta_runtime::audio`), the app plays them through the
-  driver. Open: the text window's blips (`$28`/`$25`), and a playtest.
+  driver. Open: a playtest.
+- The text window types a glyph a frame with its blip (`$28`/`$25` on
+  port 3; `$C5` pauses, `$C7` blip, `$C8` speed), 2026-09-24.
