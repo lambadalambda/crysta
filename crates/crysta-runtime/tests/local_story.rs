@@ -30,6 +30,23 @@ fn settle(world: &mut World<'_>) {
     frames_until(world, 200, |world| !world.in_transition());
 }
 
+/// Presses A once the page on screen has typed out, as a player does:
+/// presses while it types are not read.
+fn press_a(world: &mut World<'_>) {
+    typed(world);
+    world.update(None, A).unwrap();
+}
+
+/// Frames until the page on screen has typed out.
+fn typed(world: &mut World<'_>) {
+    for _ in 0..600 {
+        if !world.typing() {
+            break;
+        }
+        world.update(None, Presses::default()).unwrap();
+    }
+}
+
 /// Frames until `done`, each one neutral.
 fn frames_until(world: &mut World<'_>, limit: u32, done: impl Fn(&World<'_>) -> bool) -> u32 {
     for frame in 0..limit {
@@ -41,13 +58,15 @@ fn frames_until(world: &mut World<'_>, limit: u32, done: impl Fn(&World<'_>) -> 
     panic!("not within {limit} frames");
 }
 
-/// The tracks and the sound latch words the world asked for since the last
-/// call.
+/// The tracks and the sound latch words, less the text blips, the world
+/// asked for since the last call.
 fn cues(world: &mut World<'_>) -> (Vec<u8>, Vec<u16>) {
     let (mut tracks, mut sounds) = (Vec::new(), Vec::new());
     for cue in world.take_cues() {
         match cue {
             Cue::Track { track, .. } => tracks.push(track),
+            // Text blips (port 3 `$28`/`$25`) are checked on their own.
+            Cue::Sound(0x2800 | 0x2500) => {}
             Cue::Sound(latch) => sounds.push(latch),
         }
     }
@@ -87,7 +106,7 @@ fn elle_wakes_ark_then_walks_out() {
     // Five pages over three requests, each acknowledged with A.
     let mut pages = 0;
     while world.in_scene() {
-        world.update(None, A).unwrap();
+        press_a(&mut world);
         pages += 1;
         assert!(pages < 20);
     }
@@ -195,8 +214,12 @@ fn the_friends_ask_for_help_at_the_blue_door() {
     let silent = frames_until(&mut world, 200, |world| world.dialogue().is_some());
     assert!((38..=44).contains(&silent), "asked after {silent} frames");
     let (mut pages, mut gaps) = (0, Vec::new());
-    while world.dialogue().and_then(|view| view.cursor).is_none() {
-        world.update(None, A).unwrap();
+    // The choice opens once its page has typed out.
+    while {
+        typed(&mut world);
+        world.dialogue().and_then(|view| view.cursor).is_none()
+    } {
+        press_a(&mut world);
         pages += 1;
         if world.dialogue().is_none() {
             gaps.push(frames_until(&mut world, 200, |world| {
@@ -214,10 +237,10 @@ fn the_friends_ask_for_help_at_the_blue_door() {
     assert_eq!(pages, 6);
     // Option 1, help: two more pages, then `$2E`; the friend walks back and
     // the pad unlocks.
-    world.update(None, A).unwrap();
+    press_a(&mut world);
     let mut follow = 0;
     while world.in_scene() || world.dialogue().is_some() {
-        world.update(None, A).unwrap();
+        press_a(&mut world);
         follow += 1;
         assert!(follow < 20);
     }
@@ -238,7 +261,7 @@ fn a_map_load_clears_local_flags_and_counters_and_keeps_items() {
     // Through the wake-up, so Elle's items are held.
     frames_until(&mut world, 400, |world| world.dialogue().is_some());
     while world.in_scene() {
-        world.update(None, A).unwrap();
+        press_a(&mut world);
     }
     frames_until(&mut world, 600, |world| !world.pad_locked());
     let mut local = world.clone();
@@ -285,7 +308,7 @@ fn two_hits_break_the_blue_door_and_open_the_stairs() {
     let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
     let read_out = |world: &mut World<'_>| {
         for _ in 0..3000 {
-            let reading = world.dialogue().is_some() || world.in_scene();
+            let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
             world
                 .update(None, if reading { A } else { Presses::default() })
                 .unwrap();
@@ -417,7 +440,7 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
     }
     let read_out = |world: &mut World<'_>| {
         for _ in 0..3000 {
-            let reading = world.dialogue().is_some() || world.in_scene();
+            let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
             world
                 .update(None, if reading { A } else { Presses::default() })
                 .unwrap();
@@ -574,7 +597,7 @@ fn after_the_door() -> Vec<u8> {
 fn read_out(world: &mut World<'_>) -> u32 {
     let mut pages = 0;
     for _ in 0..3000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         pages += u32::from(reading);
         world
             .update(None, if reading { A } else { Presses::default() })
@@ -763,7 +786,7 @@ fn the_opened_box_takes_ark_inside_to_map_41() {
     cues(&mut world);
     let mut reading_frames = 0;
     for _ in 0..2000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         reading_frames += u32::from(reading);
         world
             .update(None, if reading { A } else { Presses::default() })
@@ -792,7 +815,7 @@ fn the_guide_tours_44_42_43_and_back_to_41_then_frees_ark() {
     let mut world = World::enter_with_events(image, 0x0041, 136, 208, events).unwrap();
     let mut landings = Vec::new();
     for _ in 0..3000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         let map = world.map();
         world
             .update(None, if reading { A } else { Presses::default() })
@@ -903,10 +926,10 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
         (world.position(), world.facing()),
         ((72, 384), Direction::Up)
     );
-    world.update(None, A).unwrap();
+    press_a(&mut world);
     assert!(flag(&world, 0x240), "the first talk");
     for _ in 0..3000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
@@ -915,10 +938,10 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
         }
     }
     assert!(flag(&world, 0x241), "consent");
-    world.update(None, A).unwrap();
+    press_a(&mut world);
     assert!(flag(&world, 0x242), "the second talk takes it");
     for _ in 0..3000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
@@ -951,7 +974,7 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     }
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
     for _ in 0..4000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
@@ -1133,6 +1156,39 @@ fn the_townspeople_stand_ready_and_two_of_them_walk() {
     );
 }
 
+#[test]
+fn a_page_types_out_with_blips_and_presses_wait_for_it() {
+    // Elle's first page types a glyph a frame, each with the blip `$28`
+    // (`$85:9EE8`); an A while it types is not read.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut world = World::enter_with_events(image, 0x000F, 304, 112, fresh_game_flags()).unwrap();
+    frames_until(&mut world, 400, |world| world.dialogue().is_some());
+    world.take_cues();
+    assert!(world.typing());
+    let first = world.dialogue().unwrap().glyphs;
+    world.update(None, A).unwrap();
+    let view = world.dialogue().unwrap();
+    assert_eq!(view.glyphs, first + 1, "the press did not end the page");
+    let mut frames = 1;
+    while world.typing() {
+        world.update(None, Presses::default()).unwrap();
+        frames += 1;
+    }
+    let page = world.dialogue().unwrap();
+    assert_eq!(page.glyphs, page.page.glyphs().len());
+    let typed = page.glyphs;
+    let blips = world
+        .take_cues()
+        .into_iter()
+        .filter(|cue| *cue == Cue::Sound(0x2800))
+        .count();
+    assert_eq!(blips, typed - first, "one per glyph typed");
+    assert!(frames >= typed - first);
+}
+
 /// The story flags after the frozen return.
 fn after_the_return() -> Vec<u8> {
     let mut events = after_the_door();
@@ -1170,7 +1226,7 @@ fn the_elder_at_ds_door_sends_ark_out_with_21_and_296() {
             break;
         }
     }
-    world.update(None, A).unwrap();
+    press_a(&mut world);
     read_out(&mut world);
     assert!(flag(&world, 0x21) && flag(&world, 0x296));
     for _ in 0..120 {
@@ -1304,7 +1360,7 @@ fn the_friend_steps_aside_after_the_door_breaks_and_a_press_waits_for_it() {
     assert!(world.strike(DOOR));
     let mut path = Vec::new();
     for _ in 0..3000 {
-        let reading = world.dialogue().is_some() || world.in_scene();
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         // A pressed on every frame the reaction holds the pad: it must not
         // take the stairs then. Once the pad is free a press may.
         let held = world.pad_locked();

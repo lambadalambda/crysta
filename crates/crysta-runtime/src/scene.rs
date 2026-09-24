@@ -140,15 +140,44 @@ fn bcd_add(a: u16, b: u16) -> u16 {
 /// The pad's direction bits in the SNES word: Up, Down, Left, Right.
 pub const PAD_DIRECTIONS: u16 = 0x0F00;
 
-/// A page's boundary, which is all the state machine needs to know of it.
+/// A page's boundary and typing, which is all the state machine needs to
+/// know of it.
 pub trait Page {
     /// What ends this page.
     fn acknowledgement(&self) -> Acknowledgement;
+    /// Frames the page takes to type out.
+    fn duration(&self) -> u16 {
+        0
+    }
+    /// The blip of a glyph typed on frame `tick`, if one is.
+    fn blip(&self, _tick: u16) -> Option<u8> {
+        None
+    }
+    /// Glyphs shown `typed` frames after the page opened.
+    fn shown(&self, _typed: u16) -> usize {
+        usize::MAX
+    }
 }
 
 impl Page for DialoguePage {
     fn acknowledgement(&self) -> Acknowledgement {
         DialoguePage::acknowledgement(self)
+    }
+    fn duration(&self) -> u16 {
+        DialoguePage::duration(self)
+    }
+    fn blip(&self, tick: u16) -> Option<u8> {
+        self.glyphs()
+            .iter()
+            .rev()
+            .find(|glyph| glyph.tick == tick)
+            .and_then(|glyph| glyph.sound)
+    }
+    fn shown(&self, typed: u16) -> usize {
+        self.glyphs()
+            .iter()
+            .filter(|glyph| glyph.tick < typed)
+            .count()
     }
 }
 
@@ -162,6 +191,8 @@ pub struct Dialogue<P = DialoguePage> {
     retained: Option<P>,
     /// The open choice: catalog, cursor as a native result (1 or 2).
     choice: Option<(DialogueChoice, u8)>,
+    /// Frames the page on screen has been typing.
+    typed: u16,
 }
 
 impl<P> Default for Dialogue<P> {
@@ -170,6 +201,7 @@ impl<P> Default for Dialogue<P> {
             text: None,
             retained: None,
             choice: None,
+            typed: 0,
         }
     }
 }
@@ -180,13 +212,16 @@ pub struct View<'a, P> {
     pub page: &'a P,
     /// Where the choice cursor sits, relative to the page, when one is open.
     pub cursor: Option<[u16; 2]>,
+    /// Glyphs typed so far; all of them once the page is out.
+    pub glyphs: usize,
 }
 
 impl<P: Page> Dialogue<P> {
-    /// Whether a request or choice owns the window (`$0DC2 != 0`).
+    /// Whether a request, a choice or typing owns the window (`$0DC2 !=
+    /// 0`).
     #[must_use]
-    pub const fn busy(&self) -> bool {
-        self.text.is_some() || self.choice.is_some()
+    pub fn busy(&self) -> bool {
+        self.text.is_some() || self.choice.is_some() || self.typing()
     }
 
     /// `COP 1B`: publishes a request. Refused while the window is busy; the
@@ -198,9 +233,37 @@ impl<P: Page> Dialogue<P> {
         self.retained = None;
         if !pages.is_empty() {
             self.text = Some((pages, 0));
+            self.typed = 0;
             self.settle();
         }
         true
+    }
+
+    /// One frame of typing (`$85:913E`: a glyph a frame at the default
+    /// speed, each with its blip). Returns the blip typed this frame.
+    pub fn tick(&mut self) -> Option<u8> {
+        let page = self.page()?;
+        if self.typed >= page.duration() {
+            return None;
+        }
+        let blip = page.blip(self.typed);
+        self.typed += 1;
+        blip
+    }
+
+    /// The page on screen.
+    fn page(&self) -> Option<&P> {
+        match &self.text {
+            Some((pages, index)) => Some(&pages[*index]),
+            None => self.retained.as_ref(),
+        }
+    }
+
+    /// Whether the page on screen is still typing: presses wait for the
+    /// acknowledgement the text reaches after its last glyph.
+    #[must_use]
+    pub fn typing(&self) -> bool {
+        self.page().is_some_and(|page| self.typed < page.duration())
     }
 
     /// Ends the request when the page showing returns without acknowledgement.
@@ -226,6 +289,9 @@ impl<P: Page> Dialogue<P> {
     /// Applies one frame's presses. Returns the choice result (0 cancel, 1
     /// or 2) when a choice closes this frame.
     pub fn press(&mut self, presses: Presses) -> Option<u8> {
+        if self.typing() {
+            return None;
+        }
         if let Some((choice, cursor)) = &mut self.choice {
             if presses.cancel {
                 self.close_choice();
@@ -257,6 +323,7 @@ impl<P: Page> Dialogue<P> {
             match pages[*index].acknowledgement() {
                 Acknowledgement::Next if *index + 1 < pages.len() => {
                     *index += 1;
+                    self.typed = 0;
                     self.settle();
                 }
                 _ => self.text = None,
@@ -273,18 +340,17 @@ impl<P: Page> Dialogue<P> {
     /// The page on screen, if any, and the choice cursor.
     #[must_use]
     pub fn view(&self) -> Option<View<'_, P>> {
-        if let Some((pages, index)) = &self.text {
-            return Some(View {
-                page: &pages[*index],
-                cursor: None,
-            });
-        }
-        let page = self.retained.as_ref()?;
+        let page = self.page()?;
         let cursor = self
             .choice
             .as_ref()
+            .filter(|_| self.text.is_none())
             .map(|(choice, cursor)| choice.options[usize::from(*cursor - 1)].position);
-        Some(View { page, cursor })
+        Some(View {
+            page,
+            cursor,
+            glyphs: page.shown(self.typed),
+        })
     }
 }
 
@@ -391,6 +457,30 @@ mod tests {
         assert_eq!(dialogue.view().unwrap().cursor, Some([16, 16]));
         assert_eq!(dialogue.press(A), Some(2));
         assert!(dialogue.view().is_none());
+    }
+
+    /// A page that returns at once but takes three frames to type.
+    struct Slow;
+
+    impl Page for Slow {
+        fn acknowledgement(&self) -> Acknowledgement {
+            Acknowledgement::None
+        }
+        fn duration(&self) -> u16 {
+            3
+        }
+    }
+
+    #[test]
+    fn a_page_that_returns_at_once_is_busy_until_it_is_typed() {
+        let mut dialogue = Dialogue::default();
+        assert!(dialogue.request(vec![Slow]));
+        for _ in 0..3 {
+            assert!(dialogue.busy(), "a script waiting on the text waits");
+            assert!(!dialogue.request(vec![Slow]));
+            dialogue.tick();
+        }
+        assert!(!dialogue.busy());
     }
 
     #[test]

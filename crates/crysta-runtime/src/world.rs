@@ -714,6 +714,9 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        if let Some(blip) = self.globals.dialogue.tick() {
+            self.globals.audio.sound_port3(blip);
+        }
         if self.scene.is_some() {
             self.answer_scene(presses);
             self.apply_patches()?;
@@ -810,6 +813,13 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn items(&self) -> &[u8] {
         &self.globals.items
+    }
+
+    /// Whether the dialogue page on screen is still typing out; presses
+    /// wait for it.
+    #[must_use]
+    pub fn typing(&self) -> bool {
+        self.globals.dialogue.typing()
     }
 
     /// The dialogue window, if a script has something on it.

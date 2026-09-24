@@ -600,6 +600,23 @@ const PRESS_B: Presses = Presses {
     down: false,
 };
 
+/// Presses once the page on screen has typed out: presses while it types
+/// are not read.
+fn press(world: &mut World<'_>, presses: Presses) {
+    typed(world);
+    world.update(None, presses).unwrap();
+}
+
+/// Frames until the page on screen has typed out.
+fn typed(world: &mut World<'_>) {
+    for _ in 0..600 {
+        if !world.typing() {
+            break;
+        }
+        world.update(None, Presses::default()).unwrap();
+    }
+}
+
 fn flag(world: &World<'_>, flag: usize) -> bool {
     world.events()[flag / 8] & (1 << (flag % 8)) != 0
 }
@@ -615,11 +632,12 @@ fn read_through(world: &mut World<'_>) -> usize {
     }
     let mut presses = 0;
     while world.dialogue().is_some() || world.in_scene() {
+        typed(world);
         assert!(
             world.dialogue().is_none_or(|view| view.cursor.is_none()),
             "a choice is open"
         );
-        world.update(None, PRESS_A).unwrap();
+        press(world, PRESS_A);
         presses += 1;
         assert!(presses < 40, "the text never ended");
     }
@@ -631,15 +649,19 @@ fn read_through(world: &mut World<'_>) -> usize {
 fn talk_until_choice(world: &mut World<'_>) -> usize {
     // A frame for the resident's loop to face the player and take interaction.
     world.update(None, Presses::default()).unwrap();
-    world.update(None, PRESS_A).unwrap();
+    press(world, PRESS_A);
     assert!(world.in_scene(), "the callback must hold the world");
     let mut pages = 0;
-    while world.dialogue().and_then(|view| view.cursor).is_none() {
+    // The choice opens once its page has typed out.
+    while {
+        typed(world);
+        world.dialogue().and_then(|view| view.cursor).is_none()
+    } {
         assert!(
             world.dialogue().is_some(),
             "the scene ended without a choice"
         );
-        world.update(None, PRESS_A).unwrap();
+        press(world, PRESS_A);
         pages += 1;
         assert!(pages < 40);
     }
@@ -667,7 +689,7 @@ fn the_elder_grants_26_before_the_choice_and_either_answer_continues() {
         );
         // Either answer: the callback returns and hands the follow-up to the
         // Elder's own script, which shows it while the world runs.
-        world.update(None, answer).unwrap();
+        press(&mut world, answer);
         assert!(!world.in_scene());
         // The follow-up is cooperative, with the pad's directions locked.
         while world.dialogue().is_none() {
@@ -706,19 +728,19 @@ fn the_weaver_grants_28_only_to_the_first_answer() {
             if !world.in_scene() {
                 return;
             }
-            world.update(None, PRESS_A).unwrap();
+            press(world, PRESS_A);
         }
         panic!("the conversation never ended");
     };
     // Refuse: the second option. Nothing granted; the talk ends.
     talk_until_choice(&mut world);
-    world.update(None, down).unwrap();
-    world.update(None, PRESS_A).unwrap();
+    press(&mut world, down);
+    press(&mut world, PRESS_A);
     finish(&mut world);
     assert!(!flag(&world, 0x28));
     // Asked again, the first option grants it.
     talk_until_choice(&mut world);
-    world.update(None, PRESS_A).unwrap();
+    press(&mut world, PRESS_A);
     finish(&mut world);
     assert!(flag(&world, 0x28));
 }
