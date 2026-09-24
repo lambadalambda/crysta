@@ -73,7 +73,8 @@ pub struct Shop {
 /// Refuses a table that leaves the image or does not end, and a price
 /// that is not BCD.
 pub fn shops(image: &[u8]) -> Result<Vec<Shop>, ShopError> {
-    let records = layout::at(image, RECORDS).ok_or(ShopError::Truncated(RECORDS))?;
+    let records = layout::at(image, RECORDS)
+        .ok_or(ShopError::Invalid(RECORDS, "unrecorded in this revision"))?;
     // The spawner's row offset: `ADC #$0010` at `$92:CD10`, `#$0008` at the
     // European `$92:E382`.
     let row = per_revision(image, 16, 8);
@@ -124,8 +125,10 @@ fn stock(image: &[u8], start: u32) -> Result<Vec<ShopItem>, ShopError> {
 /// # Errors
 /// Refuses a read outside the image and a cost that is not BCD.
 pub fn prime_blue_cost(image: &[u8], item: u8) -> Result<u32, ShopError> {
-    let costs =
-        layout::at(image, PRIME_BLUE_COSTS).ok_or(ShopError::Truncated(PRIME_BLUE_COSTS))?;
+    let costs = layout::at(image, PRIME_BLUE_COSTS).ok_or(ShopError::Invalid(
+        PRIME_BLUE_COSTS,
+        "unrecorded in this revision",
+    ))?;
     let at = costs + u32::from(item) * 2;
     bcd(word(read(image, at, 2)?, 0)).ok_or(ShopError::Invalid(at, "cost is not BCD"))
 }

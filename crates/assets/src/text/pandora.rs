@@ -170,14 +170,14 @@ impl PandoraDialogue {
 // $8596BE compares assignments in address order. $85BEF7 resets the default
 // controller configuration; read its immediate stores, not captured button RAM.
 pub(super) fn default_button_source(image: &[u8], mask: u16) -> Result<u32, TextError> {
+    // European `$85:BF8F`, the same six stores.
+    let start = crate::layout::at(image, 0x85_bef7)
+        .ok_or_else(|| invalid(0x85_bef7, "unrecorded default controller initialization"))?;
     let mut assignments = [0_u16; 6];
     for (index, target) in [0x634, 0x636, 0x638, 0x63a, 0x63e, 0x63c]
         .into_iter()
         .enumerate()
     {
-        // European `$85:BF8F`, the same six stores.
-        let start = crate::layout::at(image, 0x85_bef7)
-            .ok_or_else(|| invalid(0x85_bef7, "unrecorded default controller initialization"))?;
         let source = start + u32::try_from(index).unwrap() * 6;
         let code = super::bytes(image, source, 6)?;
         if code[0] != 0xa9 || code[3] != 0x8d || u16::from_le_bytes([code[4], code[5]]) != target {
@@ -194,5 +194,5 @@ pub(super) fn default_button_source(image: &[u8], mask: u16) -> Result<u32, Text
         .ok_or_else(|| invalid(0x85_970d, "unrecorded controller label table"))?;
     let source = labels + u32::try_from(index).unwrap() * 2;
     let pointer = super::bytes(image, source, 2)?;
-    Ok(0x85_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
+    Ok((labels & 0xFF_0000) | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
 }
