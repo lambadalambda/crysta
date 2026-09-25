@@ -41,6 +41,13 @@ lines: its content is 224×64 (Japanese 224×48). `DA` at the top is base
 records keep their absolute tiles, so relative to the European window they
 sit at y = 24 and 40 (not checked on screen).
 
+The frozen-return Elder's `COP 1B` at `$88:8D36` requests `$88:8D6C`.
+Its 216-pixel custom window contains a glyph at x204: the 12-pixel pitch
+fits, though its 16-pixel cell extends four pixels past the portable content
+bitmap. The decoder clips that edge when composing and partially typing the
+page, rather than freezing the actor. This is a bounded portable bitmap rule,
+not a native raster comparison of that window's right edge.
+
 ## The first bedroom page
 
 The script requests text by address in bank `$88`, as in Japanese: the

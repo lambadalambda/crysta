@@ -443,7 +443,10 @@ impl Decoder<'_> {
     fn glyph(&mut self, text_source: u32, font_source: u32) -> Result<(), TextError> {
         let [x, y] = self.position.map(usize::from);
         let [width, height] = self.dimensions.map(usize::from);
-        if x + 16 > width || y + 16 > height {
+        // Glyphs advance by 12 pixels although their cells are 16 wide.
+        // The final glyph of a narrow English window can extend four pixels
+        // beyond its content; clip that overlap, not the entire text page.
+        if x + 12 > width || y + 16 > height {
             return Err(invalid(text_source, "text exceeds qualified page geometry"));
         }
         let glyph = DialogueGlyph {
@@ -672,9 +675,10 @@ fn blit(
         }
     }
     let [x, y] = glyph.position.map(usize::from);
+    let visible = 16.min(width - x);
     for row in 0..16 {
-        pixels[(y + row) * width + x..(y + row) * width + x + 16]
-            .copy_from_slice(&shape[row * 16..row * 16 + 16]);
+        pixels[(y + row) * width + x..(y + row) * width + x + visible]
+            .copy_from_slice(&shape[row * 16..row * 16 + visible]);
     }
     Ok(())
 }

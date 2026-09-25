@@ -47,6 +47,40 @@ fn the_first_bedroom_pages_decode_with_their_dictionary_words() {
     assert_eq!(text(1), "Ark.You looked likeyou were having anightmare.");
 }
 
+#[test]
+fn the_european_elders_narrow_window_accepts_its_last_glyph_cell() {
+    let Some(rom) = european() else {
+        return;
+    };
+    // $88:8D36 requests $88:8D6C after setting $21. The custom 216px
+    // window's last character starts at x204: its 12px advance fits, while
+    // the 16px glyph cell extends four pixels past the content boundary.
+    let pages = HouseDialogue::decode_at(rom.image(), 0x88_8d6c).unwrap();
+    let (page, index) = pages
+        .iter()
+        .find_map(|page| {
+            page.glyphs()
+                .iter()
+                .position(|glyph| glyph.text_source == 0x88_8de4 && glyph.position[0] == 204)
+                .map(|index| (page, index))
+        })
+        .expect("custom-window edge glyph");
+    assert_eq!(page.width(), 216);
+    assert!(index + 1 < page.glyphs().len(), "exercise partial typing");
+    let before = page.typed(rom.image(), index);
+    let partial = page.typed(rom.image(), index + 1);
+    let width = usize::from(page.width());
+    let y = usize::from(page.glyphs()[index].position[1]);
+    for row in y..y + 16 {
+        let edge = row * width + 204..row * width + 216;
+        assert_eq!(&partial[edge.clone()], &page.indexed()[edge]);
+    }
+    assert!((y..y + 16).any(|row| {
+        let edge = row * width + 204..row * width + 216;
+        before[edge.clone()] != partial[edge]
+    }));
+}
+
 fn japanese() -> Option<Rom> {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../local/Tenchi Souzou (Japan).sfc");
     Rom::load(&std::fs::read(path).ok()?).ok()
