@@ -344,7 +344,7 @@ fn european_new_game_opens_pandora_and_completes_the_tour() {
         return;
     }
     if std::env::var("ORACLE_EU_TOUR_CHILD").is_ok() {
-        run_tour_child();
+        run_tour_child(false);
     }
     let out = std::process::Command::new(std::env::current_exe().expect("current exe"))
         .args([
@@ -363,7 +363,35 @@ fn european_new_game_opens_pandora_and_completes_the_tour() {
     );
 }
 
-fn run_tour_child() -> ! {
+/// A second fresh child replays the accepted prefix and the separately
+/// observed spear, frozen return, Elder mission and south-gate continuation.
+#[test]
+fn european_new_game_reaches_the_underworld_on_foot() {
+    if local_rom("Terranigma (E) [!].smc").is_none() {
+        eprintln!("skipping: local European dump not present");
+        return;
+    }
+    if std::env::var("ORACLE_EU_WORLD_CHILD").is_ok() {
+        run_tour_child(true);
+    }
+    let out = std::process::Command::new(std::env::current_exe().expect("current exe"))
+        .args([
+            "--exact",
+            "european_new_game_reaches_the_underworld_on_foot",
+            "--nocapture",
+        ])
+        .env("ORACLE_EU_WORLD_CHILD", "1")
+        .output()
+        .expect("spawn child");
+    assert!(
+        out.status.success(),
+        "European world-map witness failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn run_tour_child(to_world: bool) -> ! {
     let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
     let rom = rom::Rom::load(&image).expect("validated European ROM");
     assert_eq!(rom.revision(), rom::Revision::EuropeEnglish);
@@ -380,12 +408,20 @@ fn run_tour_child() -> ! {
         session.run_frame();
     }
     let commands = include_str!("fixtures/eu-pandora-tour.inputs");
-    assert_eq!(
-        commands.lines().count(),
-        453,
-        "full observed route is required"
-    );
-    for (index, line) in commands.lines().enumerate() {
+    let extension = if to_world {
+        include_str!("fixtures/eu-world-map.inputs")
+    } else {
+        ""
+    };
+    assert_eq!(commands.lines().count(), 453, "full tour is required");
+    if to_world {
+        assert_eq!(
+            extension.lines().count(),
+            212,
+            "full continuation is required"
+        );
+    }
+    for (index, line) in commands.lines().chain(extension.lines()).enumerate() {
         let mut parts = line.split_whitespace();
         let frames: usize = parts.next().expect("frame count").parse().expect("frames");
         let held: Vec<_> = parts.collect();
@@ -440,6 +476,42 @@ fn run_tour_child() -> ! {
                 (0x41, 120, 192),
                 "Ark can move on both axes after the completed tour"
             ),
+            467 => assert_eq!(word(0x47e), 0x42, "spear room entered on foot"),
+            577 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x21, 120, 448));
+                for id in [0x240, 0x241, 0x242, 0x23, 0xfe] {
+                    assert!(event(id), "frozen return must retain event {id:#x}");
+                }
+                assert_eq!(&w[0x18048..0x1804a], &[0x81, 1], "spear entered inventory");
+                assert!(!event(0x296), "Elder has not assigned the mission yet");
+            }
+            612 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x0d, 120, 704));
+                assert!(event(0x21), "Elder learns of the frozen town");
+                assert!(!event(0x296), "his answer has not completed yet");
+            }
+            648 => {
+                assert!(event(0x296), "Elder sends Ark on his mission");
+                assert!(!event(0x3c), "town has not finished its own scene");
+            }
+            663 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x0a, 504, 868));
+                assert!(event(0x3c), "frozen Crysta scene finishes");
+            }
+            665 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x03, 536, 544));
+                assert_eq!(session.frame_state().frames, 73937);
+                for id in [
+                    0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2e, 0x3c, 0xfe, 0x240, 0x241,
+                    0x242, 0x243, 0x244, 0x292, 0x296,
+                ] {
+                    assert!(event(id), "world map must retain event {id:#x}");
+                }
+                eprintln!(
+                    "EU world map reached at frame {}",
+                    session.frame_state().frames
+                );
+            }
             _ => {}
         }
     }

@@ -25,16 +25,20 @@ and run the story tests against it.
   bedroom, exterior and weaver positions against the European ROM. Portable
   `crates/crysta-runtime/tests/local_european.rs` checks the same opening
   doorway and, separately, the Elder and weaver choices. All pass with the
-  owned European ROM. This is **not** the requested bedroom-to-world-map
-  native route or a continuous portable replay.
+  owned European ROM. This opening witness is not a continuous portable
+  replay.
 - The headless native exploration continued, using only real buttons from the
   same empty-SRAM European boot: returning home grants `$27/$2E`, a thrown pot
   breaks the blue door (`$292`), the second Down approach opens Pandora's Box
   (`$22`), and the forced tour passes `$41 → $44 → $42 → $43 → $41`, sets
   `$243/$244`, and releases Ark to move on both axes. A reproducible fresh-child
-  input fixture and native test check the opening and tour checkpoints. This
-  is still **not** a continuous portable replay or the world-map route.
-- Next: collect the spear, return to frozen Crysta, receive the Elder's mission,
-  and reach world-map `$03`; check the portable story against those European
-  inputs. The European dialogue acknowledgement schedules must be observed
-  rather than copied from the Japanese route.
+  input fixture and native test check the opening and tour checkpoints.
+- A second fresh child replays that prefix plus the European spear/return
+  continuation without save-state restoration or memory writes. It checks
+  `$240/$241/$242` and the actual spear inventory entry, the frozen return
+  `$FE/$23`, Elder `$21` followed by mission `$296`, town `$3C`, and arrival
+  on world-map `$03` at `(536,544)` at frame 73937. The headless native
+  European route now reaches the requested endpoint. The portable European
+  tests still need to cover this continuation and a continuous replay;
+  source-specific English dialogue acknowledgements cannot be assumed from
+  Japanese timings.
