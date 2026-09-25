@@ -391,6 +391,129 @@ fn european_new_game_reaches_the_underworld_on_foot() {
     );
 }
 
+/// The refusal and retry-acceptance branch is not the direct `$2E` route.
+/// The native script keeps the pad through later pages, then grants `$0B`
+/// and gives Ark control; never infer release from `$2F` alone.
+#[test]
+fn european_friend_refusal_then_retry_acceptance_releases_ark() {
+    if local_rom("Terranigma (E) [!].smc").is_none() {
+        eprintln!("skipping: local European dump not present");
+        return;
+    }
+    if std::env::var("ORACLE_EU_RETRY_CHILD").is_ok() {
+        run_friend_retry_child();
+    }
+    let out = std::process::Command::new(std::env::current_exe().expect("current exe"))
+        .args([
+            "--exact",
+            "european_friend_refusal_then_retry_acceptance_releases_ark",
+            "--nocapture",
+        ])
+        .env("ORACLE_EU_RETRY_CHILD", "1")
+        .output()
+        .expect("spawn child");
+    assert!(
+        out.status.success(),
+        "European retry witness failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn run_friend_retry_child() -> ! {
+    let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
+    let rom = rom::Rom::load(&image).expect("validated European ROM");
+    assert_eq!(rom.revision(), rom::Revision::EuropeEnglish);
+    let mut session = Session::new(&rom).expect("empty-SRAM native session");
+    for _ in 0..1800 {
+        session.run_frame();
+    }
+    session.set_button(Button::Start, true);
+    for _ in 0..10 {
+        session.run_frame();
+    }
+    session.set_button(Button::Start, false);
+    for _ in 0..150 {
+        session.run_frame();
+    }
+    let fixture = include_str!("fixtures/eu-pandora-tour.inputs");
+    assert_eq!(
+        fixture.lines().count(),
+        453,
+        "the recorded route is complete"
+    );
+    // Stop at the *first* friend's answer, before the direct `$2E` choice.
+    for line in fixture.lines().take(166) {
+        replay_european_input(&mut session, line);
+    }
+    let snapshot = |session: &Session| {
+        let w = session.wram_image();
+        let word = |at: usize| u16::from_le_bytes([w[at], w[at + 1]]);
+        let flag = |id: usize| w[0x6c0 + id / 8] & (1 << (id % 8)) != 0;
+        (
+            word(0x47e),
+            word(0x1000),
+            word(0x1002),
+            word(0x0dc2),
+            [0x2e, 0x2f, 0x3f, 0x42, 0x0b].map(flag),
+        )
+    };
+    assert_eq!(snapshot(&session), (0x0c, 120, 447, 0xffff, [false; 5]));
+    for line in ["1 Down", "60", "1 A"] {
+        replay_european_input(&mut session, line);
+    }
+    // Later English requests require separate acknowledgements after typing.
+    for i in 0..23 {
+        replay_european_input(&mut session, "240");
+        replay_european_input(&mut session, "1 A");
+        if i == 13 {
+            let (map, x, y, _, flags) = snapshot(&session);
+            assert_eq!((map, x, y), (0x0c, 120, 448));
+            assert_eq!(
+                flags[..4],
+                [false, true, true, true],
+                "retry is `$2F`, not `$2E`"
+            );
+            assert!(!flags[4], "$0B follows the player script's later pages");
+        }
+    }
+    assert!(
+        snapshot(&session).4[4],
+        "the native player script grants `$0B`"
+    );
+    for line in ["600", "44 Right", "100"] {
+        replay_european_input(&mut session, line);
+    }
+    assert_eq!(
+        snapshot(&session),
+        (0x0c, 184, 448, 0, [false, true, true, true, true]),
+        "Ark walks after the alternate scene releases the pad"
+    );
+    std::process::exit(0);
+}
+
+fn replay_european_input(session: &mut Session, line: &str) {
+    let mut parts = line.split_whitespace();
+    let frames: usize = parts.next().expect("frame count").parse().expect("frames");
+    let held: Vec<_> = parts.collect();
+    for (name, button) in [
+        ("Start", Button::Start),
+        ("A", Button::A),
+        ("Up", Button::Up),
+        ("Down", Button::Down),
+        ("Left", Button::Left),
+        ("Right", Button::Right),
+    ] {
+        session.set_button(button, held.contains(&name));
+    }
+    assert!(held
+        .iter()
+        .all(|name| matches!(*name, "Start" | "A" | "Up" | "Down" | "Left" | "Right")));
+    for _ in 0..frames {
+        session.run_frame();
+    }
+}
+
 fn run_tour_child(to_world: bool) -> ! {
     let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
     let rom = rom::Rom::load(&image).expect("validated European ROM");
@@ -422,25 +545,7 @@ fn run_tour_child(to_world: bool) -> ! {
         );
     }
     for (index, line) in commands.lines().chain(extension.lines()).enumerate() {
-        let mut parts = line.split_whitespace();
-        let frames: usize = parts.next().expect("frame count").parse().expect("frames");
-        let held: Vec<_> = parts.collect();
-        for (name, button) in [
-            ("Start", Button::Start),
-            ("A", Button::A),
-            ("Up", Button::Up),
-            ("Down", Button::Down),
-            ("Left", Button::Left),
-            ("Right", Button::Right),
-        ] {
-            session.set_button(button, held.contains(&name));
-        }
-        assert!(held
-            .iter()
-            .all(|name| matches!(*name, "Start" | "A" | "Up" | "Down" | "Left" | "Right")));
-        for _ in 0..frames {
-            session.run_frame();
-        }
+        replay_european_input(&mut session, line);
         let w = session.wram_image();
         let word = |offset: usize| u16::from_le_bytes([w[offset], w[offset + 1]]);
         let event = |id: usize| w[0x6c0 + id / 8] & (1 << (id % 8)) != 0;
