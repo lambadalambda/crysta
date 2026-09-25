@@ -720,7 +720,7 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
 
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
-fn european_single_world_replays_bedroom_through_pandora_tour() {
+fn european_single_world_replays_bedroom_through_crystal_spear() {
     let Some(rom) = european() else { return };
     let mut world =
         World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
@@ -1280,4 +1280,92 @@ fn european_single_world_replays_bedroom_through_pandora_tour() {
     eu_frames(&mut world, 12, Some(Direction::Up));
     eu_frames(&mut world, 120, None);
     assert_eq!((world.map(), world.position()), (0x41, (120, 192)));
+
+    // Approach the wooden arch on foot after the tour, then circle the
+    // pedestals to speak to the spear, rather than initializing its room.
+    for (frames, direction) in [
+        (8, Direction::Left),
+        (32, Direction::Up),
+        (32, Direction::Up),
+        (8, Direction::Left),
+        (32, Direction::Up),
+    ] {
+        eu_frames(&mut world, frames, Some(direction));
+        eu_frames(&mut world, 12, None);
+    }
+    assert_eq!(world.position(), (72, 80), "at the weapon arch");
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    eu_frames(&mut world, 180, None);
+    assert_eq!((world.map(), world.position()), (0x42, (136, 464)));
+    for (frames, direction) in [
+        (44, Direction::Left),
+        (60, Direction::Up),
+        (32, Direction::Left),
+        (32, Direction::Up),
+        (20, Direction::Right),
+        (20, Direction::Up),
+    ] {
+        eu_frames(&mut world, frames, Some(direction));
+        eu_frames(&mut world, 12, None);
+    }
+    assert_eq!(world.position(), (72, 384), "at the spear");
+    assert_eq!(world.facing(), Direction::Up);
+    for id in [0x240, 0x241, 0x242] {
+        assert!(!eu_flag(&world, id), "spear event {id:#x} not granted yet");
+    }
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert!(eu_flag(&world, 0x240), "first talk with the spear");
+    assert!(!eu_flag(&world, 0x241) && !eu_flag(&world, 0x242));
+    assert!(
+        eu_finish_scene(&mut world, 5000),
+        "consent to take the spear"
+    );
+    assert!(eu_flag(&world, 0x241));
+    assert!(!eu_flag(&world, 0x242));
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert!(eu_flag(&world, 0x242), "second talk takes the spear");
+    for frame in 0..6000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if world.map() == 0x21 {
+            break;
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x21, (136, 368)));
+    assert!(
+        world.items().contains(&0x81),
+        "actual Crystal Spear inventory"
+    );
 }
