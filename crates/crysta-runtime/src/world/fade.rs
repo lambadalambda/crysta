@@ -268,7 +268,7 @@ impl World<'_> {
         entered.face(self.facing);
         entered.fading = next;
         let from = self.map;
-        entered.dark = super::transition::dark_frames(from, transfer.map);
+        entered.dark = super::transition::dark_frames(self.image, from, transfer.map);
         *self = entered;
         Ok(Some(Step::Entered {
             from,

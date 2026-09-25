@@ -181,6 +181,8 @@ const FADE: u16 = 16;
 /// must decompress and whether the music's samples change, which the
 /// cache (`$0418`..`$044E`) decides. Loads the route does not take stay
 /// dark for [`DARK`] frames, its usual room-to-room load.
+/// Japanese route measurements except for the European bedroom door, whose
+/// PAL load has been measured at 14 rather than 17 dark frames.
 const MEASURED_DARK: [((u16, u16), u16); 27] = [
     ((0x0F, 0x10), 17),
     ((0x10, 0x0C), 18),
@@ -212,12 +214,17 @@ const MEASURED_DARK: [((u16, u16), u16); 27] = [
 ];
 const DARK: u16 = 17;
 
-/// The dark frames of the load from `from` to `to`.
-pub(super) fn dark_frames(from: u16, to: u16) -> u16 {
-    MEASURED_DARK
+/// The dark frames of the load from `from` to `to` on this ROM.
+pub(super) fn dark_frames(image: &[u8], from: u16, to: u16) -> u16 {
+    let japanese = MEASURED_DARK
         .iter()
         .find(|(maps, _)| *maps == (from, to))
-        .map_or(DARK, |&(_, frames)| frames)
+        .map_or(DARK, |&(_, frames)| frames);
+    if (from, to) == (0x0f, 0x10) {
+        assets::layout::per_revision(image, japanese, 14)
+    } else {
+        japanese
+    }
 }
 
 /// `$8D:8985`: each selector's arrival adjustment, as (dx, dy).
@@ -451,7 +458,7 @@ impl World<'_> {
         }
         let from = self.map;
         let to = entered.map;
-        entered.dark = dark_frames(from, to);
+        entered.dark = dark_frames(self.image, from, to);
         *self = entered;
         Ok(Step::Entered { from, to })
     }
@@ -487,5 +494,19 @@ mod tests {
             Walk::new(DOOR_ARRIVING, Direction::Up).end((0, 100)),
             (0, 83)
         );
+    }
+
+    #[test]
+    fn the_european_bedroom_door_has_fourteen_dark_frames_only() {
+        let mut europe = vec![0; 0x1_0000];
+        europe[0xffc0..0xffc0 + 21].fill(b' ');
+        europe[0xffc0..0xffc0 + 12].copy_from_slice(b"TERRANIGMA P");
+        let japan = [0; 16]; // No revision header falls back to Japan.
+        assert_eq!(dark_frames(&europe, 0x0f, 0x10), 14);
+        assert_eq!(dark_frames(&japan, 0x0f, 0x10), 17);
+        for image in [&europe[..], &japan[..]] {
+            assert_eq!(dark_frames(image, 0x0c, 0x0d), 18);
+            assert_eq!(dark_frames(image, 0x0f, 0x0b), DARK);
+        }
     }
 }

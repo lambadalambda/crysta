@@ -79,7 +79,38 @@ fn the_european_wake_up_releases_ark_after_elles_dialogue() {
     for _ in 0..67 {
         world.update(Some(Direction::Down), Presses::NONE).unwrap();
     }
+    let mut waited = 0;
     for _ in 0..83 {
+        waited += 1;
+        let (movement, interaction) = world.update(None, Presses::NONE).unwrap();
+        if matches!(
+            movement,
+            Step::Entered {
+                from: 0x0f,
+                to: 0x10
+            }
+        ) || matches!(
+            interaction,
+            Some(Step::Entered {
+                from: 0x0f,
+                to: 0x10
+            })
+        ) {
+            break;
+        }
+    }
+    assert!(waited < 83, "bedroom doorway loaded the European room");
+    let mut dark = 0;
+    for _ in 0..40 {
+        world.update(None, Presses::NONE).unwrap();
+        if world.brightness() > 0 {
+            break;
+        }
+        dark += 1;
+    }
+    assert_eq!(dark, 14, "native European bedroom load is 14 dark frames");
+    assert!(waited + dark < 83, "doorway timing fits the native leg");
+    for _ in (waited + dark + 1)..83 {
         world.update(None, Presses::NONE).unwrap();
     }
     assert_eq!(world.map(), 0x0010, "leave through the bedroom doorway");

@@ -9,8 +9,9 @@ measured on the reference emulator.
   move the same per frame as the Japanese ROM. The game only runs slower in
   real time.
 - **Loads.** Loads are shorter: door `$0F`→`$10` stays dark 14 frames, not
-  17, likely because a PAL frame has more CPU time. Other loads are not
-  measured yet.
+  17, likely because a PAL frame has more CPU time. The portable world now
+  uses 14 for that European load (with an end-to-end door test); Japanese
+  remains 17. Other European loads are not measured yet.
 - **Sound.** The same driver (bootstrap `$86:AC42`, byte-identical) and song
   data: the sound bank moves from `$C6:2191` to `$C8:2191`, the track table
   from `$96:F2A0` to `$99:F9EA` (all 59 entries, pointers `+$20000` or
