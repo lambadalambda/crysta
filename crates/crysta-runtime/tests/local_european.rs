@@ -572,11 +572,11 @@ fn european_frozen_elder_assigns_the_world_map_mission() {
     world.face(Direction::Down);
     let mut started = false;
     for frame in 0..6000 {
-        let confirm = if !started {
+        let confirm = if started {
+            (world.dialogue().is_some() || world.in_scene()) && !world.typing() && frame % 2 == 0
+        } else {
             started = true;
             true
-        } else {
-            (world.dialogue().is_some() || world.in_scene()) && !world.typing() && frame % 2 == 0
         };
         world
             .update(
@@ -666,4 +666,261 @@ fn european_frozen_town_releases_ark_to_the_underworld() {
     for id in [0x21, 0x23, 0x3c, 0xfe, 0x242, 0x296] {
         assert_ne!(world.events()[id / 8] & (1 << (id % 8)), 0);
     }
+}
+
+fn eu_flag(world: &World<'_>, id: usize) -> bool {
+    world.events()[id / 8] & (1 << (id % 8)) != 0
+}
+
+fn eu_frames(world: &mut World<'_>, count: usize, direction: Option<Direction>) {
+    for _ in 0..count {
+        world.update(direction, Presses::NONE).unwrap();
+    }
+}
+
+/// Play a scene using the English page/cursor state, not Japanese page counts
+/// or the native emulator's fixed acknowledgement intervals.
+fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
+    let mut chose = false;
+    let mut quiet = 0;
+    for frame in 0..limit {
+        let view = world.dialogue();
+        let choosing = view.as_ref().and_then(|page| page.cursor).is_some();
+        let confirm = view.is_some() && !world.typing() && frame % 2 == 0;
+        if choosing && confirm {
+            chose = true;
+        }
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if !world.in_scene() && world.dialogue().is_none() && !world.pad_locked() {
+            quiet += 1;
+            if quiet == 30 {
+                return chose;
+            }
+        } else {
+            quiet = 0;
+        }
+    }
+    panic!(
+        "English scene did not release Ark: map={:#x} pos={:?} typing={} cursor={} frozen={:x?}",
+        world.map(),
+        world.position(),
+        world.typing(),
+        world.dialogue().and_then(|page| page.cursor).is_some(),
+        world.frozen_scripts()
+    );
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
+fn european_single_world_replays_from_bedroom_to_weaver() {
+    let Some(rom) = european() else { return };
+    let mut world =
+        World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
+    for _ in 0..400 {
+        if world.dialogue().is_some() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    assert!(world.dialogue().is_some(), "Elle speaks in the bedroom");
+    eu_finish_scene(&mut world, 6000);
+    assert!(eu_flag(&world, 0x20));
+    assert_eq!(world.items(), [0x7a, 0xa0]);
+
+    for (frames, direction) in [
+        (62, Some(Direction::Right)),
+        (38, None),
+        (67, Some(Direction::Down)),
+        (83, None),
+    ] {
+        eu_frames(&mut world, frames, direction);
+    }
+    assert_eq!((world.map(), world.position()), (0x10, (392, 353)));
+
+    // The native European route supplies walking candidates; all movement
+    // remains in this world and crosses the ordinary exit/door geometry.
+    for (leg, (frames, direction)) in [
+        (42, Some(Direction::Down)),
+        (78, Some(Direction::Left)),
+        (90, None),
+        (12, Some(Direction::Left)),
+        (100, None),
+        (55, Some(Direction::Left)),
+        (70, Some(Direction::Up)),
+        (100, None),
+        (1, Some(Direction::Up)),
+        (100, None),
+        (50, Some(Direction::Up)),
+        (100, None),
+        (180, Some(Direction::Up)),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if leg == 8 {
+            world
+                .update(
+                    direction,
+                    Presses {
+                        confirm: true,
+                        ..Presses::NONE
+                    },
+                )
+                .unwrap();
+        } else {
+            eu_frames(&mut world, frames, direction);
+        }
+        if leg == 4 {
+            assert_eq!(world.map(), 0x0c, "crossed into C");
+        }
+    }
+    assert_eq!(world.map(), 0x0b);
+    // The first B doorway scene can still be talking when portable Ark reaches
+    // (120,191); the native route's remaining Up frames ran after its pages.
+    eu_finish_scene(&mut world, 4000);
+    eu_frames(&mut world, 180, Some(Direction::Up));
+    eu_frames(&mut world, 100, None);
+    assert_eq!(world.position(), (120, 128), "approach the Elder on foot");
+    assert!(!eu_flag(&world, 0x26));
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    // The Elder's first request grants $26 before the visible choice is answered.
+    for frame in 0..4000 {
+        if world.dialogue().and_then(|page| page.cursor).is_some() {
+            break;
+        }
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+    }
+    assert!(
+        world.dialogue().and_then(|page| page.cursor).is_some(),
+        "Elder choice: pos={:?} flag26={} scene={} locked={} typing={} page={} frozen={:x?}",
+        world.position(),
+        eu_flag(&world, 0x26),
+        world.in_scene(),
+        world.pad_locked(),
+        world.typing(),
+        world.dialogue().is_some(),
+        world.frozen_scripts()
+    );
+    assert!(eu_flag(&world, 0x26));
+    assert!(eu_finish_scene(&mut world, 4000), "Elder's answer selected");
+    assert!(eu_flag(&world, 0x26));
+
+    for (leg, (frames, direction)) in [
+        (60, Some(Direction::Down)),
+        (100, None),
+        (10, Some(Direction::Left)),
+        (82, Some(Direction::Down)),
+        (100, None),
+        (45, Some(Direction::Down)),
+        (140, None),
+        (22, Some(Direction::Down)),
+        (25, None),
+        (15, None),
+        (140, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        eu_frames(&mut world, frames, direction);
+        if leg == 1 {
+            assert_eq!(
+                world.map(),
+                0x0c,
+                "leaving B returns through C: pos={:?} locked={} scene={} frozen={:x?}",
+                world.position(),
+                world.pad_locked(),
+                world.in_scene(),
+                world.frozen_scripts()
+            );
+        }
+        if leg == 4 {
+            assert_eq!(world.map(), 0x0d, "cross the house lobby");
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x0a, (504, 769)));
+
+    for (leg, (frames, direction)) in [
+        (32, Some(Direction::Down)),
+        (60, None),
+        (24, Some(Direction::Right)),
+        (90, None),
+        (120, Some(Direction::Left)),
+        (60, None),
+        (300, Some(Direction::Up)),
+        (60, None),
+        (132, Some(Direction::Right)),
+        (60, None),
+        (65, Some(Direction::Up)),
+        (60, None),
+        (56, Some(Direction::Left)),
+        (60, None),
+        (25, Some(Direction::Up)),
+        (100, None),
+        (1, Some(Direction::Up)),
+        (100, None),
+        (40, Some(Direction::Up)),
+        (180, None),
+        (43, Some(Direction::Up)),
+        (60, None),
+        (22, Some(Direction::Left)),
+        (60, None),
+        (20, Some(Direction::Up)),
+        (60, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if leg == 16 {
+            assert_eq!(world.facing(), Direction::Up);
+            world
+                .update(
+                    None,
+                    Presses {
+                        confirm: true,
+                        ..Presses::NONE
+                    },
+                )
+                .unwrap();
+        } else {
+            eu_frames(&mut world, frames, direction);
+        }
+    }
+    assert_eq!((world.map(), world.position()), (0x13, (360, 144)));
+    assert!(!eu_flag(&world, 0x28));
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert!(eu_finish_scene(&mut world, 4000), "weaver's choice opened");
+    assert!(eu_flag(&world, 0x28), "weaver grants $28");
 }
