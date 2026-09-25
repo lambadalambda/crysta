@@ -27,7 +27,14 @@ and run the story tests against it.
   doorway and, separately, the Elder and weaver choices. All pass with the
   owned European ROM. This is **not** the requested bedroom-to-world-map
   native route or a continuous portable replay.
-- Next: return home through the blue-door and pot scenes, Pandora's Box,
-  frozen return, the Elder's mission, and world-map `$03`. The European
-  dialogue acknowledgement schedules must be observed rather than copied
-  from the Japanese route.
+- The headless native exploration continued, using only real buttons from the
+  same empty-SRAM European boot: returning home grants `$27/$2E`, a thrown pot
+  breaks the blue door (`$292`), the second Down approach opens Pandora's Box
+  (`$22`), and the forced tour passes `$41 → $44 → $42 → $43 → $41`, sets
+  `$243/$244`, and releases Ark to move on both axes. A reproducible fresh-child
+  input fixture and native test check the opening and tour checkpoints. This
+  is still **not** a continuous portable replay or the world-map route.
+- Next: collect the spear, return to frozen Crysta, receive the Elder's mission,
+  and reach world-map `$03`; check the portable story against those European
+  inputs. The European dialogue acknowledgement schedules must be observed
+  rather than copied from the Japanese route.

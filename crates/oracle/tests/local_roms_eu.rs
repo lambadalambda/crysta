@@ -334,3 +334,114 @@ fn run_story_child() -> ! {
     );
     std::process::exit(0);
 }
+
+/// Exact headless inputs observed on the European executable, starting after
+/// the 1960-frame empty-SRAM title/name-entry bootstrap. No state injection.
+#[test]
+fn european_new_game_opens_pandora_and_completes_the_tour() {
+    if local_rom("Terranigma (E) [!].smc").is_none() {
+        eprintln!("skipping: local European dump not present");
+        return;
+    }
+    if std::env::var("ORACLE_EU_TOUR_CHILD").is_ok() {
+        run_tour_child();
+    }
+    let out = std::process::Command::new(std::env::current_exe().expect("current exe"))
+        .args([
+            "--exact",
+            "european_new_game_opens_pandora_and_completes_the_tour",
+            "--nocapture",
+        ])
+        .env("ORACLE_EU_TOUR_CHILD", "1")
+        .output()
+        .expect("spawn child");
+    assert!(
+        out.status.success(),
+        "European tour witness failed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    );
+}
+
+fn run_tour_child() -> ! {
+    let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
+    let rom = rom::Rom::load(&image).expect("validated European ROM");
+    assert_eq!(rom.revision(), rom::Revision::EuropeEnglish);
+    let mut session = Session::new(&rom).expect("empty-SRAM native session");
+    for _ in 0..1800 {
+        session.run_frame();
+    }
+    session.set_button(Button::Start, true);
+    for _ in 0..10 {
+        session.run_frame();
+    }
+    session.set_button(Button::Start, false);
+    for _ in 0..150 {
+        session.run_frame();
+    }
+    let commands = include_str!("fixtures/eu-pandora-tour.inputs");
+    assert_eq!(
+        commands.lines().count(),
+        453,
+        "full observed route is required"
+    );
+    for (index, line) in commands.lines().enumerate() {
+        let mut parts = line.split_whitespace();
+        let frames: usize = parts.next().expect("frame count").parse().expect("frames");
+        let held: Vec<_> = parts.collect();
+        for (name, button) in [
+            ("Start", Button::Start),
+            ("A", Button::A),
+            ("Up", Button::Up),
+            ("Down", Button::Down),
+            ("Left", Button::Left),
+            ("Right", Button::Right),
+        ] {
+            session.set_button(button, held.contains(&name));
+        }
+        assert!(held
+            .iter()
+            .all(|name| matches!(*name, "Start" | "A" | "Up" | "Down" | "Left" | "Right")));
+        for _ in 0..frames {
+            session.run_frame();
+        }
+        let w = session.wram_image();
+        let word = |offset: usize| u16::from_le_bytes([w[offset], w[offset + 1]]);
+        let event = |id: usize| w[0x6c0 + id / 8] & (1 << (id % 8)) != 0;
+        if (index + 1) % 50 == 0 {
+            eprintln!(
+                "command {} frame {} map {:x}",
+                index + 1,
+                session.frame_state().frames,
+                word(0x47e)
+            );
+        }
+        match index + 1 {
+            339 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x21, 136, 368));
+                assert!(event(0x22), "Pandora's Box must open on foot");
+                assert!(event(0x292), "pot throw must break the blue door");
+            }
+            372 => assert_eq!(word(0x47e), 0x41, "tour begins in Pandora's room"),
+            406 => assert_eq!(word(0x47e), 0x44, "tour visits the first side room"),
+            434 => assert_eq!(word(0x47e), 0x43, "tour visits the third side room"),
+            448 => {
+                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x41, 136, 208));
+                for id in [0x20, 0x22, 0x26, 0x27, 0x28, 0x2e, 0x243, 0x244, 0x292] {
+                    assert!(event(id), "tour must retain event {id:#x}");
+                }
+                eprintln!(
+                    "EU Pandora tour complete at frame {}",
+                    session.frame_state().frames
+                );
+            }
+            453 => assert_eq!(
+                (word(0x47e), word(0x1000), word(0x1002)),
+                (0x41, 120, 192),
+                "Ark can move on both axes after the completed tour"
+            ),
+            _ => {}
+        }
+    }
+    std::process::exit(0);
+}
