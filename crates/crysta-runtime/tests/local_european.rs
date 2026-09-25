@@ -720,7 +720,7 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
 
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
-fn european_single_world_replays_from_bedroom_to_weaver() {
+fn european_single_world_replays_bedroom_to_friends_request() {
     let Some(rom) = european() else { return };
     let mut world =
         World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
@@ -923,4 +923,75 @@ fn european_single_world_replays_from_bedroom_to_weaver() {
         .unwrap();
     assert!(eu_finish_scene(&mut world, 4000), "weaver's choice opened");
     assert!(eu_flag(&world, 0x28), "weaver grants $28");
+
+    // Back through the town into C: the friends stop Ark at the blue door.
+    for (leg, (frames, direction)) in [
+        (22, Some(Direction::Down)),
+        (40, None),
+        (22, Some(Direction::Right)),
+        (40, None),
+        (55, Some(Direction::Down)),
+        (160, None),
+        (10, Some(Direction::Down)),
+        (40, None),
+        (55, Some(Direction::Right)),
+        (40, None),
+        (55, Some(Direction::Down)),
+        (40, None),
+        (132, Some(Direction::Left)),
+        (40, None),
+        (280, Some(Direction::Down)),
+        (80, None),
+        (101, Some(Direction::Right)),
+        (40, None),
+        (38, Some(Direction::Up)),
+        (60, None),
+        (1, None), // A opens the house door.
+        (100, None),
+        (40, Some(Direction::Up)),
+        (160, None),
+        (100, Some(Direction::Up)),
+        (160, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        if leg == 20 {
+            world
+                .update(
+                    None,
+                    Presses {
+                        confirm: true,
+                        ..Presses::NONE
+                    },
+                )
+                .unwrap();
+        } else {
+            eu_frames(&mut world, frames, direction);
+        }
+        if leg == 13 {
+            // The portable resolver stops the 132-frame Left leg seven
+            // pixels earlier than the native town route. Finish the same
+            // sidewalk lane on foot before walking south past the wall.
+            assert_eq!(world.map(), 0x0a);
+            assert_eq!(world.position().1, 400);
+            for _ in 0..16 {
+                if world.position().0 <= 356 {
+                    break;
+                }
+                world.update(Some(Direction::Left), Presses::NONE).unwrap();
+            }
+            eu_frames(&mut world, 40, None);
+            assert!(world.position().0 <= 356, "align with the south lane");
+        }
+        if leg == 23 {
+            assert_eq!(world.map(), 0x0d, "return through D");
+        }
+    }
+    assert_eq!(world.map(), 0x0c, "walked back home through D");
+    assert!(world.dialogue().is_some(), "friend's request is on screen");
+    assert!(eu_flag(&world, 0x27), "friend arrives at the blue door");
+    assert!(!eu_flag(&world, 0x2e));
+    assert!(eu_finish_scene(&mut world, 5000), "accepted friend's help");
+    assert!(eu_flag(&world, 0x2e));
 }
