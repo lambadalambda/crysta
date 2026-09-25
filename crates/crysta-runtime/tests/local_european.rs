@@ -3,7 +3,7 @@ use assets::maps::exits::ExitList;
 use assets::maps::scripts::EventFlags;
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
 use crysta_runtime::scene::Presses;
-use crysta_runtime::world::{fresh_game_flags, World};
+use crysta_runtime::world::{fresh_game_flags, Step, World};
 use crysta_runtime::{BOX_MAPS, MAPS};
 use rom::{Revision, Rom};
 use room_core::Direction;
@@ -720,7 +720,7 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
 
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
-fn european_single_world_replays_bedroom_to_open_blue_door() {
+fn european_single_world_replays_bedroom_through_pandora_tour() {
     let Some(rom) = european() else { return };
     let mut world =
         World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
@@ -1193,4 +1193,91 @@ fn european_single_world_replays_bedroom_to_open_blue_door() {
             .all(|resident| resident.record != 0x03_8c32),
         "the broken door has gone"
     );
+
+    for (frames, direction, map, position) in [
+        (30, Direction::Up, 0x0e, (152, 880)),
+        (35, Direction::Up, 0x20, (408, 880)),
+        (35, Direction::Up, 0x21, (136, 128)),
+    ] {
+        if map != 0x0e {
+            eu_frames(&mut world, 33, Some(Direction::Left));
+            eu_frames(&mut world, 80, None);
+        }
+        eu_frames(&mut world, frames, Some(direction));
+        eu_frames(&mut world, 400, None);
+        assert_eq!((world.map(), world.position()), (map, position));
+    }
+    assert!(!eu_flag(&world, 0x22));
+    assert!(world.dialogue().is_some(), "the box's entry voice");
+    eu_finish_scene(&mut world, 4000);
+    eu_frames(&mut world, 150, Some(Direction::Down));
+    eu_frames(&mut world, 180, None);
+    assert_eq!(world.position(), (136, 351), "approach the box");
+    eu_frames(&mut world, 25, Some(Direction::Down));
+    eu_frames(&mut world, 180, None);
+    assert_eq!(world.position(), (136, 359), "first contact recoils");
+    assert!(!eu_flag(&world, 0x22));
+    assert!(world.dialogue().is_some(), "the box warns Ark");
+    eu_finish_scene(&mut world, 4000);
+    let mut reloaded = false;
+    for (frames, direction) in [(15, Some(Direction::Down)), (300, None)] {
+        for _ in 0..frames {
+            let (movement, interaction) = world.update(direction, Presses::NONE).unwrap();
+            reloaded |= [movement, interaction.unwrap_or(Step::Stayed)]
+                .iter()
+                .any(|step| {
+                    matches!(
+                        step,
+                        Step::Entered {
+                            from: 0x21,
+                            to: 0x21
+                        }
+                    )
+                });
+        }
+    }
+    assert!(reloaded, "Pandora's Box reloads $21 before the tour");
+    assert!(eu_flag(&world, 0x22), "the second approach opens the box");
+    assert_eq!((world.map(), world.position()), (0x21, (136, 368)));
+
+    // The box and its guide control the transfers; no map is re-entered or
+    // progression flag seeded. A is sent only for finished English pages.
+    let mut landings = Vec::new();
+    for frame in 0..16000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        let before = world.map();
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if world.map() != before {
+            landings.push((world.map(), world.position()));
+        }
+        if eu_flag(&world, 0x244) && !world.pad_locked() && !world.in_transition() {
+            break;
+        }
+    }
+    assert_eq!(
+        landings,
+        [
+            (0x41, (136, 208)),
+            (0x44, (392, 464)),
+            (0x42, (136, 464)),
+            (0x43, (392, 208)),
+            (0x41, (136, 208))
+        ]
+    );
+    assert!(eu_flag(&world, 0x243) && eu_flag(&world, 0x244));
+    assert!(!world.pad_locked(), "guide releases Ark");
+    assert!(!world.in_scene() && world.dialogue().is_none());
+    eu_frames(&mut world, 12, Some(Direction::Left));
+    eu_frames(&mut world, 120, None);
+    eu_frames(&mut world, 12, Some(Direction::Up));
+    eu_frames(&mut world, 120, None);
+    assert_eq!((world.map(), world.position()), (0x41, (120, 192)));
 }
