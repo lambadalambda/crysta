@@ -1314,7 +1314,10 @@ fn the_south_gate_leads_onto_the_underworld_where_ark_walks() {
     // The underworld selects 1.
     assert_eq!(cues(&mut world), (vec![2], vec![0x4D00]));
     frames_until(&mut world, 200, |world| !world.in_transition());
-    replay(&mut world, &[(5, 16)]);
+    for step in 1..=16 {
+        world.update(None, Presses::default()).unwrap();
+        assert_eq!(world.position(), (536, 528 + step), "neutral arrival");
+    }
     assert_eq!(world.position(), (536, 544), "underworld-arrival");
     // Crysta's rectangle on the plane leads back into the town.
     let mut back = world.clone();

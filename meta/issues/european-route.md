@@ -41,11 +41,13 @@ and run the story tests against it.
   European route now reaches the requested endpoint. Portable European tests
   separately cover the frozen Elder's `$21/$296` conversation and the town's
   `$3C` scene through the south gate. They seed the preceding flags at each
-  checkpoint rather than replaying the journey continuously: the portable
-  map `$03` currently needs an explicit 16-frame Down input to reach native
-  settled `(536,544)` from raw `(536,528)`. The town controller also
-  stops at unsupported `$88:855E` after granting `$3C`; it releases input
-  and the exit remains playable, but its remaining behavior is unqualified.
-  The full continuous portable replay and native-frame timing/text
-  presentation remain open; English dialogue acknowledgements cannot be
-  assumed from Japanese timings.
+  checkpoint rather than replaying the journey continuously: on map `$03`,
+  portable `Plane::tick` performs the native 16-pixel entrance walk on neutral
+  frames from raw `(536,528)` to `(536,544)`. `World::in_transition()` ends
+  after the dark load, before this plane arrival; the earlier test's Down
+  input during those 16 frames was ignored, not required. The town controller
+  also stops at unsupported `$88:855E` after granting `$3C`; it releases
+  input and the exit remains playable, but its remaining behavior is
+  unqualified. The full continuous portable replay and native-frame
+  timing/text presentation remain open; English dialogue acknowledgements
+  cannot be assumed from Japanese timings.

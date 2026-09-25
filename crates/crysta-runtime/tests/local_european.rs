@@ -652,10 +652,11 @@ fn european_frozen_town_releases_ark_to_the_underworld() {
         }
     }
     assert_eq!(world.position(), (536, 528), "raw world-map placement");
-    // Unlike the native European 240-frame neutral arrival (536,544), the
-    // portable world map still needs explicit Down input for this first step.
-    for _ in 0..16 {
-        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    // Plane::new queues the native 16-pixel entrance walk. The old test
+    // supplied Down here, but the world player moves even with no input.
+    for step in 1..=16 {
+        world.update(None, Presses::NONE).unwrap();
+        assert_eq!(world.position(), (536, 528 + step));
     }
     assert_eq!(
         world.position(),
