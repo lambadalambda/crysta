@@ -1,14 +1,15 @@
 //! Headless, empty-SRAM European bedroom text compared with its native tiles.
 //! ares boots once per process; the owned-ROM witness runs in a fresh child.
+use assets::text::window::WindowArt;
 use assets::text::{Acknowledgement, HouseDialogue, Placement};
 use oracle::{Button, Session};
 use rom::{Revision, Rom};
 use std::{path::Path, process::Command};
 
-const TEST: &str = "european_first_bedroom_page_matches_native_glyph_cells";
+const TEST: &str = "european_first_bedroom_page_matches_native_glyphs_and_frame";
 
 #[test]
-fn european_first_bedroom_page_matches_native_glyph_cells() {
+fn european_first_bedroom_page_matches_native_glyphs_and_frame() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../local/Terranigma (E) [!].smc");
     let image = match std::fs::read(path) {
         Ok(image) => image,
@@ -31,8 +32,9 @@ fn european_first_bedroom_page_matches_native_glyph_cells() {
         .expect("fresh native child");
     assert!(
         out.status.success()
-            && String::from_utf8_lossy(&out.stderr)
-                .contains("EU native first bedroom page: 4992 glyph-cell pixels match"),
+            && String::from_utf8_lossy(&out.stderr).contains(
+                "EU native first bedroom page: 4992 glyph-cell and 4864 frame pixels match"
+            ),
         "European text witness failed or skipped\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -116,7 +118,10 @@ fn inspect_native_page(rom: &Rom) {
     }
     assert_eq!(count, 4_992, "every first-page glyph cell compared");
     assert!(ink > 0, "native page has real foreground ink");
-    eprintln!("EU native first bedroom page: {count} glyph-cell pixels match");
+    let frame = WindowArt::from_rom(rom.image()).expect("European window frame");
+    let border = compare_native_frame(&wram, &vram, &frame, page.width(), page.height());
+    assert_eq!(border, 4_864, "all 76 frame tiles compared");
+    eprintln!("EU native first bedroom page: {count} glyph-cell and {border} frame pixels match");
 }
 
 fn run(session: &mut Session, frames: usize, held: Option<Button>) {
@@ -128,12 +133,54 @@ fn run(session: &mut Session, frames: usize, held: Option<Button>) {
     }
 }
 
+fn compare_native_frame(
+    wram: &[u8],
+    vram: &[u8],
+    art: &WindowArt,
+    width: u16,
+    height: u16,
+) -> usize {
+    let (columns, rows) = (i32::from(width / 8), i32::from(height / 8));
+    let (mut count, mut ink) = (0, 0);
+    for row in -1..=rows {
+        for column in -1..=columns {
+            let kind = match (column == -1, column == columns, row == -1, row == rows) {
+                (true, _, true, _) => 0,
+                (_, true, true, _) => 2,
+                (_, _, true, _) => 1,
+                (true, _, _, true) => 5,
+                (_, true, _, true) => 7,
+                (_, _, _, true) => 6,
+                (true, ..) => 3,
+                (_, true, ..) => 4,
+                _ => continue,
+            };
+            let cell = 0x04c4_i32 + row * 64 + column * 2;
+            let at = 0x1_d000 + usize::try_from(cell).expect("frame tilemap address");
+            let tile = u16::from_le_bytes([wram[at], wram[at + 1]]);
+            assert_eq!(tile & 0x03ff, 0x10 + kind, "frame tile at ({column},{row})");
+            for (pixel, &expected) in art.frame[usize::from(kind)].iter().enumerate() {
+                let actual = tile_index(vram, tile, pixel % 8, pixel / 8);
+                assert_eq!(actual, expected, "frame ({column},{row}) pixel {pixel}");
+                ink += usize::from(actual != 0);
+                count += 1;
+            }
+        }
+    }
+    assert!(ink > 0, "native frame has visible edges");
+    count
+}
+
 fn native_index(wram: &[u8], vram: &[u8], x: usize, y: usize) -> u8 {
     // $7F:D4C4: European content tilemap (32 tiles wide, 2 bytes per tile).
     let at = 0x1_d000 + 0x04c4 + (y / 8) * 64 + (x / 8) * 2;
     let tile = u16::from_le_bytes([wram[at], wram[at + 1]]);
-    let tx = if tile & 0x4000 != 0 { 7 - x % 8 } else { x % 8 };
-    let ty = if tile & 0x8000 != 0 { 7 - y % 8 } else { y % 8 };
+    tile_index(vram, tile, x % 8, y % 8)
+}
+
+fn tile_index(vram: &[u8], tile: u16, x: usize, y: usize) -> u8 {
+    let tx = if tile & 0x4000 != 0 { 7 - x } else { x };
+    let ty = if tile & 0x8000 != 0 { 7 - y } else { y };
     let address = (0xe000 + usize::from(tile & 0x03ff) * 16 + ty * 2) & 0xffff;
     (vram[address] >> (7 - tx) & 1) | ((vram[address + 1] >> (7 - tx) & 1) << 1)
 }

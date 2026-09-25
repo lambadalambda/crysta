@@ -25,7 +25,8 @@ Decode them into the same pages, choices and labels the slice uses.
 - A fresh-child empty-SRAM European text test now waits at the first bedroom
   page's native `$D5`, verifies the `$04C4`/224×64 content anchor, and matches
   its live WRAM tilemap/VRAM glyph cells against all 4,992 pixels of the
-  decoded first page's 26 glyph cells. The optional test skips if the owned
-  dump is absent. It tests one fully typed page's content and placement, not
-  native RGB, frame and prompt art or the other slice windows, choices,
-  titles and item names.
+  decoded first page's 26 glyph cells. The same snapshot compares all 76
+  perimeter frame tiles (4,864 2bpp indices) against the ROM-decoded window
+  art. This tests one fully typed page's indexed content and WRAM-staged
+  frame layout, not uploaded BG3 tilemap attributes, native RGB/HDMA, prompt
+  art or the other slice windows, choices, titles and item names.
