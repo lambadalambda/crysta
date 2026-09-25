@@ -48,6 +48,17 @@ bitmap. The decoder clips that edge when composing and partially typing the
 page, rather than freezing the actor. This is a bounded portable bitmap rule,
 not a native raster comparison of that window's right edge.
 
+A fresh, empty-SRAM headless European boot now checks the **first fully typed
+bedroom page** at its native `$D5` wait. `crates/map-inspector/tests/local_european_text_native.rs`
+reads `$7F:D4C4`'s 224×64 content tilemap and 2bpp VRAM, then compares
+all 4,992 unique pixels in the first page's 26 glyph cells with the
+ROM-decoded indexed page. It asserts real foreground ink and the European
+`$04C4` anchor without inspecting a window frame, wait arrow, or framebuffer
+colour. The page does not exercise every content row. This optional owned-ROM
+check skips if the dump is absent; it is one native page's content/placement
+evidence, not a proof that all dialogue, choices, labels, item names, or their
+RGB/window presentation match native frames.
+
 ## The first bedroom page
 
 The script requests text by address in bank `$88`, as in Japanese: the

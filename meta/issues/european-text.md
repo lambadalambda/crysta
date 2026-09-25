@@ -22,3 +22,10 @@ Decode them into the same pages, choices and labels the slice uses.
   the portable bitmap; the dialogue proceeds to mission `$296`. This does
   not establish a native raster match for that window or complete the
   remaining text/timing acceptance.
+- A fresh-child empty-SRAM European text test now waits at the first bedroom
+  page's native `$D5`, verifies the `$04C4`/224×64 content anchor, and matches
+  its live WRAM tilemap/VRAM glyph cells against all 4,992 pixels of the
+  decoded first page's 26 glyph cells. The optional test skips if the owned
+  dump is absent. It tests one fully typed page's content and placement, not
+  native RGB, frame and prompt art or the other slice windows, choices,
+  titles and item names.
