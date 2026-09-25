@@ -65,7 +65,14 @@ impl Game {
     /// One frame with the buttons held now; the music hears the world's
     /// requests.
     pub fn frame(&mut self, held: u32) {
-        let pressed = held & !self.held;
+        self.frame_with_presses(held, 0);
+    }
+
+    /// One frame plus keyboard presses that occurred since the previous frame.
+    /// A release and re-press between frames is still a new action even if the
+    /// sampled held bits did not change.
+    pub fn frame_with_presses(&mut self, held: u32, keyboard_presses: u32) {
+        let pressed = (held & !self.held) | keyboard_presses;
         self.held = held;
         let direction = [
             (buttons::UP, Direction::Up),
@@ -190,6 +197,11 @@ mod web {
         /// One frame with the buttons held now.
         pub fn frame(&mut self, held: u32) {
             self.0.frame(held);
+        }
+
+        /// One frame with held buttons and keyboard presses since the last frame.
+        pub fn frame_with_presses(&mut self, held: u32, keyboard_presses: u32) {
+            self.0.frame_with_presses(held, keyboard_presses);
         }
 
         /// The view as RGBA bytes.
@@ -340,5 +352,42 @@ mod tests {
             game.frame(buttons::CONFIRM);
         }
         assert_eq!(page(&game), second, "holding does not");
+    }
+
+    #[test]
+    fn a_repress_between_pal_frames_is_not_lost_when_confirm_remains_held() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../local/Terranigma (E) [!].smc"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let mut game = Game::new(&bytes).unwrap();
+        for _ in 0..130 {
+            game.frame(0);
+        }
+        while game.session.world.typing() {
+            game.frame(0);
+        }
+        let page = |game: &Game| {
+            game.session
+                .world
+                .dialogue()
+                .map(|view| view.page.indexed().to_vec())
+        };
+        let first = page(&game);
+        game.frame(buttons::CONFIRM);
+        while game.session.world.typing() {
+            game.frame(buttons::CONFIRM);
+        }
+        let second = page(&game);
+        assert_ne!(first, second, "the first press turned a page");
+        game.frame(buttons::CONFIRM);
+        assert_eq!(page(&game), second, "holding does not repeat");
+        // The browser can receive keyup+keydown before the next PAL frame.
+        // It passes that keydown separately from the continuously held sample.
+        game.frame_with_presses(buttons::CONFIRM, buttons::CONFIRM);
+        assert_ne!(page(&game), second, "the new press turns another page");
     }
 }

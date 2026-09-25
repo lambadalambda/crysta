@@ -29,8 +29,8 @@ function say(text, error = false) {
 }
 
 // Keys held by code, newest last: the newest direction wins, as in the
-// native app. A and B presses are latched until a frame takes them, so a
-// tap between two frames still counts.
+// native app. Action presses are latched until a frame takes them, so a
+// tap between two frames still counts, even if the prior frame held the key.
 const keys = [];
 let latched = 0;
 
@@ -44,14 +44,16 @@ addEventListener('keydown', (event) => {
   const name = KEYS[event.code];
   if (!name) return;
   event.preventDefault();
-  if (!keys.includes(event.code)) keys.push(event.code);
-  latched |= BUTTONS[name] & ~DIRECTIONS;
+  if (!event.repeat && !keys.includes(event.code)) {
+    keys.push(event.code);
+    latched |= BUTTONS[name] & ~DIRECTIONS;
+  }
 });
 addEventListener('keyup', (event) => {
   const index = keys.indexOf(event.code);
   if (index >= 0) keys.splice(index, 1);
 });
-addEventListener('blur', () => { keys.length = 0; });
+addEventListener('blur', () => { keys.length = 0; latched = 0; });
 
 function keyboard() {
   let bits = 0;
@@ -169,7 +171,7 @@ function loop(now, token) {
     owed = Math.min(owed + (now - last), frameMs * 4);
     last = now;
     while (owed >= frameMs) {
-      game.frame(buttons() | latched);
+      game.frame_with_presses(buttons(), latched);
       latched = 0;
       owed -= frameMs;
     }
