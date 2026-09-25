@@ -163,8 +163,10 @@ name = "oracle"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "crysta-runtime",
  "memory-map",
  "rom",
+ "room-core",
  "serde",
  "serde_json",
  "sha2",

@@ -27,4 +27,9 @@ measured on the reference emulator.
   $96:F2A2,X`), 170 in Japanese and 172 in European, not a program state.
 - **Route.** The Japanese route's movement replays on the European ROM; each
   conversation needs its presses counted again (the English text has more,
-  shorter pages).
+  shorter pages). `crates/oracle/tests/local_eu_pal_movement.rs` now performs
+  an independent empty-SRAM native boot through Elle's wake-up and compares
+  all 63 ordered `(map,x,y)` frame boundaries (the initial anchor plus 62
+  held-Right frames) with a freshly initialized portable `World` after its
+  English pages. No frame shift or input-onset adjustment is used. This pins
+  one ordinary walking leg, not every route movement, animation or map load.

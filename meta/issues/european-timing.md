@@ -21,6 +21,12 @@ timing may differ from the Japanese measurements.
   no-ROM revision test cover the change. Native movement and load durations
   for the rest of the route, plus native sound-tempo comparison, are not yet
   qualified. The SPC driver/song data comparison is not itself a tempo test.
+- A separate fresh-child empty-SRAM native test replays the European input
+  fixture through Elle's wake-up and compares every boundary of the first 62
+  held-Right bedroom frames (including the initial anchor) against a portable
+  `World` after its English pages. All 63 `(map,x,y)` states match with no
+  frame shift; this qualifies that ordinary movement leg, not the rest of
+  the route's load/movement timing or host real-time pacing.
 - The app and web audio player now use a revision-aware NMI/port-script cadence:
   533 stereo samples and 17,067 settling SPC cycles per Japanese frame; 640
   samples and 20,480 cycles per European frame. This corrects track-change,
