@@ -51,8 +51,10 @@ and run the story tests against it.
   the dark load, before this plane arrival; Down input is not required.
 - The continuous functional replay is green with the owned European ROM, but
   it does not prove full native-frame equivalence: the portable frozen-return
-  scene does not model the scripted player repositioning, and the town actor
-  remains frozen at unsupported `$88:855E` after granting `$3C`. Input is
-  released and the gate is playable; the actor's remainder is unqualified.
-  PAL load/music tempo and native-frame text presentation still need their
-  own evidence before this route and its dependencies can be archived.
+  scene does not model the scripted player repositioning. The town controller's
+  `$88:855E` `COP BF` now redirects to `$88:8519` on the next tick rather than
+  freezing or falling into the player's script; the replay observes no frozen
+  actor after 48 neutral frames, with `$3C` set and input released. The target's
+  animation cadence and native controller PC have not been compared. PAL
+  load/music tempo and native-frame text presentation still need their own
+  evidence before this route and its dependencies can be archived.

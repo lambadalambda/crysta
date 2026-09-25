@@ -48,6 +48,8 @@ const TEXT_STEP: u8 = 0x20;
 const CHOICE: u8 = 0x1A;
 /// Points the actor's own script at a long address; `$80:AAFB`.
 const SET_SCRIPT: u8 = 0xC0;
+/// Redirects the actor's script to a long address and yields; `$80:AAE1`.
+const REDIRECT_SCRIPT: u8 = 0xBF;
 /// Unlocks pad buttons, `$045E &= !mask`; `$80:8FE6`.
 const UNLOCK_INPUT: u8 = 0x29;
 /// Locks pad buttons, `$045E |= mask`; `$80:8FF5`.
@@ -1035,10 +1037,9 @@ impl Actor {
             SHOW_TEXT | SHOW_TEXT_BANKED | TEXT_WAIT | TEXT_STEP | CHOICE => {
                 return self.text_service(service, operands, bank, around)
             }
-            WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT | LONG_JUMP
-            | CONTINUATION | DELETE_ON_FLAG | DELETE | WAIT_FOR_FLAG | OCCUPY => {
-                return self.script_service(service, operands, around)
-            }
+            WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT
+            | REDIRECT_SCRIPT | LONG_JUMP | CONTINUATION | DELETE_ON_FLAG | DELETE
+            | WAIT_FOR_FLAG | OCCUPY => return self.script_service(service, operands, around),
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
             SWITCH | SPEED => return self.parameter_service(service, operands, bank, image),
             POSE_MOVING | REPEAT_MOVING => return self.moving_pose(service, operands, image),
@@ -1588,6 +1589,7 @@ impl Actor {
                 }
                 self.pc = operands + 2;
             }
+            REDIRECT_SCRIPT => return self.redirect_script(operands, image),
             SET_SCRIPT | LONG_JUMP => {
                 let Some(target) = image.get(operands..operands + 3).and_then(long) else {
                     self.state = State::Frozen;
@@ -1649,6 +1651,21 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// `COP BF` writes the actor's script pointer, clears its countdown and
+    /// exits the scheduler (`$80:AAE1`). The target runs on the next tick.
+    fn redirect_script(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(target) = image
+            .get(operands..operands + 3)
+            .and_then(long)
+            .filter(|&target| image.get(target..target + 2).is_some())
+        else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.pc = target;
+        false
     }
 
     /// `COP 1B`, `1F`, `20` and `1A`. Returns whether execution continues
@@ -3240,6 +3257,40 @@ mod script_service_tests {
         assert_eq!(globals.inventory.items(), [0x81]);
         assert_eq!(globals.inventory.count(0x81), 2);
         assert_eq!(actor.selector, 7);
+    }
+
+    #[test]
+    fn cop_bf_redirects_the_actor_next_tick_without_running_fallthrough() {
+        // COP BF $88:8010; pose 7 belongs to a different script. The target
+        // sets pose 9, then yields. A same-frame jump would set it on tick 1.
+        let mut code = vec![2, 0xBF, 0x10, 0x80, 0x88, 2, 0x80, 7, 2, 0xBD];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!(
+            (actor.pc, actor.selector, actor.state),
+            (AT + 0x10, 0, State::Running)
+        );
+        tick(&mut actor, &image);
+        assert_eq!((actor.pc, actor.selector), (AT + 0x15, 9));
+        assert_eq!(actor.frozen_at(), None);
+    }
+
+    #[test]
+    fn cop_bf_refuses_truncated_ram_and_out_of_image_targets() {
+        for code in [
+            vec![2, 0xBF, 0x10],             // missing address/bank bytes
+            vec![2, 0xBF, 0x00, 0x40, 0x7E], // RAM
+            vec![2, 0xBF, 0x00, 0x90, 0x88], // beyond the image
+        ] {
+            let mut image = vec![0; AT + code.len()];
+            image[AT..].copy_from_slice(&code);
+            let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+            tick(&mut actor, &image);
+            assert_eq!(actor.state, State::Frozen, "{code:02X?}");
+            assert_eq!(actor.frozen_at(), Some(AT), "{code:02X?}");
+        }
     }
 
     #[test]

@@ -33,6 +33,7 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
   a single portable `World` now reaches and walks the same map from fresh
   bedroom flags without seeded checkpoints or warps. See [the route
   issue](european-route.md). This establishes the connected functional path,
-  not native-frame presentation parity. The frozen-return player walk and
-  the town actor after `$3C` are not fully modelled; text raster and PAL
-  load/music tempo acceptance remain open.
+  not native-frame presentation parity. The frozen-return player walk is not
+  fully modelled; the town controller's `COP BF` redirect now runs without
+  freezing, but its animation cadence and native PC have not been compared.
+  Text raster and PAL load/music tempo acceptance remain open.

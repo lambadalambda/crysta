@@ -1534,12 +1534,12 @@ fn european_single_world_replays_bedroom_to_underworld() {
     }
     assert!(eu_flag(&world, 0x3c), "town grants its scene flag");
     assert!(!world.pad_locked(), "town releases Ark");
-    // The town actor is still parked at an unsupported continuation after
-    // $3C. This is a playable exit, not a qualified completion of its script.
-    assert_eq!(
-        world.frozen_scripts(),
-        &[(0x03_8a6e, 0x08_855e)],
-        "the post-$3C town continuation remains unqualified"
+    // COP BF redirects the controller away from the player's scene script.
+    // Let its deferred target run before checking for unsupported commands.
+    eu_frames(&mut world, 48, None);
+    assert!(
+        world.frozen_scripts().is_empty(),
+        "the town controller keeps running"
     );
     for _ in 0..300 {
         if world.map() == 0x03 {
