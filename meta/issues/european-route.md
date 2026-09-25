@@ -22,11 +22,9 @@ and run the story tests against it.
   conversation (which grants `$26` before its choice is answered), and
   answers the weaver (`$28`). The fresh child process in
   `crates/oracle/tests/local_roms_eu.rs` verifies those milestones and the
-  bedroom, exterior and weaver positions against the European ROM. Portable
-  `crates/crysta-runtime/tests/local_european.rs` checks the same opening
-  doorway and, separately, the Elder and weaver choices. All pass with the
-  owned European ROM. This opening witness is not a continuous portable
-  replay.
+  bedroom, exterior and weaver positions against the European ROM. Separate
+  portable opening tests also cover the doorway and conversations; the
+  single-world replay described below now connects these checkpoints.
 - The headless native exploration continued, using only real buttons from the
   same empty-SRAM European boot: returning home grants `$27/$2E`, a thrown pot
   breaks the blue door (`$292`), the second Down approach opens Pandora's Box
@@ -38,16 +36,23 @@ and run the story tests against it.
   `$240/$241/$242` and the actual spear inventory entry, the frozen return
   `$FE/$23`, Elder `$21` followed by mission `$296`, town `$3C`, and arrival
   on world-map `$03` at `(536,544)` at frame 73937. The headless native
-  European route now reaches the requested endpoint. Portable European tests
-  separately cover the frozen Elder's `$21/$296` conversation and the town's
-  `$3C` scene through the south gate. They seed the preceding flags at each
-  checkpoint rather than replaying the journey continuously: on map `$03`,
-  portable `Plane::tick` performs the native 16-pixel entrance walk on neutral
-  frames from raw `(536,528)` to `(536,544)`. `World::in_transition()` ends
-  after the dark load, before this plane arrival; the earlier test's Down
-  input during those 16 frames was ignored, not required. The town controller
-  also stops at unsupported `$88:855E` after granting `$3C`; it releases
-  input and the exit remains playable, but its remaining behavior is
-  unqualified. The full continuous portable replay and native-frame
-  timing/text presentation remain open; English dialogue acknowledgements
-  cannot be assumed from Japanese timings.
+  European route now reaches the requested endpoint. In
+  `crates/crysta-runtime/tests/local_european.rs`, a single `World` from
+  `fresh_game_flags()` now plays the bedroom, Elder, weaver, friend's choice,
+  three real pot throws, Box and tour, spear pickup, frozen return, Elder's
+  mission, town scene and south gate without re-entry, flag injection, debug
+  placement or direct door strikes. It checks the native milestones and
+  `(536,544)` on `$03`, then walks on the plane. English pages and choices
+  are acknowledged when ready rather than at the native/Japanese frame counts.
+  The town descent needs a few extra Left inputs to reach the native lane
+  (`x≤356`); the untouched portable route otherwise stops at the wall.
+  `Plane::tick` performs the native 16-pixel entrance walk on neutral frames
+  from raw `(536,528)` to `(536,544)`. `World::in_transition()` ends after
+  the dark load, before this plane arrival; Down input is not required.
+- The continuous functional replay is green with the owned European ROM, but
+  it does not prove full native-frame equivalence: the portable frozen-return
+  scene does not model the scripted player repositioning, and the town actor
+  remains frozen at unsupported `$88:855E` after granting `$3C`. Input is
+  released and the gate is playable; the actor's remainder is unqualified.
+  PAL load/music tempo and native-frame text presentation still need their
+  own evidence before this route and its dependencies can be archived.

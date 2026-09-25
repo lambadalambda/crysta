@@ -26,3 +26,13 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
 4. [Run the European version at its own timing and sound](european-timing.md)
 5. [Accept the European ROM in the app and the web page](european-hosts.md)
 6. [Check the European slice against a native route](european-route.md)
+
+## Progress
+
+- A headless empty-SRAM European native replay reaches map `$03` at `(536,544)`;
+  a single portable `World` now reaches and walks the same map from fresh
+  bedroom flags without seeded checkpoints or warps. See [the route
+  issue](european-route.md). This establishes the connected functional path,
+  not native-frame presentation parity. The frozen-return player walk and
+  the town actor after `$3C` are not fully modelled; text raster and PAL
+  load/music tempo acceptance remain open.
