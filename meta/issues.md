@@ -57,3 +57,5 @@
 - [ ] [Decode the European text engine, font and windows](issues/european-text.md)
 - [ ] [Run the European version at its own timing and sound](issues/european-timing.md)
 - [ ] [Check the European slice against a native route](issues/european-route.md)
+- [ ] [Reproduce the European friend's door-scene freeze in the player host](issues/european-friend-scene-freeze.md)
+- [ ] [Reproduce European post-Box Elder and frozen-town progression in the player host](issues/european-post-box-progression.md)
