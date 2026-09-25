@@ -720,7 +720,7 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
 
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
-fn european_single_world_replays_bedroom_to_friends_request() {
+fn european_single_world_replays_bedroom_to_open_blue_door() {
     let Some(rom) = european() else { return };
     let mut world =
         World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
@@ -994,4 +994,203 @@ fn european_single_world_replays_bedroom_to_friends_request() {
     assert!(!eu_flag(&world, 0x2e));
     assert!(eu_finish_scene(&mut world, 5000), "accepted friend's help");
     assert!(eu_flag(&world, 0x2e));
+
+    // Take a pot from C and miss the blue door on purpose: the native route
+    // also misses from (136,368) before moving farther left for the first hit.
+    for (frames, direction) in [
+        (11, Some(Direction::Right)),
+        (60, None),
+        (67, Some(Direction::Up)),
+        (80, None),
+        (24, Some(Direction::Left)),
+        (60, None),
+    ] {
+        eu_frames(&mut world, frames, direction);
+    }
+    assert_eq!(world.position(), (104, 352), "first pot on foot");
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    for (leg, (frames, direction)) in [
+        (120, None),
+        (22, Some(Direction::Down)),
+        (60, None),
+        (55, Some(Direction::Right)),
+        (60, None),
+        (1, Some(Direction::Up)),
+        (40, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        eu_frames(&mut world, frames, direction);
+        if leg == 0 {
+            assert_eq!(world.pot().map(|pot| pot.tile), Some(0xfa));
+            assert!(world.patched_cells().contains(&(5, 21, 0xf8)));
+        }
+    }
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    eu_frames(&mut world, 180, None);
+    assert_eq!(world.position(), (136, 368), "missed throw");
+    assert!(world.pot().is_none());
+    assert!(
+        !world.patched_cells().contains(&(11, 21, 0x181)),
+        "miss did not hit the door"
+    );
+    assert!(!eu_flag(&world, 0x292));
+
+    for (frames, direction) in [
+        (55, Some(Direction::Left)),
+        (60, None),
+        (14, Some(Direction::Up)),
+        (60, None),
+        (16, Some(Direction::Left)),
+        (60, None),
+        (20, Some(Direction::Up)),
+        (60, None),
+        (1, Some(Direction::Right)),
+        (30, None),
+    ] {
+        eu_frames(&mut world, frames, direction);
+    }
+    assert_eq!(world.position(), (40, 352), "second pot on foot");
+    assert_eq!(world.facing(), Direction::Right);
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    for (leg, (frames, direction)) in [
+        (120, None),
+        (45, Some(Direction::Down)),
+        (60, None),
+        (22, Some(Direction::Down)),
+        (60, None),
+        (66, Some(Direction::Right)),
+        (60, None),
+        (40, Some(Direction::Up)),
+        (60, None),
+        (33, Some(Direction::Right)),
+        (60, None),
+        (20, Some(Direction::Up)),
+        (80, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        eu_frames(&mut world, frames, direction);
+        if leg == 0 {
+            assert_eq!(world.pot().map(|pot| pot.tile), Some(0xfa));
+            assert!(world.patched_cells().contains(&(3, 21, 0xf8)));
+        }
+    }
+    assert_eq!(world.position(), (184, 368), "aim at the door");
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    eu_frames(&mut world, 180, None);
+    assert!(
+        world.patched_cells().contains(&(11, 21, 0x181)),
+        "first pot hit"
+    );
+    assert!(!eu_flag(&world, 0x292), "one hit does not open the door");
+    eu_finish_scene(&mut world, 4000);
+
+    for (frames, direction) in [
+        (16, Some(Direction::Down)),
+        (60, None),
+        (33, Some(Direction::Left)),
+        (60, None),
+        (28, Some(Direction::Up)),
+        (60, None),
+        (33, Some(Direction::Left)),
+        (60, None),
+    ] {
+        eu_frames(&mut world, frames, direction);
+    }
+    assert_eq!(world.position(), (88, 352), "third pot on foot");
+    assert_eq!(world.facing(), Direction::Left);
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    for (leg, (frames, direction)) in [
+        (120, None),
+        (33, Some(Direction::Right)),
+        (60, None),
+        (28, Some(Direction::Down)),
+        (60, None),
+        (33, Some(Direction::Right)),
+        (60, None),
+        (20, Some(Direction::Up)),
+        (80, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        eu_frames(&mut world, frames, direction);
+        if leg == 0 {
+            assert_eq!(world.pot().map(|pot| pot.tile), Some(0xfb));
+            assert!(world.patched_cells().contains(&(4, 21, 0xf8)));
+        }
+    }
+    assert_eq!(
+        world.position(),
+        (184, 368),
+        "second shot from the native lane"
+    );
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    eu_frames(&mut world, 240, None);
+    assert!(eu_flag(&world, 0x292), "the second pot opens the blue door");
+    eu_finish_scene(&mut world, 5000);
+    assert!(world.patched_cells().contains(&(11, 21, 0xcb)));
+    assert!(world.patched_cells().contains(&(11, 20, 0xf6)));
+    assert!(
+        eu_flag(&world, 0x09),
+        "friends' reaction reached its last local"
+    );
+    assert!(
+        world
+            .residents()
+            .iter()
+            .all(|resident| resident.record != 0x03_8c32),
+        "the broken door has gone"
+    );
 }
