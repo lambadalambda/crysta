@@ -16,7 +16,11 @@ measured on the reference emulator.
   data: the sound bank moves from `$C6:2191` to `$C8:2191`, the track table
   from `$96:F2A0` to `$99:F9EA` (all 59 entries, pointers `+$20000` or
   more). Sample 62's European copy wraps past the end of the ROM into bank
-  0. The SPC's clock is region-free, so tempo is the same in real time.
+  0. The SPC's clock is region-free; the portable host now polls its track
+  script and alternating sound-effect latch every ~640 samples at 32 kHz on
+  PAL, not the Japanese 533. The fixed 640 approximation is 50.000 Hz rather
+  than 50.007 Hz. Source identity and port pacing do not prove native PCM
+  tempo, fades or sound presentation.
 - **RAM.** The layout is the same: `$047E` map, `$0694` money, `$07ED` Prime
   Blue, `$06A4` text speed, `$0DE8`, the event flags at `$7E:06C0`, the
   actors from `$1000`. `$0450` is the current track's bank byte (`LDA

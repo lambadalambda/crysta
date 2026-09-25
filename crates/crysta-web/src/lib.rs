@@ -132,9 +132,12 @@ impl Game {
     /// A driver that does not boot.
     pub fn start_audio(&mut self) -> Result<(), String> {
         let driver = extract_driver(&self.cartridge).map_err(|error| error.to_string())?;
+        let revision = self.cartridge.revision();
         let cartridge = self.cartridge.clone();
-        let player = Player::new(&driver, move |track| Ok(extract_track(&cartridge, track)?))
-            .map_err(|error| error.to_string())?;
+        let player = Player::new(&driver, revision, move |track| {
+            Ok(extract_track(&cartridge, track)?)
+        })
+        .map_err(|error| error.to_string())?;
         self.player = Some(player);
         Ok(())
     }

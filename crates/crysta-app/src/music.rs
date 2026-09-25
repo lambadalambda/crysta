@@ -13,10 +13,40 @@ use std::collections::VecDeque;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
-/// Stereo frames per NMI frame: 32000 Hz over the SNES's 60 Hz.
-const FRAME: usize = 533;
-/// SPC cycles per NMI frame, for settling without rendering.
-const FRAME_CYCLES: u32 = 17_067;
+/// A host NMI/port-script frame in the audio-only 32 kHz backend. This is
+/// separate from the SPC driver's own region-independent music tempo.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Cadence {
+    samples: usize,
+    cycles: u32,
+}
+
+impl Cadence {
+    const fn for_revision(revision: rom::Revision) -> Self {
+        match revision {
+            rom::Revision::Japan => Self {
+                samples: 533,
+                cycles: 17_067,
+            },
+            rom::Revision::EuropeEnglish => Self {
+                samples: 640,
+                cycles: 20_480,
+            },
+        }
+    }
+
+    /// Samples until the next NMI, keeping partial audio-buffer chunks.
+    fn consume(self, phase: &mut usize, available: usize) -> (usize, bool) {
+        let samples = available.min(self.samples - *phase);
+        *phase += samples;
+        let boundary = *phase == self.samples;
+        if boundary {
+            *phase = 0;
+        }
+        (samples, boundary)
+    }
+}
+
 /// Frames a port wait may take: a fade takes some five seconds, an echo
 /// buffer's drain a third of one.
 const WAIT_FRAMES: u32 = 900;
@@ -99,6 +129,8 @@ pub struct Player {
     sounds: VecDeque<u16>,
     /// Whether the next NMI frame writes the latch rather than zeros.
     latch_frame: bool,
+    /// Host-side NMI/port cadence, not the track's SPC clock.
+    cadence: Cadence,
     /// Stereo frames rendered into the current NMI frame.
     phase: usize,
 }
@@ -111,6 +143,7 @@ impl Player {
     /// A failed upload or a driver that does not answer.
     pub fn new(
         driver: &Driver,
+        revision: rom::Revision,
         tracks: impl FnMut(u8) -> Result<Track> + Send + 'static,
     ) -> Result<Self> {
         let mut apu = Apu::new()?;
@@ -123,6 +156,7 @@ impl Player {
             waited: 0,
             sounds: VecDeque::new(),
             latch_frame: true,
+            cadence: Cadence::for_revision(revision),
             phase: 0,
         };
         player.settle()?;
@@ -161,7 +195,7 @@ impl Player {
     /// As [`Self::render`].
     pub fn settle(&mut self) -> Result<()> {
         while !self.script.is_empty() {
-            self.apu.run_cycles(FRAME_CYCLES)?;
+            self.apu.run_cycles(self.cadence.cycles)?;
             self.frame()?;
         }
         Ok(())
@@ -178,13 +212,11 @@ impl Player {
         }
         let mut rest = out;
         while !rest.is_empty() {
-            let frames = (rest.len() / 2).min(FRAME - self.phase);
+            let (frames, boundary) = self.cadence.consume(&mut self.phase, rest.len() / 2);
             let (now, later) = rest.split_at_mut(frames * 2);
             self.apu.render(now)?;
             rest = later;
-            self.phase += frames;
-            if self.phase == FRAME {
-                self.phase = 0;
+            if boundary {
                 self.frame()?;
             }
         }
@@ -406,6 +438,57 @@ mod tests {
         assert!(matches!(faded.last(), Some(Op::Upload(_))), "no F4");
     }
 
+    #[test]
+    fn port_script_uses_region_frame_cadence_not_music_tempo() {
+        assert_eq!(Cadence::for_revision(rom::Revision::Japan).samples, 533);
+        assert_eq!(Cadence::for_revision(rom::Revision::Japan).cycles, 17_067);
+        assert_eq!(
+            Cadence::for_revision(rom::Revision::EuropeEnglish).samples,
+            640
+        );
+        assert_eq!(
+            Cadence::for_revision(rom::Revision::EuropeEnglish).cycles,
+            20_480
+        );
+        for revision in [rom::Revision::Japan, rom::Revision::EuropeEnglish] {
+            let cadence = Cadence::for_revision(revision);
+            let mut phase = 0;
+            assert_eq!(
+                cadence.consume(&mut phase, cadence.samples - 1),
+                (cadence.samples - 1, false)
+            );
+            assert_eq!(cadence.consume(&mut phase, 1), (1, true));
+            assert_eq!(phase, 0);
+            assert_eq!(
+                cadence.consume(&mut phase, cadence.samples + 1),
+                (cadence.samples, true)
+            );
+            assert_eq!(cadence.consume(&mut phase, 1), (1, false));
+            assert_eq!(phase, 1);
+        }
+    }
+
+    #[test]
+    fn european_audio_driver_renders_non_silent_chunk_independent_pcm() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Terranigma (E) [!].smc");
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let rom = rom::Rom::load(&bytes).expect("owned European ROM");
+        assert_eq!(rom.revision(), rom::Revision::EuropeEnglish);
+        let (mut whole, mut chunked) = (player(&rom, 4), player(&rom, 4));
+        assert_eq!(whole.cadence.samples, 640);
+        let mut expected = vec![0; 64_000];
+        whole.play(&mut expected).unwrap();
+        let mut actual = vec![0; expected.len()];
+        for chunk in actual.chunks_mut(254) {
+            chunked.play(chunk).unwrap();
+        }
+        assert_eq!(actual, expected);
+        assert!(actual.iter().any(|&sample| sample != 0));
+    }
+
     fn rom() -> rom::Rom {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
         rom::Rom::load(&bytes).unwrap()
@@ -413,9 +496,11 @@ mod tests {
 
     fn player(rom: &rom::Rom, track: u8) -> Player {
         let owned = rom.clone();
-        let mut player = Player::new(&extract_driver(rom).unwrap(), move |track| {
-            Ok(extract_track(&owned, track)?)
-        })
+        let mut player = Player::new(
+            &extract_driver(rom).unwrap(),
+            rom.revision(),
+            move |track| Ok(extract_track(&owned, track)?),
+        )
         .unwrap();
         player.take(Cue::Track { track, fade: false }).unwrap();
         player.settle().unwrap();

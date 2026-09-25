@@ -138,8 +138,9 @@ fn start_music(cartridge: &rom::Rom) -> Result<music_output::Music, String> {
 /// Boots the driver; tracks come from the cartridge as the game asks.
 fn start_player(cartridge: &rom::Rom) -> Result<music::Player, String> {
     let driver = music_data::extract_driver(cartridge).map_err(|error| error.to_string())?;
+    let revision = cartridge.revision();
     let cartridge = cartridge.clone();
-    music::Player::new(&driver, move |track| {
+    music::Player::new(&driver, revision, move |track| {
         Ok(music_data::extract_track(&cartridge, track)?)
     })
     .map_err(|error| error.to_string())
