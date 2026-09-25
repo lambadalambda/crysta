@@ -556,3 +556,113 @@ fn the_elders_question_opens_and_either_answer_continues() {
         assert!(world.events()[0x26 / 8] & (1 << (0x26 % 8)) != 0, "$26 set");
     }
 }
+
+#[test]
+fn european_frozen_elder_assigns_the_world_map_mission() {
+    let Some(rom) = european() else {
+        return;
+    };
+    let mut events = fresh_game_flags();
+    for id in [
+        0x20, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2e, 0xfe, 0x240, 0x241, 0x242, 0x243, 0x244, 0x292,
+    ] {
+        events[id / 8] |= 1 << (id % 8);
+    }
+    let mut world = World::enter_with_events(rom.image(), 0x000d, 120, 704, events).unwrap();
+    world.face(Direction::Down);
+    let mut started = false;
+    for frame in 0..6000 {
+        let confirm = if !started {
+            started = true;
+            true
+        } else {
+            (world.dialogue().is_some() || world.in_scene()) && !world.typing() && frame % 2 == 0
+        };
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if world.events()[0x296 / 8] & (1 << (0x296 % 8)) != 0 && !world.pad_locked() {
+            break;
+        }
+    }
+    assert_ne!(world.events()[0x21 / 8] & (1 << (0x21 % 8)), 0);
+    assert_ne!(
+        world.events()[0x296 / 8] & (1 << (0x296 % 8)),
+        0,
+        "mission absent: scene={} locked={} typing={} dialogue={} cursor={} frozen={:x?}",
+        world.in_scene(),
+        world.pad_locked(),
+        world.typing(),
+        world.dialogue().is_some(),
+        world.dialogue().and_then(|view| view.cursor).is_some(),
+        world.frozen_scripts()
+    );
+    assert_eq!(world.map(), 0x000d);
+}
+
+#[test]
+fn european_frozen_town_releases_ark_to_the_underworld() {
+    let Some(rom) = european() else {
+        return;
+    };
+    // The native European route sets these before the town presentation;
+    // $3C belongs to the town script, not the seeded return state.
+    let mut events = fresh_game_flags();
+    for id in [
+        0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2e, 0xfe, 0x240, 0x241, 0x242, 0x243, 0x244,
+        0x292, 0x296,
+    ] {
+        events[id / 8] |= 1 << (id % 8);
+    }
+    let mut world = World::enter_with_events(rom.image(), 0x000a, 504, 769, events).unwrap();
+    for frame in 0..4000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if world.events()[0x3c / 8] & (1 << (0x3c % 8)) != 0 && !world.pad_locked() {
+            break;
+        }
+    }
+    assert_ne!(world.events()[0x3c / 8] & (1 << (0x3c % 8)), 0);
+    assert!(!world.pad_locked(), "town scene released Ark");
+    for _ in 0..300 {
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+        if world.map() == 0x0003 {
+            break;
+        }
+    }
+    assert_eq!(world.map(), 0x0003, "south gate opens after the mission");
+    for _ in 0..200 {
+        world.update(None, Presses::NONE).unwrap();
+        if !world.in_transition() {
+            break;
+        }
+    }
+    assert_eq!(world.position(), (536, 528), "raw world-map placement");
+    // Unlike the native European 240-frame neutral arrival (536,544), the
+    // portable world map still needs explicit Down input for this first step.
+    for _ in 0..16 {
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    assert_eq!(
+        world.position(),
+        (536, 544),
+        "European settled route position"
+    );
+    for id in [0x21, 0x23, 0x3c, 0xfe, 0x242, 0x296] {
+        assert_ne!(world.events()[id / 8] & (1 << (id % 8)), 0);
+    }
+}

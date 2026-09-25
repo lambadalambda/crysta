@@ -38,7 +38,14 @@ and run the story tests against it.
   `$240/$241/$242` and the actual spear inventory entry, the frozen return
   `$FE/$23`, Elder `$21` followed by mission `$296`, town `$3C`, and arrival
   on world-map `$03` at `(536,544)` at frame 73937. The headless native
-  European route now reaches the requested endpoint. The portable European
-  tests still need to cover this continuation and a continuous replay;
-  source-specific English dialogue acknowledgements cannot be assumed from
-  Japanese timings.
+  European route now reaches the requested endpoint. Portable European tests
+  separately cover the frozen Elder's `$21/$296` conversation and the town's
+  `$3C` scene through the south gate. They seed the preceding flags at each
+  checkpoint rather than replaying the journey continuously: the portable
+  map `$03` currently needs an explicit 16-frame Down input to reach native
+  settled `(536,544)` from raw `(536,528)`. The town controller also
+  stops at unsupported `$88:855E` after granting `$3C`; it releases input
+  and the exit remains playable, but its remaining behavior is unqualified.
+  The full continuous portable replay and native-frame timing/text
+  presentation remain open; English dialogue acknowledgements cannot be
+  assumed from Japanese timings.
