@@ -5,9 +5,10 @@ cargo run --release --manifest-path crates/crysta-app/Cargo.toml -- \
   'local/Tenchi Souzou (Japan).sfc'
 ```
 
-The authenticated Japanese ROM supplies all art and music locally. No asset
-bundle or downloaded soundtrack is required. This crate stays outside the root
-workspace so native platform dependencies do not change reference-producer pins.
+The authenticated Japanese or European English ROM supplies all art and music
+locally. No asset bundle or downloaded soundtrack is required. This crate stays
+outside the root workspace so native platform dependencies do not change
+reference-producer pins.
 
 ## Controls
 
@@ -78,10 +79,11 @@ CRYSTA_JP_ROM="$PWD/local/Tenchi Souzou (Japan).sfc" \
 
 ## Simulation speed
 
-Windowed simulation uses the Japanese reference's nominal **60.098814 ticks/s**,
-independent of display refresh or event-loop wakeups. Catch-up is capped at four
-steps after a host stall; larger backlogs are discarded and logged. Headless
-scripts remain exact logical steps. Audio pacing is independent.
+Windowed simulation uses the ROM's console rate: 60.098814 ticks/s for the
+Japanese ROM and 50.007 ticks/s for the European one, independent of display
+refresh or event-loop wakeups. Catch-up is capped at four steps after a host
+stall; larger backlogs are discarded and logged. Headless scripts remain exact
+logical steps. Audio pacing is independent.
 See [timing measurements and NPC fidelity limits](../../docs/native-crysta-timing.md).
 
 ## Background presentation

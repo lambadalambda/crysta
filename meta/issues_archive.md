@@ -129,3 +129,4 @@
 - [x] [Show the area titles](issues/area-titles.md)
 - [x] [Draw the text window as the game does](issues/native-text-window.md)
 - [x] [Map the European ROM to the Japanese one](issues/european-address-map.md)
+- [x] [Accept the European ROM in the app and the web page](issues/european-hosts.md)

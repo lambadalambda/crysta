@@ -2,8 +2,8 @@
 
 The Crysta slice in a browser. The page runs the native app's session,
 renderer and music (`crysta-app`'s library) as WebAssembly. Players select
-their own Japanese ROM; it is read with `File.arrayBuffer()` and stays in
-memory, never fetched, uploaded or stored.
+their own European English or Japanese ROM; it is read with
+`File.arrayBuffer()` and stays in memory, never fetched, uploaded or stored.
 
 ## Build and run
 
@@ -24,6 +24,7 @@ start sound only after a click).
 ```sh
 cargo test --release --manifest-path crates/crysta-web/Cargo.toml
 node crates/crysta-web/smoke.mjs local/crysta-web/site 'local/Tenchi Souzou (Japan).sfc'
+node crates/crysta-web/smoke.mjs local/crysta-web/site 'local/Terranigma (E) [!].smc'
 ```
 
 The smoke check runs 600 frames and renders ten seconds of sound into

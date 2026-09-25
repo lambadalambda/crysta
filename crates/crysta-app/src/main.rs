@@ -29,7 +29,7 @@ use winit::window::{Window, WindowId};
 fn main() {
     let mut arguments = std::env::args().skip(1);
     let Some(path) = arguments.next() else {
-        eprintln!("usage: crysta-app <japanese-rom>");
+        eprintln!("usage: crysta-app <japanese-or-european-rom>");
         std::process::exit(2);
     };
     let bytes = match std::fs::read(&path) {

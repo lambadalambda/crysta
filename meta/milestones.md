@@ -231,7 +231,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Read every ROM address through a per-revision layout](issues/revision-layout.md)
 - [Decode the European text engine, font and windows](issues/european-text.md)
 - [Run the European version at its own timing and sound](issues/european-timing.md)
-- [Accept the European ROM in the app and the web page](issues/european-hosts.md)
 - [Check the European slice against a native route](issues/european-route.md)
 
 ## Completion policy
