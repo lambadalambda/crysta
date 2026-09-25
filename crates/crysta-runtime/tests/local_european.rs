@@ -720,7 +720,7 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
 
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
-fn european_single_world_replays_bedroom_through_crystal_spear() {
+fn european_single_world_replays_bedroom_to_underworld() {
     let Some(rom) = european() else { return };
     let mut world =
         World::enter_with_events(rom.image(), 0x000f, 304, 112, fresh_game_flags()).unwrap();
@@ -1367,5 +1367,179 @@ fn european_single_world_replays_bedroom_through_crystal_spear() {
     assert!(
         world.items().contains(&0x81),
         "actual Crystal Spear inventory"
+    );
+
+    // The frozen return has its own English pages. It releases control with
+    // $FE/$23; unlike native, the portable script has no forced player walk,
+    // so climb from the actual (136,368) rather than the native (120,448).
+    for frame in 0..12000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if eu_flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(eu_flag(&world, 0xfe) && eu_flag(&world, 0x23));
+    assert!(!world.pad_locked());
+    assert_eq!(world.position(), (136, 368), "unmodelled scripted walk");
+    eu_frames(&mut world, 12, Some(Direction::Left));
+    eu_frames(&mut world, 12, None);
+    for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
+        if map != 0x20 {
+            for _ in 0..200 {
+                if world.position().0 >= (if map == 0x0e { 408 } else { 152 }) {
+                    break;
+                }
+                world.update(Some(Direction::Right), Presses::NONE).unwrap();
+            }
+            eu_frames(&mut world, 12, None);
+        }
+        for _ in 0..400 {
+            if world.map() == map {
+                break;
+            }
+            world.update(Some(Direction::Up), Presses::NONE).unwrap();
+        }
+        for _ in 0..200 {
+            if !world.in_transition() {
+                break;
+            }
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert_eq!((world.map(), world.position()), (map, landing));
+    }
+
+    eu_frames(&mut world, 34, Some(Direction::Down));
+    eu_frames(&mut world, 12, None);
+    eu_frames(&mut world, 44, Some(Direction::Left));
+    eu_frames(&mut world, 12, None);
+    for _ in 0..120 {
+        if world.map() == 0x0d {
+            break;
+        }
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    assert_eq!(world.map(), 0x0d);
+    for _ in 0..200 {
+        if !world.in_transition() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    for _ in 0..300 {
+        if world.position().1 >= 704 {
+            break;
+        }
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    assert_eq!(world.position(), (120, 704), "approach the Elder");
+    assert!(!eu_flag(&world, 0x21) && !eu_flag(&world, 0x296));
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert!(eu_flag(&world, 0x21), "Elder learns about frozen Crysta");
+    for frame in 0..6000 {
+        if world.dialogue().and_then(|page| page.cursor).is_some() {
+            break;
+        }
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+    }
+    assert!(world.dialogue().and_then(|page| page.cursor).is_some());
+    assert!(
+        eu_flag(&world, 0x21) && !eu_flag(&world, 0x296),
+        "mission follows the answer"
+    );
+    assert!(
+        eu_finish_scene(&mut world, 6000),
+        "answer Elder's mission choice"
+    );
+    assert!(eu_flag(&world, 0x296), "Elder assigns the mission");
+
+    for _ in 0..200 {
+        if world.map() == 0x0a {
+            break;
+        }
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    assert_eq!(world.map(), 0x0a, "Elder's doorway leads into town");
+    assert!(!eu_flag(&world, 0x3c));
+    for frame in 0..6000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if eu_flag(&world, 0x3c) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(eu_flag(&world, 0x3c), "town grants its scene flag");
+    assert!(!world.pad_locked(), "town releases Ark");
+    // The town actor is still parked at an unsupported continuation after
+    // $3C. This is a playable exit, not a qualified completion of its script.
+    assert_eq!(
+        world.frozen_scripts(),
+        &[(0x03_8a6e, 0x08_855e)],
+        "the post-$3C town continuation remains unqualified"
+    );
+    for _ in 0..300 {
+        if world.map() == 0x03 {
+            break;
+        }
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    assert_eq!(world.map(), 0x03, "south gate opens after the mission");
+    for _ in 0..200 {
+        if !world.in_transition() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    assert_eq!(world.position(), (536, 528), "raw map entrance");
+    for step in 1..=16 {
+        world.update(None, Presses::NONE).unwrap();
+        assert_eq!(world.position(), (536, 528 + step), "neutral arrival");
+    }
+    for id in [
+        0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2e, 0x3c, 0xfe, 0x240, 0x241, 0x242, 0x243,
+        0x244, 0x292, 0x296,
+    ] {
+        assert!(eu_flag(&world, id), "EU native route flag {id:#x}");
+    }
+    assert!(world.items().contains(&0x81), "the spear remains held");
+    eu_frames(&mut world, 16, Some(Direction::Down));
+    eu_frames(&mut world, 16, None);
+    assert_eq!(world.map(), 0x03);
+    assert!(
+        world.position().1 > 544,
+        "Ark walks on the underworld plane"
     );
 }
