@@ -6,6 +6,7 @@ use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use crysta_runtime::{BOX_MAPS, MAPS};
 use rom::{Revision, Rom};
+use room_core::Direction;
 use std::path::Path;
 
 fn load(name: &str, revision: Revision) -> Option<Rom> {
@@ -22,6 +23,67 @@ fn european() -> Option<Rom> {
 
 fn japanese() -> Option<Rom> {
     load("Tenchi Souzou (Japan).sfc", Revision::Japan)
+}
+
+#[test]
+fn the_european_wake_up_releases_ark_after_elles_dialogue() {
+    let Some(rom) = european() else {
+        return;
+    };
+    let mut world =
+        World::enter_with_events(rom.image(), 0x000F, 304, 112, fresh_game_flags()).unwrap();
+    for _ in 0..400 {
+        if world.dialogue().is_some() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    assert!(world.dialogue().is_some(), "Elle must speak in the bedroom");
+    let mut acknowledgements = 0;
+    while world.in_scene() {
+        for _ in 0..600 {
+            if !world.typing() {
+                break;
+            }
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert!(!world.typing(), "English page must finish typing");
+        world
+            .update(
+                None,
+                Presses {
+                    confirm: true,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        acknowledgements += 1;
+        assert!(acknowledgements < 20, "European dialogue did not finish");
+    }
+    assert_ne!(world.events()[0x20 / 8] & (1 << (0x20 % 8)), 0);
+    for _ in 0..600 {
+        if !world.pad_locked() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    assert!(!world.pad_locked(), "Ark can walk after Elle leaves");
+    assert_eq!(world.items(), [0x7A, 0xA0]);
+    assert!(world.frozen_scripts().is_empty());
+    for _ in 0..62 {
+        world.update(Some(Direction::Right), Presses::NONE).unwrap();
+    }
+    for _ in 0..38 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    for _ in 0..67 {
+        world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    }
+    for _ in 0..83 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    assert_eq!(world.map(), 0x0010, "leave through the bedroom doorway");
+    assert_eq!(world.position(), (392, 353), "the native doorway landing");
 }
 
 #[test]
