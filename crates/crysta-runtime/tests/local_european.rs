@@ -87,6 +87,49 @@ fn the_european_wake_up_releases_ark_after_elles_dialogue() {
 }
 
 #[test]
+fn the_european_weaver_grants_28_after_the_first_answer() {
+    let Some(rom) = european() else {
+        return;
+    };
+    let mut events = fresh_game_flags();
+    events[0x26 / 8] |= 1 << (0x26 % 8);
+    let mut world = World::enter_with_events(rom.image(), 0x0013, 360, 144, events).unwrap();
+    world.face(Direction::Up);
+    let mut talked = false;
+    let mut chose = false;
+    for frame in 0..4000 {
+        let choosing = world.dialogue().and_then(|view| view.cursor).is_some();
+        let reading = world.dialogue().is_some() || world.in_scene();
+        let confirm = if choosing {
+            chose = true;
+            true
+        } else if reading && !world.typing() && frame % 2 == 0 {
+            true
+        } else if !reading && !talked && frame > 50 {
+            talked = true;
+            true
+        } else {
+            false
+        };
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        assert!(world.frozen_scripts().is_empty());
+        if chose && !world.in_scene() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(chose, "the European choice opened");
+    assert_ne!(world.events()[0x28 / 8] & (1 << (0x28 % 8)), 0);
+}
+
+#[test]
 fn the_bedroom_loads_and_runs() {
     let Some(rom) = european() else {
         return;

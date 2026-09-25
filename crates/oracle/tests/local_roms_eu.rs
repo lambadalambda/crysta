@@ -106,7 +106,7 @@ fn run_scenario_child() -> ! {
 }
 
 #[test]
-fn european_new_game_wakes_ark_and_enters_the_next_room() {
+fn european_new_game_reaches_the_weaver_in_crysta() {
     if local_rom("Terranigma (E) [!].smc").is_none() {
         eprintln!("skipping: local European dump not present");
         return;
@@ -119,7 +119,7 @@ fn european_new_game_wakes_ark_and_enters_the_next_room() {
     let out = std::process::Command::new(std::env::current_exe().expect("current exe"))
         .args([
             "--exact",
-            "european_new_game_wakes_ark_and_enters_the_next_room",
+            "european_new_game_reaches_the_weaver_in_crysta",
             "--nocapture",
         ])
         .env("ORACLE_EU_STORY_CHILD", "1")
@@ -138,7 +138,14 @@ fn run_story_child() -> ! {
     let rom = rom::Rom::load(&image).expect("validated European ROM");
     assert_eq!(rom.revision(), rom::Revision::EuropeEnglish);
     let mut session = Session::new(&rom).expect("empty-SRAM native session");
-    let buttons = [Button::Start, Button::Down, Button::A, Button::Right];
+    let buttons = [
+        Button::Start,
+        Button::Down,
+        Button::A,
+        Button::Right,
+        Button::Left,
+        Button::Up,
+    ];
     let mut frame = 0;
     let mut advance = |count: u32, held: Option<Button>| {
         for button in buttons {
@@ -150,7 +157,14 @@ fn run_story_child() -> ! {
         frame += count;
         let wram = session.wram_image();
         let word = |offset: usize| u16::from_le_bytes([wram[offset], wram[offset + 1]]);
-        (word(0x047e), word(0x1000), word(0x1002), wram[0x6c4], frame)
+        (
+            word(0x047e),
+            word(0x1000),
+            word(0x1002),
+            u16::from_le_bytes([wram[0x6c4], wram[0x6c5]]),
+            frame,
+            word(0x0dc2),
+        )
     };
     // Real inputs from an empty-SRAM boot: load menu -> New Game (fourth
     // entry) -> accept the default name. Europe reaches its menu later than JP.
@@ -194,9 +208,129 @@ fn run_story_child() -> ! {
     assert_eq!(room.0, 0x0010, "ordinary movement enters the next room");
     assert_eq!((room.1, room.2), (392, 353));
     assert_ne!(room.3 & 1, 0, "the story flag persists across the exit");
+
+    // Ordinary movement through C into B. The Japanese route supplies
+    // candidate walking legs; these endpoints are checked on the EU CPU.
+    for (leg, (frames, held)) in [
+        (42, Some(Button::Down)),
+        (78, Some(Button::Left)),
+        (90, None),
+        (12, Some(Button::Left)),
+        (100, None),
+        (55, Some(Button::Left)),
+        (70, Some(Button::Up)),
+        (100, None),
+        (1, Some(Button::A)), // facing Up: open B's door
+        (100, None),
+        (50, Some(Button::Up)),
+        (100, None),
+        (180, Some(Button::Up)),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let state = advance(frames, held);
+        if leg == 4 {
+            assert_eq!(state.0, 0x000c, "bedroom route crosses C");
+        }
+    }
+    let elder = advance(0, None);
+    assert_eq!(elder.0, 0x000b);
+    assert_eq!((elder.1, elder.2), (120, 128));
+    // The first request completes and grants $26 *before* the choice is
+    // answered; the fourth A selects an answer, the rest finish its response.
+    assert_eq!(elder.3 & (1 << (0x26 % 8)), 0);
+    for _ in 0..3 {
+        advance(1, Some(Button::A));
+        advance(240, None);
+    }
+    let choice = advance(0, None);
+    assert_ne!(choice.3 & (1 << (0x26 % 8)), 0);
+    assert_eq!(choice.5, 0xffff, "the choice is still unanswered");
+    advance(1, Some(Button::A));
+    let answered = advance(240, None);
+    assert_ne!(answered.5, 0xffff, "A answered the choice");
+    for _ in 0..4 {
+        advance(1, Some(Button::A));
+        advance(240, None);
+    }
+    let spoken = advance(0, None);
+    assert_ne!(spoken.3 & (1 << (0x26 % 8)), 0, "Elder grants event $26");
+    for (leg, (frames, held)) in [
+        (60, Some(Button::Down)),
+        (100, None),
+        (10, Some(Button::Left)),
+        (82, Some(Button::Down)),
+        (100, None),
+        (45, Some(Button::Down)),
+        (140, None),
+        (22, Some(Button::Down)),
+        (25, None),
+        (15, None),
+        (140, None),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let state = advance(frames, held);
+        if leg == 1 {
+            assert_eq!(state.0, 0x000c, "leaving B returns through C");
+        } else if leg == 4 {
+            assert_eq!(state.0, 0x000d, "the route crosses D");
+        }
+    }
+    let exterior = advance(0, None);
+    assert_eq!(exterior.0, 0x000a, "walk out of Ark's house");
+    assert_eq!((exterior.1, exterior.2), (504, 769));
+
+    // Cross the town, open the weaver's door, and approach her on foot.
+    for (frames, held) in [
+        (32, Some(Button::Down)),
+        (60, None),
+        (24, Some(Button::Right)),
+        (90, None),
+        (120, Some(Button::Left)),
+        (60, None),
+        (300, Some(Button::Up)),
+        (60, None),
+        (132, Some(Button::Right)),
+        (60, None),
+        (65, Some(Button::Up)),
+        (60, None),
+        (56, Some(Button::Left)),
+        (60, None),
+        (25, Some(Button::Up)),
+        (100, None),
+        (1, Some(Button::A)),
+        (100, None),
+        (40, Some(Button::Up)),
+        (180, None),
+        (43, Some(Button::Up)),
+        (60, None),
+        (22, Some(Button::Left)),
+        (60, None),
+        (20, Some(Button::Up)),
+        (60, None),
+    ] {
+        advance(frames, held);
+    }
+    let weaver = advance(0, None);
+    assert_eq!(weaver.0, 0x0013);
+    assert_eq!((weaver.1, weaver.2), (360, 144));
+    advance(1, Some(Button::A));
+    advance(180, None);
+    assert_eq!(advance(0, None).3 & (1 << 8), 0, "$28 not yet granted");
+    // Eleven further English page/choice acknowledgements grant $28.
+    for _ in 0..11 {
+        advance(1, Some(Button::A));
+        advance(240, None);
+    }
+    let told = advance(0, None);
+    assert_ne!(told.3 & (1 << 8), 0, "the weaver grants event $28");
+    assert_eq!(told.0, 0x0013);
     eprintln!(
-        "EU new game: bedroom at {bedroom_frame}, map $10 at {}",
-        room.4
+        "EU new game: bedroom at {bedroom_frame}, room $10 at {}, exterior at {}, weaver at {}",
+        room.4, exterior.4, told.4
     );
     std::process::exit(0);
 }
