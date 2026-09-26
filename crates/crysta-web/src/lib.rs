@@ -251,6 +251,9 @@ mod web {
 }
 
 #[cfg(test)]
+mod european_route;
+
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -398,7 +401,9 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../local/Terranigma (E) [!].smc"
         );
-        let Ok(bytes) = std::fs::read(path) else { return };
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
         let mut game = Game::new(&bytes).unwrap();
         // Bounded host continuation: the fresh native route covers the
         // bedroom-to-C prefix. Seed only its prior wake/Elder/weaver flags.
@@ -407,11 +412,15 @@ mod tests {
             events[id / 8] |= 1 << (id % 8);
         }
         game.session.world = crysta_runtime::world::World::enter_with_events(
-            game.session.image, 0x0c, 120, 464, events,
-        ).unwrap();
-        let flag = |game: &Game, id: usize| {
-            game.session.world.events()[id / 8] & (1 << (id % 8)) != 0
-        };
+            game.session.image,
+            0x0c,
+            120,
+            464,
+            events,
+        )
+        .unwrap();
+        let flag =
+            |game: &Game, id: usize| game.session.world.events()[id / 8] & (1 << (id % 8)) != 0;
         let (mut answers, mut moved_cursor) = (0, false);
         for frame in 0..9000 {
             let world = &game.session.world;
@@ -442,7 +451,10 @@ mod tests {
         for _ in 0..44 {
             game.frame(buttons::RIGHT);
         }
-        assert!(game.session.world.position().0 > x, "Ark walks after the alternate scene");
+        assert!(
+            game.session.world.position().0 > x,
+            "Ark walks after the alternate scene"
+        );
         for _ in 0..300 {
             game.frame(0);
         }
