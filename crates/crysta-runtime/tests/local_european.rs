@@ -853,6 +853,186 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
     );
 }
 
+/// An alternative from the actual post-Box return, not a seeded map entry.
+/// It visits a frozen neighbor and the now-empty room Elder before the
+/// separate doorway Elder grants the mission. The native route has no such
+/// detour yet; this only qualifies portable on-foot behavior.
+#[allow(clippy::too_many_lines)] // Keep the fork's map and flag checkpoints together.
+fn eu_check_post_box_detour(start: &World<'_>) {
+    let mut world = start.clone();
+    assert_eq!((world.map(), world.position()), (0x0c, (184, 368)));
+    assert!(eu_flag(&world, 0x23) && !eu_flag(&world, 0x21));
+    for (frames, direction) in [
+        (34, Some(Direction::Down)),
+        (12, None),
+        (44, Some(Direction::Left)),
+        (12, None),
+    ] {
+        eu_frames(&mut world, frames, direction);
+    }
+    assert_eq!(world.position(), (120, 417));
+    eu_until(&mut world, 35, Direction::Down, |w| w.position().1 >= 432);
+    assert_eq!(world.position(), (120, 432));
+    eu_frames(&mut world, 160, Some(Direction::Right));
+    assert_eq!((world.map(), world.position()), (0x10, (321, 432)));
+    assert!(world
+        .residents()
+        .iter()
+        .any(|r| r.record == 0x03_8d84 && !r.hidden));
+    eu_until(&mut world, 200, Direction::Right, |w| w.position().0 >= 424);
+    assert_eq!(world.position(), (424, 432));
+    eu_frames(&mut world, 20, None);
+    eu_frames(&mut world, 1, Some(Direction::Up));
+    assert_eq!(world.facing(), Direction::Up);
+    assert!(
+        world.dialogue().is_none(),
+        "no preexisting page at the neighbor"
+    );
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert_eq!(
+        world.dialogue().map(|view| view.page.boundary_source()),
+        Some(0x88_e1ea),
+        "the frozen neighbor's European page, not a leftover scene"
+    );
+    eu_finish_scene(&mut world, 4000);
+    assert!(!world.pad_locked() && !eu_flag(&world, 0x21));
+
+    eu_until(&mut world, 500, Direction::Left, |w| w.map() == 0x0c);
+    eu_frames(&mut world, 100, None);
+    assert_eq!(world.position(), (215, 432));
+    eu_until(&mut world, 180, Direction::Left, |w| w.position().0 <= 136);
+    eu_frames(&mut world, 12, None);
+    assert_eq!(world.position(), (136, 432));
+    eu_until(&mut world, 320, Direction::Up, |w| w.position().1 <= 352);
+    assert_eq!((world.map(), world.position()), (0x0c, (136, 352)));
+    world
+        .update(
+            Some(Direction::Up),
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    eu_frames(&mut world, 130, None);
+    assert!(
+        world.patched_cells().contains(&(8, 20, 0xf7)),
+        "opened the B doorway by hand"
+    );
+    eu_until(&mut world, 320, Direction::Up, |w| w.map() == 0x0b);
+    eu_frames(&mut world, 130, None);
+    assert_eq!(world.position(), (120, 191));
+    assert!(eu_flag(&world, 0x27) && !eu_flag(&world, 0x21));
+    assert!(
+        world.residents().iter().all(|r| r.record != 0x03_8b9e),
+        "room Elder is absent while $27 XOR $21"
+    );
+    assert!(!eu_flag(&world, 0x296));
+
+    eu_until(&mut world, 550, Direction::Down, |w| w.map() == 0x0c);
+    eu_frames(&mut world, 130, None);
+    assert_eq!(world.position(), (136, 353));
+    eu_until(&mut world, 150, Direction::Down, |w| w.position().1 >= 417);
+    eu_frames(&mut world, 12, None);
+    eu_until(&mut world, 100, Direction::Left, |w| w.position().0 <= 120);
+    eu_frames(&mut world, 12, None);
+    eu_until(&mut world, 200, Direction::Down, |w| w.map() == 0x0d);
+    eu_frames(&mut world, 130, None);
+    assert_eq!(world.position(), (120, 625));
+    assert!(world.residents().iter().any(|r| r.record == 0x03_8cc6));
+    eu_until(&mut world, 300, Direction::Down, |w| w.position().1 >= 704);
+    assert_eq!(world.position(), (120, 704));
+    assert!(!eu_flag(&world, 0x21) && !eu_flag(&world, 0x296));
+    world
+        .update(
+            None,
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            },
+        )
+        .unwrap();
+    assert!(eu_flag(&world, 0x21) && !eu_flag(&world, 0x296));
+    assert!(
+        eu_finish_scene(&mut world, 6000),
+        "accepted doorway Elder's mission"
+    );
+    assert!(eu_flag(&world, 0x296) && !world.pad_locked());
+    assert!(!eu_flag(&world, 0x3c), "town scene has not run yet");
+
+    eu_until(&mut world, 250, Direction::Down, |w| w.map() == 0x0a);
+    assert!(!eu_flag(&world, 0x3c), "town arrival precedes its scene");
+    let mut saw_town_page = world.dialogue().is_some();
+    for frame in 0..6000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        saw_town_page |= world.dialogue().is_some();
+        if eu_flag(&world, 0x3c) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(saw_town_page, "town scene opened a European page");
+    assert!(eu_flag(&world, 0x3c), "town scene after detour");
+    assert!(!world.pad_locked() && !world.in_scene() && world.dialogue().is_none());
+    eu_frames(&mut world, 48, None);
+    assert!(world.frozen_scripts().is_empty() && world.player_script_frozen_at().is_none());
+    eu_until(&mut world, 450, Direction::Down, |w| w.map() == 0x03);
+    for _ in 0..200 {
+        if !world.in_transition() {
+            break;
+        }
+        world.update(None, Presses::NONE).unwrap();
+    }
+    for step in 1..=16 {
+        world.update(None, Presses::NONE).unwrap();
+        assert_eq!(world.position(), (536, 528 + step));
+    }
+    assert!([0x21, 0x296, 0x3c]
+        .into_iter()
+        .all(|id| eu_flag(&world, id)));
+    assert!(!world.pad_locked() && !world.in_scene() && world.dialogue().is_none());
+    eu_frames(&mut world, 16, Some(Direction::Down));
+    eu_frames(&mut world, 16, None);
+    assert_eq!(world.map(), 0x03);
+    assert!(world.position().1 > 544, "Ark walks after the detour");
+}
+
+fn eu_until(
+    world: &mut World<'_>,
+    limit: usize,
+    direction: Direction,
+    reached: impl Fn(&World<'_>) -> bool,
+) {
+    for _ in 0..limit {
+        if reached(world) {
+            return;
+        }
+        world.update(Some(direction), Presses::NONE).unwrap();
+    }
+    assert!(
+        reached(world),
+        "failed to walk {direction:?} in map={:#x} at {:?}",
+        world.map(),
+        world.position()
+    );
+}
+
 #[test]
 #[allow(clippy::too_many_lines)] // Keep the single-World journey and its checkpoints together.
 fn european_single_world_replays_bedroom_to_underworld() {
@@ -1556,6 +1736,8 @@ fn european_single_world_replays_bedroom_to_underworld() {
         }
         assert_eq!((world.map(), world.position()), (map, landing));
     }
+
+    eu_check_post_box_detour(&world);
 
     eu_frames(&mut world, 34, Some(Direction::Down));
     eu_frames(&mut world, 12, None);
