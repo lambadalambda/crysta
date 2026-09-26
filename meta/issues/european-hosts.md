@@ -32,5 +32,8 @@ either and run the matching layout.
 - The rebuilt browser Wasm site accepted the European ROM and started the
   bedroom without a browser error. The headless `smoke.mjs` run advanced
   600 frames, rendered lit pixels and non-silent audio, and reported no fault.
-  These checks establish startup, **not** an end-to-end European story
-  playthrough; that remains [European route](european-route.md).
+  The startup check alone does not establish the story route. A separate
+  fresh `Game` input-only host test and headless browser trace now reach and
+  walk on `$03` after the retry-choice, Box and post-Box frozen-town detour;
+  see [European route](european-route.md) and the two browser-report issues.
+  The original reporter's browser build and saved state remain unknown.

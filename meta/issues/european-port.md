@@ -37,3 +37,10 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
   fully modelled; the town controller's `COP BF` redirect now runs without
   freezing, but its animation cadence and native PC have not been compared.
   Text raster and PAL load/music tempo acceptance remain open.
+- A fresh European `Game::new` host replay now takes the alternate friend's
+  refusal→retry route, opens the door, plays through the Box and frozen-town
+  detour to the doorway Elder, and walks on world-map `$03`. Its input trace
+  reaches the same rendered endpoint on the rebuilt headless browser page
+  with no mismatched action edges or game fault. This adds a current
+  browser-host path, not native-frame text/sound parity or a reproduction of
+  the original reporter's older build/save state.

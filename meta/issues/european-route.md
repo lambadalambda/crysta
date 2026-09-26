@@ -58,3 +58,15 @@ and run the story tests against it.
   animation cadence and native controller PC have not been compared. PAL
   load/music tempo and native-frame text presentation still need their own
   evidence before this route and its dependencies can be archived.
+- A fresh `crysta-web` `Game::new` host test also reaches and walks on `$03`
+  from the bedroom without seeding flags or maps. Unlike the native and
+  original continuous `World` route, it first **refuses, then accepts** the
+  friends' retry (`$2F`, not `$2E`), opens the blue door with separate pot
+  inputs, and detours through a frozen `$10` resident and the empty `$0B`
+  Elder room before speaking to the `$0D` doorway Elder. The resulting
+  28,020-frame input trace replayed through a headless browser's real
+  keyboard handlers, PAL frame loop and European Wasm game without input-edge
+  mismatch or game fault; a screenshot shows Ark on the world map. This
+  qualifies a current browser-host path, **not** native frame-by-frame
+  equivalence of that alternate detour. The original reporter's build/state
+  remains unknown.
