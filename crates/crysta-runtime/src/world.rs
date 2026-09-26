@@ -50,6 +50,11 @@ pub struct World<'a> {
     residents: Vec<Resident>,
     /// The running script of each resident, aligned with `residents`.
     actors: Vec<Actor>,
+    /// The player's own script installed by a resident's `COP DF`.
+    player_actor: Option<Actor>,
+    /// One script turn per frame; an after-turn replacement starts before the
+    /// next walk rather than running two Ark scripts in one frame.
+    player_turn: PlayerTurn,
     /// Collision cells marked when `room` was last rebuilt.
     blocked: Vec<(u16, u16)>,
     /// The `$7E:06C0` event-flag bitmap, owned so it can be written to.
@@ -290,6 +295,8 @@ impl<'a> World<'a> {
             walking: WalkingState::new(x, y),
             residents: present,
             actors,
+            player_actor: None,
+            player_turn: PlayerTurn::Ready,
             blocked,
             spawn_events: events.clone(),
             globals: Globals::with_events(events),
@@ -429,6 +436,19 @@ impl<'a> World<'a> {
     /// Propagates unqualified target-arrival records, destination resident-resolution,
     /// room, exit-list and actor occupancy rebuild failures.
     pub fn step_checked(&mut self, direction: Option<Direction>) -> Result<Step, WorldError> {
+        // A direct stepping call also owns one frame; `update` resets this in
+        // `frame` instead so its inner step cannot give Ark a second turn.
+        if !self.animate {
+            if self.player_turn == PlayerTurn::Deferred {
+                if self.scene.is_none() {
+                    self.player_turn = PlayerTurn::Ready;
+                    self.run_player_actor();
+                    return Ok(Step::Stayed);
+                }
+            } else {
+                self.player_turn = PlayerTurn::Ready;
+            }
+        }
         // A script holds the world until [`Self::update`] answers it.
         if self.scene.is_some() {
             return Ok(Step::Stayed);
@@ -600,6 +620,9 @@ impl<'a> World<'a> {
         {
             self.scene = Some(Scene::Own(index));
         }
+        if self.scene.is_none() {
+            self.run_player_actor();
+        }
         self.apply_patches()?;
         self.spawn_actors();
         let cells = blocking_cells(&self.residents, &self.actors);
@@ -608,6 +631,43 @@ impl<'a> World<'a> {
             self.blocked = cells;
         }
         Ok(())
+    }
+
+    /// Ark's own `COP DF` script is not a resident: it neither blocks a cell
+    /// nor takes interaction. Also called after a dialogue/callback resumes,
+    /// before the next frame can let Ark walk past the queued handoff.
+    fn run_player_actor(&mut self) {
+        let position = self.position();
+        if let Some(script) = self.globals.player_script.take() {
+            let runtime = u32::try_from(script).ok().map(|script| 0x80_0000 | script);
+            let mut actor = Actor::new(position, runtime, 0, 1);
+            actor.set_map(self.map);
+            self.player_actor = Some(actor);
+            if self.player_turn == PlayerTurn::Ran {
+                self.player_turn = PlayerTurn::Deferred;
+            }
+        }
+        if self.player_turn != PlayerTurn::Ready {
+            return;
+        }
+        if let Some(actor) = &mut self.player_actor {
+            self.player_turn = PlayerTurn::Ran;
+            let mut around = surroundings(
+                self.image,
+                &mut self.globals,
+                &self.base,
+                &[],
+                position,
+                self.facing,
+            );
+            actor.tick(&mut around);
+            if actor.blocked().is_some() {
+                self.scene = Some(Scene::Player);
+            }
+            if actor.is_gone() {
+                self.player_actor = None;
+            }
+        }
     }
 
     /// Writes the tile patches scripts queued into the base room, and the
@@ -793,6 +853,9 @@ impl<'a> World<'a> {
             Direction::Down => 0x0400,
             Direction::Up => 0x0800,
         });
+        if self.player_turn == PlayerTurn::Ran {
+            self.player_turn = PlayerTurn::Ready;
+        }
         // A load's dark frames run nothing.
         if self.dark > 0 {
             self.dark -= 1;
@@ -810,6 +873,12 @@ impl<'a> World<'a> {
         if let Some(step) = self.fade_frame()? {
             self.apply_patches()?;
             return Ok((step, None));
+        }
+        if self.player_turn == PlayerTurn::Deferred && self.scene.is_none() {
+            self.player_turn = PlayerTurn::Ready;
+            self.run_player_actor();
+            self.apply_patches()?;
+            return Ok((Step::Stayed, None));
         }
         if self.scene.is_some() {
             self.answer_scene(presses);
@@ -876,6 +945,13 @@ impl<'a> World<'a> {
             .zip(&self.actors)
             .filter_map(|(resident, actor)| Some((resident.record, actor.frozen_at()?)))
             .collect()
+    }
+
+    /// The player's own `COP DF` script stopped at an unsupported ROM offset.
+    /// This is separate from the residents returned by [`Self::frozen_scripts`].
+    #[must_use]
+    pub fn player_script_frozen_at(&self) -> Option<usize> {
+        self.player_actor.as_ref().and_then(Actor::frozen_at)
     }
 
     /// Hits the resident spawned from `record`, as a thrown object would;
@@ -1108,6 +1184,9 @@ impl<'a> World<'a> {
             pc,
             wait,
         });
+        if self.scene.is_none() && self.globals.player_script.is_some() {
+            self.run_player_actor();
+        }
         true
     }
 
@@ -1120,6 +1199,7 @@ impl<'a> World<'a> {
         let answer = self.globals.dialogue.press(presses);
         let wait = match scene {
             Scene::Own(index) => self.actors[index].blocked(),
+            Scene::Player => self.player_actor.as_ref().and_then(Actor::blocked),
             Scene::Callback { wait, .. } => Some(wait),
         };
         let answer = match wait {
@@ -1152,6 +1232,23 @@ impl<'a> World<'a> {
                     self.scene = Some(Scene::Own(index));
                 }
             }
+            Scene::Player => {
+                let player = self.position();
+                let mut around = surroundings(
+                    self.image,
+                    &mut self.globals,
+                    &self.base,
+                    &[],
+                    player,
+                    self.facing,
+                );
+                if let Some(actor) = &mut self.player_actor {
+                    actor.resume(answer, &mut around);
+                    if actor.blocked().is_some() {
+                        self.scene = Some(Scene::Player);
+                    }
+                }
+            }
             Scene::Callback { actor, pc, wait } => {
                 let player = self.position();
                 let occupied = occupied_by_others(&self.actors, &self.residents, actor, player);
@@ -1166,6 +1263,9 @@ impl<'a> World<'a> {
                 let blocked = self.actors[actor].resume_callback(pc, wait, answer, &mut around);
                 self.scene = blocked.map(|(pc, wait)| Scene::Callback { actor, pc, wait });
             }
+        }
+        if self.scene.is_none() && self.globals.player_script.is_some() {
+            self.run_player_actor();
         }
     }
 
@@ -1457,11 +1557,24 @@ const fn facing_delta(facing: Direction) -> (i16, i16) {
     }
 }
 
+/// Ark's one script turn in a world frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PlayerTurn {
+    /// No script has run this frame.
+    Ready,
+    /// Ark's script has already run this frame.
+    Ran,
+    /// A replacement was installed after that turn; run it before the next walk.
+    Deferred,
+}
+
 /// A script the world waits on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scene {
     /// A resident's own script, blocked in it.
     Own(usize),
+    /// Ark's own script installed by `COP DF`, blocked in text or a choice.
+    Player,
     /// A callback running on a resident, blocked at `pc`.
     Callback {
         /// The resident it runs on.
@@ -1612,6 +1725,8 @@ mod tests {
             walking: WalkingState::new(56, 64),
             residents: vec![],
             actors: vec![],
+            player_actor: None,
+            player_turn: PlayerTurn::Ready,
             blocked: vec![],
             globals: Globals::with_events(new_game_flags()),
             scene: None,
@@ -1639,6 +1754,169 @@ mod tests {
             dawn: 15,
             animate: false,
         }
+    }
+
+    #[test]
+    fn a_blocked_resident_hands_the_next_frame_to_the_players_text_not_walking() {
+        // One synthetic page, used once before DF and once in Ark's script.
+        let mut image = vec![0; 0x34_8040];
+        image[0x8040..0x8043].copy_from_slice(&[0xc1, 0x00, 0xd3]);
+        image[0x8000..0x800f].copy_from_slice(&[
+            0x02, 0x1f, // resident waits for the first page
+            0x02, 0xdf, 0x20, 0x80, 0x80, // COP DF queues player at $80:8020
+            0x02, 0xc1, 0x03, 0x00, // resident waits three frames
+            0x02, 0x07, 0x0a, 0x80, // then writes its own flag
+        ]);
+        image[0x8020..0x8036].copy_from_slice(&[
+            0x02, 0x2a, 0x50, 0xff, // player locks directions
+            0x02, 0x1b, 0x40, 0x80, // player publishes another page
+            0x02, 0x1f, // player, not resident, owns the blocking wait
+            0x02, 0x07, 0x0b, 0x80, // only player writes $0B
+            0x02, 0x29, 0x50, 0xff, // player releases pad
+            0x02, 0xc1, 0x01, 0x00, // yield after release
+        ]);
+        let mut world = synthetic_world();
+        world.image = &image;
+        world.armed = false; // the synthetic exit is under the player's feet
+        let mut npc = resident();
+        npc.body = false;
+        world.residents.push(npc);
+        world
+            .actors
+            .push(Actor::new((24, 32), Some(0x80_8000), 0, 1));
+        world
+            .globals
+            .dialogue
+            .request(assets::text::HouseDialogue::decode_at(&image, 0x80_8040).unwrap());
+        world.run_actors().unwrap();
+        assert!(matches!(world.scene, Some(Scene::Own(0))));
+        while world.typing() {
+            world.globals.dialogue.tick();
+        }
+        let before = world.position();
+        world
+            .update(
+                None,
+                Presses {
+                    confirm: true,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        assert!(
+            world.globals.player_script.is_none(),
+            "scene continuation installs DF before the next walk"
+        );
+        assert!(world.pad_locked());
+        assert!(matches!(world.scene, Some(Scene::Player)));
+        world.update(Some(Direction::Right), Presses::NONE).unwrap();
+        assert_eq!(
+            world.position(),
+            before,
+            "DF handoff must run before walking"
+        );
+        assert!(world.pad_locked());
+        assert!(matches!(world.scene, Some(Scene::Player)));
+        assert!(world.dialogue().is_some());
+        assert_eq!(
+            world.globals.events[0x0a / 8] & (1 << (0x0a % 8)),
+            0,
+            "resident waits while player owns the text"
+        );
+        for _ in 0..20 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert_eq!(
+            world.globals.events[0x0a / 8] & (1 << (0x0a % 8)),
+            0,
+            "resident remains paused through the player-owned wait"
+        );
+        world
+            .update(
+                None,
+                Presses {
+                    confirm: true,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        assert_ne!(
+            world.globals.events[0x0b / 8] & (1 << (0x0b % 8)),
+            0,
+            "player resumed after its page"
+        );
+        assert!(!world.pad_locked());
+        assert!(!world.in_scene());
+    }
+
+    #[test]
+    fn a_callback_handoff_does_not_tick_two_player_scripts_in_one_frame() {
+        let mut image = vec![0; 0x8060];
+        image[0x8000..0x8008].copy_from_slice(&[
+            0x02, 0x21, 0x10, 0x80, // resident registers a callback
+            0x02, 0xc1, 0x01, 0x00, // resident yields
+        ]);
+        image[0x8010..0x8017].copy_from_slice(&[
+            0x02, 0xdf, 0x40, 0x80, 0x80, // callback replaces Ark's script
+            0x02, 0x05,
+        ]);
+        image[0x8020..0x8028].copy_from_slice(&[
+            0x02, 0x07, 0x0a, 0x80, // old player script writes $0A
+            0x02, 0xc1, 0x01, 0x00,
+        ]);
+        image[0x8040..0x804c].copy_from_slice(&[
+            0x02, 0x07, 0x0b, 0x80, // new player script writes $0B
+            0x02, 0x2a, 0x50, 0xff, // and locks walking
+            0x02, 0xc1, 0x01, 0x00,
+        ]);
+        let mut world = synthetic_world();
+        world.image = &image;
+        world.armed = false;
+        let mut npc = resident();
+        npc.body = false;
+        world.residents.push(npc);
+        world
+            .actors
+            .push(Actor::new((24, 32), Some(0x80_8000), 0, 1));
+        world.player_actor = Some(Actor::new(world.position(), Some(0x80_8020), 0, 1));
+        world.run_actors().unwrap();
+        assert_ne!(world.events()[0x0a / 8] & (1 << (0x0a % 8)), 0);
+        assert!(world.talk_to(0));
+        assert_eq!(
+            world.globals.player_script, None,
+            "callback installs the new actor"
+        );
+        assert_eq!(
+            world.events()[0x0b / 8] & (1 << (0x0b % 8)),
+            0,
+            "Ark already had a turn this frame"
+        );
+        let position = world.position();
+        world.update(Some(Direction::Right), Presses::NONE).unwrap();
+        assert_ne!(world.events()[0x0b / 8] & (1 << (0x0b % 8)), 0);
+        assert!(world.pad_locked());
+        assert_eq!(
+            world.position(),
+            position,
+            "new script owns the next frame before walking"
+        );
+    }
+
+    #[test]
+    fn an_unsupported_player_script_is_reported_separately_from_residents() {
+        let mut image = vec![0; 0x8010];
+        image[0x8000] = 0xff;
+        let mut world = synthetic_world();
+        world.image = &image;
+        world.globals.input_mask = PAD_DIRECTIONS;
+        world.player_actor = Some(Actor::new(world.position(), Some(0x80_8000), 0, 1));
+        world.run_actors().unwrap();
+        assert!(world.pad_locked());
+        assert_eq!(world.player_script_frozen_at(), Some(0x8000));
+        assert!(
+            world.frozen_scripts().is_empty(),
+            "the resident list is separate"
+        );
     }
 
     #[test]

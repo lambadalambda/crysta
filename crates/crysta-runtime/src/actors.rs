@@ -2105,8 +2105,11 @@ impl Actor {
                     // `$80:B87B` retries the COP next frame.
                     return false;
                 }
-                // The player's standing script it installs is the host's
-                // standing player; the pad stays masked as the script set it.
+                let Some(script) = image.get(operands..operands + 3).and_then(long) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.player_script = Some(script);
                 self.pc = operands + 3;
             }
             TRANSFER => {
@@ -3194,9 +3197,14 @@ mod script_service_tests {
         globals.player_action = true;
         tick_at(&mut actor, &image, &mut globals, (0, 0));
         assert_eq!(actor.selector, 0, "retries while $097C & $0810");
+        assert_eq!(
+            globals.player_script, None,
+            "a forced action defers the handoff"
+        );
         globals.player_action = false;
         tick_at(&mut actor, &image, &mut globals, (0, 0));
         assert_eq!(actor.selector, 7);
+        assert_eq!(globals.player_script, Some(0x08_8ea6));
     }
 
     #[test]

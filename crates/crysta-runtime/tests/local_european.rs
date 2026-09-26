@@ -709,6 +709,110 @@ fn eu_frames(world: &mut World<'_>, count: usize, direction: Option<Direction>) 
     }
 }
 
+#[test]
+fn european_retry_acceptance_runs_the_player_script_before_releasing_ark() {
+    let Some(rom) = european() else { return };
+    assert_eq!(
+        rom.image().get(0x08_ac7b..0x08_ac80),
+        Some(&[0x02, 0xdf, 0x98, 0xac, 0x88][..]),
+        "EU friend's COP DF hands Ark the $88:AC98 player script"
+    );
+    // Bounded continuation probe. The separate native test records the
+    // input-only bedroom -> first C choice route; this seeds only its prior
+    // Elder/weaver/wake-up flags, not any result of the friend's conversation.
+    let mut events = fresh_game_flags();
+    for id in [0x20, 0x26, 0x28] {
+        events[id / 8] |= 1 << (id % 8);
+    }
+    let mut world = World::enter_with_events(rom.image(), 0x0c, 120, 464, events).unwrap();
+    let (mut choices, mut moved_cursor) = (0, false);
+    let mut later_pages = Vec::new();
+    let mut saw_retry_before_player_script = false;
+    let mut saw_player_event = false;
+    for frame in 0..9000 {
+        if saw_retry_before_player_script {
+            if let Some(page) = world.dialogue() {
+                let source = page.page.boundary_source();
+                if !later_pages.contains(&source) {
+                    later_pages.push(source);
+                }
+            }
+        }
+        let choosing = world.dialogue().and_then(|page| page.cursor).is_some();
+        let ready = world.dialogue().is_some() && !world.typing();
+        let press = if choosing && choices == 0 && !moved_cursor {
+            moved_cursor = true;
+            Presses {
+                down: true,
+                ..Presses::NONE
+            }
+        } else if choosing && choices < 2 {
+            choices += 1;
+            Presses {
+                confirm: true,
+                ..Presses::NONE
+            }
+        } else {
+            Presses {
+                confirm: ready && frame % 2 == 0 || (eu_flag(&world, 0x2f) && frame % 240 == 0),
+                ..Presses::NONE
+            }
+        };
+        world.update(None, press).unwrap();
+        if !saw_retry_before_player_script
+            && [0x2f, 0x3f, 0x42].into_iter().all(|id| eu_flag(&world, id))
+        {
+            assert!(
+                !eu_flag(&world, 0x0b),
+                "player script has not granted $0B yet"
+            );
+            assert!(world.pad_locked(), "retry scene still owns the pad");
+            saw_retry_before_player_script = true;
+        }
+        if eu_flag(&world, 0x0b) && !saw_player_event {
+            assert_eq!(
+                later_pages,
+                [0x88_af55, 0x88_af85],
+                "the first two player-script pages precede $0B"
+            );
+            saw_player_event = true;
+        }
+        if choices == 2 && eu_flag(&world, 0x0b) && !world.pad_locked() {
+            break;
+        }
+    }
+    assert!(
+        saw_retry_before_player_script,
+        "reached the locked retry branch"
+    );
+    assert_eq!(choices, 2, "refuse first, accept retry");
+    assert!(eu_flag(&world, 0x2f) && eu_flag(&world, 0x3f) && eu_flag(&world, 0x42));
+    assert!(!eu_flag(&world, 0x2e), "not the direct acceptance branch");
+    assert_eq!(
+        later_pages,
+        [0x88_af55, 0x88_af85, 0x88_afbd],
+        "ordered player-script English pages before COP 29 unlock"
+    );
+    assert!(
+        eu_flag(&world, 0x0b),
+        "the player's script grants its own event"
+    );
+    assert!(!world.pad_locked(), "its COP 29 releases control");
+    assert!(world.frozen_scripts().is_empty());
+    assert_eq!(world.player_script_frozen_at(), None);
+    let before = world.position();
+    eu_frames(&mut world, 44, Some(Direction::Right));
+    assert!(
+        world.position().0 > before.0,
+        "Ark can walk after the scene"
+    );
+    eu_frames(&mut world, 300, None);
+    assert!(
+        !world.pad_locked() && !world.in_scene() && world.dialogue().is_none(),
+        "the player script stays settled"
+    );
+}
+
 /// Play a scene using the English page/cursor state, not Japanese page counts
 /// or the native emulator's fixed acknowledgement intervals.
 fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
@@ -1025,6 +1129,11 @@ fn european_single_world_replays_bedroom_to_underworld() {
     assert!(!eu_flag(&world, 0x2e));
     assert!(eu_finish_scene(&mut world, 5000), "accepted friend's help");
     assert!(eu_flag(&world, 0x2e));
+    assert_eq!(
+        world.player_script_frozen_at(),
+        None,
+        "direct acceptance remains healthy"
+    );
 
     // Take a pot from C and miss the blue door on purpose: the native route
     // also misses from (136,368) before moving farther left for the first hit.

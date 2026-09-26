@@ -57,6 +57,8 @@ pub struct Globals {
     /// `$097C & $0810`: the player is in a forced action, such as a recoil,
     /// which `COP DF` waits out.
     pub player_action: bool,
+    /// Player script pointer queued by `COP DF`, normalized to a ROM offset.
+    pub player_script: Option<usize>,
     /// A map transfer `COP 14` queued.
     pub transfer: Option<Transfer>,
     /// WRAM words scripts keep as their own variables (see
@@ -93,6 +95,7 @@ impl Globals {
             input_mask: 0,
             pad: 0,
             player_action: false,
+            player_script: None,
             transfer: None,
             scratch: crate::actors::Scratch::new(),
             inventory: crate::inventory::Inventory::default(),
