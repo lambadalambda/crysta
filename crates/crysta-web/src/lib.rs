@@ -68,11 +68,12 @@ impl Game {
         self.frame_with_presses(held, 0);
     }
 
-    /// One frame plus keyboard presses that occurred since the previous frame.
-    /// A release and re-press between frames is still a new action even if the
-    /// sampled held bits did not change.
-    pub fn frame_with_presses(&mut self, held: u32, keyboard_presses: u32) {
-        let pressed = (held & !self.held) | keyboard_presses;
+    /// One frame plus action presses observed by the page since the previous
+    /// frame. A keyboard re-press between frames, or a new gamepad press while
+    /// the keyboard holds the same action, is still a new press even if the
+    /// combined held bits did not change.
+    pub fn frame_with_presses(&mut self, held: u32, action_presses: u32) {
+        let pressed = (held & !self.held) | action_presses;
         self.held = held;
         let direction = [
             (buttons::UP, Direction::Up),
@@ -199,9 +200,9 @@ mod web {
             self.0.frame(held);
         }
 
-        /// One frame with held buttons and keyboard presses since the last frame.
-        pub fn frame_with_presses(&mut self, held: u32, keyboard_presses: u32) {
-            self.0.frame_with_presses(held, keyboard_presses);
+        /// One frame with held buttons and additional action presses.
+        pub fn frame_with_presses(&mut self, held: u32, action_presses: u32) {
+            self.0.frame_with_presses(held, action_presses);
         }
 
         /// The view as RGBA bytes.
@@ -389,5 +390,66 @@ mod tests {
         // It passes that keydown separately from the continuously held sample.
         game.frame_with_presses(buttons::CONFIRM, buttons::CONFIRM);
         assert_ne!(page(&game), second, "the new press turns another page");
+    }
+
+    #[test]
+    fn the_european_retry_branch_releases_control_through_game_frame() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../local/Terranigma (E) [!].smc"
+        );
+        let Ok(bytes) = std::fs::read(path) else { return };
+        let mut game = Game::new(&bytes).unwrap();
+        // Bounded host continuation: the fresh native route covers the
+        // bedroom-to-C prefix. Seed only its prior wake/Elder/weaver flags.
+        let mut events = crysta_runtime::world::fresh_game_flags();
+        for id in [0x20, 0x26, 0x28] {
+            events[id / 8] |= 1 << (id % 8);
+        }
+        game.session.world = crysta_runtime::world::World::enter_with_events(
+            game.session.image, 0x0c, 120, 464, events,
+        ).unwrap();
+        let flag = |game: &Game, id: usize| {
+            game.session.world.events()[id / 8] & (1 << (id % 8)) != 0
+        };
+        let (mut answers, mut moved_cursor) = (0, false);
+        for frame in 0..9000 {
+            let world = &game.session.world;
+            let choosing = world.dialogue().and_then(|view| view.cursor).is_some();
+            let ready = world.dialogue().is_some() && !world.typing();
+            let held = if choosing && answers == 0 && !moved_cursor {
+                moved_cursor = true;
+                buttons::DOWN
+            } else if choosing && answers < 2 {
+                answers += 1;
+                buttons::CONFIRM
+            } else if ready && frame % 2 == 0 || flag(&game, 0x2f) && frame % 240 == 0 {
+                buttons::CONFIRM
+            } else {
+                0
+            };
+            game.frame(held);
+            assert!(game.fault().is_none());
+            if answers == 2 && flag(&game, 0x0b) && !game.session.world.pad_locked() {
+                break;
+            }
+        }
+        assert_eq!(answers, 2, "first refusal, then retry acceptance");
+        assert!(flag(&game, 0x2f) && flag(&game, 0x3f) && flag(&game, 0x42));
+        assert!(!flag(&game, 0x2e), "not the direct branch");
+        assert!(flag(&game, 0x0b) && !game.session.world.pad_locked());
+        let x = game.session.world.position().0;
+        for _ in 0..44 {
+            game.frame(buttons::RIGHT);
+        }
+        assert!(game.session.world.position().0 > x, "Ark walks after the alternate scene");
+        for _ in 0..300 {
+            game.frame(0);
+        }
+        let world = &game.session.world;
+        assert!(!world.pad_locked() && !world.in_scene() && world.dialogue().is_none());
+        assert!(world.frozen_scripts().is_empty());
+        assert_eq!(world.player_script_frozen_at(), None);
+        assert!(game.fault().is_none());
     }
 }

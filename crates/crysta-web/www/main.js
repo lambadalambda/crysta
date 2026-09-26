@@ -5,6 +5,7 @@ const RATE = 32000;
 const AHEAD = 0.1; // Seconds of sound queued.
 const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32, DESCRIBE: 64 };
 const DIRECTIONS = 15;
+const ACTIONS = BUTTONS.CONFIRM | BUTTONS.CANCEL | BUTTONS.DESCRIBE;
 const KEYS = {
   ArrowUp: 'UP', KeyW: 'UP', ArrowDown: 'DOWN', KeyS: 'DOWN',
   ArrowLeft: 'LEFT', KeyA: 'LEFT', ArrowRight: 'RIGHT', KeyD: 'RIGHT',
@@ -33,9 +34,23 @@ function say(text, error = false) {
 // tap between two frames still counts, even if the prior frame held the key.
 const keys = [];
 let latched = 0;
+let lastPadActions = 0;
+let padLatched = 0;
+let blockedPadActions = 0;
+let focused = true;
+const inputPaused = () => !focused || document.hidden;
+
+function suspendInput() {
+  keys.length = 0;
+  latched = 0;
+  padLatched = 0;
+  lastPadActions = 0;
+  // A button held across blur/hide must be released before it is a new press.
+  blockedPadActions = ACTIONS;
+}
 
 addEventListener('keydown', (event) => {
-  if (!running) return;
+  if (!running || inputPaused()) return;
   if (event.code === 'KeyM' && !event.repeat) toggleSound();
   if (event.code === 'KeyV' && !event.repeat) {
     wide.checked = !wide.checked;
@@ -53,7 +68,8 @@ addEventListener('keyup', (event) => {
   const index = keys.indexOf(event.code);
   if (index >= 0) keys.splice(index, 1);
 });
-addEventListener('blur', () => { keys.length = 0; latched = 0; });
+addEventListener('blur', () => { focused = false; suspendInput(); });
+addEventListener('focus', () => { focused = true; });
 
 function keyboard() {
   let bits = 0;
@@ -90,10 +106,17 @@ function pad() {
 
 // The pad wins over the keyboard, as in the native app.
 function buttons() {
+  if (inputPaused()) return { held: 0, padActions: 0 };
   const keys = keyboard();
   const gamepad = pad();
+  const rawActions = gamepad & ACTIONS;
+  blockedPadActions &= rawActions;
+  const padActions = rawActions & ~blockedPadActions;
   const direction = (gamepad & DIRECTIONS) || (keys & DIRECTIONS);
-  return direction | ((keys | gamepad) & ~DIRECTIONS);
+  return {
+    held: direction | (keys & ACTIONS) | padActions,
+    padActions,
+  };
 }
 
 function stop() {
@@ -136,6 +159,9 @@ start.addEventListener('click', async () => {
   owed = 0;
   keys.length = 0;
   latched = 0;
+  lastPadActions = 0;
+  padLatched = 0;
+  blockedPadActions = 0;
   canvas.focus();
   const token = {};
   running = token;
@@ -170,9 +196,15 @@ function loop(now, token) {
     const frameMs = game.frame_ms();
     owed = Math.min(owed + (now - last), frameMs * 4);
     last = now;
+    const { held, padActions } = buttons();
+    // Poll every render callback, including those without a PAL game frame.
+    // Keep a sampled gamepad re-press until the next game frame consumes it.
+    padLatched |= padActions & ~lastPadActions;
+    lastPadActions = padActions;
     while (owed >= frameMs) {
-      game.frame_with_presses(buttons(), latched);
+      game.frame_with_presses(held, latched | padLatched);
       latched = 0;
+      padLatched = 0;
       owed -= frameMs;
     }
     const fault = game.fault();
@@ -209,4 +241,7 @@ function queueSound() {
   }
 }
 
-document.addEventListener('visibilitychange', () => { last = null; });
+document.addEventListener('visibilitychange', () => {
+  last = null;
+  if (document.hidden) suspendInput();
+});

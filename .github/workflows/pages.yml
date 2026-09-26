@@ -30,6 +30,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y clang llvm
       - name: wasm-bindgen
         run: cargo install --locked wasm-bindgen-cli --version 0.2.126
+      - name: Browser input edges (ROM-free)
+        run: node --test crates/crysta-web/input.test.mjs
       - name: Build
         env:
           WASM_BINDGEN: wasm-bindgen
