@@ -1,28 +1,32 @@
-//! Fresh European browser-host input route, from Elle to the blue door.
-//! Walking legs and pot checkpoints mirror `runtime/tests/local_european.rs`.
-//! Set `CRYSTA_WEB_EU_TRACE=/tmp/eu.trace` to export run-length count/held/pressed bits.
+//! Fresh European browser-host input routes from Elle through the blue door.
+//! Walking legs, Box tour and frozen-town detour mirror `runtime/tests/local_european.rs`.
+//! Set `CRYSTA_WEB_EU_TRACE=/tmp/eu.trace` for the door route, or
+//! `CRYSTA_WEB_EU_DETOUR_TRACE=/tmp/eu-detour.trace` for the full detour.
 use super::{buttons, Game};
 use room_core::Direction;
 use std::fmt::Write as _;
+use std::path::PathBuf;
 
 use buttons::{CONFIRM as X, DOWN as D, LEFT as L, RIGHT as R, UP as U};
 
+// Run-length count, held bits, extra action presses.
+type Trace = Vec<(usize, u32, u32)>;
+
 struct Route {
     game: Game,
-    // Optional exact host input log: count, held bits, extra action presses.
-    trace: Option<Vec<(usize, u32, u32)>>,
+    trace: Option<(PathBuf, Trace)>,
 }
 
 impl Route {
-    fn new(bytes: &[u8]) -> Self {
+    fn new(bytes: &[u8], trace_env: &str) -> Self {
         Self {
             game: Game::new(bytes).unwrap(),
-            trace: std::env::var_os("CRYSTA_WEB_EU_TRACE").map(|_| Vec::new()),
+            trace: std::env::var_os(trace_env).map(|path| (path.into(), Vec::new())),
         }
     }
 
     fn frame(&mut self, held: u32) {
-        if let Some(trace) = &mut self.trace {
+        if let Some((_, trace)) = &mut self.trace {
             if let Some((count, previous, presses)) = trace.last_mut() {
                 if (*previous, *presses) == (held, 0) {
                     *count += 1;
@@ -47,6 +51,21 @@ impl Route {
         for &(count, held) in legs {
             self.frames(count, held);
         }
+    }
+
+    fn until(&mut self, limit: usize, held: u32, reached: impl Fn(&Self) -> bool) {
+        for _ in 0..limit {
+            if reached(self) {
+                return;
+            }
+            self.frame(held);
+        }
+        assert!(
+            reached(self),
+            "failed to walk {held:#x} in map={:#x} at {:?}",
+            self.world().map(),
+            self.world().position()
+        );
     }
 
     fn press_x(&mut self) {
@@ -87,7 +106,7 @@ impl Route {
     }
 
     fn save_trace(&self) {
-        if let (Some(path), Some(trace)) = (std::env::var_os("CRYSTA_WEB_EU_TRACE"), &self.trace) {
+        if let Some((path, trace)) = &self.trace {
             let mut text = String::from("# count held pressed (web button bits, hex)\n");
             for &(count, held, pressed) in trace {
                 writeln!(text, "{count} {held:#x} {pressed:#x}").unwrap();
@@ -101,17 +120,11 @@ fn flag(route: &Route, id: usize) -> bool {
     route.world().events()[id / 8] & (1 << (id % 8)) != 0
 }
 
-#[test]
+// Run the refusal/retry and separate-pot route once per fresh Game; hand back
+// the live host at $20 so later tests can continue without seeding state.
 #[allow(clippy::too_many_lines)] // One input-only journey, with checkpoints at each transition.
-fn fresh_european_retry_and_separate_pot_presses_open_the_blue_door() {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../local/Terranigma (E) [!].smc"
-    );
-    let Ok(bytes) = std::fs::read(path) else {
-        return;
-    };
-    let mut route = Route::new(&bytes);
+fn opened_blue_door(bytes: &[u8], trace_env: &str) -> Route {
+    let mut route = Route::new(bytes, trace_env);
     assert_eq!(
         (route.world().map(), route.world().position()),
         (0x0f, (304, 112))
@@ -509,5 +522,361 @@ fn fresh_european_retry_and_separate_pot_presses_open_the_blue_door() {
     );
     route.legs(&[(33, L), (80, 0), (35, U), (400, 0)]);
     assert_eq!(route.world().map(), 0x20, "the post-door route continues");
+    route
+}
+
+fn european_rom(trace_env: &str) -> Option<Vec<u8>> {
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../local/Terranigma (E) [!].smc"
+    );
+    match std::fs::read(path) {
+        Ok(bytes) => Some(bytes),
+        Err(error)
+            if error.kind() == std::io::ErrorKind::NotFound
+                && std::env::var_os(trace_env).is_none() =>
+        {
+            None // The owned ROM is optional for ordinary tests.
+        }
+        Err(error) => panic!("cannot read European ROM for {trace_env}: {error}"),
+    }
+}
+
+#[test]
+fn fresh_european_retry_and_separate_pot_presses_open_the_blue_door() {
+    let Some(bytes) = european_rom("CRYSTA_WEB_EU_TRACE") else {
+        return;
+    };
+    opened_blue_door(&bytes, "CRYSTA_WEB_EU_TRACE").save_trace();
+}
+
+#[test]
+#[allow(clippy::too_many_lines)] // Checkpoints follow the same live host through the detour.
+fn fresh_european_post_box_frozen_town_detour() {
+    let Some(bytes) = european_rom("CRYSTA_WEB_EU_DETOUR_TRACE") else {
+        return;
+    };
+    let mut route = opened_blue_door(&bytes, "CRYSTA_WEB_EU_DETOUR_TRACE");
+    route.legs(&[(33, L), (80, 0), (35, U), (400, 0)]);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x21, (136, 128))
+    );
+    assert!(!flag(&route, 0x22));
+    assert!(route.world().dialogue().is_some(), "the box's entry voice");
+    route.finish_scene(4000);
+    route.legs(&[(150, D), (180, 0)]);
+    assert_eq!(route.world().position(), (136, 351));
+    route.legs(&[(25, D), (180, 0)]);
+    assert_eq!(
+        route.world().position(),
+        (136, 359),
+        "first contact recoils"
+    );
+    assert!(!flag(&route, 0x22));
+    assert!(route.world().dialogue().is_some(), "the box warns Ark");
+    route.finish_scene(4000);
+    route.legs(&[(15, D), (300, 0)]);
+    assert!(flag(&route, 0x22), "the second approach opens the box");
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x21, (136, 368))
+    );
+
+    let mut landings = Vec::new();
+    for frame in 0..16000 {
+        let confirm =
+            route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
+        let before = route.world().map();
+        route.frame(if confirm { X } else { 0 });
+        if route.world().map() != before {
+            landings.push((route.world().map(), route.world().position()));
+        }
+        if flag(&route, 0x244) && !route.world().pad_locked() && !route.world().in_transition() {
+            break;
+        }
+    }
+    assert_eq!(
+        landings,
+        [
+            (0x41, (136, 208)),
+            (0x44, (392, 464)),
+            (0x42, (136, 464)),
+            (0x43, (392, 208)),
+            (0x41, (136, 208)),
+        ]
+    );
+    assert!(flag(&route, 0x243) && flag(&route, 0x244));
+    assert!(!route.world().pad_locked() && !route.world().in_scene());
+    assert!(route.world().dialogue().is_none());
+    route.legs(&[(12, L), (120, 0), (12, U), (120, 0)]);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x41, (120, 192))
+    );
+
+    // Reach the wooden arch and spear on foot. Both conversations need
+    // separate X edges; the second actually takes the Crystal Spear.
+    route.legs(&[
+        (8, L),
+        (12, 0),
+        (32, U),
+        (12, 0),
+        (32, U),
+        (12, 0),
+        (8, L),
+        (12, 0),
+        (32, U),
+        (12, 0),
+    ]);
+    assert_eq!(route.world().position(), (72, 80), "at the weapon arch");
+    route.press_x();
+    route.frames(180, 0);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x42, (136, 464))
+    );
+    route.legs(&[
+        (44, L),
+        (12, 0),
+        (60, U),
+        (12, 0),
+        (32, L),
+        (12, 0),
+        (32, U),
+        (12, 0),
+        (20, R),
+        (12, 0),
+        (20, U),
+        (12, 0),
+    ]);
+    assert_eq!(route.world().position(), (72, 384), "at the spear");
+    assert_eq!(route.world().facing(), Direction::Up);
+    for id in [0x240, 0x241, 0x242] {
+        assert!(!flag(&route, id), "spear event {id:#x} not granted yet");
+    }
+    route.press_x();
+    assert!(flag(&route, 0x240), "first talk with the spear");
+    assert!(!flag(&route, 0x241) && !flag(&route, 0x242));
+    assert!(route.finish_scene(5000), "consent to take the spear");
+    assert!(flag(&route, 0x241) && !flag(&route, 0x242));
+    route.press_x();
+    assert!(flag(&route, 0x242), "second talk takes the spear");
+    for frame in 0..6000 {
+        let confirm =
+            route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
+        route.frame(if confirm { X } else { 0 });
+        if route.world().map() == 0x21 {
+            break;
+        }
+    }
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x21, (136, 368))
+    );
+    assert!(
+        route.world().items().contains(&0x81),
+        "actual Crystal Spear inventory"
+    );
+
+    // Frozen return: portable Ark has no forced walk; climb from (136,368).
+    for frame in 0..12000 {
+        let confirm =
+            route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
+        route.frame(if confirm { X } else { 0 });
+        if flag(&route, 0x23) && !route.world().pad_locked() && route.world().dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(flag(&route, 0xfe) && flag(&route, 0x23));
+    assert!(!route.world().pad_locked() && route.world().dialogue().is_none());
+    assert_eq!(
+        route.world().position(),
+        (136, 368),
+        "unmodelled scripted walk"
+    );
+    route.legs(&[(12, L), (12, 0)]);
+    for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
+        if map != 0x20 {
+            let x = if map == 0x0e { 408 } else { 152 };
+            route.until(200, R, |r| r.world().position().0 >= x);
+            route.frames(12, 0);
+        }
+        route.until(400, U, |r| r.world().map() == map);
+        route.until(200, 0, |r| !r.world().in_transition());
+        assert_eq!(
+            (route.world().map(), route.world().position()),
+            (map, landing)
+        );
+    }
+    assert!(flag(&route, 0x23) && !flag(&route, 0x21));
+
+    // Frozen neighbor has its own European page. The room Elder is absent
+    // while $27 is set and $21 is not; the doorway Elder is a different actor.
+    route.legs(&[(34, D), (12, 0), (44, L), (12, 0)]);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x0c, (120, 417))
+    );
+    route.until(35, D, |r| r.world().position().1 >= 432);
+    assert_eq!(route.world().position(), (120, 432));
+    route.frames(160, R);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x10, (321, 432))
+    );
+    assert!(route
+        .world()
+        .residents()
+        .iter()
+        .any(|r| r.record == 0x03_8d84 && !r.hidden));
+    route.until(200, R, |r| r.world().position().0 >= 424);
+    assert_eq!(route.world().position(), (424, 432));
+    route.legs(&[(20, 0), (1, U)]);
+    assert_eq!(route.world().facing(), Direction::Up);
+    assert!(
+        route.world().dialogue().is_none(),
+        "no preexisting neighbor page"
+    );
+    route.press_x();
+    assert_eq!(
+        route
+            .world()
+            .dialogue()
+            .map(|view| view.page.boundary_source()),
+        Some(0x88_e1ea),
+        "frozen neighbor's European page"
+    );
+    route.finish_scene(4000);
+    assert!(!route.world().pad_locked() && !flag(&route, 0x21));
+
+    route.until(500, L, |r| r.world().map() == 0x0c);
+    route.frames(100, 0);
+    assert_eq!(route.world().position(), (215, 432));
+    route.until(180, L, |r| r.world().position().0 <= 136);
+    route.frames(12, 0);
+    assert_eq!(route.world().position(), (136, 432));
+    route.until(320, U, |r| r.world().position().1 <= 352);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x0c, (136, 352))
+    );
+    route.frame(U | X); // Open B's doorway with a fresh X edge.
+    route.frames(130, 0);
+    assert!(route.world().patched_cells().contains(&(8, 20, 0xf7)));
+    route.until(320, U, |r| r.world().map() == 0x0b);
+    route.frames(130, 0);
+    assert_eq!(route.world().position(), (120, 191));
+    assert!(flag(&route, 0x27) && !flag(&route, 0x21));
+    assert!(
+        route
+            .world()
+            .residents()
+            .iter()
+            .all(|r| r.record != 0x03_8b9e),
+        "room Elder is absent while $27 XOR $21"
+    );
+    assert!(!flag(&route, 0x296));
+
+    route.until(550, D, |r| r.world().map() == 0x0c);
+    route.frames(130, 0);
+    assert_eq!(route.world().position(), (136, 353));
+    route.until(150, D, |r| r.world().position().1 >= 417);
+    route.frames(12, 0);
+    route.until(100, L, |r| r.world().position().0 <= 120);
+    route.frames(12, 0);
+    route.until(200, D, |r| r.world().map() == 0x0d);
+    route.frames(130, 0);
+    assert_eq!(route.world().position(), (120, 625));
+    assert!(route
+        .world()
+        .residents()
+        .iter()
+        .any(|r| r.record == 0x03_8cc6));
+    route.until(300, D, |r| r.world().position().1 >= 704);
+    assert_eq!(route.world().position(), (120, 704));
+    assert!(!flag(&route, 0x21) && !flag(&route, 0x296));
+    route.press_x();
+    assert!(
+        flag(&route, 0x21) && !flag(&route, 0x296),
+        "doorway Elder learns of frozen Crysta"
+    );
+    for frame in 0..6000 {
+        if route
+            .world()
+            .dialogue()
+            .and_then(|page| page.cursor)
+            .is_some()
+        {
+            break;
+        }
+        let confirm =
+            route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
+        route.frame(if confirm { X } else { 0 });
+    }
+    assert!(
+        route
+            .world()
+            .dialogue()
+            .and_then(|page| page.cursor)
+            .is_some(),
+        "Elder's mission choice"
+    );
+    assert!(
+        flag(&route, 0x21) && !flag(&route, 0x296),
+        "mission follows the answer"
+    );
+    assert!(route.finish_scene(6000), "accepted doorway Elder's mission");
+    assert!(flag(&route, 0x296) && !route.world().pad_locked());
+    assert!(!flag(&route, 0x3c), "town scene has not run yet");
+
+    route.until(250, D, |r| r.world().map() == 0x0a);
+    assert!(!flag(&route, 0x3c), "town arrival precedes its scene");
+    let mut saw_town_page = route.world().dialogue().is_some();
+    for frame in 0..6000 {
+        let confirm =
+            route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
+        route.frame(if confirm { X } else { 0 });
+        saw_town_page |= route.world().dialogue().is_some();
+        if flag(&route, 0x3c) && !route.world().pad_locked() && route.world().dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(saw_town_page, "town scene opened a European page");
+    assert!(flag(&route, 0x3c), "town scene after detour");
+    assert!(!route.world().pad_locked() && !route.world().in_scene());
+    assert!(route.world().dialogue().is_none());
+    route.frames(48, 0); // Run the town controller's deferred target.
+    assert!(route.world().frozen_scripts().is_empty());
+    assert_eq!(route.world().player_script_frozen_at(), None);
+    route.until(450, D, |r| r.world().map() == 0x03);
+    route.until(200, 0, |r| !r.world().in_transition());
+    for step in 1..=16 {
+        route.frame(0);
+        assert_eq!(
+            route.world().position(),
+            (536, 528 + step),
+            "neutral map arrival"
+        );
+    }
+    for id in [
+        0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x3c, 0xfe, 0x240, 0x241, 0x242, 0x243, 0x244,
+        0x292, 0x296,
+    ] {
+        assert!(flag(&route, id), "EU detour flag {id:#x}");
+    }
+    assert!(
+        flag(&route, 0x2f) && !flag(&route, 0x2e),
+        "retry, not direct acceptance"
+    );
+    assert!(route.world().items().contains(&0x81));
+    assert!(!route.world().pad_locked() && !route.world().in_scene());
+    assert!(route.world().dialogue().is_none());
+    route.legs(&[(16, D), (16, 0)]);
+    assert_eq!(route.world().map(), 0x03);
+    assert!(
+        route.world().position().1 > 544,
+        "Ark walks after the detour"
+    );
     route.save_trace();
 }
