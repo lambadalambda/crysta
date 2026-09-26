@@ -37,9 +37,11 @@ Single bytes `$00-$7F` are glyphs, not ASCII: `$20` space, `$21-$3A` A-Z,
 
 `C1` opens at base `$04C4`, a row higher than the Japanese window, with four
 lines: its content is 224×64 (Japanese 224×48). `DA` at the top is base
-`$0104`, four lines; `DB` is `$044A`, 22 tiles, four lines. The choice
-records keep their absolute tiles, so relative to the European window they
-sit at y = 24 and 40 (not checked on screen).
+`$0104`, four lines; `DB` is `$044A`, 22 tiles, four lines. The standard
+absolute choice records sit at y = 24 and 40 relative to this window
+(not checked here). The Elder's first-choice catalog 2 instead has relative
+records `$84 00` and `$86 00`: its decoded cursor-source cells start at y32
+and y48.
 
 The frozen-return Elder's `COP 1B` at `$88:8D36` requests `$88:8D6C`.
 Its 216-pixel custom window contains a glyph at x204: the 12-pixel pitch
@@ -61,6 +63,20 @@ does not exercise every content row. This optional owned-ROM check skips if the
 dump is absent; it is one native page's indexed content/staged frame layout
 evidence, not a proof that all dialogue, choices, labels, item names, or their
 RGB/HDMA presentation match native frames.
+
+A separate fresh-child test, `crates/map-inspector/tests/local_european_choice_native.rs`,
+boots once with empty SRAM and follows the first 53 input rows of the European
+Pandora tour after the 1960-frame boot. It stops at the **first room-B Elder
+choice**, before answering or approaching the Box: map `$0B`, event `$26` set,
+`$0DC2=$FFFF`, window anchor `$0DB6=$04C4`. The ROM-decoded request
+`$88:91C6` ends in a retained `$D4` at `$88:925B`; catalog 2 initially
+selects result 1 (`$0DCE=0`), then one Down edge selects result 2 (`$0DCE=1`)
+without answering. At both selections, the entire 224×64 page matches the
+WRAM-staged `$7F:D4C4` tilemap and 2bpp VRAM (14,208 pixels each), except
+**only** the selected cursor's 8×16 blank source cell. Both option labels
+have foreground ink in their own glyph rows y32/48, within the requested
+y24/40 option-row bands. This is indexed staged content evidence, not native
+cursor animation, uploaded BG3 attributes, RGB/HDMA, or other pages/choices.
 
 ## The first bedroom page
 
