@@ -50,16 +50,22 @@ and run the story tests against it.
   from raw `(536,528)` to `(536,544)`. `World::in_transition()` ends after
   the dark load, before this plane arrival; Down input is not required.
 - The continuous functional replay is green with the owned European ROM, but
-  it does not prove full native-frame equivalence: the portable frozen-return
-  scene does not model the scripted player repositioning. The town controller's
-  `$88:855E` `COP BF` now redirects to `$88:8519` on the next tick rather than
-  freezing or falling into the player's script; the replay observes no frozen
-  actor after 48 neutral frames, with `$3C` set and input released. The target's
-  animation cadence and native controller PC have not been compared. PAL load
-  and movement timing beyond the bounded bedroom witnesses, route-wide sound,
-  and native-frame text presentation still need their own evidence before this
-  route and its dependencies can be archived. The timing issue now records a
-  native-vs-direct track-4 tempo match for the steady bedroom window only.
+  it does not prove full native-frame equivalence. Fixture boundaries now show
+  native frozen-return control releasing at `(136,464)` before manual Left/Up
+  reaches `(120,448)`; portable releases at `(136,368)`, so its missing
+  96-pixel scripted descent is explicit and remains unimplemented pending a
+  source-pinned player stream. The town controller's `$88:855E` `COP BF`
+  redirect runs without freezing, but its animation cadence and native PC are
+  still not compared.
+- Bounded route evidence now covers two ordinary PAL movement legs, steady
+  bedroom track-4 tempo, native CPU-to-APU pot/door values and track-change
+  patterns, the bedroom and two Elder choices (including the 216-pixel mission
+  page), first-choice cursor/BG3 upload, one Crysta title OBJ phase, eight stable
+  bedroom BG3 CGRAM entries and bounded two-frame native framebuffer
+  self-consistency. It intentionally exposes rather than fixes the early
+  portable door-contact/audio order and 405-vs-420 spear return. Other loads,
+  movement, text, composed RGB/HDMA, exact title/item presentation, host
+  wall-clock delivery and PCM/DSP fidelity still prevent route-wide parity.
 - A fresh `crysta-web` `Game::new` host test also reaches and walks on `$03`
   from the bedroom without seeding flags or maps. Unlike the native and
   original continuous `World` route, it first **refuses, then accepts** the

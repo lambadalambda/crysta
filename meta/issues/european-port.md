@@ -33,12 +33,17 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
   a single portable `World` now reaches and walks the same map from fresh
   bedroom flags without seeded checkpoints or warps. See [the route
   issue](european-route.md). This establishes the connected functional path,
-  not native-frame presentation parity. The frozen-return player walk is not
-  fully modelled; the town controller's `COP BF` redirect now runs without
-  freezing, but its animation cadence and native PC have not been compared.
-  Text raster and PAL load/movement acceptance remain open. A bounded
-  native-vs-direct comparison now qualifies the steady bedroom track-4 tempo,
-  not route-wide sound or timing.
+  not native-frame presentation parity. The frozen-return boundary is now
+  precise: native script release `(136,464)`, later manual endpoint `(120,448)`,
+  portable release `(136,368)`. The exact player stream remains unpinned and
+  unmodelled; the town controller redirect runs but its animation/native PC are
+  not compared. Bounded evidence now covers two PAL movement legs, bedroom
+  tempo, route audio-port patterns, three native dialogue/choice rasters,
+  first-choice cursor/BG3 upload, eight stable bedroom BG3 CGRAM entries and
+  bounded two-frame native framebuffer self-consistency, plus one Crysta title
+  OBJ phase. Full text/RGB/HDMA, remaining loads/movement, native item-name
+  presentation, host wall-clock delivery and PCM/DSP parity remain open; known
+  door/spear timing mismatches are documented rather than hidden.
 - A fresh European `Game::new` host replay now takes the alternate friend's
   refusal→retry route, opens the door, plays through the Box and frozen-town
   detour to the doorway Elder, and walks on world-map `$03`. Its input trace

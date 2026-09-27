@@ -21,11 +21,14 @@ timing may differ from the Japanese measurements.
   no-ROM revision test cover the change. Native movement and load durations
   for the rest of the route are not yet qualified.
 - A separate fresh-child empty-SRAM native test replays the European input
-  fixture through Elle's wake-up and compares every boundary of the first 62
-  held-Right bedroom frames (including the initial anchor) against a portable
-  `World` after its English pages. All 63 `(map,x,y)` states match with no
-  frame shift; this qualifies that ordinary movement leg, not the rest of
-  the route's load/movement timing or host real-time pacing.
+  fixture through Elle's wake-up and compares every boundary of two ordinary
+  movement legs with a portable `World`: the first 62 held-Right bedroom
+  frames (63 states including the anchor), then—after deliberately not
+  comparing the doorway/load interval—the first 42 held-Down exterior frames
+  from the shared `$10 (392,353)` landing (43 states). The second leg ends at
+  `(392,413)` on both implementations with no frame shift. This qualifies
+  those two movement legs, not the intervening load, later route movement,
+  animation or host real-time pacing.
 - The app and web audio player now use a revision-aware NMI/port-script cadence:
   533 stereo samples and 17,067 settling SPC cycles per Japanese frame; 640
   samples and 20,480 cycles per European frame. This corrects track-change,
@@ -43,5 +46,16 @@ timing may differ from the Japanese measurements.
   1%-slower rendering retains correlation but is rejected at 3,968 frames of
   drift; synthetic positive, unrelated-envelope and 1%-slower controls cover
   the matcher gates. This qualifies the steady bedroom track's **tempo**, not
-  exact PCM/waveform phase, a common start boundary, host real-time audio
-  delivery, port-event timing, fades, sound effects or the other route tracks.
+  exact PCM/waveform phase, a common start boundary or host real-time delivery.
+- A bounded CPU-to-APU write capture now replays the native route while draining
+  every frame without overflow. Route-local windows observe exact adjacent
+  port-2/3 pairs for pot lift `$1100`, break `$1200`, door hit `$1300` and open
+  `$001A`, plus the door reaction's `F1` fade and bounded `F0 → FF/upload → F4`
+  patterns for its changes and the later spear windows. The portable route
+  emits its source-derived track/fanfare cues and does not restart an unchanged
+  track. This is command-pattern evidence, not PCM/DSP fidelity or native track
+  identity for the spear windows: tracks `$34/$1C/$06` share stop parameter 5.
+  It also exposes retained timing gaps rather than hiding them: portable door
+  contact is four frames early and orders `$001A` before `$1200`, whereas native
+  orders `$1200 → $001A → $1300`; the spear return remains 420 portable frames
+  versus 405 native.

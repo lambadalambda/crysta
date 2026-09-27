@@ -16,20 +16,32 @@ measured on the reference emulator.
   data: the sound bank moves from `$C6:2191` to `$C8:2191`, the track table
   from `$96:F2A0` to `$99:F9EA` (all 59 entries, pointers `+$20000` or
   more). Sample 62's European copy wraps past the end of the ROM into bank
-  0. The SPC's clock is region-free; the portable host now polls its track
-  script and alternating sound-effect latch every ~640 samples at 32 kHz on
-  PAL, not the Japanese 533. The fixed 640 approximation is 50.000 Hz rather
-  than 50.007 Hz. Source identity and port pacing do not prove native PCM
-  tempo, fades or sound presentation.
+  0. The SPC's clock is region-free; the portable host polls its track script
+  and alternating sound-effect latch every 640 samples at 32 kHz on PAL, not
+  the Japanese 533. Native capture instead yields individual video-frame
+  counts of 639–641 but 383,946 stereo frames over 600 PAL frames. A 12-second
+  native bedroom track-4 envelope matches the source-only player with 512
+  stereo frames of endpoint drift; a 1%-slower negative is rejected at 3,968.
+  A separate CPU-to-APU write witness observes exact native pot/door effect
+  pairs and bounded `F1/F0/FF/F4` route patterns. It is not PCM/DSP fidelity or
+  unique spear-track identification; tracks `$34/$1C/$06` share parameter 5.
+  Portable door contact is still four frames early and emits `$001A` before
+  `$1200`, while native orders `$1200 → $001A → $1300`; spear return remains
+  420 portable frames versus 405 native.
 - **RAM.** The layout is the same: `$047E` map, `$0694` money, `$07ED` Prime
   Blue, `$06A4` text speed, `$0DE8`, the event flags at `$7E:06C0`, the
   actors from `$1000`. `$0450` is the current track's bank byte (`LDA
   $96:F2A2,X`), 170 in Japanese and 172 in European, not a program state.
 - **Route.** The Japanese route's movement replays on the European ROM; each
   conversation needs its presses counted again (the English text has more,
-  shorter pages). `crates/oracle/tests/local_eu_pal_movement.rs` now performs
-  an independent empty-SRAM native boot through Elle's wake-up and compares
-  all 63 ordered `(map,x,y)` frame boundaries (the initial anchor plus 62
-  held-Right frames) with a freshly initialized portable `World` after its
-  English pages. No frame shift or input-onset adjustment is used. This pins
-  one ordinary walking leg, not every route movement, animation or map load.
+  shorter pages). `crates/oracle/tests/local_eu_pal_movement.rs` performs an
+  independent empty-SRAM native boot and compares two ordinary legs with a
+  portable `World`: all 63 ordered `(map,x,y)` boundaries for 62 held-Right
+  bedroom frames, then—after leaving the doorway/load interval deliberately
+  unaligned—all 43 boundaries for 42 held-Down exterior frames from shared
+  anchor `$10 (392,353)` to `(392,413)`. No frame shift or input-onset
+  adjustment is used within either leg. This does not qualify other movement,
+  animation, map loads or host wall-clock delivery. The native frozen-return
+  script releases control at `(136,464)`; later manual Left/Up reaches
+  `(120,448)`. Portable control releases at `(136,368)`, proving a missing
+  96-pixel scripted descent rather than a discrepancy in the later input.

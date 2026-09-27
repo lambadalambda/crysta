@@ -47,36 +47,54 @@ The frozen-return Elder's `COP 1B` at `$88:8D36` requests `$88:8D6C`.
 Its 216-pixel custom window contains a glyph at x204: the 12-pixel pitch
 fits, though its 16-pixel cell extends four pixels past the portable content
 bitmap. The decoder clips that edge when composing and partially typing the
-page, rather than freezing the actor. This is a bounded portable bitmap rule,
-not a native raster comparison of that window's right edge.
+page, rather than freezing the actor.
 
-A fresh, empty-SRAM headless European boot now checks the **first fully typed
+A fresh, empty-SRAM headless European boot checks the **first fully typed
 bedroom page** at its native `$D5` wait. `crates/map-inspector/tests/local_european_text_native.rs`
-reads the `$7F:D4C4` **WRAM-staged** 224×64 content tilemap and 2bpp VRAM,
-then compares all 4,992 unique pixels in the first page's 26 glyph cells with
-the ROM-decoded indexed page. In the same snapshot it checks all 76 staged
-frame tiles around the content (4,864 2bpp indices) against the ROM-decoded
-`$10..$17` frame art, including flipped VRAM sampling. It asserts real
-foreground and frame ink and the European `$04C4` anchor without inspecting
-the uploaded BG3 tilemap/attributes, prompt or framebuffer colour. The page
-does not exercise every content row. This optional owned-ROM check skips if the
-dump is absent; it is one native page's indexed content/staged frame layout
-evidence, not a proof that all dialogue, choices, labels, item names, or their
-RGB/HDMA presentation match native frames.
+reads the `$7F:D4C4` WRAM-staged 224×64 content tilemap and 2bpp VRAM, then
+compares all 4,992 unique pixels in the first page's 26 glyph cells with the
+ROM-decoded indexed page. It also checks all 76 staged frame tiles (4,864
+indices) against the ROM-decoded `$10..$17` frame art, including flipped VRAM
+sampling. Eight stable native CGRAM entries (1, 2, 4, 5, 6, 8, 9 and 10)
+match decoded window/speaker colours; entry 0 is untested, and colour-3 entries
+3/7/11 are omitted because HDMA rewrites them per scanline. The test maps PAL
+logical rows to the uncropped ares framebuffer at `y+29` and observes 3,401
+bounded non-shade candidates unchanged across two settled native frames,
+omitting 4,512 shade-index candidates. That last result
+is native framebuffer self-consistency only: composition may show other layers,
+so it does not attribute those RGB values to BG3/CGRAM or claim portable RGB or
+HDMA parity.
 
-A separate fresh-child test, `crates/map-inspector/tests/local_european_choice_native.rs`,
-boots once with empty SRAM and follows the first 53 input rows of the European
-Pandora tour after the 1960-frame boot. It stops at the **first room-B Elder
-choice**, before answering or approaching the Box: map `$0B`, event `$26` set,
-`$0DC2=$FFFF`, window anchor `$0DB6=$04C4`. The ROM-decoded request
-`$88:91C6` ends in a retained `$D4` at `$88:925B`; catalog 2 initially
-selects result 1 (`$0DCE=0`), then one Down edge selects result 2 (`$0DCE=1`)
-without answering. At both selections, the entire 224×64 page matches the
-WRAM-staged `$7F:D4C4` tilemap and 2bpp VRAM (14,208 pixels each), except
-**only** the selected cursor's 8×16 blank source cell. Both option labels
-have foreground ink in their own glyph rows y32/48, within the requested
-y24/40 option-row bands. This is indexed staged content evidence, not native
-cursor animation, uploaded BG3 attributes, RGB/HDMA, or other pages/choices.
+The first-choice test follows the first 53 European tour rows to the
+**unanswered room-B Elder choice**: map `$0B`, `$26` set, `$0DC2=$FFFF`, anchor
+`$04C4`. At both selection states the 224×64 page matches 14,208 indexed pixels,
+excluding only the selected 8×16 cursor source cell. It additionally samples
+both visible and hidden BG3 cursor phases at both positions, compares the
+cursor/interior indexed art with ROM-decoded `WindowArt`, and verifies that all
+224 uploaded BG3 tilemap words equal the WRAM staging words, including their
+tile and attribute bits. This proves complete staged-word upload; it does not
+independently derive every staged attribute or qualify exact blink timing or
+composed video.
+
+The same test binary has a separate fresh child for the **late doorway-Elder
+mission**. It replays the retained fixtures without memory writes to map `$0D`
+at `(120,704)`, with `$21` set and `$296` clear, and stops at decoded boundaries
+rather than a fixed delay. It compares 13,568 indexed pixels on the 216×64 page
+containing the x204 glyph, excluding only the source-positioned 16×16 D5 prompt,
+and 13,696 pixels at each of two unanswered choice selections, excluding only
+the selected 8×16 cursor source cell. Both option rows contain real ink outside
+the cursor columns.
+
+Finally, `local_european_title_native.rs` naturally reaches `$0A` and checks one
+settled source-motion phase of the six-letter **Crysta** area title. Six current
+16×16 OAM pieces, their uploaded OBJ glyph pixels, and palette-2 selection plus
+its two used colours (entries 1 and 2) agree with the ROM-derived title. This is
+current hardware configuration at one visible position, not framebuffer proof
+or animation-cadence parity. English title and item-name decoding already
+covers Crysta, Elder's, Merchant, Center, S.Bulb,
+P. Cure and dictionary-expanded Crystal Thread. A native Crystal Thread frame
+is not claimed: naturally selecting item `$32` requires a separate shop route
+outside this slice.
 
 ## The first bedroom page
 

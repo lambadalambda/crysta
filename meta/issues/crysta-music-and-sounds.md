@@ -44,3 +44,18 @@ in scenes, and plays sound effects from scripts and the player code.
   driver. Open: a playtest.
 - The text window types a glyph a frame with its blip (`$28`/`$25` on
   port 3; `$C5` pauses, `$C7` blip, `$C8` speed), 2026-09-24.
+- The oracle now records bounded CPU writes to `$2140–$2143` in bus order,
+  preserving them across mid-frame trace exits and clearing the timeline on
+  successful state load. A fresh European route drains it each frame without
+  overflow and witnesses adjacent native port-2/3 pairs for pot lift `$1100`,
+  break `$1200`, door hit `$1300` and open `$001A`, plus bounded fade/change
+  patterns (`F1`, parameter/`F0`, `FF` with the `$1048` destination, isolated
+  final `F4`). The portable route pins the corresponding cues and avoids an
+  unchanged-track restart.
+- This does not close the playtest or prove PCM/DSP fidelity. The spear windows'
+  source/route identities remain inferred because tracks `$34/$1C/$06` all use
+  stop parameter 5. Native door effects order `$1200 → $001A → $1300`; portable
+  currently orders `$001A → $1200 → $1300` because contact runs four frames
+  early. Deferring only the cue would detach it from the ROM's immediate
+  `COP 37 $1A`, so the timing mismatch remains explicit. Spear music returns
+  after 405 native frames versus 420 portable.

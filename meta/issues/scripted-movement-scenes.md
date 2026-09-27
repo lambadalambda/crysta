@@ -44,3 +44,15 @@ Scenes move Ark and residents, run on map entry (C's changed entry, the town con
   Follow-ups applied: tests for `COP 0F`'s facing match and for the
   map-load reset through a real door (locals cleared, globals and items
   kept); `Globals::default` sizes the counters; `COP 13` mirrors only for 2.
+
+## Progress: frozen-return player boundary
+
+- The retained European fixture now proves that the map `$21` return script
+  releases native control at `(136,464)`. Only afterward do explicit Left and
+  Up legs reach `(120,464)` and `(120,448)`. The portable route releases at
+  `(136,368)`, 96 pixels above native, and its first Left attempt does not move.
+- This is evidence of the missing player-scripted descent, not an implementation.
+  The exact European player-stream entry and complete `COP 84` instruction
+  sequence are not source-pinned, so a route-specific coordinate snap or a
+  claim of general scripted-player movement would be unsafe. The issue remains
+  open for that source work and the other movement/entry criteria.
