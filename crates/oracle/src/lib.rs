@@ -110,7 +110,12 @@ mod ffi {
         ) -> bool;
         pub fn snes_setPixelFormat(snes: *mut Snes, pixelFormat: c_int);
         pub fn snes_setPixels(snes: *mut Snes, pixelData: *mut u8);
-        pub fn snes_setSamples(snes: *mut Snes, sampleData: *mut i16, samplesPerFrame: c_int);
+        pub fn snes_copySamples(
+            snes: *mut Snes,
+            sampleData: *mut i16,
+            frameCapacity: c_int,
+        ) -> c_int;
+        pub fn snes_testConvertAudioSample(sample: f64) -> i16;
         pub fn snes_setButtonState(snes: *mut Snes, player: c_int, button: c_int, pressed: bool);
         pub fn snes_saveState(snes: *mut Snes, data: *mut u8) -> c_int;
         pub fn snes_loadState(snes: *mut Snes, data: *const u8, size: c_int) -> bool;
@@ -132,8 +137,14 @@ mod ffi {
 pub const FRAME_WIDTH: usize = 512;
 /// Framebuffer height in pixels.
 pub const FRAME_HEIGHT: usize = 480;
-/// Samples per frame, stereo (legacy shim boundary capacity).
-pub const SAMPLES_PER_FRAME: usize = 534;
+/// Maximum stereo audio frames captured for one video frame.
+///
+/// The DSP output is resampled to exactly 32,000 stereo frames per second.
+/// Ordinary captures are approximately 532–533 frames on NTSC and 639–641
+/// on PAL; scheduler boundaries can shift a neighboring sample, and startup or
+/// synchronization transitions can be shorter (495 was observed during PAL
+/// boot). The aggregate cadence, not an exact per-frame count, is contractual.
+pub const MAX_AUDIO_FRAMES_PER_FRAME: usize = 1024;
 /// Size in bytes of a cartridge SRAM image accepted by [`Session::new_with_sram`].
 pub const SRAM_SIZE: usize = 8 * 1024;
 /// Maximum records accepted by one bounded CPU trace.
@@ -210,6 +221,10 @@ const _: () = assert!(
 const _: () = assert!(
     SRAM_SIZE <= i32::MAX as usize,
     "validated SRAM image fits the core's i32 length"
+);
+const _: () = assert!(
+    MAX_AUDIO_FRAMES_PER_FRAME <= i32::MAX as usize,
+    "audio frame capacity fits the core's i32 length"
 );
 
 static ZEROED_SRAM: [u8; SRAM_SIZE] = [0; SRAM_SIZE];
@@ -416,9 +431,9 @@ impl Session {
     ///
     /// # Panics
     ///
-    /// Panics if the sample-buffer size does not fit an `i32`; it is a
-    /// compile-time constant that always fits. The ROM and SRAM length
-    /// conversions are guaranteed by their const assertions.
+    /// Panics only if the native audio boundary violates its bounded capture
+    /// contract. The ROM and SRAM length conversions are guaranteed by const
+    /// assertions.
     pub fn new(rom: &Rom) -> Result<Self, SessionError> {
         Self::new_with_sram(rom, &ZEROED_SRAM)
     }
@@ -434,7 +449,7 @@ impl Session {
     ///
     /// # Panics
     ///
-    /// Panics only for compile-time-bounded length conversions; see [`Self::new`].
+    /// Panics under the same native audio contract violation as [`Self::new`].
     pub fn new_with_sram(rom: &Rom, sram: &[u8]) -> Result<Self, SessionError> {
         let sram = validate_sram(sram)?;
         Self::boot(rom, sram)
@@ -464,29 +479,47 @@ impl Session {
             let mut session = Self {
                 snes,
                 pixels: vec![0; FRAME_WIDTH * FRAME_HEIGHT * 4],
-                samples: vec![0; SAMPLES_PER_FRAME * 2],
+                samples: vec![0; MAX_AUDIO_FRAMES_PER_FRAME * 2],
             };
             ffi::snes_setPixelFormat(snes, ffi::PIXEL_FORMAT_XRGB);
             ffi::snes_setPixels(snes, session.pixels.as_mut_ptr());
-            let samples_per_frame = i32::try_from(SAMPLES_PER_FRAME).expect("fits i32");
-            ffi::snes_setSamples(snes, session.samples.as_mut_ptr(), samples_per_frame);
+            session.flush_samples();
             Ok(session)
         }
     }
 
-    /// Advances exactly one frame, then flushes the framebuffer and audio
-    /// samples into the session buffers, mirroring upstream's per-frame
-    /// `playAudio()` + `renderScreen()` sequence.
+    fn flush_samples(&mut self) {
+        self.samples.resize(MAX_AUDIO_FRAMES_PER_FRAME * 2, 0);
+        let capacity = i32::try_from(MAX_AUDIO_FRAMES_PER_FRAME).expect("fits i32");
+        let frames =
+            unsafe { ffi::snes_copySamples(self.snes, self.samples.as_mut_ptr(), capacity) };
+        assert!(frames >= 0, "core rejected the audio capture buffer");
+        let frames = usize::try_from(frames).expect("nonnegative audio frame count");
+        assert!(
+            frames <= MAX_AUDIO_FRAMES_PER_FRAME,
+            "core audio frame count exceeded allocation"
+        );
+        self.samples.truncate(frames * 2);
+    }
+
+    /// Advances exactly one frame, then flushes the framebuffer and that
+    /// frame's variable-length 32 kHz stereo PCM into the session buffers.
+    ///
+    /// Ordinary captures are approximately 532–533 stereo frames on NTSC and
+    /// 639–641 on PAL. Scheduler and synchronization boundaries may produce
+    /// neighboring or shorter counts; [`Self::samples`] exposes the actual
+    /// complete frame without padding.
     ///
     /// # Panics
     ///
-    /// Panics if the sample-buffer size does not fit an `i32`; it is a
-    /// compile-time constant that always fits.
+    /// Panics if the native core rejects the bounded audio buffer or violates
+    /// its frame-count contract.
     pub fn run_frame(&mut self) {
         unsafe {
             ffi::snes_runFrame(self.snes);
-            let samples_per_frame = i32::try_from(SAMPLES_PER_FRAME).expect("fits i32");
-            ffi::snes_setSamples(self.snes, self.samples.as_mut_ptr(), samples_per_frame);
+        }
+        self.flush_samples();
+        unsafe {
             ffi::snes_setPixels(self.snes, self.pixels.as_mut_ptr());
         }
     }
@@ -578,7 +611,13 @@ impl Session {
         &self.pixels
     }
 
-    /// The last frame's audio samples, interleaved stereo.
+    /// The last video frame's audio at 32,000 stereo frames per second,
+    /// interleaved left/right.
+    ///
+    /// The slice has an even, variable length. Ordinary captures are around
+    /// 1,064–1,066 `i16` samples on NTSC and 1,278–1,282 on PAL, with possible
+    /// neighboring scheduler effects and shorter startup/synchronization
+    /// frames. It is empty before the first call to [`Self::run_frame`].
     #[must_use]
     pub fn samples(&self) -> &[i16] {
         &self.samples
@@ -708,6 +747,11 @@ impl Drop for Session {
 
 /// Saves the core state to an opaque byte vector for replay resumption.
 ///
+/// Saving synchronizes/mutates the native core. After serialization, the shim
+/// resets the DSP resampler to 32 kHz and clears both native capture
+/// accumulators. The currently exposed [`Session::samples`] remains unchanged;
+/// the next frame replaces it from the fresh resampler phase.
+///
 /// # Panics
 ///
 /// Panics if the state exceeds an internal bound (allocation guard).
@@ -727,6 +771,10 @@ pub fn save_state(session: &Session) -> Vec<u8> {
 }
 
 /// Loads a core state previously saved by [`save_state`].
+///
+/// After a successful load, the shim resets the DSP resampler to 32 kHz and
+/// clears both native capture accumulators. The next frame therefore starts at
+/// the same fresh audio phase as the first frame after [`save_state`].
 ///
 /// # Panics
 ///
@@ -968,6 +1016,18 @@ mod tests {
     }
 
     #[test]
+    fn native_pcm_conversion_is_finite_saturating_and_truncating() {
+        let convert = |sample| unsafe { ffi::snes_testConvertAudioSample(sample) };
+        assert_eq!(convert(f64::NAN), 0);
+        assert_eq!(convert(f64::INFINITY), 0);
+        assert_eq!(convert(f64::NEG_INFINITY), 0);
+        assert_eq!(convert(-2.0), i16::MIN);
+        assert_eq!(convert(2.0), i16::MAX);
+        assert_eq!(convert(1.9 / 32768.0), 1);
+        assert_eq!(convert(-1.9 / 32768.0), -1);
+    }
+
+    #[test]
     fn trace_digest_v1_is_stable() {
         let trace = CpuTrace {
             entries: vec![CpuTraceEntry {
@@ -1009,6 +1069,66 @@ mod tests {
         assert!(
             String::from_utf8_lossy(&output.stderr).contains("synthetic ares checks passed"),
             "child must reach the end of its assertions"
+        );
+    }
+
+    fn assert_audio_boundary(session: &mut Session) {
+        assert!(
+            session.samples().is_empty(),
+            "instruction tracing must not publish a partial audio frame"
+        );
+
+        session.run_frame();
+        let captured_frames = session.samples().len() / 2;
+        assert!(
+            matches!(captured_frames, 532 | 533),
+            "normal run after a mid-frame trace must publish one complete NTSC frame"
+        );
+        let capacity = i32::try_from(MAX_AUDIO_FRAMES_PER_FRAME).unwrap();
+        let mut raw = vec![i16::MIN; MAX_AUDIO_FRAMES_PER_FRAME * 2];
+        assert_eq!(
+            unsafe { ffi::snes_copySamples(session.snes, raw.as_mut_ptr(), capacity) },
+            i32::try_from(captured_frames).unwrap()
+        );
+        assert_eq!(&raw[..session.samples().len()], session.samples());
+        assert!(raw[session.samples().len()..]
+            .iter()
+            .all(|&sample| sample == i16::MIN));
+
+        let mut rejected = vec![i16::MAX; MAX_AUDIO_FRAMES_PER_FRAME * 2];
+        assert_eq!(
+            unsafe {
+                ffi::snes_copySamples(
+                    session.snes,
+                    rejected.as_mut_ptr(),
+                    i32::try_from(captured_frames - 1).unwrap(),
+                )
+            },
+            -1
+        );
+        assert!(rejected.iter().all(|&sample| sample == i16::MAX));
+        assert_eq!(
+            unsafe { ffi::snes_copySamples(session.snes, std::ptr::null_mut(), capacity) },
+            -1
+        );
+        assert_eq!(
+            unsafe { ffi::snes_copySamples(std::ptr::null_mut(), raw.as_mut_ptr(), capacity) },
+            -1
+        );
+        assert_eq!(
+            unsafe { ffi::snes_copySamples(session.snes, raw.as_mut_ptr(), -1) },
+            -1
+        );
+
+        let snapshot = save_state(session);
+        session.run_frame();
+        let after_save = session.samples().to_vec();
+        load_state(session, &snapshot);
+        session.run_frame();
+        assert_eq!(
+            session.samples(),
+            after_save,
+            "save/reset and load/reset must replay exact per-frame PCM"
         );
     }
 
@@ -1078,6 +1198,12 @@ mod tests {
         assert!(!frame_trace.entries.is_empty());
         assert_eq!(s.frame_state().frames, 1);
 
+        let midframe_trace = s
+            .trace_until_pc(0x80_9000, 5_000, 1)
+            .expect("trace a partial frame");
+        assert_eq!(midframe_trace.stop, CpuTraceStop::InstructionLimit);
+        assert_audio_boundary(&mut s);
+
         // Memory-model accessor shapes.
         assert_eq!(s.vram().len(), 0x8000);
         assert_eq!(s.cgram().len(), 0x100);
@@ -1090,12 +1216,6 @@ mod tests {
         }));
         assert!(panic.is_err(), "wram past the image must panic");
 
-        // Snapshot-resume determinism is covered by the ROM-backed integration
-        // suites. Here we only verify that save/load round-trips without error
-        // on the boot frame (no run_frames needed).
-        let snap = save_state(&s);
-        assert!(!snap.is_empty());
-        load_state(&mut s, &snap);
         // The vendored ares engine does not tear down cleanly at process exit;
         // exit before static destructors run. The parent test verifies this
         // marker and the child status.
