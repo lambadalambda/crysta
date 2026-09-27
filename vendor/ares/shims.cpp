@@ -488,6 +488,16 @@ const uint16_t* snes_cgram(const Snes* snes) {
   return (const uint16_t*)SuperFamicom::ppuImpl.cgram;
 }
 
+void snes_bg3_state(const Snes* snes, uint16_t* output) {
+  (void)snes;
+  const auto& bg = SuperFamicom::ppuImpl.bg3.io;
+  output[0] = bg.screenAddress;
+  output[1] = bg.tiledataAddress;
+  output[2] = bg.screenSize;
+  output[3] = bg.mode;
+  output[4] = bg.aboveEnable;
+}
+
 // Physical OAM reconstruction is a pure memory accessor, not $2138 (which
 // advances PPU I/O state). These describe current registers, not output latches.
 constexpr uint8_t packObsel(uint16_t tiledataAddress, uint8_t nameselect, uint8_t baseSize) {

@@ -125,6 +125,7 @@ mod ffi {
         pub fn snes_cycles(snes: *const Snes) -> u64;
         pub fn snes_vram(snes: *const Snes) -> *const u16;
         pub fn snes_cgram(snes: *const Snes) -> *const u16;
+        pub fn snes_bg3_state(snes: *const Snes, output: *mut u16);
         pub fn snes_sprite_state(snes: *const Snes, output: *mut u8);
         pub fn snes_cpu_registers(snes: *const Snes, registers: *mut SnesCpuRegisters);
         pub fn snes_cpu_pc(snes: *const Snes) -> u16;
@@ -149,6 +150,21 @@ pub const MAX_AUDIO_FRAMES_PER_FRAME: usize = 1024;
 pub const SRAM_SIZE: usize = 8 * 1024;
 /// Maximum records accepted by one bounded CPU trace.
 pub const MAX_CPU_TRACE_INSTRUCTIONS: usize = 2_000_000;
+
+/// Current read-only BG3 configuration (not a scanline rendering latch).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bg3State {
+    /// VRAM word address of the first BG3 screen (tilemap).
+    pub screen_address: u16,
+    /// VRAM word address of the BG3 character data.
+    pub tiledata_address: u16,
+    /// BG3 screen size register bits (0 = 32×32 tiles).
+    pub screen_size: u16,
+    /// ares BG3 mode (0 = 2bpp, 4 = inactive).
+    pub mode: u16,
+    /// Enabled on the main screen.
+    pub above_enable: bool,
+}
 
 /// Current read-only OBJ hardware state for reference inspection.
 ///
@@ -641,6 +657,21 @@ impl Session {
             std::ptr::copy_nonoverlapping(ffi::snes_cgram(self.snes), out.as_mut_ptr(), 0x100);
         }
         out
+    }
+
+    /// Reads current BG3 tilemap/character configuration without PPU I/O side effects.
+    #[must_use]
+    pub fn bg3_state(&self) -> Bg3State {
+        let mut fields = [0u16; 5];
+        // SAFETY: the session owns the initialized core; shim fills five words.
+        unsafe { ffi::snes_bg3_state(self.snes, fields.as_mut_ptr()) };
+        Bg3State {
+            screen_address: fields[0],
+            tiledata_address: fields[1],
+            screen_size: fields[2],
+            mode: fields[3],
+            above_enable: fields[4] != 0,
+        }
     }
 
     /// Reads physical OAM and current OBJ configuration without advancing the

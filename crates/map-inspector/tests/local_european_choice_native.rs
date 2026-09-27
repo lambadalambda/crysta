@@ -1,5 +1,7 @@
-//! Empty-SRAM European Elder's first choice: retained ROM page versus native indices.
+//! Empty-SRAM European Elder's first choice: ROM page/cursor art versus native
+//! indexed tiles and uploaded BG3 choice-window words (not composed RGB/video).
 //! ares boots once per process, so this owned-ROM witness runs in a fresh child.
+use assets::text::window::WindowArt;
 use assets::text::{Acknowledgement, DialogueChoice, DialoguePage, HouseDialogue};
 use oracle::{Button, Session};
 use rom::{Revision, Rom};
@@ -69,35 +71,150 @@ fn inspect_native_choice(rom: &Rom) {
         );
     }
 
+    let art = WindowArt::from_rom(rom.image()).expect("European window art");
+    assert!(art.cursor.iter().flatten().any(|&index| index != 3));
+    assert!(art.interior.iter().all(|&index| index == 3));
     let mut session = Session::new(rom).expect("empty-SRAM European emulator");
     reach_elder_choice(&mut session);
-    let wram = session.wram_image();
-    assert_choice_wait(&wram);
-    assert_eq!(word(&wram, 0x0dce), 0, "initial choice selects result 1");
-    let vram: Vec<u8> = session
-        .vram()
-        .iter()
-        .flat_map(|w| w.to_le_bytes())
-        .collect();
-    let first = compare_page(&wram, &vram, page, &choice, 0);
-
-    // A single Down edge moves to result 2; no A/B or page acknowledgement.
+    check_selection(&mut session, page, &choice, &art, 0);
+    // One Down edge selects result 2, without answering.
     run(&mut session, 1, Some(Button::Down));
     run(&mut session, 18, None);
-    let wram = session.wram_image();
-    assert_choice_wait(&wram);
-    assert_eq!(
-        word(&wram, 0x0dce),
-        1,
-        "Down selects result 2 without answering"
+    check_selection(&mut session, page, &choice, &art, 1);
+    eprintln!("EU native first Elder choice: both selections, visible/hidden BG3 cursors and 224 uploaded choice-window tilemap words/attributes match");
+}
+
+// Sample both phases without claiming an exact blink period or framebuffer timing.
+fn check_selection(
+    session: &mut Session,
+    page: &DialoguePage,
+    choice: &DialogueChoice,
+    art: &WindowArt,
+    selected: usize,
+) {
+    let mut seen = [false; 2];
+    for _ in 0..80 {
+        let wram = session.wram_image();
+        assert_choice_wait(&wram);
+        assert_eq!(word(&wram, 0x0dce), u16::try_from(selected).unwrap());
+        let bg = session.bg3_state();
+        assert_eq!(
+            (
+                bg.screen_address,
+                bg.tiledata_address,
+                bg.screen_size,
+                bg.mode,
+                bg.above_enable
+            ),
+            (0x6800, 0x7000, 0, 0, true),
+            "BG3 active 32x32 2bpp window, $E000 characters"
+        );
+        let vram = session.vram();
+        let [x, y] = choice.options[selected].position.map(usize::from);
+        assert_eq!(x, 0);
+        let at = usize::from(bg.screen_address) + 0x04c4 / 2 + y / 8 * 32;
+        let visible = match [vram[at], vram[at + 32]] {
+            [0x202c, 0x203c] => true,
+            [0x2020, 0x2020] => false,
+            other => panic!("unexpected selected BG3 cursor words {other:04x?}"),
+        };
+        if !seen[usize::from(visible)] {
+            let bytes: Vec<u8> = vram.iter().flat_map(|w| w.to_le_bytes()).collect();
+            compare_page(&wram, &bytes, page, choice, selected);
+            compare_uploaded_window(&wram, &vram, page, choice, art, visible, bg.screen_address);
+            seen[usize::from(visible)] = true;
+        }
+        if seen == [true, true] {
+            return;
+        }
+        run(session, 1, None);
+    }
+    panic!(
+        "both BG3 cursor phases not observed for result {}: {seen:?}",
+        choice.options[selected].result
     );
-    let vram: Vec<u8> = session
-        .vram()
-        .iter()
-        .flat_map(|w| w.to_le_bytes())
-        .collect();
-    let second = compare_page(&wram, &vram, page, &choice, 1);
-    eprintln!("EU native first Elder choice: {first}+{second} indexed pixels match, both labels have ink, Down leaves $0DC2 unanswered");
+}
+
+fn compare_uploaded_window(
+    wram: &[u8],
+    vram: &[u16],
+    page: &DialoguePage,
+    choice: &DialogueChoice,
+    art: &WindowArt,
+    visible: bool,
+    screen: u16,
+) {
+    let selected = usize::from(word(wram, 0x0dce));
+    let bytes: Vec<u8> = vram.iter().flat_map(|w| w.to_le_bytes()).collect();
+    let [cx, cy] = choice.options[selected].position.map(usize::from);
+    let mut distinct = 0;
+    // Content rectangle only: 28 columns x 8 rows, no neighboring BGs.
+    for row in 0..8 {
+        for column in 0..28 {
+            let at = row * 32 + column;
+            let staged = word(wram, 0x1_d000 + 0x04c4 + at * 2);
+            let uploaded = vram[usize::from(screen) + 0x04c4 / 2 + at];
+            let cursor_row = column == cx / 8 && (cy / 8..cy / 8 + 2).contains(&row);
+            if cursor_row {
+                let tile_id = if visible {
+                    0x2c + (row - cy / 8) * 16
+                } else {
+                    0x20
+                };
+                let expected = u16::try_from(0x2000 | tile_id).unwrap();
+                assert_eq!(staged, expected, "staged cursor tile/palette/priority/flip");
+                assert_eq!(
+                    uploaded, expected,
+                    "uploaded cursor tile/palette/priority/flip"
+                );
+            } else {
+                assert_eq!(
+                    uploaded & 0x03ff,
+                    staged & 0x03ff,
+                    "uploaded tile ID at ({column},{row})"
+                );
+                assert_eq!(
+                    uploaded & 0xfc00,
+                    staged & 0xfc00,
+                    "uploaded palette/priority/flip at ({column},{row})"
+                );
+                assert_eq!(uploaded, staged, "uploaded BG3 word at ({column},{row})");
+            }
+            distinct += usize::from(uploaded & 0x03ff != 0x20);
+        }
+    }
+    assert!(
+        distinct > 2,
+        "nontrivial page tiles uploaded, not just cursor"
+    );
+    for row in 0..16 {
+        for column in 0..8 {
+            let expected = if visible {
+                art.cursor[row / 8][row % 8 * 8 + column]
+            } else {
+                art.interior[row % 8 * 8 + column]
+            };
+            assert_eq!(
+                page.indexed()[(cy + row) * 224 + cx + column],
+                page.background_index(),
+                "cursor source blank"
+            );
+            let tile = vram[usize::from(screen) + 0x04c4 / 2 + (cy + row) / 8 * 32 + cx / 8];
+            assert_eq!(
+                tile_index(&bytes, tile, column, row % 8),
+                expected,
+                "BG3 cursor indexed pixel ({column},{row}), visible={visible}, result {}",
+                choice.options[selected].result
+            );
+        }
+    }
+}
+
+fn tile_index(vram: &[u8], tile: u16, x: usize, y: usize) -> u8 {
+    let tx = if tile & 0x4000 != 0 { 7 - x } else { x };
+    let ty = if tile & 0x8000 != 0 { 7 - y } else { y };
+    let at = (0xe000 + usize::from(tile & 0x03ff) * 16 + ty * 2) & 0xffff;
+    (vram[at] >> (7 - tx) & 1) | ((vram[at + 1] >> (7 - tx) & 1) << 1)
 }
 
 fn reach_elder_choice(session: &mut Session) {

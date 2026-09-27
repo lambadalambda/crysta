@@ -30,6 +30,8 @@ pub struct WindowArt {
     pub frame: [[u8; 64]; 8],
     /// The interior tile `$20`.
     pub interior: [u8; 64],
+    /// The choice cursor's top and bottom 8×8 tiles (`$2c`, `$3c`).
+    pub cursor: [[u8; 64]; 2],
     /// BG3 colours 0..12: palettes 0 (1 white, 2 edge), 1 (5 the default
     /// speaker colour, 6 its edge) and 2; each palette's colour 3 is the
     /// shade.
@@ -95,6 +97,7 @@ impl WindowArt {
         Ok(Self {
             frame,
             interior: tile(0x20)?,
+            cursor: [tile(0x2c)?, tile(0x3c)?],
             colours,
             prompt,
             shade,
