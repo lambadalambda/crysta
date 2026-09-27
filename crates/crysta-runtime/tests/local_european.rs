@@ -1690,8 +1690,7 @@ fn european_single_world_replays_bedroom_to_underworld() {
     );
 
     // The frozen return has its own English pages. It releases control with
-    // $FE/$23; unlike native, the portable script has no forced player walk,
-    // so climb from the actual (136,368) rather than the native (120,448).
+    // $FE/$23; unlike native, the portable script has no forced player walk.
     for frame in 0..12000 {
         let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
         world
@@ -1707,11 +1706,26 @@ fn european_single_world_replays_bedroom_to_underworld() {
             break;
         }
     }
-    assert!(eu_flag(&world, 0xfe) && eu_flag(&world, 0x23));
-    assert!(!world.pad_locked());
-    assert_eq!(world.position(), (136, 368), "unmodelled scripted walk");
+    assert!(
+        eu_flag(&world, 0xfe) && eu_flag(&world, 0x23),
+        "portable frozen-return flags must precede manual input"
+    );
+    assert!(
+        !world.pad_locked(),
+        "portable frozen return releases the pad"
+    );
+    assert_eq!(
+        (world.map(), world.position()),
+        (0x21, (136, 368)),
+        "portable control releases 96px above the native scripted landing (136,464)"
+    );
     eu_frames(&mut world, 12, Some(Direction::Left));
     eu_frames(&mut world, 12, None);
+    assert_eq!(
+        (world.map(), world.position()),
+        (0x21, (136, 368)),
+        "manual Left cannot traverse this lane from the portable release position"
+    );
     for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
         if map != 0x20 {
             for _ in 0..200 {

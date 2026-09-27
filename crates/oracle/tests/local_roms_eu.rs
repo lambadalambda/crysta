@@ -582,8 +582,33 @@ fn run_tour_child(to_world: bool) -> ! {
                 "Ark can move on both axes after the completed tour"
             ),
             467 => assert_eq!(word(0x47e), 0x42, "spear room entered on foot"),
+            // The fixture's neutral 120 frames end before either manual direction.
+            // The 96px descent belongs to the frozen-return script, not Left/Up.
+            573 => {
+                assert_eq!(
+                    (word(0x47e), word(0x1000), word(0x1002)),
+                    (0x21, 136, 464),
+                    "native scripted descent completes before manual route input"
+                );
+                assert!(event(0xfe) && event(0x23), "frozen return releases control");
+                assert_eq!(
+                    word(0x45e),
+                    0,
+                    "native pad is unlocked before manual Left/Up"
+                );
+            }
+            // Separate retained manual Left and Up legs, including their rests.
+            575 => assert_eq!(
+                (word(0x47e), word(0x1000), word(0x1002)),
+                (0x21, 120, 464),
+                "manual Left changes X only after scripted release"
+            ),
             577 => {
-                assert_eq!((word(0x47e), word(0x1000), word(0x1002)), (0x21, 120, 448));
+                assert_eq!(
+                    (word(0x47e), word(0x1000), word(0x1002)),
+                    (0x21, 120, 448),
+                    "manual Up changes Y after manual Left; not a scripted landing"
+                );
                 for id in [0x240, 0x241, 0x242, 0x23, 0xfe] {
                     assert!(event(id), "frozen return must retain event {id:#x}");
                 }

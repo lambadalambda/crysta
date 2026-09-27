@@ -679,7 +679,7 @@ fn fresh_european_post_box_frozen_town_detour() {
         "actual Crystal Spear inventory"
     );
 
-    // Frozen return: portable Ark has no forced walk; climb from (136,368).
+    // Frozen return: portable Ark has no forced walk; release precedes manual Left.
     for frame in 0..12000 {
         let confirm =
             route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
@@ -688,14 +688,25 @@ fn fresh_european_post_box_frozen_town_detour() {
             break;
         }
     }
-    assert!(flag(&route, 0xfe) && flag(&route, 0x23));
-    assert!(!route.world().pad_locked() && route.world().dialogue().is_none());
+    assert!(
+        flag(&route, 0xfe) && flag(&route, 0x23),
+        "portable frozen-return flags must precede manual input"
+    );
+    assert!(
+        !route.world().pad_locked() && route.world().dialogue().is_none(),
+        "portable frozen return releases the pad"
+    );
     assert_eq!(
-        route.world().position(),
-        (136, 368),
-        "unmodelled scripted walk"
+        (route.world().map(), route.world().position()),
+        (0x21, (136, 368)),
+        "portable control releases 96px above the native scripted landing (136,464)"
     );
     route.legs(&[(12, L), (12, 0)]);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x21, (136, 368)),
+        "manual Left cannot traverse this lane from the portable release position"
+    );
     for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
         if map != 0x20 {
             let x = if map == 0x0e { 408 } else { 152 };
