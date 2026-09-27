@@ -1,5 +1,7 @@
 //! Frame-by-frame European walking witness from an empty-SRAM native boot.
 //! ares has one safe boot per process; the owned-ROM run lives in a fresh child.
+//! Only the two ordinary walking legs are frame-compared: not the doorway/load
+//! duration, animation, host real-time pacing, or full-route equivalence.
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use oracle::{Button, Session};
@@ -35,7 +37,9 @@ fn european_first_bedroom_walk_matches_native_each_frame() {
     assert!(
         out.status.success()
             && String::from_utf8_lossy(&out.stderr)
-                .contains("EU first bedroom walk: 63 frame boundaries match"),
+                .contains("EU first bedroom walk: 63 frame boundaries match")
+            && String::from_utf8_lossy(&out.stderr)
+                .contains("EU exterior held-Down walk: 43 frame boundaries match"),
         "native/portable EU walk diverged\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&out.stdout),
         String::from_utf8_lossy(&out.stderr)
@@ -89,6 +93,50 @@ fn inspect_walk(rom: &Rom) {
     }
     assert!(portable.position().0 > 304, "the held leg actually walks");
     eprintln!("EU first bedroom walk: 63 frame boundaries match");
+
+    // Replay the fixture's natural doorway/load interval, but do not compare
+    // its frames: this witness starts the next leg at the shared landing.
+    for (expected, frames, button, direction) in [
+        ("38", 38, None, None),
+        ("67 Down", 67, Some(Button::Down), Some(Direction::Down)),
+        ("83", 83, None, None),
+    ] {
+        assert_eq!(commands.next(), Some(expected), "fixture doorway command");
+        run(&mut native, frames, button);
+        for _ in 0..frames {
+            portable.update(direction, Presses::NONE).unwrap();
+        }
+    }
+    let anchor = (0x10, 392, 353);
+    assert_eq!(position(&native), anchor, "native exterior anchor");
+    assert_eq!(
+        (portable.map(), portable.position().0, portable.position().1),
+        anchor,
+        "portable exterior anchor"
+    );
+    assert_eq!(commands.next(), Some("42 Down"), "fixture's exterior walk");
+    for frame in 0..=42 {
+        assert_eq!(
+            (portable.map(), portable.position().0, portable.position().1),
+            position(&native),
+            "exterior held-Down walk boundary {frame}"
+        );
+        if frame < 42 {
+            native.set_button(Button::Down, true);
+            native.run_frame();
+            portable
+                .update(Some(Direction::Down), Presses::NONE)
+                .unwrap();
+        }
+    }
+    assert!(
+        portable.position().1 > anchor.2,
+        "the exterior leg actually walks"
+    );
+    eprintln!(
+        "EU exterior held-Down walk: 43 frame boundaries match; anchor {anchor:?}, end {:?}",
+        position(&native)
+    );
 }
 
 fn finish_wakeup(world: &mut World<'_>) {
