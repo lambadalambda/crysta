@@ -42,6 +42,11 @@ spc-player = { path = "spc-player" }
 # MIT OR Apache-2.0; structured local diagnostics, already in the dependency tree.
 serde_json = "1"
 
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+# Native reference execution only; oracle's crysta-runtime dependency is itself
+# dev-only, so this edge does not make a dependency cycle.
+oracle = { path = "../oracle" }
+
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "warn"
