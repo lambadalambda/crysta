@@ -2,6 +2,7 @@
 use assets::maps::exits::ExitList;
 use assets::maps::scripts::EventFlags;
 use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
+use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, Step, World};
 use crysta_runtime::{BOX_MAPS, MAPS};
@@ -703,6 +704,14 @@ fn eu_flag(world: &World<'_>, id: usize) -> bool {
     world.events()[id / 8] & (1 << (id % 8)) != 0
 }
 
+fn route_audio(world: &mut World<'_>) -> Vec<Cue> {
+    world
+        .take_cues()
+        .into_iter()
+        .filter(|cue| !matches!(cue, Cue::Sound(0x2800 | 0x2500)))
+        .collect()
+}
+
 fn eu_frames(world: &mut World<'_>, count: usize, direction: Option<Direction>) {
     for _ in 0..count {
         world.update(direction, Presses::NONE).unwrap();
@@ -1328,6 +1337,7 @@ fn european_single_world_replays_bedroom_to_underworld() {
         eu_frames(&mut world, frames, direction);
     }
     assert_eq!(world.position(), (104, 352), "first pot on foot");
+    route_audio(&mut world); // Isolate the three throws from earlier map/scene music.
     world
         .update(
             None,
@@ -1372,6 +1382,11 @@ fn european_single_world_replays_bedroom_to_underworld() {
         "miss did not hit the door"
     );
     assert!(!eu_flag(&world, 0x292));
+    assert_eq!(
+        route_audio(&mut world),
+        [Cue::Sound(0x1100), Cue::Sound(0x1200)],
+        "lift and missed throw; no track restart"
+    );
 
     for (frames, direction) in [
         (55, Some(Direction::Left)),
@@ -1439,6 +1454,11 @@ fn european_single_world_replays_bedroom_to_underworld() {
     );
     assert!(!eu_flag(&world, 0x292), "one hit does not open the door");
     eu_finish_scene(&mut world, 4000);
+    assert_eq!(
+        route_audio(&mut world),
+        [Cue::Sound(0x1100), Cue::Sound(0x1200), Cue::Sound(0x1300)],
+        "first hit; portable door hit is four frames earlier than native"
+    );
 
     for (frames, direction) in [
         (16, Some(Direction::Down)),
@@ -1500,8 +1520,45 @@ fn european_single_world_replays_bedroom_to_underworld() {
     eu_frames(&mut world, 240, None);
     assert!(eu_flag(&world, 0x292), "the second pot opens the blue door");
     eu_finish_scene(&mut world, 5000);
+    // EU $88:B40F sets local $8002 and immediately executes COP 37 $1A:
+    // the second-hit script does not wait for the pot to break. Portable
+    // contact is four frames early; deferring this cue alone would detach it
+    // from its source command and patch sequence.
+    assert_eq!(
+        rom.image().get(0x08_b40f..0x08_b416),
+        Some(&[2, 0x07, 0x02, 0x80, 2, 0x37, 0x1a][..])
+    );
+    let second_hit_audio = route_audio(&mut world);
+    assert_eq!(
+        second_hit_audio,
+        [
+            Cue::Sound(0x1100),
+            Cue::Sound(0x001a),
+            Cue::Sound(0x1200),
+            Cue::Sound(0x1300),
+            Cue::Track {
+                track: 1,
+                fade: true
+            },
+            Cue::Track {
+                track: 4,
+                fade: false
+            },
+        ],
+        "second hit, door opens, reaction fades, then C music resumes once"
+    );
+    assert_ne!(
+        second_hit_audio.iter().copied().filter(|cue| matches!(cue, Cue::Sound(_))).collect::<Vec<_>>(),
+        [Cue::Sound(0x1100), Cue::Sound(0x1200), Cue::Sound(0x001a), Cue::Sound(0x1300)],
+        "native break -> open -> hit sound order is NOT portable order until contact timing is traced"
+    );
     assert!(world.patched_cells().contains(&(11, 21, 0xcb)));
     assert!(world.patched_cells().contains(&(11, 20, 0xf6)));
+    eu_frames(&mut world, 12, None);
+    assert!(
+        route_audio(&mut world).is_empty(),
+        "quiet in C must not restart the same track"
+    );
     assert!(
         eu_flag(&world, 0x09),
         "friends' reaction reached its last local"
@@ -1658,6 +1715,7 @@ fn european_single_world_replays_bedroom_to_underworld() {
     );
     assert!(eu_flag(&world, 0x241));
     assert!(!eu_flag(&world, 0x242));
+    route_audio(&mut world); // The first conversation is not the spear grant.
     world
         .update(
             None,
@@ -1684,6 +1742,24 @@ fn european_single_world_replays_bedroom_to_underworld() {
         }
     }
     assert_eq!((world.map(), world.position()), (0x21, (136, 368)));
+    assert_eq!(
+        route_audio(&mut world),
+        [
+            Cue::Track {
+                track: 0x34,
+                fade: false
+            },
+            Cue::Track {
+                track: 0x1c,
+                fade: false
+            },
+            Cue::Track {
+                track: 0x06,
+                fade: false
+            },
+        ],
+        "spear fanfare and return to map music (portable return at 420 frames; native 405)"
+    );
     assert!(
         world.items().contains(&0x81),
         "actual Crystal Spear inventory"
