@@ -36,7 +36,9 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
   not native-frame presentation parity. The frozen-return player walk is not
   fully modelled; the town controller's `COP BF` redirect now runs without
   freezing, but its animation cadence and native PC have not been compared.
-  Text raster and PAL load/music tempo acceptance remain open.
+  Text raster and PAL load/movement acceptance remain open. A bounded
+  native-vs-direct comparison now qualifies the steady bedroom track-4 tempo,
+  not route-wide sound or timing.
 - A fresh European `Game::new` host replay now takes the alternate friend's
   refusal→retry route, opens the door, plays through the Box and frozen-town
   detour to the doorway Elder, and walks on world-map `$03`. Its input trace

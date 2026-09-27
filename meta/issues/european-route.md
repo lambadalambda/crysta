@@ -55,9 +55,11 @@ and run the story tests against it.
   `$88:855E` `COP BF` now redirects to `$88:8519` on the next tick rather than
   freezing or falling into the player's script; the replay observes no frozen
   actor after 48 neutral frames, with `$3C` set and input released. The target's
-  animation cadence and native controller PC have not been compared. PAL
-  load/music tempo and native-frame text presentation still need their own
-  evidence before this route and its dependencies can be archived.
+  animation cadence and native controller PC have not been compared. PAL load
+  and movement timing beyond the bounded bedroom witnesses, route-wide sound,
+  and native-frame text presentation still need their own evidence before this
+  route and its dependencies can be archived. The timing issue now records a
+  native-vs-direct track-4 tempo match for the steady bedroom window only.
 - A fresh `crysta-web` `Game::new` host test also reaches and walks on `$03`
   from the bedroom without seeding flags or maps. Unlike the native and
   original continuous `World` route, it first **refuses, then accepts** the
