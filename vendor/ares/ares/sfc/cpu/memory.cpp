@@ -1,3 +1,7 @@
+// Oracle-only observation point: CPU::write is the instruction bus path;
+// DMA/HDMA call bus.write directly and must not be reported as CPU writes.
+extern "C" void oracle_cpu_apu_write(unsigned address, unsigned data);
+
 auto CPU::idle() -> void {
   status.clockCount = 6;
   dmaEdge();
@@ -25,6 +29,7 @@ auto CPU::write(n24 address, n8 data) -> void {
   r.mar = address;
   step(status.clockCount);
   bus.write(address, r.mdr = data);
+  if((address & 0x40fffc) == 0x002140) oracle_cpu_apu_write((u32)address, (u8)data);
 }
 
 alwaysinline auto CPU::wait(n24 address) const -> u32 {

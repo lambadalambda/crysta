@@ -43,6 +43,20 @@ mod ffi {
     const _: () = assert!(std::mem::offset_of!(SnesCpuTraceEntry, emulation) == 8);
 
     #[repr(C)]
+    #[derive(Clone, Copy, Default)]
+    pub struct SnesApuPortWrite {
+        pub frame: u32,
+        pub scanline: u16,
+        pub cycle: u16,
+        pub port: u8,
+        pub value: u8,
+        pub reserved: [u8; 2],
+    }
+
+    const _: () = assert!(std::mem::size_of::<SnesApuPortWrite>() == 12);
+    const _: () = assert!(std::mem::offset_of!(SnesApuPortWrite, port) == 8);
+
+    #[repr(C)]
     #[derive(Default)]
     pub struct SnesCpuRegisters {
         pub address: u32,
@@ -93,6 +107,13 @@ mod ffi {
         pub fn snes_free(snes: *mut Snes);
         pub fn snes_reset(snes: *mut Snes, hard: bool);
         pub fn snes_runFrame(snes: *mut Snes);
+        pub fn snes_clearApuPortWrites(snes: *mut Snes);
+        pub fn snes_takeApuPortWrites(
+            snes: *mut Snes,
+            out: *mut SnesApuPortWrite,
+            capacity: c_int,
+            overflow: *mut bool,
+        ) -> c_int;
         pub fn snes_traceUntil(
             snes: *mut Snes,
             target: u32,
@@ -150,6 +171,9 @@ pub const MAX_AUDIO_FRAMES_PER_FRAME: usize = 1024;
 pub const SRAM_SIZE: usize = 8 * 1024;
 /// Maximum records accepted by one bounded CPU trace.
 pub const MAX_CPU_TRACE_INSTRUCTIONS: usize = 2_000_000;
+/// Maximum retained CPU-origin APU port writes between explicit takes/clears.
+pub const MAX_APU_PORT_WRITES: usize = 4096;
+const _: () = assert!(MAX_APU_PORT_WRITES <= i32::MAX as usize);
 
 /// Current read-only BG3 configuration (not a scanline rendering latch).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -178,6 +202,34 @@ pub struct SpriteState {
     pub obsel: u8,
     /// Current first-sprite priority index, in 0..128; not the scanline latch.
     pub first_sprite: u8,
+}
+
+/// One CPU instruction bus write to `$2140`–`$2143` in banks `$00`–`$3f`
+/// or `$80`–`$bf`. Excludes APU address aliases `$2144`–`$217f`,
+/// DMA/HDMA bus transfers, and writes from the SPC.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ApuPortWrite {
+    /// Completed video-frame events at the time of the write (zero-based).
+    /// This event boundary is not the beam scanline wrap.
+    pub frame: u32,
+    /// CPU beam scanline at the write (not a completed frame index).
+    pub scanline: u16,
+    /// CPU beam master-clock position within the scanline, not a global cycle count.
+    /// Scanline/cycle may wrap before the next frame event; vector order is authoritative.
+    pub cycle: u16,
+    /// Physical port index, 0–3.
+    pub port: u8,
+    /// Byte placed on the CPU-to-SPC bus.
+    pub value: u8,
+}
+
+/// Chronological, bounded CPU-to-APU writes since the last take or clear.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ApuPortWrites {
+    /// First [`MAX_APU_PORT_WRITES`] writes, in bus order.
+    pub entries: Vec<ApuPortWrite>,
+    /// At least one later write was dropped; this interval is incomplete.
+    pub overflow: bool,
 }
 
 /// A controller button for [`Session::set_button`].
@@ -615,6 +667,53 @@ impl Session {
         Ok(CpuTrace { entries, stop })
     }
 
+    /// Discards pending CPU-to-APU writes and resets the sticky overflow flag.
+    /// Does not affect the emulated machine or the other capture buffers.
+    pub fn clear_apu_port_writes(&mut self) {
+        unsafe { ffi::snes_clearApuPortWrites(self.snes) };
+    }
+
+    /// Takes CPU instruction writes (not DMA or HDMA transfers) since boot,
+    /// the last take, or clear, including writes made during mid-frame trace exits. A full buffer retains its first 4096
+    /// entries and sets `overflow` until a take/clear. Saving retains pending
+    /// writes; successful load clears them (the old timeline is discarded).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the native core violates the fixed-size capture contract.
+    #[must_use]
+    pub fn take_apu_port_writes(&mut self) -> ApuPortWrites {
+        let mut raw = vec![ffi::SnesApuPortWrite::default(); MAX_APU_PORT_WRITES];
+        let mut overflow = false;
+        let count = unsafe {
+            ffi::snes_takeApuPortWrites(
+                self.snes,
+                raw.as_mut_ptr(),
+                i32::try_from(MAX_APU_PORT_WRITES).expect("bounded capacity fits i32"),
+                &raw mut overflow,
+            )
+        };
+        let count = usize::try_from(count).expect("core rejected APU capture buffer");
+        assert!(
+            count <= MAX_APU_PORT_WRITES,
+            "core exceeded APU capture buffer"
+        );
+        raw.truncate(count);
+        ApuPortWrites {
+            entries: raw
+                .into_iter()
+                .map(|write| ApuPortWrite {
+                    frame: write.frame,
+                    scanline: write.scanline,
+                    cycle: write.cycle,
+                    port: write.port,
+                    value: write.value,
+                })
+                .collect(),
+            overflow,
+        }
+    }
+
     /// Sets a button state for player 1; applies to subsequent frames.
     pub fn set_button(&mut self, button: Button, pressed: bool) {
         unsafe { ffi::snes_setButtonState(self.snes, 1, button.as_c(), pressed) };
@@ -780,7 +879,8 @@ impl Drop for Session {
 ///
 /// Saving synchronizes/mutates the native core. After serialization, the shim
 /// resets the DSP resampler to 32 kHz and clears both native capture
-/// accumulators. The currently exposed [`Session::samples`] remains unchanged;
+/// accumulators. Pending APU writes are retained across save. The currently
+/// exposed [`Session::samples`] remains unchanged;
 /// the next frame replaces it from the fresh resampler phase.
 ///
 /// # Panics
@@ -804,7 +904,8 @@ pub fn save_state(session: &Session) -> Vec<u8> {
 /// Loads a core state previously saved by [`save_state`].
 ///
 /// After a successful load, the shim resets the DSP resampler to 32 kHz and
-/// clears both native capture accumulators. The next frame therefore starts at
+/// clears both native capture accumulators and pending APU writes/overflow.
+/// The next frame therefore starts at
 /// the same fresh audio phase as the first frame after [`save_state`].
 ///
 /// # Panics
@@ -848,6 +949,262 @@ mod tests {
             crc32: d.crc32,
         }];
         Rom::load_with_known(&image, &known).expect("synthetic rom loads")
+    }
+
+    #[test]
+    fn apu_port_writes_are_bounded_and_survive_trace_steps() {
+        if let Some(mode) = std::env::var_os("ORACLE_APU_CHILD") {
+            let mut image = vec![0u8; Rom::IMAGE_SIZE];
+            // SEI; CLC; XCE; JML $80:8000 (native mode, 8-bit accumulator).
+            image[0xffc0..0xffc7].copy_from_slice(&[0x78, 0x18, 0xfb, 0x5c, 0, 0x80, 0x80]);
+            // LDA #$11; STA $2140; LDA #$22; STA $2141; BRA to self.
+            image[0x8000..0x800c].copy_from_slice(&[
+                0xa9, 0x11, 0x8d, 0x40, 0x21, 0xa9, 0x22, 0x8d, 0x41, 0x21, 0x80, 0xfe,
+            ]);
+            if mode == "overflow" {
+                image[0x800b] = 0xf4; // BRA back to $8000.
+            }
+            image[0xfffc..0xfffe].copy_from_slice(&[0xc0, 0xff]);
+            let d = rom::digests(&image);
+            let known = [rom::KnownRom {
+                revision: rom::Revision::Japan,
+                sha256: d.sha256,
+                crc32: d.crc32,
+            }];
+            let rom = Rom::load_with_known(&image, &known).unwrap();
+            let mut session = Session::new(&rom).unwrap();
+            assert_eq!(session.take_apu_port_writes().entries.len(), 0);
+            assert_eq!(
+                session.trace_until_pc(0x80_8005, 1000, 2).unwrap().stop,
+                CpuTraceStop::TargetReached
+            );
+            if mode == "quiet" {
+                let first = session.take_apu_port_writes();
+                assert!(!first.overflow);
+                assert_eq!(first.entries.len(), 1);
+                assert_eq!((first.entries[0].port, first.entries[0].value), (0, 0x11));
+                assert!(session.take_apu_port_writes().entries.is_empty());
+            }
+            assert_eq!(
+                session.trace_until_pc(0x80_800a, 1000, 2).unwrap().stop,
+                CpuTraceStop::TargetReached
+            );
+            let writes = session.take_apu_port_writes();
+            assert!(!writes.overflow);
+            assert_eq!(writes.entries.len(), if mode == "quiet" { 1 } else { 2 });
+            assert_eq!(
+                (
+                    writes.entries.last().unwrap().port,
+                    writes.entries.last().unwrap().value
+                ),
+                (1, 0x22)
+            );
+            if mode == "overflow" {
+                assert_eq!((writes.entries[0].port, writes.entries[0].value), (0, 0x11));
+                assert!(writes.entries[1].cycle >= writes.entries[0].cycle);
+            }
+            session.clear_apu_port_writes();
+            assert!(session.take_apu_port_writes().entries.is_empty());
+            session.run_frame();
+            let writes = session.take_apu_port_writes();
+            if mode == "overflow" {
+                assert!(writes.overflow);
+                assert_eq!(writes.entries.len(), MAX_APU_PORT_WRITES);
+                assert_eq!((writes.entries[0].port, writes.entries[0].value), (0, 0x11));
+                assert_eq!((writes.entries[1].port, writes.entries[1].value), (1, 0x22));
+                assert!(!session.take_apu_port_writes().overflow);
+                session.run_frame();
+                let state = save_state(&session);
+                // Saving does not erase pending writes.
+                let saved_writes = session.take_apu_port_writes();
+                assert!(saved_writes.overflow);
+                assert!(saved_writes.entries.iter().any(|w| w.frame >= 1));
+                assert!(saved_writes
+                    .entries
+                    .iter()
+                    .all(|w| w.scanline < 262 && w.cycle < 1364));
+                session.run_frame();
+                load_state(&mut session, &state);
+                assert_eq!(
+                    session.take_apu_port_writes(),
+                    ApuPortWrites {
+                        entries: vec![],
+                        overflow: false
+                    }
+                );
+            } else {
+                // The spin loop is quiet; clear/take must not invent a write.
+                assert_eq!(
+                    writes,
+                    ApuPortWrites {
+                        entries: vec![],
+                        overflow: false
+                    }
+                );
+                let state = save_state(&session);
+                load_state(&mut session, &state);
+                assert!(session.take_apu_port_writes().entries.is_empty());
+            }
+            std::process::exit(0);
+        }
+        for mode in ["quiet", "overflow"] {
+            let output = std::process::Command::new(std::env::current_exe().unwrap())
+                .args([
+                    "--exact",
+                    "tests::apu_port_writes_are_bounded_and_survive_trace_steps",
+                    "--nocapture",
+                ])
+                .env("ORACLE_APU_CHILD", mode)
+                .output()
+                .unwrap();
+            assert!(
+                output.status.success(),
+                "{mode}: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
+    }
+
+    #[test]
+    fn apu_hook_excludes_other_addresses_and_dma_hdma() {
+        if std::env::var_os("ORACLE_APU_BOUNDARY_CHILD").is_some() {
+            fn store(code: &mut Vec<u8>, value: u8, address: u16) {
+                code.extend([0xa9, value, 0x8d, address as u8, (address >> 8) as u8]);
+            }
+            fn store_long(code: &mut Vec<u8>, value: u8, bank: u8, address: u16) {
+                code.extend([0xa9, value, 0x8f, address as u8, (address >> 8) as u8, bank]);
+            }
+            let mut code = Vec::new();
+            store(&mut code, 0x32, 0x2142);
+            store(&mut code, 0x43, 0x2143);
+            store(&mut code, 0x21, 0x213f); // Adjacent PPU register, not APU I/O.
+            store(&mut code, 0x54, 0x2144); // APU mirror: deliberately outside the hook's range.
+            store_long(&mut code, 0x65, 0x40, 0x2140); // ROM bank, not APU I/O.
+            store_long(&mut code, 0x76, 0x7e, 0x2140); // WRAM bank, not APU I/O.
+            store_long(&mut code, 0x87, 0x80, 0x2142); // Valid mirrored CPU I/O bank.
+            let before_dma = 0x80_8000 + code.len() as u32;
+
+            // DMA channel 0: one byte from WRAM $7e:0000 to B-bus $2140.
+            store_long(&mut code, 0xa5, 0x7e, 0x0000);
+            for (value, address) in [
+                (0, 0x4300),
+                (0x40, 0x4301),
+                (0, 0x4302),
+                (0, 0x4303),
+                (0x7e, 0x4304),
+                (1, 0x4305),
+                (0, 0x4306),
+            ] {
+                store(&mut code, value, address);
+            }
+            store(&mut code, 1, 0x420b);
+            // $4302 reads the advanced DMA source pointer: the transfer really ran.
+            code.extend([0xea, 0xad, 0x02, 0x43, 0x8f, 0x10, 0x00, 0x7e]);
+            let after_dma = 0x80_8000 + code.len() as u32;
+
+            // HDMA channel 1: table at $7e:0020, one $2140 byte on the next scanline.
+            for (offset, byte) in [0x81, 0x5a, 0].into_iter().enumerate() {
+                store_long(&mut code, byte, 0x7e, 0x0020 + offset as u16);
+            }
+            for (value, address) in [
+                (0, 0x4310),
+                (0x40, 0x4311),
+                (0x20, 0x4312),
+                (0, 0x4313),
+                (0x7e, 0x4314),
+            ] {
+                store(&mut code, value, address);
+            }
+            store(&mut code, 2, 0x420c);
+            // Sample HDMA's A2A pointer while spinning. It advances beyond $0021
+            // only when a scanline transfer has consumed the table byte.
+            code.extend([0xad, 0x18, 0x43, 0x8f, 0x11, 0x00, 0x7e, 0x80, 0xf7]);
+
+            let mut image = vec![0u8; Rom::IMAGE_SIZE];
+            image[0xffc0..0xffc7].copy_from_slice(&[0x78, 0x18, 0xfb, 0x5c, 0, 0x80, 0x80]);
+            image[0x8000..0x8000 + code.len()].copy_from_slice(&code);
+            image[0xfffc..0xfffe].copy_from_slice(&[0xc0, 0xff]);
+            let d = rom::digests(&image);
+            let rom = Rom::load_with_known(
+                &image,
+                &[rom::KnownRom {
+                    revision: rom::Revision::Japan,
+                    sha256: d.sha256,
+                    crc32: d.crc32,
+                }],
+            )
+            .unwrap();
+            let mut session = Session::new(&rom).unwrap();
+            assert_eq!(
+                session.trace_until_pc(before_dma, 1000, 2).unwrap().stop,
+                CpuTraceStop::TargetReached
+            );
+            assert_eq!(
+                session.wram(0x2140),
+                0x76,
+                "excluded WRAM-bank write took effect"
+            );
+            let writes = session.take_apu_port_writes();
+            assert!(!writes.overflow);
+            assert_eq!(
+                writes
+                    .entries
+                    .iter()
+                    .map(|w| (w.port, w.value))
+                    .collect::<Vec<_>>(),
+                [(2, 0x32), (3, 0x43), (2, 0x87)]
+            );
+            assert!(writes
+                .entries
+                .iter()
+                .all(|w| w.frame == 0 && w.scanline < 262 && w.cycle < 1364));
+            assert!(writes
+                .entries
+                .windows(2)
+                .all(|pair| pair[0].scanline < pair[1].scanline
+                    || (pair[0].scanline == pair[1].scanline && pair[0].cycle < pair[1].cycle)));
+
+            assert_eq!(
+                session.trace_until_pc(after_dma, 1000, 2).unwrap().stop,
+                CpuTraceStop::TargetReached
+            );
+            assert_eq!(
+                session.wram(0x10),
+                1,
+                "DMA source pointer must have advanced"
+            );
+            assert!(
+                session.take_apu_port_writes().entries.is_empty(),
+                "DMA must not enter CPU write queue"
+            );
+            session.run_frames(2);
+            assert!(
+                session.wram(0x11) >= 0x22,
+                "HDMA table must have transferred"
+            );
+            assert_eq!(
+                session.take_apu_port_writes(),
+                ApuPortWrites {
+                    entries: vec![],
+                    overflow: false
+                }
+            );
+            std::process::exit(0);
+        }
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tests::apu_hook_excludes_other_addresses_and_dma_hdma",
+                "--nocapture",
+            ])
+            .env("ORACLE_APU_BOUNDARY_CHILD", "1")
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 
     #[test]

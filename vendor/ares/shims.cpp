@@ -40,6 +40,17 @@ static_assert(offsetof(SnesCpuTraceEntry, status) == 6);
 static_assert(offsetof(SnesCpuTraceEntry, dataBank) == 7);
 static_assert(offsetof(SnesCpuTraceEntry, emulation) == 8);
 
+struct SnesApuPortWrite {
+  uint32_t frame;
+  uint16_t scanline;
+  uint16_t cycle;
+  uint8_t port;
+  uint8_t value;
+  uint8_t reserved[2];
+};
+static_assert(sizeof(SnesApuPortWrite) == 12);
+static_assert(offsetof(SnesApuPortWrite, port) == 8);
+
 struct SnesCpuRegisters {
   uint32_t address;
   uint16_t accumulator;
@@ -66,6 +77,7 @@ static_assert(offsetof(SnesCpuRegisters, emulation) == 16);
 static_assert(offsetof(SnesCpuRegisters, reserved) == 17);
 
 static constexpr uint32_t CpuTraceInstructionLimit = 2'000'000;
+static constexpr std::size_t ApuWriteCapacity = 4096;
 static constexpr int SramSize = 8 * 1024;
 static_assert(SramSize == 8192);
 static_assert(sizeof(uint8_t) == 1);
@@ -261,6 +273,13 @@ public:
   Node::System root;
   u32 frames = 0;
   bool loaded = false;
+  std::vector<SnesApuPortWrite> apuWrites;
+  bool apuWritesOverflow = false;
+
+  auto clearApuWrites() -> void {
+    apuWrites.clear();
+    apuWritesOverflow = false;
+  }
 
   OracleCore() {
     platform.systemPak = std::make_shared<vfs::directory>();
@@ -305,6 +324,7 @@ public:
       auto device = port->allocate("Gamepad");
       port->connect();
     }
+    clearApuWrites();
     root->power();
     // Publish native SFC DSP output at an exact host-side 32 kHz cadence.
     resetAudioBoundary();
@@ -313,6 +333,21 @@ public:
 };
 
 }  // namespace
+
+// Called only by CPU::write, after the mapped bus write, not by DMA/HDMA or
+// the SPC's own port writes. Runs on the session's emulation thread.
+extern "C" void oracle_cpu_apu_write(unsigned address, unsigned data) {
+  auto* core = singletonCore;
+  if(!core || !core->loaded) return;
+  if(core->apuWrites.size() == ApuWriteCapacity) {
+    core->apuWritesOverflow = true;
+    return;
+  }
+  auto& cpu = SuperFamicom::cpu;
+  core->apuWrites.push_back({core->frames, (uint16_t)cpu.vcounter(),
+                            (uint16_t)cpu.hcounter(), (uint8_t)(address & 3),
+                            (uint8_t)data, {}});
+}
 
 extern "C" {
 
@@ -353,6 +388,23 @@ bool snes_loadRomWithSram(Snes* snes, const uint8_t* data, int length,
 bool snes_loadRom(Snes* snes, const uint8_t* data, int length) {
   static constexpr uint8_t ZeroedSram[SramSize] = {};
   return snes_loadRomWithSram(snes, data, length, ZeroedSram, SramSize);
+}
+
+void snes_clearApuPortWrites(Snes* snes) {
+  if(snes) ((OracleCore*)snes)->clearApuWrites();
+}
+
+// Returns -1 without modifying the queue for invalid or insufficient output.
+// A successful take returns the chronological count and clears overflow too.
+int snes_takeApuPortWrites(Snes* snes, SnesApuPortWrite* out, int capacity, bool* overflow) {
+  if(!snes || !out || !overflow || capacity < 0) return -1;
+  auto* core = (OracleCore*)snes;
+  if(core->apuWrites.size() > (std::size_t)capacity) return -1;
+  int count = (int)core->apuWrites.size();
+  if(count) std::memcpy(out, core->apuWrites.data(), count * sizeof(SnesApuPortWrite));
+  *overflow = core->apuWritesOverflow;
+  core->clearApuWrites();
+  return count;
 }
 
 void snes_runFrame(Snes* snes) {
@@ -460,7 +512,10 @@ bool snes_loadState(Snes* snes, const uint8_t* data, int size) {
   core.frames = f;
   auto s = serializer{data + 4, (u32)size - 4};
   bool ok = core.root->unserialize(s);
-  if(ok) core.resetAudioBoundary();
+  if(ok) {
+    core.resetAudioBoundary();
+    core.clearApuWrites();  // host-side evidence belongs to the previous timeline
+  }
   return ok;
 }
 
