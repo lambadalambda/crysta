@@ -17,6 +17,50 @@ fn owned_rom() -> Option<Rom> {
 }
 
 #[test]
+fn c_to_d_checked_paths_use_the_source_qualified_native_spawn() {
+    let Some(rom) = owned_rom() else { return };
+
+    let mut stepped = World::enter_candidate(rom.image(), 0xC, 120, 440, new_game_flags()).unwrap();
+    let mut step = Step::Stayed;
+    for _ in 0..40 {
+        step = stepped.step_checked(Some(Direction::Down)).unwrap();
+        if matches!(step, Step::Entered { .. }) {
+            break;
+        }
+    }
+    assert_eq!(step, Step::Entered { from: 0xC, to: 0xD });
+    assert_eq!(stepped.position(), (120, 608));
+
+    let mut interacted =
+        World::enter_candidate(rom.image(), 0xC, 120, 464, new_game_flags()).unwrap();
+    interacted.face(Direction::Down);
+    assert_eq!(
+        interacted.interact_checked().unwrap(),
+        Step::Entered { from: 0xC, to: 0xD }
+    );
+    assert_eq!(interacted.position(), (120, 608));
+}
+
+#[test]
+fn animated_c_to_d_keeps_its_selector_placement_path() {
+    let Some(rom) = owned_rom() else { return };
+    let mut image = rom.image().to_vec();
+    image[0x18DCD + 8] += 2;
+    let mut world = World::enter_with_events(&image, 0xC, 120, 440, new_game_flags()).unwrap();
+
+    for _ in 0..100 {
+        world
+            .update(Some(Direction::Down), crysta_runtime::scene::Presses::NONE)
+            .unwrap();
+        if world.map() == 0xD {
+            break;
+        }
+    }
+    assert_eq!(world.map(), 0xD);
+    assert_eq!(world.position(), (122, 608));
+}
+
+#[test]
 fn transition_paths_own_arrival_until_free_despite_hostile_inputs() {
     let Some(rom) = owned_rom() else { return };
     for (source, destination, x, y, route, advances) in [
@@ -140,6 +184,7 @@ fn interactive_steps_preserve_checked_exit_and_arrival_behavior() {
 fn explicit_entry_remains_raw_and_unqualified_target_records_fail_closed() {
     let Some(rom) = owned_rom() else { return };
     for (source, destination, offset, raw) in [
+        (0xC, 0xD, 0x18DCD, (112, 608)),
         (0x1E, 0xA, 0x18F9B, (784, 752)),
         (0x19, 0x17, 0x18F42, (448, 352)),
     ] {

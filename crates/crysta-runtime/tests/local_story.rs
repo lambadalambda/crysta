@@ -1021,9 +1021,9 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
 #[test]
 fn the_stairs_lead_back_up_from_the_box_room_to_c() {
     // Selector 13 back up: `$21` (8,6) -> `$20`, `$20` (25,53) -> E, E (9,53)
-    // -> C, each Up-only type 29 (`$3ACA`). Each arrival starts at the raw
-    // anchor plus (16,10) and rests at plus (8,16), as on the native return
-    // (`departure` journey 54080, 54441, 54746).
+    // -> C, each Up-only type 29 (`$3ACA`). The first native load is
+    // `(368,874)`; `(360,872)` is transition-owned motion, and free control
+    // settles at `(360,880)` (`departure` journey 54080, 54441, 54746).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -1054,7 +1054,20 @@ fn the_stairs_lead_back_up_from_the_box_room_to_c() {
             }
         }
         landings.push((world.map(), world.position()));
-        settle(&mut world);
+        if map == 0x0020 {
+            let mut transition_positions = Vec::new();
+            while world.in_transition() {
+                world.update(None, Presses::default()).unwrap();
+                transition_positions.push(world.position());
+            }
+            assert!(
+                transition_positions.contains(&(360, 872)),
+                "the native (360,872) point belongs to the arrival motion"
+            );
+            assert_eq!(transition_positions.last(), Some(&(360, 880)));
+        } else {
+            settle(&mut world);
+        }
         landings.push((world.map(), world.position()));
     }
     assert_eq!(

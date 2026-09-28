@@ -9,8 +9,8 @@
 //! own 63-frame descents and climbs. The screen fades out over the last 16
 //! frames of leaving and in over the first 16 after the load (fade type 0,
 //! `$8D:89F4` and `$8D:8A81`: one brightness step a frame). The frame API
-//! ([`World::update`]) plays them; the stepping API loads at once, at the
-//! legacy placement, for route discovery.
+//! ([`World::update`]) plays them; the stepping API loads at once, at its
+//! raw or exact source-qualified placement, for route discovery.
 //!
 //! Not modelled: the loads' own frames (3 to 5 natively, more between the
 //! house and the town, which only lengthens the dark), and the player's

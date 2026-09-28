@@ -115,7 +115,7 @@ pub struct World<'a> {
 /// A world that could not be entered or stepped.
 #[derive(Debug)]
 pub enum WorldError {
-    /// A targeted return edge no longer matches its exact qualified record.
+    /// A source-qualified arrival edge no longer matches its exact record.
     Arrival {
         /// Source map.
         map: u16,
@@ -158,7 +158,7 @@ impl fmt::Display for WorldError {
         match self {
             Self::Arrival { map, record } => write!(
                 f,
-                "unqualified return arrival from map {map:#06x}, record {record:#08x}"
+                "unqualified arrival from map {map:#06x}, record {record:#08x}"
             ),
             Self::Room(source) => write!(f, "{source}"),
             Self::Residents { map, source } => write!(f, "map {map:#06x} residents: {source}"),
@@ -1489,28 +1489,36 @@ impl<'a> World<'a> {
     fn enter_exit(&self, record: &ExitRecord, departed: bool) -> Result<Option<Self>, WorldError> {
         // Validate pinned source identities before interpreting mutable operands.
         let arrival = qualified_arrival(self.map, record)?;
+        // The animated transition derives its own destination handoff after the
+        // fade; this measured placement only belongs to synchronous host exits.
+        let placement = if departed {
+            None
+        } else {
+            qualified_placement(self.map, record)?
+        };
         let Ok(destination) = record.direct_destination() else {
             return Ok(None);
         };
         if !admitted(destination) {
             return Ok(None);
         }
-        let (x, y) = match arrival {
-            Some(arrival) => arrival.position(),
+        let (x, y) = match (arrival, placement) {
+            (Some(arrival), _) => arrival.position(),
+            (None, Some(position)) => position,
             // Stairs settle at the raw anchor plus (8,16): the adjustment
             // (`$8D:8985`, down (-14,-23), up (8,-6)) and the stair walk
             // back by the same; [`transition`] plays the walk.
-            None if matches!(record.selector(), STAIRS | STAIRS_UP) => {
+            (None, None) if matches!(record.selector(), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)
             }
             // A world map spawns the player 8 to the right of the anchor;
             // the plane's arrival walk takes it the rest of the way.
-            None if WORLD_MAPS.contains(&destination) => {
+            (None, None) if WORLD_MAPS.contains(&destination) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y)
             }
-            None => record.destination_position(),
+            (None, None) => record.destination_position(),
         };
         // Leaving plays the exit's sound before the load (`$8D:8872`);
         // landing on stairs plays their step (`COP 36 17`, `$84:BA19`).
@@ -1580,8 +1588,28 @@ pub(super) const STAIRS_UP: u8 = 13;
 /// it (`$0B81`) until it breaks.
 const CLOSED_DOOR: u16 = 5;
 
-/// Only these two record/state witnesses have measured arrival profiles.
-/// Other edges retain the legacy raw host transfer, not selector qualification.
+/// The ordinary C-to-D door loads eight pixels right of its raw anchor.
+/// This adjustment is source-record evidence, not a selector-wide rule.
+fn qualified_placement(map: u16, record: &ExitRecord) -> Result<Option<(u16, u16)>, WorldError> {
+    const OFFSET: usize = 0x18DCD;
+    const BYTES: [u8; 12] = [7, 28, 1, 4, 13, 0, 0, 5, 112, 0, 96, 2];
+
+    let source = record.source_range().start;
+    if map != 0xC || (source != OFFSET && record.raw_destination() != 0xD) {
+        return Ok(None);
+    }
+    if source != OFFSET || record.bytes() != &BYTES {
+        return Err(WorldError::Arrival {
+            map,
+            record: source,
+        });
+    }
+    Ok(Some((120, 608)))
+}
+
+/// Only these two record/state witnesses have measured owned arrival profiles.
+/// Other edges receive no [`ReturnRoute`]; exact one-off corrections are handled
+/// by [`qualified_placement`] before the raw host-transfer fallback.
 fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, WorldError> {
     let source = record.source_range().start;
     let (offset, bytes, route) = match map {
@@ -2075,6 +2103,37 @@ mod tests {
                 }
                 assert_eq!(world.map(), map);
                 assert!(world.arrival().is_none());
+            }
+        }
+    }
+
+    #[test]
+    fn c_to_d_placement_pins_every_operand_and_source() {
+        const MAP: u16 = 0xC;
+        const OFFSET: usize = 0x18DCD;
+        const BYTES: [u8; 12] = [7, 28, 1, 4, 13, 0, 0, 5, 112, 0, 96, 2];
+
+        for changed in 0..14 {
+            let at = OFFSET + if changed == 13 { 16 } else { 0 };
+            let mut image = vec![0; 0x19000];
+            let pointer = 0x18000 + usize::from(MAP) * 2;
+            image[pointer..pointer + 2]
+                .copy_from_slice(&u16::try_from(at - 0x10000).unwrap().to_le_bytes());
+            image[at..at + 12].copy_from_slice(&BYTES);
+            image[at + 12] = 0xFF;
+            if changed < 12 {
+                image[at + changed] ^= if changed == 5 { 0x80 } else { 2 };
+            }
+            let exits = ExitList::from_rom(&image, MAP).unwrap();
+            let record = &exits.records()[0];
+            if changed == 12 {
+                assert_eq!(qualified_placement(MAP, record).unwrap(), Some((120, 608)));
+                assert_eq!(qualified_placement(0xB, record).unwrap(), None);
+            } else {
+                assert!(matches!(
+                    qualified_placement(MAP, record),
+                    Err(WorldError::Arrival { map: MAP, record }) if record == at
+                ));
             }
         }
     }

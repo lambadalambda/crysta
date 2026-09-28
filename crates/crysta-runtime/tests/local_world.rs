@@ -828,7 +828,11 @@ fn interaction_builds_residents_from_the_actual_events() {
                 );
                 assert_eq!(world.events(), events);
                 assert_eq!(world.residents(), actual);
-                let (x, y) = record.destination_position();
+                let (x, y) = if source == 0xC && record.source_range().start == 0x18DCD {
+                    (120, 608)
+                } else {
+                    record.destination_position()
+                };
                 let expected = if candidate {
                     World::enter_candidate(image, destination, x, y, events.clone())
                 } else {
