@@ -1,8 +1,9 @@
 //! The slice on the European English ROM (ADR 0004).
 use assets::maps::exits::ExitList;
 use assets::maps::scripts::EventFlags;
-use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder};
+use crysta_runtime::art::{residents_art, Animation, ArkAtlas, Body, Placeholder, Raster};
 use crysta_runtime::audio::Cue;
+use crysta_runtime::residents::Resident;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, Step, World};
 use crysta_runtime::{BOX_MAPS, MAPS};
@@ -700,6 +701,107 @@ fn european_frozen_town_releases_ark_to_the_underworld() {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FrozenResidentVariant {
+    record: usize,
+    position: (u16, u16),
+    script: u32,
+    selector: u8,
+    hflip: bool,
+    descriptor: usize,
+}
+
+const fn frozen_variant(
+    record: usize,
+    position: (u16, u16),
+    script: u32,
+    selector: u8,
+    hflip: bool,
+    descriptor: usize,
+) -> FrozenResidentVariant {
+    FrozenResidentVariant {
+        record,
+        position,
+        script,
+        selector,
+        hflip,
+        descriptor,
+    }
+}
+
+fn frozen_variants(world: &World<'_>, records: &[usize]) -> Vec<FrozenResidentVariant> {
+    world
+        .residents()
+        .iter()
+        .filter(|resident| records.contains(&resident.record))
+        .map(|resident: &Resident| {
+            assert!(resident.body && !resident.hidden && !resident.walking);
+            assert_eq!(resident.initial, resident.selector);
+            FrozenResidentVariant {
+                record: resident.record,
+                position: resident.position,
+                script: resident.script.expect("frozen resident script"),
+                selector: resident.selector,
+                hflip: resident.hflip,
+                descriptor: resident.descriptor.expect("frozen resident descriptor"),
+            }
+        })
+        .collect()
+}
+
+fn selected_resident_raster(image: &[u8], world: &World<'_>, record: usize) -> Raster {
+    let index = world
+        .residents()
+        .iter()
+        .position(|resident| resident.record == record)
+        .expect("focused frozen resident");
+    let resident = &world.residents()[index];
+    let art = residents_art(
+        image,
+        world.map(),
+        world.residents(),
+        EventFlags::Bitmap(world.spawn_events()),
+        EventFlags::Bitmap(world.events()),
+    );
+    let body = art[index]
+        .as_ref()
+        .unwrap_or_else(|error| panic!("resident {record:#08x} has no art: {error:?}"));
+    let animation = body
+        .animation(resident.selector, resident.hflip)
+        .unwrap_or_else(|error| {
+            panic!(
+                "resident {record:#08x} selector {} flip {}: {error}",
+                resident.selector, resident.hflip
+            )
+        });
+    assert_eq!(
+        animation.frames.len(),
+        1,
+        "the frozen standing selector must present one stable frame"
+    );
+    animation.frames[0].clone()
+}
+
+fn raster_rgba_sha256(raster: &Raster) -> String {
+    use std::fmt::Write as _;
+
+    let rgba: Vec<u8> = raster
+        .pixels
+        .iter()
+        .flat_map(|&argb| {
+            let [alpha, red, green, blue] = argb.to_be_bytes();
+            [red, green, blue, alpha]
+        })
+        .collect();
+    rom::digests(&rgba)
+        .sha256
+        .iter()
+        .fold(String::new(), |mut output, byte| {
+            write!(output, "{byte:02x}").unwrap();
+            output
+        })
+}
+
 fn eu_flag(world: &World<'_>, id: usize) -> bool {
     world.events()[id / 8] & (1 << (id % 8)) != 0
 }
@@ -904,14 +1006,62 @@ fn eu_finish_scene(world: &mut World<'_>, limit: usize) -> bool {
     );
 }
 
-/// An alternative from the actual post-Box return, not a seeded map entry.
-/// It visits a frozen neighbor and the now-empty room Elder before the
-/// separate doorway Elder grants the mission. The native route has no such
-/// detour yet; this only qualifies portable on-foot behavior.
+/// An alternative from the actual post-Box return. It follows the retained
+/// source-bound native census route through 10, 11, B and D before the separate
+/// doorway Elder grants the mission.
 #[allow(clippy::too_many_lines)] // Keep the fork's map and flag checkpoints together.
-fn eu_check_post_box_detour(start: &World<'_>) {
+fn eu_check_post_box_detour(image: &[u8], start: &World<'_>) {
     let mut world = start.clone();
+    let c_variants = [
+        frozen_variant(0x03_8c12, (88, 416), 0x88_a9ab, 1, false, 0x03_ed02),
+        frozen_variant(0x03_8c1c, (56, 384), 0x88_abbe, 2, false, 0x03_ed02),
+        frozen_variant(0x03_8c26, (72, 368), 0x88_9f52, 0, false, 0x03_ed1c),
+        frozen_variant(0x03_8c30, (104, 368), 0x88_a7ed, 0, false, 0x03_eda0),
+    ];
+    let ten_variants = [
+        frozen_variant(0x03_8d84, (424, 416), 0x88_9d56, 2, false, 0x03_ed02),
+        frozen_variant(0x03_8d8e, (440, 416), 0x88_9e5f, 2, false, 0x03_ed1c),
+    ];
+    let eleven_variants = [frozen_variant(
+        0x03_8dea,
+        (440, 640),
+        0x88_b1b5,
+        4,
+        false,
+        0x03_ec56,
+    )];
+    let d_variants = [frozen_variant(
+        0x03_8cbc,
+        (72, 672),
+        0x88_afc3,
+        3,
+        false,
+        0x03_ed93,
+    )];
+    let doorway_elder = [frozen_variant(
+        0x03_8cc6,
+        (120, 720),
+        0x88_8d0b,
+        1,
+        false,
+        0x03_ed44,
+    )];
     assert_eq!((world.map(), world.position()), (0x0c, (184, 368)));
+    assert_eq!(
+        frozen_variants(&world, &[0x03_8c12, 0x03_8c1c, 0x03_8c26, 0x03_8c30]),
+        c_variants
+    );
+    let raster = selected_resident_raster(image, &world, 0x03_8c12);
+    assert_eq!(
+        (raster.offset, raster.width, raster.height),
+        ((-16, -32), 32, 32),
+        "native composition bounds"
+    );
+    assert_eq!(
+        raster_rgba_sha256(&raster),
+        "6650c29608ea5afe3e27a2210b06d86a8d9017eecc8e8903da1ef785c1899bc0",
+        "native composition 77c0c977… under frozen OBJ palette 5"
+    );
     assert!(eu_flag(&world, 0x23) && !eu_flag(&world, 0x21));
     for (frames, direction) in [
         (34, Some(Direction::Down)),
@@ -926,10 +1076,25 @@ fn eu_check_post_box_detour(start: &World<'_>) {
     assert_eq!(world.position(), (120, 432));
     eu_frames(&mut world, 160, Some(Direction::Right));
     assert_eq!((world.map(), world.position()), (0x10, (321, 432)));
-    assert!(world
-        .residents()
-        .iter()
-        .any(|r| r.record == 0x03_8d84 && !r.hidden));
+    assert_eq!(
+        frozen_variants(&world, &[0x03_8d84, 0x03_8d8e]),
+        ten_variants
+    );
+    eu_until(&mut world, 200, Direction::Right, |w| w.position().0 >= 360);
+    eu_frames(&mut world, 20, None);
+    eu_until(&mut world, 300, Direction::Down, |w| w.map() == 0x11);
+    eu_frames(&mut world, 130, None);
+    assert_eq!((world.map(), world.position()), (0x11, (360, 609)));
+    assert_eq!(frozen_variants(&world, &[0x03_8dea]), eleven_variants);
+    eu_until(&mut world, 300, Direction::Up, |w| w.map() == 0x10);
+    eu_frames(&mut world, 130, None);
+    assert_eq!((world.map(), world.position()), (0x10, (360, 463)));
+    assert_eq!(
+        frozen_variants(&world, &[0x03_8d84, 0x03_8d8e]),
+        ten_variants
+    );
+    eu_until(&mut world, 300, Direction::Up, |w| w.position().1 <= 432);
+    eu_frames(&mut world, 20, None);
     eu_until(&mut world, 200, Direction::Right, |w| w.position().0 >= 424);
     assert_eq!(world.position(), (424, 432));
     eu_frames(&mut world, 20, None);
@@ -981,11 +1146,11 @@ fn eu_check_post_box_detour(start: &World<'_>) {
     eu_until(&mut world, 320, Direction::Up, |w| w.map() == 0x0b);
     eu_frames(&mut world, 130, None);
     assert_eq!(world.position(), (120, 191));
-    assert!(eu_flag(&world, 0x27) && !eu_flag(&world, 0x21));
     assert!(
-        world.residents().iter().all(|r| r.record != 0x03_8b9e),
+        frozen_variants(&world, &[0x03_8b9e]).is_empty(),
         "room Elder is absent while $27 XOR $21"
     );
+    assert!(eu_flag(&world, 0x27) && !eu_flag(&world, 0x21));
     assert!(!eu_flag(&world, 0x296));
 
     eu_until(&mut world, 550, Direction::Down, |w| w.map() == 0x0c);
@@ -998,7 +1163,12 @@ fn eu_check_post_box_detour(start: &World<'_>) {
     eu_until(&mut world, 200, Direction::Down, |w| w.map() == 0x0d);
     eu_frames(&mut world, 130, None);
     assert_eq!(world.position(), (120, 625));
-    assert!(world.residents().iter().any(|r| r.record == 0x03_8cc6));
+    assert_eq!(frozen_variants(&world, &[0x03_8cbc]), d_variants);
+    assert_eq!(
+        frozen_variants(&world, &[0x03_8cc6]),
+        doorway_elder,
+        "the doorway Elder is separate from the nine source residents"
+    );
     eu_until(&mut world, 300, Direction::Down, |w| w.position().1 >= 704);
     assert_eq!(world.position(), (120, 704));
     assert!(!eu_flag(&world, 0x21) && !eu_flag(&world, 0x296));
@@ -1879,7 +2049,7 @@ fn european_single_world_replays_bedroom_to_underworld() {
         assert_eq!((world.map(), world.position()), (map, landing));
     }
 
-    eu_check_post_box_detour(&world);
+    eu_check_post_box_detour(rom.image(), &world);
 
     eu_frames(&mut world, 34, Some(Direction::Down));
     eu_frames(&mut world, 12, None);

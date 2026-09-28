@@ -120,6 +120,20 @@ fn flag(route: &Route, id: usize) -> bool {
     route.world().events()[id / 8] & (1 << (id % 8)) != 0
 }
 
+fn resident_variants(route: &Route, records: &[usize]) -> Vec<(usize, u8, bool)> {
+    route
+        .world()
+        .residents()
+        .iter()
+        .filter(|resident| records.contains(&resident.record))
+        .map(|resident| {
+            assert!(resident.body && !resident.hidden && !resident.walking);
+            assert_eq!(resident.initial, resident.selector);
+            (resident.record, resident.selector, resident.hflip)
+        })
+        .collect()
+}
+
 // Run the refusal/retry and separate-pot route once per fresh Game; hand back
 // the live host at $20 so later tests can continue without seeding state.
 #[allow(clippy::too_many_lines)] // One input-only journey, with checkpoints at each transition.
@@ -734,6 +748,11 @@ fn fresh_european_post_box_frozen_town_detour() {
         );
     }
     assert!(flag(&route, 0x23) && !flag(&route, 0x21));
+    assert_eq!(
+        resident_variants(&route, &[0x03_8c12, 0x03_8c1c, 0x03_8c26, 0x03_8c30]),
+        [(0x03_8c1c, 2, false)],
+        "the retry branch has its own frozen C roster"
+    );
 
     // Frozen neighbor has its own European page. The room Elder is absent
     // while $27 is set and $21 is not; the doorway Elder is a different actor.
@@ -749,11 +768,34 @@ fn fresh_european_post_box_frozen_town_detour() {
         (route.world().map(), route.world().position()),
         (0x10, (321, 432))
     );
-    assert!(route
-        .world()
-        .residents()
-        .iter()
-        .any(|r| r.record == 0x03_8d84 && !r.hidden));
+    assert_eq!(
+        resident_variants(&route, &[0x03_8d84, 0x03_8d8e]),
+        [(0x03_8d84, 2, false), (0x03_8d8e, 2, false)]
+    );
+    route.until(200, R, |r| r.world().position().0 >= 360);
+    route.frames(20, 0);
+    route.until(300, D, |r| r.world().map() == 0x11);
+    route.frames(130, 0);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x11, (360, 609))
+    );
+    assert_eq!(
+        resident_variants(&route, &[0x03_8dea]),
+        [(0x03_8dea, 4, false)]
+    );
+    route.until(300, U, |r| r.world().map() == 0x10);
+    route.frames(130, 0);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x10, (360, 463))
+    );
+    assert_eq!(
+        resident_variants(&route, &[0x03_8d84, 0x03_8d8e]),
+        [(0x03_8d84, 2, false), (0x03_8d8e, 2, false)]
+    );
+    route.until(300, U, |r| r.world().position().1 <= 432);
+    route.frames(20, 0);
     route.until(200, R, |r| r.world().position().0 >= 424);
     assert_eq!(route.world().position(), (424, 432));
     route.legs(&[(20, 0), (1, U)]);
@@ -793,11 +835,7 @@ fn fresh_european_post_box_frozen_town_detour() {
     assert_eq!(route.world().position(), (120, 191));
     assert!(flag(&route, 0x27) && !flag(&route, 0x21));
     assert!(
-        route
-            .world()
-            .residents()
-            .iter()
-            .all(|r| r.record != 0x03_8b9e),
+        resident_variants(&route, &[0x03_8b9e]).is_empty(),
         "room Elder is absent while $27 XOR $21"
     );
     assert!(!flag(&route, 0x296));
@@ -812,11 +850,15 @@ fn fresh_european_post_box_frozen_town_detour() {
     route.until(200, D, |r| r.world().map() == 0x0d);
     route.frames(130, 0);
     assert_eq!(route.world().position(), (120, 625));
-    assert!(route
-        .world()
-        .residents()
-        .iter()
-        .any(|r| r.record == 0x03_8cc6));
+    assert_eq!(
+        resident_variants(&route, &[0x03_8cbc]),
+        [(0x03_8cbc, 3, false)]
+    );
+    assert_eq!(
+        resident_variants(&route, &[0x03_8cc6]),
+        [(0x03_8cc6, 1, false)],
+        "doorway Elder is separate from the nine source residents"
+    );
     route.until(300, D, |r| r.world().position().1 >= 704);
     assert_eq!(route.world().position(), (120, 704));
     assert!(!flag(&route, 0x21) && !flag(&route, 0x296));
