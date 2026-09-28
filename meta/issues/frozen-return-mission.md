@@ -54,5 +54,22 @@ Ark returns to `$21`, Elle is frozen (`$FE`, `$23`), the village residents are f
   at the native `(120,608)` rather than the raw `(112,608)`. Every operand and
   the normalized source are pinned and mutations fail closed; explicit entry
   stays raw and the animated path still settles at `(120,625)`.
-- Open against the broader acceptance criteria: the complete frozen-resident
-  variants are not yet source-pinned and checked.
+- The nine frozen-return source residents are now pinned by a fresh empty-SRAM
+  European native census. It forks the retained direct-acceptance (`$2E`) route
+  at C, follows `C → 10 → 11 → 10 → C → B → C → D`, and stops at
+  `(120,625)` before talking to the Elder. Initialization is bound from the
+  advanced source cursor at `$80:F5D3` to its entity slot through completion at
+  `$80:F5E4`; linked membership follows `$0DFC → entity+$2C`, not stale slots.
+  The witness checks creation and settled state, composition SHA-256, selected
+  OBJ palette and all sixteen CGRAM words for C `$83:8C12/1C/26/30`, D
+  `$83:8CBC`, 10 `$83:8D84/8E`, and 11 `$83:8DEA`. B `$83:8B9E` is likewise
+  source-bound at creation and then correctly unlinked by `$27 XOR $21`.
+- D's doorway Elder `$83:8CC6` is checked separately from those nine. The
+  continuous portable direct route matches each visited resident's record,
+  position, script, selector, flip and descriptor, and joins C `$83:8C12`'s
+  live selector 1 to the qualified `32×32` RGBA raster (offset `(-16,-32)`).
+  The continuous browser retry route correctly has only `$83:8C1C` in C under
+  `$2F/$3F/$42`, while matching the visited 10/11/D variants and the separate
+  doorway Elder before completing `$21/$296/$3C` and reaching the world map.
+  The full native direct route, portable route, rebuilt Wasm browser replay,
+  focused witnesses and strict scoped gates all pass.

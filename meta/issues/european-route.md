@@ -72,7 +72,7 @@ and run the story tests against it.
   friends' retry (`$2F`, not `$2E`), opens the blue door with separate pot
   inputs, and detours through a frozen `$10` resident and the empty `$0B`
   Elder room before speaking to the `$0D` doorway Elder. The regenerated
-  28,121-frame input trace includes the corrected scripted release and manual
+  28,532-frame input trace includes the corrected scripted release and manual
   boundaries, and was replayed through a rebuilt headless browser's real
   handlers, PAL frame loop and European Wasm game without input-edge mismatch
   or game fault. This qualifies a current browser-host path, **not** native

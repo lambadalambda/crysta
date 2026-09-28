@@ -48,7 +48,7 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
 - A fresh European `Game::new` host replay now takes the alternate friend's
   refusal→retry route, opens the door, plays through the Box and frozen-town
   detour to the doorway Elder, and walks on world-map `$03`. Its regenerated
-  28,121-frame input trace includes the corrected `(136,464)` release plus
+  28,532-frame input trace includes the corrected `(136,464)` release plus
   manual Left/Up boundaries and reaches the same rendered endpoint on the
   rebuilt headless browser page with no mismatched action edges or game fault.
   This adds a current browser-host path, not native-frame text/sound parity or a
