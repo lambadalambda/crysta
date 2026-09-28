@@ -639,9 +639,9 @@ impl<'a> World<'a> {
     fn run_player_actor(&mut self) {
         let position = self.position();
         if let Some(script) = self.globals.player_script.take() {
+            let source = self.globals.player_script_source.take();
             let runtime = u32::try_from(script).ok().map(|script| 0x80_0000 | script);
-            let mut actor = Actor::new(position, runtime, 0, 1);
-            actor.set_map(self.map);
+            let actor = Actor::for_player(self.image, self.map, position, runtime, source);
             self.player_actor = Some(actor);
             if self.player_turn == PlayerTurn::Ran {
                 self.player_turn = PlayerTurn::Deferred;
@@ -650,8 +650,16 @@ impl<'a> World<'a> {
         if self.player_turn != PlayerTurn::Ready {
             return;
         }
-        if let Some(actor) = &mut self.player_actor {
-            self.player_turn = PlayerTurn::Ran;
+        let Some((actor_before, moving_before)) = self
+            .player_actor
+            .as_ref()
+            .map(|actor| (actor.position, actor.admitted_player_motion_active()))
+        else {
+            return;
+        };
+        self.player_turn = PlayerTurn::Ran;
+        {
+            let actor = self.player_actor.as_mut().expect("player actor");
             let mut around = surroundings(
                 self.image,
                 &mut self.globals,
@@ -664,9 +672,59 @@ impl<'a> World<'a> {
             if actor.blocked().is_some() {
                 self.scene = Some(Scene::Player);
             }
-            if actor.is_gone() {
-                self.player_actor = None;
+        }
+        self.project_player_actor_turn(position, actor_before, moving_before);
+    }
+
+    /// Projects one player-script turn into Ark's world position. Both ordinary
+    /// ticks and same-frame dialogue continuations use this path, so no first
+    /// movement sample can escape collision qualification.
+    fn project_player_actor_turn(
+        &mut self,
+        position: (u16, u16),
+        actor_before: (u16, u16),
+        moving_before: bool,
+    ) {
+        let Some((actor_after, mut moving_after)) = self
+            .player_actor
+            .as_ref()
+            .map(|actor| (actor.position, actor.admitted_player_motion_active()))
+        else {
+            return;
+        };
+        if moving_before || moving_after {
+            let resolved =
+                scripted_displacement(actor_before, actor_after).and_then(|displacement| {
+                    match displacement {
+                        None => Ok(position),
+                        Some((direction, pixels)) => self
+                            .room
+                            .room
+                            .resolve_scripted_cardinal(position.0, position.1, direction, pixels)
+                            .map(|movement| (movement.x, movement.y))
+                            .map_err(|_| ()),
+                    }
+                });
+            if let Ok(position) = resolved {
+                self.player_actor.as_mut().expect("player actor").position = position;
+                self.walking = WalkingState::new(position.0, position.1);
+            } else {
+                self.player_actor
+                    .as_mut()
+                    .expect("player actor")
+                    .refuse_player_motion(position);
+                moving_after = false;
             }
+        }
+        if moving_before && !moving_after {
+            let position = self.position();
+            self.walking = WalkingState::new(position.0, position.1);
+            self.run = None;
+            self.run_age = 0;
+            self.animation = AnimationState::standing(self.facing);
+        }
+        if self.player_actor.as_ref().is_some_and(Actor::is_gone) {
+            self.player_actor = None;
         }
     }
 
@@ -901,6 +959,21 @@ impl<'a> World<'a> {
         }
         let busy = self.globals.dialogue.busy();
         self.globals.dialogue.press(presses);
+        if self
+            .player_actor
+            .as_ref()
+            .is_some_and(Actor::admitted_player_motion_active)
+        {
+            let before = self.position();
+            self.run_actors()?;
+            self.apply_patches()?;
+            let movement = if self.position() == before {
+                Step::Stayed
+            } else {
+                Step::Walked
+            };
+            return Ok((movement, None));
+        }
         let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
         let direction = direction.filter(|_| !locked);
         let lift = presses.confirm && !locked && !busy && !self.globals.dialogue.busy();
@@ -1234,6 +1307,10 @@ impl<'a> World<'a> {
             }
             Scene::Player => {
                 let player = self.position();
+                let before = self
+                    .player_actor
+                    .as_ref()
+                    .map(|actor| (actor.position, actor.admitted_player_motion_active()));
                 let mut around = surroundings(
                     self.image,
                     &mut self.globals,
@@ -1247,6 +1324,9 @@ impl<'a> World<'a> {
                     if actor.blocked().is_some() {
                         self.scene = Some(Scene::Player);
                     }
+                }
+                if let Some((actor_before, moving_before)) = before {
+                    self.project_player_actor_turn(player, actor_before, moving_before);
                 }
             }
             Scene::Callback { actor, pc, wait } => {
@@ -1555,6 +1635,30 @@ const fn facing_delta(facing: Direction) -> (i16, i16) {
         Direction::Left => (-1, 0),
         Direction::Right => (1, 0),
     }
+}
+
+/// A cardinal delta between two positions, with stillness represented by
+/// `None`; diagonal or unrepresentable displacement is outside the bounded
+/// player-script profile.
+fn scripted_displacement(
+    before: (u16, u16),
+    after: (u16, u16),
+) -> Result<Option<(Direction, u16)>, ()> {
+    let (dx, dy) = (
+        i32::from(after.0) - i32::from(before.0),
+        i32::from(after.1) - i32::from(before.1),
+    );
+    let (direction, pixels) = match (dx, dy) {
+        (0, 0) => return Ok(None),
+        (0, dy) if dy > 0 => (Direction::Down, dy),
+        (0, dy) => (Direction::Up, -dy),
+        (dx, 0) if dx > 0 => (Direction::Right, dx),
+        (dx, 0) => (Direction::Left, -dx),
+        _ => return Err(()),
+    };
+    u16::try_from(pixels)
+        .map(|pixels| Some((direction, pixels)))
+        .map_err(|_| ())
 }
 
 /// Ark's one script turn in a world frame.

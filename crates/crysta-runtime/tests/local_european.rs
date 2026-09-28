@@ -726,21 +726,29 @@ fn european_frozen_return_descends_before_releasing_ark() {
         events[id / 8] |= 1 << (id % 8);
     }
     let mut world = World::enter_with_events(rom.image(), 0x21, 136, 368, events).unwrap();
+    let mut saw_first_leg = false;
     for frame in 0..12000 {
         let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
         world
             .update(
-                None,
+                Some(Direction::Left),
                 Presses {
                     confirm,
                     ..Presses::NONE
                 },
             )
             .unwrap();
+        saw_first_leg |= world.position() == (136, 452);
+        assert_eq!(
+            world.position().0,
+            136,
+            "manual Left stays suppressed through every script-owned frame"
+        );
         if eu_flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
             break;
         }
     }
+    assert!(saw_first_leg, "the 84-pixel first leg ends at Y=452");
     assert!(eu_flag(&world, 0xfe) && eu_flag(&world, 0x23));
     assert!(!world.pad_locked());
     assert_eq!(world.position(), (136, 464), "scripted release position");
@@ -1799,8 +1807,8 @@ fn european_single_world_replays_bedroom_to_underworld() {
         "actual Crystal Spear inventory"
     );
 
-    // The frozen return has its own English pages. It releases control with
-    // $FE/$23; unlike native, the portable script has no forced player walk.
+    // The frozen return has its own English pages. Its source-pinned player
+    // stream descends through collision before $FE/$23 release control.
     for frame in 0..12000 {
         let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
         world
@@ -1826,16 +1834,26 @@ fn european_single_world_replays_bedroom_to_underworld() {
     );
     assert_eq!(
         (world.map(), world.position()),
-        (0x21, (136, 368)),
-        "portable control releases 96px above the native scripted landing (136,464)"
+        (0x21, (136, 464)),
+        "portable control releases at the native scripted landing"
     );
     eu_frames(&mut world, 12, Some(Direction::Left));
     eu_frames(&mut world, 12, None);
     assert_eq!(
         (world.map(), world.position()),
-        (0x21, (136, 368)),
-        "manual Left cannot traverse this lane from the portable release position"
+        (0x21, (120, 464)),
+        "manual Left resumes from the scripted release position"
     );
+    eu_frames(&mut world, 12, Some(Direction::Up));
+    eu_frames(&mut world, 12, None);
+    assert_eq!(
+        (world.map(), world.position()),
+        (0x21, (120, 448)),
+        "retained manual Up follows the native boundary"
+    );
+    eu_frames(&mut world, 12, Some(Direction::Right));
+    eu_frames(&mut world, 12, None);
+    assert_eq!(world.position(), (136, 448), "return to the stair lane");
     for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
         if map != 0x20 {
             for _ in 0..200 {

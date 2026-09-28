@@ -1,4 +1,4 @@
-use crate::{Direction, Unqualified};
+use crate::{Direction, MovementOutput, Unqualified};
 use alloc::vec::Vec;
 
 mod directional;
@@ -418,6 +418,49 @@ impl Room {
         Ok((first, second))
     }
 
+    /// Resolves one caller-admitted cardinal scripted displacement through the
+    /// same source-qualified special-player collision path as ordinary movement.
+    ///
+    /// This does not advance input history, animation, exits or scripts. The
+    /// caller owns mode and stream admission; `pixels` is a nonnegative amount
+    /// along `direction`, not a destination or coordinate snap.
+    ///
+    /// # Errors
+    /// Returns [`Unqualified`] for an unrepresentable distance or any collision
+    /// sample outside this room's admitted profile.
+    pub fn resolve_scripted_cardinal(
+        &self,
+        x: u16,
+        y: u16,
+        direction: Direction,
+        pixels: u16,
+    ) -> Result<MovementOutput, Unqualified> {
+        let magnitude = i16::try_from(pixels).map_err(|_| Unqualified::ArithmeticOverflow)?;
+        let delta = if direction.negative() {
+            -magnitude
+        } else {
+            magnitude
+        };
+        let attempted = if direction.horizontal() {
+            (delta, 0)
+        } else {
+            (0, delta)
+        };
+        let (resolved_x, resolved_y, blocked) =
+            self.resolve(x, y, Some(direction), attempted.0, attempted.1)?;
+        Ok(MovementOutput {
+            x: resolved_x,
+            y: resolved_y,
+            dx: i16::try_from(i32::from(resolved_x) - i32::from(x))
+                .map_err(|_| Unqualified::ArithmeticOverflow)?,
+            dy: i16::try_from(i32::from(resolved_y) - i32::from(y))
+                .map_err(|_| Unqualified::ArithmeticOverflow)?,
+            attempted_dx: attempted.0,
+            attempted_dy: attempted.1,
+            blocked,
+        })
+    }
+
     pub(crate) fn resolve(
         &self,
         x: u16,
@@ -504,6 +547,27 @@ mod tests {
     use super::{MaterialAlias, MaterialRule, Room};
     use crate::{pots, Direction, WalkingState};
     use alloc::vec;
+
+    #[test]
+    fn scripted_cardinal_displacement_uses_collision_correction_not_a_destination() {
+        let mut cells = vec![0; 4 * 4];
+        cells[2 * 4 + 1] = 12 << 9;
+        cells[2 * 4 + 2] = 12 << 9;
+        let room = Room::new(4, 4, cells).unwrap();
+        let clipped = room
+            .resolve_scripted_cardinal(24, 31, Direction::Down, 2)
+            .unwrap();
+        assert_eq!((clipped.x, clipped.y), (24, 32));
+        assert_eq!((clipped.dx, clipped.dy), (0, 1));
+        assert_eq!((clipped.attempted_dx, clipped.attempted_dy), (0, 2));
+        assert!(clipped.blocked);
+        let held = room
+            .resolve_scripted_cardinal(clipped.x, clipped.y, Direction::Down, 3)
+            .unwrap();
+        assert_eq!((held.x, held.y, held.dy), (24, 32, 0));
+        assert_eq!(held.attempted_dy, 3);
+        assert!(held.blocked);
+    }
 
     #[test]
     fn raw_door_patch_retains_both_classifications_without_touching_source() {

@@ -59,6 +59,8 @@ pub struct Globals {
     pub player_action: bool,
     /// Player script pointer queued by `COP DF`, normalized to a ROM offset.
     pub player_script: Option<usize>,
+    /// Normalized source offset of the `COP DF` that queued [`Self::player_script`].
+    pub player_script_source: Option<usize>,
     /// A map transfer `COP 14` queued.
     pub transfer: Option<Transfer>,
     /// WRAM words scripts keep as their own variables (see
@@ -96,6 +98,7 @@ impl Globals {
             pad: 0,
             player_action: false,
             player_script: None,
+            player_script_source: None,
             transfer: None,
             scratch: crate::actors::Scratch::new(),
             inventory: crate::inventory::Inventory::default(),

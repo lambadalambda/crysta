@@ -169,6 +169,10 @@ const SWITCH: u8 = 0x22;
 /// Picks the movement resource base (`$7F:0022`, `$80:A975`): `$4000 +
 /// n << 12`, or with `FF` a word and a bank, which is not modelled.
 const SPEED: u8 = 0xB0;
+/// Selects one of Ark's direct animation resources and starts a movement
+/// selector through the following pose wait (`$80:A200..A2D8`). Operands:
+/// pose, movement selector and resource-table index.
+const PLAYER_POSE_MOVING: u8 = 0x84;
 /// Selects a pose and starts the movement streams of the same selector
 /// (`$80:A1B9`).
 const POSE_MOVING: u8 = 0x81;
@@ -477,6 +481,9 @@ pub struct Actor {
     /// Entity `+$26`: the spawn record's fourth byte (`$80:F541`), which
     /// `COP 22` switches on.
     parameter: u8,
+    /// Entry of the one fully authenticated map `$21` frozen-return stream.
+    /// Other player scripts keep the prior generic skipped-service behavior.
+    frozen_return: Option<usize>,
     /// The movement resource the streams read: the descriptor's
     /// (`$80:FAAF`) until `COP B0` picks another.
     base: Base,
@@ -526,6 +533,7 @@ impl Actor {
             call: None,
             touchable: true,
             parameter: 0,
+            frozen_return: None,
             base: Base::Common,
             descriptor: None,
             motion: None,
@@ -552,6 +560,33 @@ impl Actor {
             cooldown: 0,
             lengths: vec![None; 256],
         }
+    }
+
+    /// Builds the temporary actor installed by `COP DF`. Only the exact map
+    /// `$21` guide invocation and frozen-return entry receive Ark's direct
+    /// animation-resource profile; a changed target or profile freezes at the
+    /// target entry instead of falling through generic service skipping.
+    pub(crate) fn for_player(
+        image: &[u8],
+        map: u16,
+        position: (u16, u16),
+        script: Option<u32>,
+        source: Option<usize>,
+    ) -> Self {
+        let mut actor = Self::new(position, script, 0, 1);
+        actor.map = map;
+        let candidate = map == 0x21 && source == cadence::frozen_return_guide(image);
+        if candidate {
+            let entry = cadence::frozen_return_start(image);
+            if entry == Some(actor.pc) && cadence::frozen_return_profile(image) == entry {
+                actor.frozen_return = entry;
+                actor.legs = true;
+            } else {
+                actor.state = State::Frozen;
+                actor.frozen_at = Some(actor.pc);
+            }
+        }
+        actor
     }
 
     /// Builds a resident with source-bound timing admission, not a global
@@ -733,6 +768,26 @@ impl Actor {
     #[must_use]
     pub const fn frozen_at(&self) -> Option<usize> {
         self.frozen_at
+    }
+
+    /// Whether an admitted player-only pose movement currently owns Ark's
+    /// displacement. The player actor may outlive this state at `COP BC`/`RTL`.
+    #[must_use]
+    pub(crate) fn admitted_player_motion_active(&self) -> bool {
+        self.frozen_return.is_some() && self.motion.is_some()
+    }
+
+    /// Refuses a player displacement the world cannot qualify, retaining the
+    /// script offset through the existing player diagnostic.
+    pub(crate) fn refuse_player_motion(&mut self, position: (u16, u16)) {
+        self.position = position;
+        self.motion = None;
+        self.stream = None;
+        self.walking = false;
+        self.state = State::Frozen;
+        if self.frozen_at.is_none() {
+            self.frozen_at = Some(self.pc);
+        }
     }
 
     /// Sets the map `COP 0A`/`49` compare with.
@@ -1042,6 +1097,9 @@ impl Actor {
             | WAIT_FOR_FLAG | OCCUPY => return self.script_service(service, operands, around),
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
             SWITCH | SPEED => return self.parameter_service(service, operands, bank, image),
+            PLAYER_POSE_MOVING if self.frozen_return.is_some() => {
+                return self.frozen_return_pose(operands, image)
+            }
             POSE_MOVING | REPEAT_MOVING => return self.moving_pose(service, operands, image),
             PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
             | SOUND_WORD => return self.audio_service(service, operands, around),
@@ -1175,6 +1233,74 @@ impl Actor {
                 false
             }
         }
+    }
+
+    /// Admits only one of the five source-pinned `COP 84` instructions in the
+    /// authenticated frozen-return stream.
+    fn frozen_return_pose(&mut self, operands: usize, image: &[u8]) -> bool {
+        let instruction = operands.saturating_sub(2);
+        if cadence::frozen_return_selection(
+            image,
+            self.frozen_return.expect("checked frozen-return profile"),
+            instruction,
+        ) {
+            return self.player_moving_pose(operands, image);
+        }
+        self.state = State::Frozen;
+        if self.frozen_at.is_none() {
+            self.frozen_at = Some(self.pc);
+        }
+        false
+    }
+
+    /// Player-only `COP 84 pose movement resource`: select one of Ark's
+    /// direct pose tables and run a common movement selector through `COP 8E`.
+    /// A resident reaching the same service remains on the generic skipped-
+    /// service path; changed player resources freeze at their source offset.
+    fn player_moving_pose(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(&[pose, selector, resource]) = image.get(operands..operands + 3) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let Some(ticks) = cadence::player_pose_ticks(image, resource) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.pose_ticks = Some(ticks);
+        let Some(list) = self.pose_list(pose) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let expected = match (pose, selector, resource) {
+            (0x17, 0x0F, 1) => Some(36),
+            (0x09, 0x1B, 0) => Some(16),
+            (0 | 1, 0, 0) => Some(1),
+            _ => None,
+        };
+        if expected.is_some_and(|expected| list != expected) {
+            self.state = State::Frozen;
+            return false;
+        }
+        self.base = Base::Common;
+        let hflip = self.hflip;
+        let Some(motion) = self
+            .legs
+            .then(|| self.movement(image))
+            .flatten()
+            .and_then(|movement| {
+                motion::Motion::start(movement, selector, hflip, false, Some(list))
+            })
+        else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.set_pose(pose, hflip);
+        self.pose_age = 0;
+        self.stream = None;
+        self.motion = Some(motion);
+        self.continuation = Some(operands + 3);
+        self.pc = operands + 3;
+        true
     }
 
     /// `COP 81 pose` and `COP 87 count pose selector`: a pose that moves
@@ -2110,6 +2236,7 @@ impl Actor {
                     return false;
                 };
                 around.globals.player_script = Some(script);
+                around.globals.player_script_source = Some(self.pc);
                 self.pc = operands + 3;
             }
             TRANSFER => {
@@ -2994,6 +3121,69 @@ mod cadence_tests {
     }
 
     #[test]
+    fn changed_frozen_return_guide_target_freezes_the_player_actor() {
+        let mut image = vec![0; 0x09_0000];
+        let guide = cadence::frozen_return_guide(&image).unwrap();
+        let changed_target = cadence::frozen_return_start(&image).unwrap() + 1;
+        let runtime = 0x80_0000 | u32::try_from(changed_target).unwrap();
+        let pointer = runtime.to_le_bytes();
+        image[guide..guide + 5].copy_from_slice(&[
+            2,
+            TAKE_PLAYER,
+            pointer[0],
+            pointer[1],
+            pointer[2],
+        ]);
+        let guide_runtime = 0x80_0000 | u32::try_from(guide).unwrap();
+        let mut guide_actor = Actor::new((136, 368), Some(guide_runtime), 0, 1);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        guide_actor.tick(&mut surroundings(&image, &[], &mut globals));
+        assert_eq!(globals.player_script, Some(changed_target));
+        assert_eq!(globals.player_script_source, Some(guide));
+
+        let actor = Actor::for_player(
+            &image,
+            0x21,
+            (136, 368),
+            Some(runtime),
+            globals.player_script_source,
+        );
+
+        assert!(matches!(actor.state, State::Frozen));
+        assert_eq!(actor.frozen_at(), Some(changed_target));
+        assert!(!actor.admitted_player_motion_active());
+    }
+
+    #[test]
+    fn generic_player_pose_motion_never_owns_ark() {
+        let image = [0];
+        let mut actor = Actor::for_player(&image, 0, (40, 48), Some(0x80_8000), None);
+        actor.pose_ticks = Some(vec![Some(2)]);
+        let words: [u16; 7] = [0, 0x6004, 0, 0, 1, 0xFFFF, 0x6004];
+        actor.resources[0] = Some(motion::Resource {
+            base: 0x6000,
+            bytes: words.iter().flat_map(|word| word.to_le_bytes()).collect(),
+        });
+
+        assert!(actor.moving_pose(POSE_MOVING, 0, &image));
+        assert!(
+            actor.motion.is_some(),
+            "generic COP 81 may retain actor motion"
+        );
+        assert!(
+            !actor.admitted_player_motion_active(),
+            "an unauthenticated player script cannot acquire Ark ownership"
+        );
+        actor.apply_stream();
+        assert_eq!(
+            actor.position,
+            (40, 49),
+            "the temporary actor may still move"
+        );
+        assert!(!actor.admitted_player_motion_active());
+    }
+
+    #[test]
     fn a_skipped_service_that_could_change_movement_revokes_admission() {
         for (bytes, kept) in [
             ([2, 0xBB, 0x0C], true),
@@ -3201,10 +3391,12 @@ mod script_service_tests {
             globals.player_script, None,
             "a forced action defers the handoff"
         );
+        assert_eq!(globals.player_script_source, None);
         globals.player_action = false;
         tick_at(&mut actor, &image, &mut globals, (0, 0));
         assert_eq!(actor.selector, 7);
         assert_eq!(globals.player_script, Some(0x08_8ea6));
+        assert_eq!(globals.player_script_source, Some(AT));
     }
 
     #[test]

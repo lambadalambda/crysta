@@ -5,7 +5,7 @@
 //! times by `class & 3`. Only the class-0 movement row on the common `$6000`
 //! base is admitted, which moves 0.5 px per tick. Anything else keeps the
 //! actor's approximate projection.
-use super::{COMMON_SIZE, COMMON_SOURCE};
+use super::{motion, COMMON_SIZE, COMMON_SOURCE};
 use assets::compression::decode;
 use assets::layout;
 use assets::maps::actors::rom_offset as offset;
@@ -115,6 +115,130 @@ pub(super) fn derive(image: &[u8], descriptor: usize) -> Result<Cadence, Refusal
 /// `COP 8E` pose wait holds for.
 pub(super) fn pose_ticks(image: &[u8], descriptor: usize) -> Option<Vec<Option<u16>>> {
     display_lists(image, offset(image.get(descriptor..descriptor + 3)?)?)
+}
+
+/// Ticks of every direct Ark display list in one `$80:A24F` resource entry.
+///
+/// Unlike resident packets these lists are uncompressed in the bank named by
+/// the resource table. The table itself is revision-aware; its pointers are
+/// already for that revision.
+pub(super) fn player_pose_ticks(image: &[u8], resource: u8) -> Option<Vec<Option<u16>>> {
+    let table = layout::offset(image, 0xA24F)?;
+    let entry = table.checked_add(usize::from(resource) * 6)?;
+    let packet = offset(image.get(entry..entry + 3)?)?;
+    let end = ((packet >> 16) + 1).checked_mul(0x1_0000)?.min(image.len());
+    list_ticks(image.get(packet..end)?)
+}
+
+/// The complete frozen-return player stream relative to the map `$21` guide
+/// header (`$88:AEB8`, European `$88:B73C`). The same relative offsets are
+/// retained by both supported revisions.
+const FROZEN_RETURN_HEADER: usize = 0x08_AEB8;
+const FROZEN_RETURN_GUIDE: usize = 0x78;
+const FROZEN_RETURN_PLAYER: usize = 0xBA;
+const FROZEN_RETURN_SOURCE: &[u8] = &[
+    0x02, 0x84, 0x17, 0x0F, 0x01, 0x02, 0x8E, 0x02, 0x84, 0x09, 0x1B, 0x00, 0x02, 0x8E, 0x02, 0x84,
+    0x00, 0x00, 0x00, 0x02, 0x8E, 0x02, 0xC1, 0x3C, 0x00, 0x02, 0x84, 0x01, 0x00, 0x00, 0x02, 0x8E,
+    0x02, 0xC1, 0x3C, 0x00, 0x02, 0x84, 0x00, 0x00, 0x00, 0x02, 0x8E, 0x02, 0xCB, 0x01, 0xC1, 0x87,
+    0x84, 0x02, 0xBC, 0x6B,
+];
+const FROZEN_RETURN_SELECTIONS: &[(usize, [u8; 3])] = &[
+    (0, [0x17, 0x0F, 1]),
+    (7, [0x09, 0x1B, 0]),
+    (14, [0, 0, 0]),
+    (25, [1, 0, 0]),
+    (36, [0, 0, 0]),
+];
+
+/// The normalized `COP DF` site in this revision's map `$21` guide.
+pub(super) fn frozen_return_guide(image: &[u8]) -> Option<usize> {
+    layout::offset(image, FROZEN_RETURN_HEADER)?.checked_add(FROZEN_RETURN_GUIDE)
+}
+
+/// The normalized entry of the frozen-return player script in this revision.
+pub(super) fn frozen_return_start(image: &[u8]) -> Option<usize> {
+    layout::offset(image, FROZEN_RETURN_HEADER)?.checked_add(FROZEN_RETURN_PLAYER)
+}
+
+/// Authenticates the exact map `$21` `COP DF` source, complete player stream,
+/// direct Ark pose resources and every movement sample the stream consumes.
+/// Returns the normalized player entry only when the whole bounded profile is
+/// retained.
+pub(super) fn frozen_return_profile(image: &[u8]) -> Option<usize> {
+    let header = layout::offset(image, FROZEN_RETURN_HEADER)?;
+    let guide = header.checked_add(FROZEN_RETURN_GUIDE)?;
+    let player = header.checked_add(FROZEN_RETURN_PLAYER)?;
+    let pointer = [
+        u8::try_from(player & 0xFF).ok()?,
+        u8::try_from(player >> 8 & 0xFF).ok()?,
+        0x80 | u8::try_from(player >> 16).ok()?,
+    ];
+    let expected_guide = [0x02, 0xDF, pointer[0], pointer[1], pointer[2]];
+    if image.get(guide..guide + expected_guide.len())? != expected_guide
+        || image.get(player..player + FROZEN_RETURN_SOURCE.len())? != FROZEN_RETURN_SOURCE
+        || !frozen_return_streams(image)
+    {
+        return None;
+    }
+
+    let table = layout::offset(image, 0xA24F)?;
+    let resource_zero = [0xE4, 0xA1, layout::per_revision(image, 0xA4, 0xA6)];
+    let resource_one = [0x64, 0xD0, layout::per_revision(image, 0x9A, 0x9C)];
+    if image.get(table..table + 3)? != resource_zero
+        || image.get(table + 6..table + 9)? != resource_one
+    {
+        return None;
+    }
+    let zero = player_pose_ticks(image, 0)?;
+    let one = player_pose_ticks(image, 1)?;
+    (zero.first() == Some(&Some(1))
+        && zero.get(1) == Some(&Some(1))
+        && zero.get(9) == Some(&Some(16))
+        && one.get(0x17) == Some(&Some(36)))
+    .then_some(player)
+}
+
+/// Whether one `COP 84` is at one of the five exact instruction sites in the
+/// authenticated stream (four distinct selections; stationary zero repeats).
+pub(super) fn frozen_return_selection(image: &[u8], player: usize, instruction: usize) -> bool {
+    FROZEN_RETURN_SELECTIONS.iter().any(|&(offset, operands)| {
+        player.checked_add(offset) == Some(instruction)
+            && image.get(instruction..instruction + 5)
+                == Some(&[0x02, 0x84, operands[0], operands[1], operands[2]])
+    })
+}
+
+/// Whether the common resource retains the two source-pinned frozen-return
+/// streams. The first emits 3,2,2 twelve times; the second emits the recorded
+/// sixteen-tick braking tail. Selector zero must remain stationary.
+pub(super) fn frozen_return_streams(image: &[u8]) -> bool {
+    if !common_streams(image) {
+        return false;
+    }
+    let Some(source) = layout::offset(image, COMMON_SOURCE) else {
+        return false;
+    };
+    let Some(packet) = decode(image.get(source..).unwrap_or(&[]), COMMON_SIZE)
+        .ok()
+        .filter(|packet| packet.data.len() == COMMON_SIZE)
+    else {
+        return false;
+    };
+    let resource = motion::Resource {
+        base: 0x6000,
+        bytes: packet.data.into(),
+    };
+    let leg = |selector, expected: &[i16]| {
+        let Some(mut motion) =
+            motion::Motion::start(resource.clone(), selector, false, false, None)
+        else {
+            return false;
+        };
+        expected.iter().all(|&dy| motion.step() == Some((0, dy)))
+    };
+    leg(0, &[0])
+        && leg(0x0F, &[3, 2, 2].repeat(12))
+        && leg(0x1B, &[2, 2, 1, 2, 1, 2, 1, 2, 1, 0, 0, 1, 0, 0, 0, 0])
 }
 
 fn display_lists(image: &[u8], packet: usize) -> Option<Vec<Option<u16>>> {
@@ -315,11 +439,70 @@ mod tests {
         assert!(!benign_skipped_service(&[2, 0x3B], 0));
     }
 
+    #[test]
+    fn direct_player_resource_ticks_follow_the_resource_table() {
+        let mut image = vec![0; 0x1_0000];
+        image[0xA24F..0xA252].copy_from_slice(&[0x00, 0xC0, 0xC0]);
+        image[0xC000..0xC004].copy_from_slice(&[4, 0, 10, 0]);
+        image[0xC004..0xC00A].copy_from_slice(&[2, 0, 0, 0, 0xFF, 0xFF]);
+        image[0xC00A..0xC010].copy_from_slice(&[4, 0, 0, 0, 0xFF, 0xFF]);
+        assert_eq!(player_pose_ticks(&image, 0), Some(vec![Some(3), Some(5)]));
+        assert_eq!(player_pose_ticks(&image, 1), None);
+    }
+
     fn owned_rom() -> Option<Vec<u8>> {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../local/Tenchi Souzou (Japan).sfc");
         let bytes = std::fs::read(path).ok()?;
         Some(rom::Rom::load(&bytes).unwrap().image().to_vec())
+    }
+
+    #[test]
+    fn frozen_return_selections_are_bound_to_their_exact_instruction_sites() {
+        let player = 4;
+        let mut image = vec![0xFF; player + FROZEN_RETURN_SOURCE.len() * 2 + 8];
+        image[player..player + FROZEN_RETURN_SOURCE.len()].copy_from_slice(FROZEN_RETURN_SOURCE);
+        for &(offset, _) in FROZEN_RETURN_SELECTIONS {
+            assert!(frozen_return_selection(&image, player, player + offset));
+        }
+        let elsewhere = player + FROZEN_RETURN_SOURCE.len();
+        image[elsewhere..elsewhere + 5].copy_from_slice(&FROZEN_RETURN_SOURCE[..5]);
+        assert!(!frozen_return_selection(&image, player, elsewhere));
+        image[player + 2] ^= 1;
+        assert!(!frozen_return_selection(&image, player, player));
+    }
+
+    #[test]
+    fn frozen_return_player_resources_have_the_source_pinned_lengths_and_streams() {
+        let Some(image) = owned_rom() else {
+            return;
+        };
+        let player = frozen_return_profile(&image).expect("frozen-return profile");
+        assert_eq!(player, 0x08_AF72);
+        assert!(frozen_return_streams(&image));
+        assert_eq!(player_pose_ticks(&image, 1).unwrap()[0x17], Some(36));
+        assert_eq!(player_pose_ticks(&image, 0).unwrap()[0x09], Some(16));
+        assert_eq!(
+            player_pose_ticks(&image, 0).unwrap()[..2],
+            [Some(1), Some(1)]
+        );
+        for &(offset, _) in FROZEN_RETURN_SELECTIONS {
+            assert!(frozen_return_selection(&image, player, player + offset));
+        }
+
+        let mut changed_stream = image.clone();
+        changed_stream[player + 2] ^= 1;
+        assert_eq!(frozen_return_profile(&changed_stream), None);
+
+        let mut changed_guide = image.clone();
+        let guide = layout::offset(&image, FROZEN_RETURN_HEADER).unwrap() + FROZEN_RETURN_GUIDE;
+        changed_guide[guide + 2] ^= 1;
+        assert_eq!(frozen_return_profile(&changed_guide), None);
+
+        let mut changed_resource = image.clone();
+        let table = layout::offset(&image, 0xA24F).unwrap();
+        changed_resource[table] ^= 1;
+        assert_eq!(frozen_return_profile(&changed_resource), None);
     }
 
     #[test]

@@ -679,7 +679,8 @@ fn fresh_european_post_box_frozen_town_detour() {
         "actual Crystal Spear inventory"
     );
 
-    // Frozen return: portable Ark has no forced walk; release precedes manual Left.
+    // Frozen return: its authenticated player stream descends through collision;
+    // release precedes the retained manual Left and Up boundaries.
     for frame in 0..12000 {
         let confirm =
             route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
@@ -698,14 +699,26 @@ fn fresh_european_post_box_frozen_town_detour() {
     );
     assert_eq!(
         (route.world().map(), route.world().position()),
-        (0x21, (136, 368)),
-        "portable control releases 96px above the native scripted landing (136,464)"
+        (0x21, (136, 464)),
+        "portable control releases at the native scripted landing"
     );
     route.legs(&[(12, L), (12, 0)]);
     assert_eq!(
         (route.world().map(), route.world().position()),
-        (0x21, (136, 368)),
-        "manual Left cannot traverse this lane from the portable release position"
+        (0x21, (120, 464)),
+        "manual Left resumes from the scripted release position"
+    );
+    route.legs(&[(12, U), (12, 0)]);
+    assert_eq!(
+        (route.world().map(), route.world().position()),
+        (0x21, (120, 448)),
+        "retained manual Up follows the native boundary"
+    );
+    route.legs(&[(12, R), (12, 0)]);
+    assert_eq!(
+        route.world().position(),
+        (136, 448),
+        "return to the stair lane"
     );
     for (map, landing) in [(0x20, (360, 880)), (0x0e, (104, 880)), (0x0c, (184, 368))] {
         if map != 0x20 {
