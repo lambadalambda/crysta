@@ -59,3 +59,9 @@ timing may differ from the Japanese measurements.
   contact is four frames early and orders `$001A` before `$1200`, whereas native
   orders `$1200 → $001A → $1300`; the spear return remains 420 portable frames
   versus 405 native.
+- A fresh European native witness source-pins the map-`$21` frozen-return
+  player stream and every movement tick. Its 36-tick first leg applies +84 Y;
+  its 16-tick second leg requests +15 but collision resolves +12 to Y=464.
+  Portable now runs that same exact admitted profile through collision and
+  releases at `(136,464)`, before separate manual Left/Up movement. This does
+  not qualify other scripted-player movement or the route's remaining timing.

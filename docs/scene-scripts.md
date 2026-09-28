@@ -45,7 +45,7 @@ callback on a confirm press when nothing else owns the window.
 | `29` / `2A` | `$80:8FE6` / `8FF5` | mask | unlocks / locks pad buttons |
 | `2F` | `$80:90C0` | mask, target | goes on while a mask button is held (`$0454`), else jumps |
 | `0D` | `$80:87C2` | facing, 4 cell offsets, target | as `0F`, on the player inside a rectangle of cells around the actor (raw X, raw Y-8, inclusive) |
-| `DF` | `$80:B827` | long script | retries while the player is in a forced action (`$097C & $0810`, the recoil), then takes the player's script; the host player stands |
+| `DF` | `$80:B827` | long script | retries while the player is in a forced action (`$097C & $0810`, the recoil), then queues the target and originating `COP DF`; the world installs its temporary player actor. Only the exact map-`$21` frozen-return source/profile receives the bounded `COP 84` behavior below |
 | `14` | `$80:8A23` | map, mode, selector, x, y | queues a transfer; the world loads it at the frame's end at (x+8, y+16), keeping the pad mask |
 | `00` / `01` | `$80:8592` / `85B8` | long target / — | calls a long subroutine keeping one return (`$7F:0004`); `01` returns there, or goes on when none is kept |
 | `99` | `$80:A4B6` | long script, flags | spawns as `A2` does, at the head of the actor list and without a parent link |
@@ -82,6 +82,7 @@ callback on a confirm press when nothing else owns the window.
 | `22` | `$80:8CD8` | low, high, words | jumps through the table on the spawn record's fourth byte (entity `+$26`); outside the range, past the table |
 | `B0` | `$80:A975` | 1, or `FF` with a word and a bank | picks the movement resource: 2 the common one, 0 the map's first private one (taken to be the actor's own); the `FF` form is not modelled |
 | `81` / `87` | `$80:A1B9` / `A1D4` | pose / count, pose, selector | a pose whose movement streams (`crysta_runtime::actors::motion`) move the actor through the next wait; `87` also sets the next `COP 8F`'s repetitions |
+| `84` | `$80:A200` | pose, movement selector, resource | directly selects one of Ark's pose resources and runs its movement through the next `COP 8E`; modelled only for the five exact instructions in the authenticated map-`$21` frozen-return player stream |
 | `BA` / `D8` | `$80:AA6F` / `B4DF` | priority / art pointer | cosmetic here; stepped over |
 | `76` / `D9` | `$80:A127` / `B501` | 2 / 1 | PPU register writes, hit profile; stepped over |
 
@@ -176,11 +177,19 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   (`$87:C783`) requires. The runtime, without `+$04`, talks to the first
   interactable actor on the cell instead.
 - **The frozen return, `$21`**: the figure (`$88:B2FF`, a long call into
-  its scene) and the guide (`$88:AEB8`) cooperate through locals and
-  sixteen pages; the guide's whitening runs, then `$88:AF3F`/`AF43` set
-  `$FE` and `$23`, the pad unlocks and the guide leaves. The scene's player
-  scripts (`COP DF`, `COP 84` streams) are not modelled: Ark stays at
-  (136,368), natively (136,464). The whitening's six particles stay frozen.
+  its scene) and the guide (Japanese header `$88:AEB8`, European `$88:B73C`)
+  cooperate through locals and sixteen pages; the guide's whitening runs, then
+  `$88:AF3F`/`AF43` set `$FE` and `$23`, the pad unlocks and the guide leaves.
+  The guide's `COP DF` is `$88:AF30` / `$88:B7B4`, and the player entry is
+  `$88:AF72` / `$88:B7F6`; the complete 52-byte player stream is identical
+  modulo relocation. The runtime admits only that origin, entry, full stream,
+  direct resource profile and its five exact `COP 84` sites. The first moving
+  pose applies +84 Y over 36 ticks. The second requests +15 over 16 ticks, but
+  collision clips it to +12: the +2 attempt at Y=463 becomes +1 and later
+  positive samples are rejected at Y=464. During active admitted motion the
+  script owns input; it releases Ark at `(136,464)`, without a coordinate snap.
+  Other player scripts retain generic skipped-service behavior. The whitening's
+  six particles stay frozen.
 - **The Elder at D's door and the town scene**: after the return, talking to
   the Elder at the door sets `$21`, and his pages and answer `$296`; in the
   town the compact actor `$88:84EF` (`COP 09 $1296 $003C`) holds Ark, speaks

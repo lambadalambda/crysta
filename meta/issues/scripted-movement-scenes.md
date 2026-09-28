@@ -47,12 +47,18 @@ Scenes move Ark and residents, run on map entry (C's changed entry, the town con
 
 ## Progress: frozen-return player boundary
 
-- The retained European fixture now proves that the map `$21` return script
-  releases native control at `(136,464)`. Only afterward do explicit Left and
-  Up legs reach `(120,464)` and `(120,448)`. The portable route releases at
-  `(136,368)`, 96 pixels above native, and its first Left attempt does not move.
-- This is evidence of the missing player-scripted descent, not an implementation.
-  The exact European player-stream entry and complete `COP 84` instruction
-  sequence are not source-pinned, so a route-specific coordinate snap or a
-  claim of general scripted-player movement would be unsafe. The issue remains
-  open for that source work and the other movement/entry criteria.
+- The European fixture and portable route now agree on the map `$21`
+  frozen-return boundary: the authenticated player stream releases control at
+  `(136,464)`, then explicit Left and Up legs reach `(120,464)` and
+  `(120,448)`.
+- The guide `COP DF` origin, relocated player entry, complete 52-byte stream,
+  five exact `COP 84` sites, direct Ark pose resources and movement samples are
+  source-pinned in both revisions. The 36-tick first leg resolves +84 pixels;
+  the 16-tick second requests +15 and collision resolves +12 to Y=464. The
+  runtime projects each cardinal displacement through the qualified player
+  collision path and never accepts a target coordinate or performs a snap.
+- This is deliberately not general `COP 84` support. Only the exact map `$21`
+  source/profile receives the player-specific service; a changed target or
+  profile freezes, and other player scripts retain generic skipped-service
+  behavior. The issue remains open for its other scripted movement, entry and
+  transfer criteria.

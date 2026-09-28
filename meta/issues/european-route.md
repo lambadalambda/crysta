@@ -50,13 +50,13 @@ and run the story tests against it.
   from raw `(536,528)` to `(536,544)`. `World::in_transition()` ends after
   the dark load, before this plane arrival; Down input is not required.
 - The continuous functional replay is green with the owned European ROM, but
-  it does not prove full native-frame equivalence. Fixture boundaries now show
-  native frozen-return control releasing at `(136,464)` before manual Left/Up
-  reaches `(120,448)`; portable releases at `(136,368)`, so its missing
-  96-pixel scripted descent is explicit and remains unimplemented pending a
-  source-pinned player stream. The town controller's `$88:855E` `COP BF`
-  redirect runs without freezing, but its animation cadence and native PC are
-  still not compared.
+  it does not prove full native-frame equivalence. The frozen-return stream is
+  now independently source-pinned: the native and portable script both release
+  at `(136,464)`, before manual Left/Up reaches `(120,448)`. The runtime admits
+  only the exact map-`$21` guide source, player stream, direct resources and
+  movement samples; this is not general scripted-player movement. The town
+  controller's `$88:855E` `COP BF` redirect runs without freezing, but its
+  animation cadence and native PC are still not compared.
 - Bounded route evidence now covers two ordinary PAL movement legs, steady
   bedroom track-4 tempo, native CPU-to-APU pot/door values and track-change
   patterns, the bedroom and two Elder choices (including the 216-pixel mission
@@ -71,10 +71,10 @@ and run the story tests against it.
   original continuous `World` route, it first **refuses, then accepts** the
   friends' retry (`$2F`, not `$2E`), opens the blue door with separate pot
   inputs, and detours through a frozen `$10` resident and the empty `$0B`
-  Elder room before speaking to the `$0D` doorway Elder. The resulting
-  28,020-frame input trace replayed through a headless browser's real
-  keyboard handlers, PAL frame loop and European Wasm game without input-edge
-  mismatch or game fault; a screenshot shows Ark on the world map. This
-  qualifies a current browser-host path, **not** native frame-by-frame
+  Elder room before speaking to the `$0D` doorway Elder. The regenerated
+  28,121-frame input trace includes the corrected scripted release and manual
+  boundaries, and was replayed through a rebuilt headless browser's real
+  handlers, PAL frame loop and European Wasm game without input-edge mismatch
+  or game fault. This qualifies a current browser-host path, **not** native
   equivalence of that alternate detour. The original reporter's build/state
   remains unknown.

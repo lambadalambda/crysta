@@ -33,21 +33,23 @@ text and timing ([ADR 0004](../../docs/adr/0004-european-executable.md)).
   a single portable `World` now reaches and walks the same map from fresh
   bedroom flags without seeded checkpoints or warps. See [the route
   issue](european-route.md). This establishes the connected functional path,
-  not native-frame presentation parity. The frozen-return boundary is now
-  precise: native script release `(136,464)`, later manual endpoint `(120,448)`,
-  portable release `(136,368)`. The exact player stream remains unpinned and
-  unmodelled; the town controller redirect runs but its animation/native PC are
-  not compared. Bounded evidence now covers two PAL movement legs, bedroom
-  tempo, route audio-port patterns, three native dialogue/choice rasters,
-  first-choice cursor/BG3 upload, eight stable bedroom BG3 CGRAM entries and
-  bounded two-frame native framebuffer self-consistency, plus one Crysta title
-  OBJ phase. Full text/RGB/HDMA, remaining loads/movement, native item-name
-  presentation, host wall-clock delivery and PCM/DSP parity remain open; known
-  door/spear timing mismatches are documented rather than hidden.
+  not native-frame presentation parity. The frozen-return boundary now agrees:
+  the exact source-pinned native and portable player stream releases at
+  `(136,464)`, before later manual movement reaches `(120,448)`. This is bounded
+  support for that map-`$21` profile, not general scripted-player movement. The
+  town controller redirect runs but its animation/native PC are not compared.
+  Bounded evidence now covers two PAL movement legs, the frozen-return stream,
+  bedroom tempo, route audio-port patterns, three native dialogue/choice
+  rasters, first-choice cursor/BG3 upload, eight stable bedroom BG3 CGRAM
+  entries and bounded two-frame native framebuffer self-consistency, plus one
+  Crysta title OBJ phase. Full text/RGB/HDMA, remaining loads/movement, native
+  item-name presentation, host wall-clock delivery and PCM/DSP parity remain
+  open; known door/spear timing mismatches are documented rather than hidden.
 - A fresh European `Game::new` host replay now takes the alternate friend's
   refusal→retry route, opens the door, plays through the Box and frozen-town
-  detour to the doorway Elder, and walks on world-map `$03`. Its input trace
-  reaches the same rendered endpoint on the rebuilt headless browser page
-  with no mismatched action edges or game fault. This adds a current
-  browser-host path, not native-frame text/sound parity or a reproduction of
-  the original reporter's older build/save state.
+  detour to the doorway Elder, and walks on world-map `$03`. Its regenerated
+  28,121-frame input trace includes the corrected `(136,464)` release plus
+  manual Left/Up boundaries and reaches the same rendered endpoint on the
+  rebuilt headless browser page with no mismatched action edges or game fault.
+  This adds a current browser-host path, not native-frame text/sound parity or a
+  reproduction of the original reporter's older build/save state.

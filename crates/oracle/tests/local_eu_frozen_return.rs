@@ -452,8 +452,8 @@ fn run_child(path: &Path) -> ! {
         ]
     );
 
-    // The 1,083-row census pins every completed frame through neutral command
-    // 573 without retaining WRAM. The first COP 8E applies all +84 source
+    // The 1,083-row census pins Y for every completed frame through neutral
+    // command 573 without retaining WRAM. The first COP 8E applies all +84 source
     // pixels. The second requests +15, but native collision applies +12 over
     // eight frames (including a final +1 at y463) and then stays at y464. This
     // is an observed per-frame boundary, not a coordinate snap.

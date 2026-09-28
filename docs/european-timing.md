@@ -41,7 +41,10 @@ measured on the reference emulator.
   unaligned—all 43 boundaries for 42 held-Down exterior frames from shared
   anchor `$10 (392,353)` to `(392,413)`. No frame shift or input-onset
   adjustment is used within either leg. This does not qualify other movement,
-  animation, map loads or host wall-clock delivery. The native frozen-return
-  script releases control at `(136,464)`; later manual Left/Up reaches
-  `(120,448)`. Portable control releases at `(136,368)`, proving a missing
-  96-pixel scripted descent rather than a discrepancy in the later input.
+  animation, map loads or host wall-clock delivery. A separate source-pinned
+  native witness covers the map-`$21` frozen-return player stream: the first
+  36-tick leg applies +84 Y; the second requests +15 over 16 ticks but collision
+  resolves +12 to Y=464. Portable now runs those same exact admitted streams
+  through collision and releases at `(136,464)`; only later manual Left/Up
+  reaches `(120,448)`. This qualifies that one scripted profile, not general
+  player-script movement.
