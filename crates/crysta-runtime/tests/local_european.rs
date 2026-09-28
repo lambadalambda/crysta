@@ -719,6 +719,40 @@ fn eu_frames(world: &mut World<'_>, count: usize, direction: Option<Direction>) 
 }
 
 #[test]
+fn european_frozen_return_descends_before_releasing_ark() {
+    let Some(rom) = european() else { return };
+    let mut events = fresh_game_flags();
+    for id in [0x22, 0x243, 0x244, 0x240, 0x241, 0x242] {
+        events[id / 8] |= 1 << (id % 8);
+    }
+    let mut world = World::enter_with_events(rom.image(), 0x21, 136, 368, events).unwrap();
+    for frame in 0..12000 {
+        let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+        world
+            .update(
+                None,
+                Presses {
+                    confirm,
+                    ..Presses::NONE
+                },
+            )
+            .unwrap();
+        if eu_flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
+            break;
+        }
+    }
+    assert!(eu_flag(&world, 0xfe) && eu_flag(&world, 0x23));
+    assert!(!world.pad_locked());
+    assert_eq!(world.position(), (136, 464), "scripted release position");
+    eu_frames(&mut world, 12, Some(Direction::Left));
+    eu_frames(&mut world, 12, None);
+    assert_eq!(world.position(), (120, 464), "manual Left after release");
+    eu_frames(&mut world, 12, Some(Direction::Up));
+    eu_frames(&mut world, 12, None);
+    assert_eq!(world.position(), (120, 448), "manual Up after release");
+}
+
+#[test]
 fn european_retry_acceptance_runs_the_player_script_before_releasing_ark() {
     let Some(rom) = european() else { return };
     assert_eq!(

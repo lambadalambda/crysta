@@ -1009,11 +1009,13 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
         "{:x?}",
         world.frozen_scripts()
     );
-    // Natively the scene's player scripts (`COP 84` streams) leave Ark at
-    // (136,464); they are not modelled, so he stays where he returned.
-    let before = world.position();
+    // Natively the two player-script `COP 84` streams release Ark after a
+    // 96-pixel descent. Ordinary input resumes from that exact boundary.
+    assert_eq!(world.position(), (136, 464), "scripted release position");
+    replay(&mut world, &[(2, 12), (5, 12)]);
+    assert_eq!(world.position(), (120, 464), "manual Left after release");
     replay(&mut world, &[(1, 12), (5, 12)]);
-    assert_ne!(world.position(), before, "Ark walks again, toward the exit");
+    assert_eq!(world.position(), (120, 448), "manual Up after release");
 }
 
 #[test]
