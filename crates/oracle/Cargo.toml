@@ -17,6 +17,7 @@ sha2 = "0.10"
 cc = "1.1"
 
 [dev-dependencies]
+assets = { path = "../assets" }
 crysta-runtime = { path = "../crysta-runtime" }
 room-core = { path = "../room-core" }
 
