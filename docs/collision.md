@@ -724,9 +724,11 @@ placement plus ownership. During ownership the host advances the profile and
 residents, but does not run ordinary player collision, turning, talking, doorway
 interaction, or exit scan/rearming. The free sample consumes its own advance;
 ordinary walking starts on the next call with fresh **host** walking history.
-`World::enter` remains an explicit raw placement operation. Mutated target
-records fail with `WorldError::Arrival`; unrelated edges retain legacy raw host
-transfers and are not newly selector-qualified.
+`World::enter` remains an explicit raw placement operation. The exact C
+`$818DCD` → D edge has a separate source-pinned `(120,608)` synchronous host
+placement; its raw anchor is `(112,608)`. Mutated source-qualified records fail
+with `WorldError::Arrival`; unrelated edges retain raw host transfers and are
+not newly selector-qualified.
 
 Town occupancy was present, not removed to get a passing return: native actor
 slot `$1180` stands at `(776,768)` on frames12928–12950 and the later walk,

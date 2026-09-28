@@ -193,8 +193,9 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
 - **The Elder at D's door and the town scene**: after the return, talking to
   the Elder at the door sets `$21`, and his pages and answer `$296`; in the
   town the compact actor `$88:84EF` (`COP 09 $1296 $003C`) holds Ark, speaks
-  and sets `$3C`. Door arrivals still use the raw placement: in D Ark stands
-  8 pixels left of the native x.
+  and sets `$3C`. Synchronous checked exits through C's exact `$818DCD`
+  record load D at the native `(120,608)`, not its raw `(112,608)` anchor.
+  The animated door path also loads at `(120,608)` and settles at `(120,625)`.
 - **The underworld, `$03`**: a Mode 7 world map. Its byte layer comes from
   the `$F0` spawn record; the player walks it on a plane (16-pixel steps at
   2 a frame, the next cell blocked at `$A0`+, a one-sided slide, wrapping at
@@ -227,10 +228,12 @@ their script at bytes 2..4 (`docs/house-scene.md`); the runtime runs them.
 except the engine's tile and palette animation services at `$87:98C2` and
 `$87:98EB`, which are display work.
 The `FD` record with `$84:A129` is the player's own and is skipped. Stairs
-(selector 14) settle at the raw anchor plus (8,16), and so do the stairs back
-up (selector 13), as natively into E and C (into `$20` natively (8,8)).
-The up-stairs' type 29 cells (`$21` (8,6), `$20` (25,53), E (9,53)) are
-admitted Up-only, as the ones going down.
+(selector 14) and stairs back up (selector 13) settle at the raw anchor plus
+(8,16). On the animated `$21` → `$20` return, Ark loads at `(368,874)`, passes
+through the transition-owned `(360,872)`, and reaches free control at
+`(360,880)`; `(360,872)` is not the settled endpoint. The up-stairs' type 29
+cells (`$21` (8,6), `$20` (25,53), E (9,53)) are admitted Up-only, as the ones
+going down.
 
 A facing Up at a wooden door's lower cell (low nine bits `$F3`, sampled 24
 pixels above the feet, from a cell-aligned y) runs the door script

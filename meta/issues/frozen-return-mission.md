@@ -47,8 +47,12 @@ Ark returns to `$21`, Elle is frozen (`$FE`, `$23`), the village residents are f
   release/manual boundaries. The whitening's particles still stay frozen and
   its 37 nested frames are not waited.
 - The way back up (selector 13 stairs), the Elder at D's door (`$21`, `$296`)
-  and the town scene (`$3C`, an `FB` compact actor) run.
-- Open against the broader acceptance criteria: ordinary door arrivals use the
-  raw placement (D: 8 pixels left; selector 5 loads at raw + (8,0) natively),
-  and the stairs up into `$20` land 8 pixels low (natively `(360,872)`). The
-  frozen residents' variants are not checked.
+  and the town scene (`$3C`, an `FB` compact actor) run. On `$21` → `$20`, Ark
+  loads at `(368,874)`, passes the transition-owned `(360,872)`, and settles
+  with free control at `(360,880)`.
+- C's exact `$818DCD` ordinary door record now places synchronous checked exits
+  at the native `(120,608)` rather than the raw `(112,608)`. Every operand and
+  the normalized source are pinned and mutations fail closed; explicit entry
+  stays raw and the animated path still settles at `(120,625)`.
+- Open against the broader acceptance criteria: the complete frozen-resident
+  variants are not yet source-pinned and checked.
