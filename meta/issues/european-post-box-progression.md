@@ -32,3 +32,11 @@ A player reported that after Pandora's Box the Elder at his house did not respon
 - The earlier headless European browser startup check established only ROM acceptance and an English bedroom with no page error. A missing keyboard re-press was fixed separately; neither startup nor that edge fix alone explains the reporter's Elder behavior.
 - The deployed page (<https://lambadalambda.github.io/crysta/>, build `c5e8e9a`) replays this route with `tools/web-replay`: owned ROM through the file input, page key handlers, one PAL frame per RAF step. All frames matched the route inputs; each named checkpoint canvas matched the Rust host view hash, with no fault or page error. This is still synthetic input, not the reporter's device or saved state.
 - Related: [European native route](european-route.md), [frozen return](frozen-return-mission.md).
+
+## Resolution
+
+- Closed 2026-09-29: the live page (build `c5e8e9a`) plays the route through
+  its own keyboard handlers with the European ROM in a headless browser
+  (`tools/web-replay`), every checkpoint image equal to the Rust route's; the
+  host and runtime regressions pass too. The original report's device, build
+  and save were not recovered; a new report should name them.

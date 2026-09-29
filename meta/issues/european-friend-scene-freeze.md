@@ -32,3 +32,11 @@ A player reported that the friends' blue-door scene freezes after they refuse an
 - Input differs by frontend: desktop Space/Enter confirms and X cancels (Z unmapped); browser X confirms and Z cancels. Pots use separate confirm presses to lift and throw; holding X+Z+direction is not required. Host presses are edges, so pressing during typing or holding through the next page does not confirm it.
 - The deployed page (<https://lambadalambda.github.io/crysta/>, build `c5e8e9a`) replays this route with `tools/web-replay`: owned ROM through the file input, page key handlers, one PAL frame per RAF step. All frames matched the route inputs; each named checkpoint canvas matched the Rust host view hash, with no fault or page error. This is still synthetic input, not the reporter's device or saved state.
 - Related: [European native route](european-route.md), [scripted movement](scripted-movement-scenes.md).
+
+## Resolution
+
+- Closed 2026-09-29: the live page (build `c5e8e9a`) plays the route through
+  its own keyboard handlers with the European ROM in a headless browser
+  (`tools/web-replay`), every checkpoint image equal to the Rust route's; the
+  host and runtime regressions pass too. The original report's device, build
+  and save were not recovered; a new report should name them.

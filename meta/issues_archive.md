@@ -133,3 +133,5 @@
 - [x] [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [x] [Repin the oracle producer source after the audio-port capture](issues/repin-oracle-audio-capture.md)
 - [x] [Replay European route traces against the deployed web page](issues/web-replay-harness.md)
+- [x] [Reproduce the European friend's door-scene freeze in the player host](issues/european-friend-scene-freeze.md)
+- [x] [Reproduce European post-Box Elder and frozen-town progression in the player host](issues/european-post-box-progression.md)

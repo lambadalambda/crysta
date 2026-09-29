@@ -6,6 +6,10 @@ The European door and post-Box detour routes were replayed in a headless
 browser against a locally built page with an uncommitted harness. Commit a
 small harness and run both traces against the live GitHub Pages build.
 
+## Dependencies
+
+- [Check the European slice against a native route](european-route.md)
+
 ## Requirements
 
 - Load a given page URL in headless Chromium and select the owned ROM through
