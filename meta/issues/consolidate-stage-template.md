@@ -2,10 +2,11 @@
 
 ## Summary
 
-The map-inspector qualification evidence chain is now three frozen stages deep
-(`current-producer` → `library-producer` → `repin-producer`), and the per-stage
-bridge modules are roughly 85% copy-paste. The duplication is tolerable at
-three; it becomes the wrong shape at four. Consolidate the template and close
+The map-inspector qualification evidence chain is now four frozen stages deep
+(`current-producer` → `library-producer` → `repin-producer` →
+`oracle-repin-producer`), and the per-stage bridge modules are roughly 85%
+copy-paste. `oracle_repin_bridge.py` was added in the same shape on purpose, so
+the provenance commit stays reviewable; consolidate now. Consolidate the template and close
 the coverage gaps an independent review found in the newest stage.
 
 ## Dependencies
@@ -19,13 +20,10 @@ the coverage gaps an independent review found in the newest stage.
   predecessor descriptor/bridge hashes and the main-delta function, so
   `library_bridge` and `repin_bridge` reduce to data plus their genuinely
   distinct parts. `verify_producer_envelope` is already the first slice.
-- Mirror it in `crates/map-inspector/tests/local_capture.rs`, where
-  `check_library_identity` and `check_repin_identity` are near-duplicates. A
-  shared `check_stage_identity` would have prevented the missing declared
-  pre-state assertion by construction.
-- Replace the hardcoded repin → library → predecessor source resolution with a
-  fold over an ordered stage list, so a new stage does not mean another
-  `.or_else()`.
+- Mirror it in `crates/map-inspector/tests/local_capture.rs`. The successor
+  stages already share `check_stage_identity` over an ordered `STAGES` list
+  (done with the oracle repin); `check_library_identity` is still separate.
+- Move the test-only `oracle_repin_bridge.historical_bytes` into a test helper.
 - Add hermetic controls for `repin_bridge.compare_to_frozen`, which currently
   has six `require`s and no tests. Its predecessor `bridge.compare_unchanged`
   has a control class in `test_bridge.py`, including a symlink-aliasing test for
