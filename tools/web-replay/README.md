@@ -28,8 +28,11 @@ Options: `--url` (for example a local build served from `local/crysta-web/site`)
 `--rom` (default `local/Terranigma (E) [!].smc`), `--chrome` or `$CHROME`
 (default: Playwright's cached `chrome-headless-shell`). `--shots` saves a PNG
 of the canvas at each checkpoint and must be under `local/`: the pictures show
-the game's art. The exit status is 0 when every checkpoint matches, 1 when one
-differs, 2 when the replay stops.
+the game's art. `--step-timeout` (default 30000 ms) bounds each browser call
+and wait; `--timeout` (default 600000 ms) bounds the whole run. On a timeout
+the replay says what did not answer, closes Chromium and exits 1. The exit
+status is 0 when every checkpoint matches, 1 when one differs or a timeout
+hits, 2 when the replay stops for another reason.
 
 Chromium runs with `--no-sandbox` because its own sandbox cannot start inside
 a sandboxed agent; it uses a throwaway profile.

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTrace, steps, keyEvents, sameInput, fnv64 } from './trace.mjs';
+import { parseTrace, steps, keyEvents, sameInput, fnv64, withTimeout, TimeoutError } from './trace.mjs';
 
 const TEXT = `# count held pressed (web button bits, hex)
 3 0x0 0x0
@@ -56,4 +56,13 @@ test('page input matches when held bits and action edges agree', () => {
 test('fnv64 matches the Rust route', () => {
   assert.equal(fnv64(new Uint8Array()), 0xcbf29ce484222325n);
   assert.equal(fnv64(new TextEncoder().encode('a')), 0xaf63dc4c8601ec8cn);
+});
+
+test('withTimeout passes results through and names what timed out', async () => {
+  assert.equal(await withTimeout(Promise.resolve(7), 50, 'fast'), 7);
+  await assert.rejects(withTimeout(Promise.reject(new Error('boom')), 50, 'failing'), /boom/);
+  const never = new Promise(() => {});
+  await assert.rejects(withTimeout(never, 10, 'Runtime.evaluate'), (error) =>
+    error instanceof TimeoutError && /Runtime\.evaluate timed out after 10 ms/.test(error.message));
+  assert.throws(() => withTimeout(never, 0, 'x'), /positive/);
 });

@@ -95,3 +95,15 @@ export function fnv64(bytes) {
   }
   return (BigInt(hi) << 32n) | BigInt(lo);
 }
+
+export class TimeoutError extends Error {}
+
+// `promise`, or a TimeoutError once `ms` pass; the timer never outlives it.
+export function withTimeout(promise, ms, what) {
+  if (!(ms > 0)) throw new Error(`timeout for ${what} must be positive, not ${ms}`);
+  let timer;
+  const late = new Promise((_, fail) => {
+    timer = setTimeout(() => fail(new TimeoutError(`${what} timed out after ${ms} ms`)), ms);
+  });
+  return Promise.race([promise, late]).finally(() => clearTimeout(timer));
+}
