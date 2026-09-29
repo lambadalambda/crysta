@@ -11,6 +11,8 @@ assets = { path = "../assets" }
 room-core = { path = "../room-core" }
 
 [dev-dependencies]
+# The reference emulator, for the European native cross-checks only.
+oracle = { path = "../oracle" }
 rom = { path = "../rom" }
 serde_json = "1" # MIT OR Apache-2.0; native qualification fixtures only.
 

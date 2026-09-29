@@ -10,7 +10,7 @@ use room_core::Direction;
 use std::{path::Path, process::Command};
 
 const TEST: &str = "european_first_bedroom_walk_matches_native_each_frame";
-const FIXTURE: &str = include_str!("fixtures/eu-pandora-tour.inputs");
+const FIXTURE: &str = include_str!("../../oracle/tests/fixtures/eu-pandora-tour.inputs");
 
 #[test]
 fn european_first_bedroom_walk_matches_native_each_frame() {

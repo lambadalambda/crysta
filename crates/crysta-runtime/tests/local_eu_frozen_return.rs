@@ -329,9 +329,9 @@ fn run_child(path: &Path) -> ! {
     session.set_button(Button::Start, false);
     session.run_frames(150);
 
-    let lines: Vec<_> = include_str!("fixtures/eu-pandora-tour.inputs")
+    let lines: Vec<_> = include_str!("../../oracle/tests/fixtures/eu-pandora-tour.inputs")
         .lines()
-        .chain(include_str!("fixtures/eu-world-map.inputs").lines())
+        .chain(include_str!("../../oracle/tests/fixtures/eu-world-map.inputs").lines())
         .collect();
     assert_eq!(lines.len(), 665);
     for line in &lines[..565] {

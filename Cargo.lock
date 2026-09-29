@@ -73,6 +73,7 @@ name = "crysta-runtime"
 version = "0.1.0"
 dependencies = [
  "assets",
+ "oracle",
  "rom",
  "room-core",
  "serde_json",
@@ -162,12 +163,9 @@ checksum = "9f7c3e4beb33f85d45ae3e3a1792185706c8e16d043238c593331cc7cd313b50"
 name = "oracle"
 version = "0.1.0"
 dependencies = [
- "assets",
  "cc",
- "crysta-runtime",
  "memory-map",
  "rom",
- "room-core",
  "serde",
  "serde_json",
  "sha2",

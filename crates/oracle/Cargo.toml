@@ -16,11 +16,6 @@ sha2 = "0.10"
 [build-dependencies]
 cc = "1.1"
 
-[dev-dependencies]
-assets = { path = "../assets" }
-crysta-runtime = { path = "../crysta-runtime" }
-room-core = { path = "../room-core" }
-
 [lints]
 rust.unsafe_code = "allow"
 clippy.all = { level = "warn", priority = -1 }
