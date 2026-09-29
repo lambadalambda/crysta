@@ -23,3 +23,9 @@ passes every other byte through, so a round trip loses nothing.
 
 - A world captured and resumed plays on identically; a slot decoded from a
   native SRAM dump resumes at the desk (472,176) facing up, on both ROMs.
+
+## Notes
+
+- The European slot from the 2008 `.srm` resumes at the desk
+  (`tests/local_saves.rs`). No Japanese dump holds a slot; the native load of
+  a Japanese slot we wrote is part of save-point.

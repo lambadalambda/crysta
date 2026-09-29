@@ -15,3 +15,9 @@ last-slot word ([saves](../../docs/saves.md)).
 - Local native dumps (Japanese, European, a 2008 `.srm`) decode; writing them
   back is byte-identical; a corrupt primary recovers from its backup, both
   corrupt reads as no data, and nothing is changed on a failed read.
+
+## Notes
+
+- The only Japanese dump at hand is a blank cartridge (`$FF` slots): it reads
+  as three empty slots. A Japanese slot with data is proved natively in
+  save-point, where the native game loads an SRAM we wrote.

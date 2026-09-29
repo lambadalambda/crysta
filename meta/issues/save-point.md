@@ -12,5 +12,6 @@ cancels, the fades and jingle `$35` ([saves](../../docs/saves.md)).
 
 ## Acceptance Criteria
 
-- Saving at the desk writes the slot natively; the screen matches native
-  frames on both ROMs.
+- Saving at the desk writes the slot natively: the native game, booted with
+  that SRAM, loads it at the desk facing up. The screen matches native frames
+  on both ROMs.

@@ -135,3 +135,5 @@
 - [x] [Replay European route traces against the deployed web page](issues/web-replay-harness.md)
 - [x] [Reproduce the European friend's door-scene freeze in the player host](issues/european-friend-scene-freeze.md)
 - [x] [Reproduce European post-Box Elder and frozen-town progression in the player host](issues/european-post-box-progression.md)
+- [x] [Keep the native save slot in the world](issues/save-slot-block.md)
+- [x] [Read and write native SRAM](issues/sram-codec.md)
