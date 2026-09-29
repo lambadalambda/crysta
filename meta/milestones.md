@@ -30,6 +30,7 @@ Lint, test, docs, safety and tracker gates pass. One maintainability follow-up
 from that repin's review is tracked below; it changes no pin.
 
 - [Consolidate the qualification stage template](issues/consolidate-stage-template.md)
+- [Repin the oracle producer source after the audio-port capture](issues/repin-oracle-audio-capture.md)
 
 <a id="m1-reference-oracle"></a>
 ## M1 — Reference oracle
