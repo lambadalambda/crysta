@@ -105,6 +105,23 @@ impl Inventory {
             .map_or(0, |slot| self.slots[slot].1)
     }
 
+    /// The slots as WRAM keeps them from `$7F:8000`: (item, count) pairs.
+    #[must_use]
+    pub fn slot_bytes(&self) -> Vec<u8> {
+        self.slots
+            .iter()
+            .flat_map(|&(item, count)| [item, count])
+            .collect()
+    }
+
+    /// Takes the slots from their WRAM bytes; missing bytes leave slots
+    /// empty.
+    pub fn set_slot_bytes(&mut self, bytes: &[u8]) {
+        for (slot, pair) in self.slots.iter_mut().zip(bytes.chunks_exact(2)) {
+            *slot = (pair[0], pair[1]);
+        }
+    }
+
     /// The items held, in slot order.
     #[must_use]
     pub fn items(&self) -> Vec<u8> {
@@ -135,6 +152,11 @@ impl Inventory {
     #[must_use]
     pub const fn prime_blue(&self) -> u16 {
         self.prime_blue
+    }
+
+    /// Sets the Prime Blue word as a load restores it.
+    pub fn set_prime_blue(&mut self, word: u16) {
+        self.prime_blue = word;
     }
 
     /// Adds Prime Blue (`$8D:95A8`), with the engine's cap.
@@ -221,6 +243,21 @@ mod tests {
         assert!(inventory.items().is_empty());
         assert!(!inventory.remove(0xA1));
         assert!(inventory.remove(0), "item 0 succeeds");
+    }
+
+    #[test]
+    fn the_slots_round_trip_through_their_wram_bytes() {
+        let mut inventory = Inventory::default();
+        inventory.add(0x10);
+        inventory.add(0x10);
+        inventory.add(0x81);
+        let bytes = inventory.slot_bytes();
+        assert_eq!(bytes.len(), 0x100);
+        assert_eq!(&bytes[..2], &[0x10, 2], "(item, count) at `$7F:8000`");
+        let mut restored = Inventory::default();
+        restored.set_slot_bytes(&bytes);
+        assert_eq!(restored.items(), inventory.items());
+        assert_eq!(restored.count(0x10), 2);
     }
 
     #[test]
