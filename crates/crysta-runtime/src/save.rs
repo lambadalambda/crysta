@@ -12,6 +12,11 @@ pub const SLOT_BYTES: usize = 0x4FA;
 const MAP: usize = 0x00;
 const FACING: usize = 0x02;
 const POSITION: usize = 0x04;
+const NAME: usize = 0x10;
+/// The name's bytes, its `D4` end included.
+const NAME_BYTES: usize = 0x0C;
+const SECONDS: usize = 0x2E;
+const LEVEL: usize = 0x56;
 const MONEY: usize = 0x94;
 const EVENTS: usize = 0xC0;
 /// The event flags the slot keeps: `$7E:06C0–07FF`.
@@ -98,6 +103,29 @@ impl SaveSlot {
         self.set_word(POSITION + 2, y.wrapping_sub(16));
     }
 
+    /// The name's glyph codes, up to its `D4` end.
+    #[must_use]
+    pub fn name(&self) -> &[u8] {
+        let name = &self.bytes[NAME..NAME + NAME_BYTES];
+        let end = name
+            .iter()
+            .position(|&code| code == NAME_END)
+            .unwrap_or(NAME_BYTES);
+        &name[..end]
+    }
+
+    /// The level (`$0656`).
+    #[must_use]
+    pub fn level(&self) -> u8 {
+        self.bytes[LEVEL]
+    }
+
+    /// The play time in seconds (`$062E`).
+    #[must_use]
+    pub fn seconds(&self) -> u32 {
+        u32::from(self.word(SECONDS)) | u32::from(self.word(SECONDS + 2)) << 16
+    }
+
     /// The event flags `$7E:06C0–07FF`.
     #[must_use]
     pub fn events(&self) -> &[u8] {
@@ -151,6 +179,9 @@ impl SaveSlot {
     }
 }
 
+/// The byte that ends a name.
+const NAME_END: u8 = 0xD4;
+
 /// A BCD word's value; 0 for a word that is not BCD.
 fn decimal(word: u16) -> u32 {
     assets::shops::bcd(word).unwrap_or(0)
@@ -182,6 +213,17 @@ mod tests {
             0x140,
             "flags past `$07FF` are not kept"
         );
+    }
+
+    #[test]
+    fn the_summary_reads_name_level_and_play_time() {
+        let mut bytes = [0; SLOT_BYTES];
+        bytes[NAME..NAME + 4].copy_from_slice(&[0x21, 0x52, 0x4B, NAME_END]);
+        bytes[LEVEL] = 7;
+        bytes[SECONDS..SECONDS + 4].copy_from_slice(&[0x10, 0x27, 0x01, 0]);
+        let slot = SaveSlot::from_bytes(&bytes);
+        assert_eq!(slot.name(), [0x21, 0x52, 0x4B]);
+        assert_eq!((slot.level(), slot.seconds()), (7, 0x1_2710));
     }
 
     #[test]

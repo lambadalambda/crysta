@@ -66,6 +66,12 @@ fn a_native_save_from_2008_decodes_and_resumes_at_the_desk() {
     let sram = Sram::from_bytes(&bytes).unwrap();
     let maps: Vec<u16> = (0..3).map(|n| sram.slot(n).unwrap().map()).collect();
     assert_eq!(maps, [0x0F, 0x0F, 0x128]);
+    // As `save1.txt` lists them: level 1 at 0:18, level 7 at 1:21 and 1:43.
+    let shown: Vec<(u8, u32)> = (0..3)
+        .map(|n| sram.slot(n).unwrap())
+        .map(|slot| (slot.level(), slot.seconds() / 60))
+        .collect();
+    assert_eq!(shown, [(1, 18), (7, 81), (7, 103)]);
     // Writing each slot back reproduces the file.
     let mut again = sram.clone();
     let last = sram.last_slot();
