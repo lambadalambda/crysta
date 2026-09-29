@@ -923,6 +923,8 @@ impl<'a> World<'a> {
             self.dark -= 1;
             return Ok((Step::Stayed, None));
         }
+        // The frame gate's play clock; a load's dark frames skip the gate.
+        self.globals.slot.tick_clock();
         self.arrived = self.arrived.saturating_add(1);
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {

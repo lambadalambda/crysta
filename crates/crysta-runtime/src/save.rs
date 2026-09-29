@@ -16,7 +16,11 @@ const POSITION: usize = 0x04;
 const NAME: usize = 0x10;
 /// The name's bytes, its `D4` end included.
 const NAME_BYTES: usize = 0x0C;
+/// The play clock: a frame divider (`$062C`) and u32 seconds (`$062E`).
+const DIVIDER: usize = 0x2C;
 const SECONDS: usize = 0x2E;
+/// The divider's reload: 60 ticks a second on both ROMs.
+const TICKS: u16 = 0x3B;
 const LEVEL: usize = 0x56;
 const MONEY: usize = 0x94;
 const EVENTS: usize = 0xC0;
@@ -178,6 +182,28 @@ impl SaveSlot {
         u32::from(self.word(SECONDS)) | u32::from(self.word(SECONDS + 2)) << 16
     }
 
+    fn set_seconds(&mut self, seconds: u32) {
+        self.bytes[SECONDS..SECONDS + 4].copy_from_slice(&seconds.to_le_bytes());
+    }
+
+    /// One frame of the play clock (`$86:8164`): the divider counts down;
+    /// below 0 it reloads and a second passes.
+    pub fn tick_clock(&mut self) {
+        if let Some(divider) = self.word(DIVIDER).checked_sub(1) {
+            self.set_word(DIVIDER, divider);
+        } else {
+            self.set_word(DIVIDER, TICKS);
+            self.set_seconds(self.seconds().wrapping_add(1));
+        }
+    }
+
+    /// A frame with the clock paused: the tick, then `INC $062C` (the
+    /// Records screen's input wait, `$87:877D`).
+    pub fn pause_clock(&mut self) {
+        self.tick_clock();
+        self.set_word(DIVIDER, self.word(DIVIDER).wrapping_add(1));
+    }
+
     /// The event flags `$7E:06C0–07FF`.
     #[must_use]
     pub fn events(&self) -> &[u8] {
@@ -308,6 +334,24 @@ mod tests {
         let slot = SaveSlot::from_bytes(&bytes);
         assert_eq!(slot.name(), [0x21, 0x52, 0x4B]);
         assert_eq!((slot.level(), slot.seconds()), (7, 0x1_2710));
+    }
+
+    #[test]
+    fn the_clock_counts_60_ticks_a_second_and_a_pause_holds_it() {
+        let mut slot = SaveSlot::default();
+        // A new game's zeroed clock: the first tick wraps into second 1.
+        slot.tick_clock();
+        assert_eq!((slot.word(DIVIDER), slot.seconds()), (0x3B, 1));
+        for _ in 0..60 {
+            slot.tick_clock();
+        }
+        assert_eq!((slot.word(DIVIDER), slot.seconds()), (0x3B, 2));
+        // Paused: the tick, then `INC $062C`; one on a wrap adds a second.
+        slot.set_word(DIVIDER, 0);
+        for _ in 0..100 {
+            slot.pause_clock();
+        }
+        assert_eq!((slot.word(DIVIDER), slot.seconds()), (0x3C, 3));
     }
 
     #[test]

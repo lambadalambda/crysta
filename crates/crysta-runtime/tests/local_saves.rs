@@ -109,5 +109,12 @@ fn a_new_game_slot_is_the_native_one_byte_for_byte() {
         let world = World::enter(rom.image(), 0x0F, 472, 176).unwrap();
         let saved = world.save_slot();
         assert_eq!((saved.name(), saved.level()), (slot.name(), 1), "{name}");
+        // The play clock: the first frame wraps into second 1, then 60 a
+        // second.
+        let mut world = world;
+        for _ in 0..61 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert_eq!(world.save_slot().seconds(), 2, "{name}");
     }
 }
