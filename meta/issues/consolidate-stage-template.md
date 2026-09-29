@@ -59,3 +59,7 @@ the coverage gaps an independent review found in the newest stage.
   `frozen_predecessor()` re-read and re-hash on every call; and
   `repin_bridge.PRODUCER_FIELDS` derives from `library_bridge.PRODUCER_FIELDS`,
   so editing that unpinned module silently changes the repin contract.
+- From the oracle repin (2026-09-29): the mutation harnesses look for one
+  `FAIL:` line, so an error elsewhere could pass unseen (the older harnesses
+  too); and `vendor/ares/ares/sfc/cpu/memory.cpp`, which the European work
+  changed, is not in the pinned inventory (the fresh builds covered it).
