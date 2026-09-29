@@ -13,6 +13,7 @@ pub mod clock;
 pub mod frame;
 pub mod music;
 pub mod music_data;
+pub mod records;
 pub mod session;
 pub mod shop;
 pub mod title;

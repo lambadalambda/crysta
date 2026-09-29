@@ -7,6 +7,7 @@ use assets::text::window::WindowArt;
 use crysta_runtime::art::{
     residents_art, Animation, ArkAtlas, Body, CarryArt, Placeholder, Raster,
 };
+use crysta_runtime::records::View;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{Step, World};
 use frame::Canvas;
@@ -66,6 +67,8 @@ pub struct Session {
     pub carry_frames: HashMap<(u32, u8, bool), Option<Animation>>,
     /// The shop display's art.
     pub shop_art: crate::shop::ShopArtCache,
+    /// The desk's Records screen art, decoded on first use.
+    pub records_art: crate::records::RecordsArtCache,
     /// The area titles.
     pub titles: crate::title::Titles,
     /// The text window's art.
@@ -108,6 +111,7 @@ impl Session {
                 .ok(),
             carry_frames: HashMap::new(),
             shop_art: crate::shop::ShopArtCache::default(),
+            records_art: crate::records::RecordsArtCache::default(),
             titles: crate::title::Titles::default(),
             window_art: WindowArt::from_rom(image).expect("the text window's art"),
             last_direction: None,
@@ -371,7 +375,9 @@ impl Session {
     /// order and only inflates the player's rank. Whatever lies outside the
     /// map's region is blanked before the dialogue goes on top.
     pub fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
-        frame.pixels.fill(0);
+        if self.compose_records(frame) {
+            return (0, 0);
+        }
         self.ensure_background(cartridge);
         self.ensure_art();
         let (carried, pot) = self.carry_sprites();
@@ -475,6 +481,27 @@ impl Session {
 }
 
 impl Session {
+    /// Clears the frame for the room, or draws the desk's Records screen,
+    /// which replaces the room while it shows; returns whether it did.
+    fn compose_records(&self, frame: &mut Canvas) -> bool {
+        frame.pixels.fill(0);
+        match self.world.records() {
+            Some(View::Screen(page)) => {
+                if let Some(art) = self.records_art.get(self.image) {
+                    let current = self.world.save_slot();
+                    let games = crate::records::Games {
+                        sram: self.world.sram(),
+                        current: &current,
+                    };
+                    crate::records::draw(frame, self.image, art, page, &games);
+                }
+                true
+            }
+            Some(View::Blank) => true,
+            Some(View::Room(_)) | None => false,
+        }
+    }
+
     /// The sprites over the scene that nothing adds onto: the shop's
     /// display and the area title (priority 3).
     fn draw_labels(&mut self, frame: &mut Canvas, camera: (i32, i32)) {
