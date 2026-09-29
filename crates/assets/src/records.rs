@@ -199,3 +199,80 @@ impl RecordsArt {
         })
     }
 }
+
+/// The LEVEL and TIME labels' BG3 entries, on the bottom row.
+const LEVEL_LABEL: [u16; 2] = [0x283D, 0x283E];
+const TIME_LABEL: [u16; 2] = [0x280E, 0x280F];
+/// A digit `d`: `$2C21 + d` over `$3031 + d` (the shop's panel digits);
+/// the colon `$2C49` over `$3059`.
+const DIGIT: [u16; 2] = [0x2C21, 0x3031];
+const COLON: [u16; 2] = [0x2C49, 0x3059];
+
+/// The BG3 entries of a level and a play time (`$85:C352`, `$86:8178`),
+/// as (column, row, entry), `row` the top row: 11 + 2·slot for a slot,
+/// 21 for the current game. Each number shows its last two decimal
+/// digits; a level's and the hours' tens digit is blank when 0; 100 hours
+/// or more show 99:59.
+#[must_use]
+pub fn stats_tiles(level: u8, seconds: u32, row: u8) -> Vec<(u8, u8, u16)> {
+    let (hours, minutes) = match seconds / 3600 {
+        hours @ 0..=99 => (hours, seconds % 3600 / 60),
+        _ => (99, 59),
+    };
+    let mut tiles = Vec::new();
+    for (column, [top, bottom]) in [(15, LEVEL_LABEL), (20, TIME_LABEL)] {
+        tiles.extend([(column, row + 1, top), (column + 1, row + 1, bottom)]);
+    }
+    tiles.extend([(24, row, COLON[0]), (24, row + 1, COLON[1])]);
+    for (column, value, blank_tens) in [
+        (17, u32::from(level), true),
+        (22, hours, true),
+        (25, minutes, false),
+    ] {
+        let digits = [(column, value % 100 / 10), (column + 1, value % 10)];
+        for (column, digit) in digits {
+            if blank_tens && column == digits[0].0 && digit == 0 {
+                continue;
+            }
+            let digit = u16::try_from(digit).unwrap_or(0);
+            tiles.extend([
+                (column, row, DIGIT[0] + digit),
+                (column, row + 1, DIGIT[1] + digit),
+            ]);
+        }
+    }
+    tiles
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_stats_blank_leading_zeros_but_the_minutes() {
+        let tiles = stats_tiles(7, 3 * 60 + 59, 11);
+        let at = |column, row| {
+            tiles
+                .iter()
+                .find(|&&(c, r, _)| (c, r) == (column, row))
+                .map(|&(_, _, entry)| entry)
+        };
+        assert_eq!(at(17, 11), None, "level 7: no tens");
+        assert_eq!((at(18, 11), at(18, 12)), (Some(0x2C28), Some(0x3038)));
+        assert_eq!((at(22, 11), at(23, 11)), (None, Some(0x2C21)), "0 hours");
+        assert_eq!((at(25, 11), at(26, 11)), (Some(0x2C21), Some(0x2C24)), "03");
+        assert_eq!(
+            (at(15, 12), at(15, 11)),
+            (Some(0x283D), None),
+            "label below"
+        );
+        // Level 100 shows 0; 111 hours show 99:59.
+        let tiles = stats_tiles(100, 111 * 3600, 21);
+        let digits: Vec<u16> = tiles
+            .iter()
+            .filter(|&&(_, row, entry)| row == 21 && entry & 0xFF00 == 0x2C00 && entry != COLON[0])
+            .map(|&(_, _, entry)| entry - DIGIT[0])
+            .collect();
+        assert_eq!(digits, [0, 9, 9, 5, 9]);
+    }
+}
