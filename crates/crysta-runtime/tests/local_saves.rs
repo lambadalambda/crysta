@@ -53,3 +53,32 @@ fn a_slot_before_the_wake_up_resumes_nothing() {
     let slot = crysta_runtime::save::SaveSlot::default();
     assert!(World::resume(rom.image(), &slot).unwrap().is_none());
 }
+
+#[test]
+fn a_native_save_from_2008_decodes_and_resumes_at_the_desk() {
+    // `local/saves/Terranigma.srm`: three European saves, two in the
+    // bedroom `$0F`, one on the world map `$128`.
+    use crysta_runtime::sram::Sram;
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../local/saves/Terranigma.srm");
+    let (Ok(bytes), Some(rom)) = (std::fs::read(path), load("Terranigma (E) [!].smc")) else {
+        return;
+    };
+    let sram = Sram::from_bytes(&bytes).unwrap();
+    let maps: Vec<u16> = (0..3).map(|n| sram.slot(n).unwrap().map()).collect();
+    assert_eq!(maps, [0x0F, 0x0F, 0x128]);
+    // Writing each slot back reproduces the file.
+    let mut again = sram.clone();
+    let last = sram.last_slot();
+    for n in (0..3).filter(|&n| n != last).chain([last]) {
+        again.write_slot(n, &sram.slot(n).unwrap());
+    }
+    assert_eq!(again.bytes()[..], bytes[..]);
+    // The first resumes where the desk's save leaves Ark.
+    let world = World::resume(rom.image(), &sram.slot(0).unwrap())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (world.map(), world.position(), world.facing()),
+        (0x0F, (472, 176), Direction::Up)
+    );
+}

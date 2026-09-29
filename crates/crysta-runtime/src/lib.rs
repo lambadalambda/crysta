@@ -25,6 +25,7 @@ pub mod residents;
 pub mod save;
 pub mod scene;
 pub mod shop;
+pub mod sram;
 pub mod world;
 
 /// Maps the static exit graph bounds the Crysta slice to.

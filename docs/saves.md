@@ -43,7 +43,8 @@ Checksum (`$8D:A867`): over the slot's `$27D` little-endian words, sum and
 xor both from `$5236`, the sum wrapping at 16 bits. Save `$8D:A6FB`, load
 `$8D:A764` (carry set on failure), copy `$8D:A7A5`, verify `$8D:A82E`. File
 select (`$87:CB50`) restores a bad primary from a good backup; both bad shows
-"No Data". Erase (`$87:83F7`) breaks both checksums (`$FFFE`, `$FEFF`).
+"No Data". Erase (`$87:83F7`) breaks both checksums: `$FFFE` over the
+primary's map word, `$FEFF` over the backup's.
 
 ## Loading
 
