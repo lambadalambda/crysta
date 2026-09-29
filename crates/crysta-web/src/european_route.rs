@@ -11,10 +11,31 @@ use buttons::{CONFIRM as X, DOWN as D, LEFT as L, RIGHT as R, UP as U};
 
 // Run-length count, held bits, extra action presses.
 type Trace = Vec<(usize, u32, u32)>;
+// Frames played so far, name, FNV-1a 64 of the drawn RGBA view.
+type Checkpoints = Vec<(usize, &'static str, u64)>;
 
 struct Route {
     game: Game,
     trace: Option<(PathBuf, Trace)>,
+    checkpoints: Checkpoints,
+}
+
+/// FNV-1a 64: cheap to recompute over a browser canvas (tools/web-replay).
+fn fnv64(bytes: &[u8]) -> u64 {
+    bytes.iter().fold(0xcbf2_9ce4_8422_2325, |hash, &byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01b3)
+    })
+}
+
+fn trace_text(trace: &Trace, checkpoints: &Checkpoints) -> String {
+    let mut text = String::from("# count held pressed (web button bits, hex)\n");
+    for &(count, held, pressed) in trace {
+        writeln!(text, "{count} {held:#x} {pressed:#x}").unwrap();
+    }
+    for &(frame, name, hash) in checkpoints {
+        writeln!(text, "# checkpoint {frame} {name} {hash:016x}").unwrap();
+    }
+    text
 }
 
 impl Route {
@@ -22,6 +43,7 @@ impl Route {
         Self {
             game: Game::new(bytes).unwrap(),
             trace: std::env::var_os(trace_env).map(|path| (path.into(), Vec::new())),
+            checkpoints: Vec::new(),
         }
     }
 
@@ -105,13 +127,18 @@ impl Route {
         );
     }
 
+    /// Names this frame for a browser replay, with the view it must show.
+    fn checkpoint(&mut self, name: &'static str) {
+        if let Some((_, trace)) = &self.trace {
+            let frame = trace.iter().map(|&(count, ..)| count).sum();
+            let hash = fnv64(&self.game.draw());
+            self.checkpoints.push((frame, name, hash));
+        }
+    }
+
     fn save_trace(&self) {
         if let Some((path, trace)) = &self.trace {
-            let mut text = String::from("# count held pressed (web button bits, hex)\n");
-            for &(count, held, pressed) in trace {
-                writeln!(text, "{count} {held:#x} {pressed:#x}").unwrap();
-            }
-            std::fs::write(path, text).unwrap();
+            std::fs::write(path, trace_text(trace, &self.checkpoints)).unwrap();
         }
     }
 }
@@ -414,6 +441,7 @@ fn opened_blue_door(bytes: &[u8], trace_env: &str) -> Route {
     assert!(!route.world().in_scene() && route.world().dialogue().is_none());
     assert!(route.world().frozen_scripts().is_empty());
     assert_eq!(route.world().player_script_frozen_at(), None);
+    route.checkpoint("retry-released");
 
     // C: lift, miss once, then land two separate throws at the blue door.
     route.legs(&[(11, R), (60, 0), (67, U), (80, 0), (24, L), (60, 0)]);
@@ -527,6 +555,7 @@ fn opened_blue_door(bytes: &[u8], trace_env: &str) -> Route {
         .residents()
         .iter()
         .all(|resident| resident.record != 0x03_8c32));
+    route.checkpoint("blue-door-open");
     // The opened stairs must be enterable, not merely drawn differently.
     route.legs(&[(30, U), (400, 0)]);
     assert_eq!(
@@ -534,8 +563,10 @@ fn opened_blue_door(bytes: &[u8], trace_env: &str) -> Route {
         (0x0e, (152, 880)),
         "Ark walks through the opened blue door"
     );
+    route.checkpoint("stairs-0e");
     route.legs(&[(33, L), (80, 0), (35, U), (400, 0)]);
     assert_eq!(route.world().map(), 0x20, "the post-door route continues");
+    route.checkpoint("map-20");
     route
 }
 
@@ -554,6 +585,18 @@ fn european_rom(trace_env: &str) -> Option<Vec<u8>> {
         }
         Err(error) => panic!("cannot read European ROM for {trace_env}: {error}"),
     }
+}
+
+#[test]
+fn trace_text_lists_runs_then_named_checkpoints() {
+    assert_eq!(fnv64(b""), 0xcbf2_9ce4_8422_2325);
+    assert_eq!(fnv64(b"a"), 0xaf63_dc4c_8601_ec8c);
+    let text = trace_text(&vec![(3, 0, 0), (1, X, 0)], &vec![(4, "door", 0xab)]);
+    assert_eq!(
+        text,
+        "# count held pressed (web button bits, hex)\n3 0x0 0x0\n1 0x10 0x0\n\
+         # checkpoint 4 door 00000000000000ab\n"
+    );
 }
 
 #[test]
@@ -676,6 +719,7 @@ fn fresh_european_post_box_frozen_town_detour() {
     assert!(flag(&route, 0x241) && !flag(&route, 0x242));
     route.press_x();
     assert!(flag(&route, 0x242), "second talk takes the spear");
+    route.checkpoint("spear-taken");
     for frame in 0..6000 {
         let confirm =
             route.world().dialogue().is_some() && !route.world().typing() && frame % 2 == 0;
@@ -748,6 +792,7 @@ fn fresh_european_post_box_frozen_town_detour() {
         );
     }
     assert!(flag(&route, 0x23) && !flag(&route, 0x21));
+    route.checkpoint("frozen-return");
     assert_eq!(
         resident_variants(&route, &[0x03_8c12, 0x03_8c1c, 0x03_8c26, 0x03_8c30]),
         [(0x03_8c1c, 2, false)],
@@ -838,6 +883,7 @@ fn fresh_european_post_box_frozen_town_detour() {
         resident_variants(&route, &[0x03_8b9e]).is_empty(),
         "room Elder is absent while $27 XOR $21"
     );
+    route.checkpoint("room-elder-absent");
     assert!(!flag(&route, 0x296));
 
     route.until(550, D, |r| r.world().map() == 0x0c);
@@ -888,12 +934,14 @@ fn fresh_european_post_box_frozen_town_detour() {
             .is_some(),
         "Elder's mission choice"
     );
+    route.checkpoint("mission-choice");
     assert!(
         flag(&route, 0x21) && !flag(&route, 0x296),
         "mission follows the answer"
     );
     assert!(route.finish_scene(6000), "accepted doorway Elder's mission");
     assert!(flag(&route, 0x296) && !route.world().pad_locked());
+    route.checkpoint("mission-accepted");
     assert!(!flag(&route, 0x3c), "town scene has not run yet");
 
     route.until(250, D, |r| r.world().map() == 0x0a);
@@ -913,6 +961,7 @@ fn fresh_european_post_box_frozen_town_detour() {
     assert!(!route.world().pad_locked() && !route.world().in_scene());
     assert!(route.world().dialogue().is_none());
     route.frames(48, 0); // Run the town controller's deferred target.
+    route.checkpoint("town-scene-done");
     assert!(route.world().frozen_scripts().is_empty());
     assert_eq!(route.world().player_script_frozen_at(), None);
     route.until(450, D, |r| r.world().map() == 0x03);
@@ -944,5 +993,6 @@ fn fresh_european_post_box_frozen_town_detour() {
         route.world().position().1 > 544,
         "Ark walks after the detour"
     );
+    route.checkpoint("world-map-03");
     route.save_trace();
 }
