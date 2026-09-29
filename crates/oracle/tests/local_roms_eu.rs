@@ -133,6 +133,7 @@ fn european_new_game_reaches_the_weaver_in_crysta() {
     );
 }
 
+#[allow(clippy::too_many_lines)] // One native replay, checked milestone by milestone.
 fn run_story_child() -> ! {
     let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
     let rom = rom::Rom::load(&image).expect("validated European ROM");
@@ -204,10 +205,17 @@ fn run_story_child() -> ! {
     advance(62, Some(Button::Right));
     advance(38, None);
     advance(67, Some(Button::Down));
-    let room = advance(83, None);
-    assert_eq!(room.0, 0x0010, "ordinary movement enters the next room");
-    assert_eq!((room.1, room.2), (392, 353));
-    assert_ne!(room.3 & 1, 0, "the story flag persists across the exit");
+    let next_room = advance(83, None);
+    assert_eq!(
+        next_room.0, 0x0010,
+        "ordinary movement enters the next room"
+    );
+    assert_eq!((next_room.1, next_room.2), (392, 353));
+    assert_ne!(
+        next_room.3 & 1,
+        0,
+        "the story flag persists across the exit"
+    );
 
     // Ordinary movement through C into B. The Japanese route supplies
     // candidate walking legs; these endpoints are checked on the EU CPU.
@@ -330,7 +338,7 @@ fn run_story_child() -> ! {
     assert_eq!(told.0, 0x0013);
     eprintln!(
         "EU new game: bedroom at {bedroom_frame}, room $10 at {}, exterior at {}, weaver at {}",
-        room.4, exterior.4, told.4
+        next_room.4, exterior.4, told.4
     );
     std::process::exit(0);
 }
@@ -514,6 +522,7 @@ fn replay_european_input(session: &mut Session, line: &str) {
     }
 }
 
+#[allow(clippy::too_many_lines)] // One native replay, checked milestone by milestone.
 fn run_tour_child(to_world: bool) -> ! {
     let image = local_rom("Terranigma (E) [!].smc").expect("owned European ROM");
     let rom = rom::Rom::load(&image).expect("validated European ROM");

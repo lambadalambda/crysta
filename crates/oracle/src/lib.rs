@@ -952,6 +952,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)] // One scripted program, checked step by step.
     fn apu_port_writes_are_bounded_and_survive_trace_steps() {
         if let Some(mode) = std::env::var_os("ORACLE_APU_CHILD") {
             let mut image = vec![0u8; Rom::IMAGE_SIZE];
@@ -1066,13 +1067,16 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::too_many_lines)] // One scripted program, checked step by step.
     fn apu_hook_excludes_other_addresses_and_dma_hdma() {
         if std::env::var_os("ORACLE_APU_BOUNDARY_CHILD").is_some() {
             fn store(code: &mut Vec<u8>, value: u8, address: u16) {
-                code.extend([0xa9, value, 0x8d, address as u8, (address >> 8) as u8]);
+                let [low, high] = address.to_le_bytes();
+                code.extend([0xa9, value, 0x8d, low, high]);
             }
             fn store_long(code: &mut Vec<u8>, value: u8, bank: u8, address: u16) {
-                code.extend([0xa9, value, 0x8f, address as u8, (address >> 8) as u8, bank]);
+                let [low, high] = address.to_le_bytes();
+                code.extend([0xa9, value, 0x8f, low, high, bank]);
             }
             let mut code = Vec::new();
             store(&mut code, 0x32, 0x2142);
@@ -1082,7 +1086,7 @@ mod tests {
             store_long(&mut code, 0x65, 0x40, 0x2140); // ROM bank, not APU I/O.
             store_long(&mut code, 0x76, 0x7e, 0x2140); // WRAM bank, not APU I/O.
             store_long(&mut code, 0x87, 0x80, 0x2142); // Valid mirrored CPU I/O bank.
-            let before_dma = 0x80_8000 + code.len() as u32;
+            let before_dma = 0x80_8000 + u32::try_from(code.len()).unwrap();
 
             // DMA channel 0: one byte from WRAM $7e:0000 to B-bus $2140.
             store_long(&mut code, 0xa5, 0x7e, 0x0000);
@@ -1100,11 +1104,16 @@ mod tests {
             store(&mut code, 1, 0x420b);
             // $4302 reads the advanced DMA source pointer: the transfer really ran.
             code.extend([0xea, 0xad, 0x02, 0x43, 0x8f, 0x10, 0x00, 0x7e]);
-            let after_dma = 0x80_8000 + code.len() as u32;
+            let after_dma = 0x80_8000 + u32::try_from(code.len()).unwrap();
 
             // HDMA channel 1: table at $7e:0020, one $2140 byte on the next scanline.
             for (offset, byte) in [0x81, 0x5a, 0].into_iter().enumerate() {
-                store_long(&mut code, byte, 0x7e, 0x0020 + offset as u16);
+                store_long(
+                    &mut code,
+                    byte,
+                    0x7e,
+                    0x0020 + u16::try_from(offset).unwrap(),
+                );
             }
             for (value, address) in [
                 (0, 0x4310),
