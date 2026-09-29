@@ -40,7 +40,7 @@ jobs:
           node --test tools/pandora-preview/bootstrap.test.mjs
           node crates/map-inspector/tests/room-slice-check.js
       - name: Browser input edges (ROM-free)
-        run: node --test crates/crysta-web/input.test.mjs
+        run: node --test crates/crysta-web/input.test.mjs tools/web-replay/trace.test.mjs
       - name: Tests (ROM-free; local tests skip without dumps)
         run: cargo test --workspace
       - name: Docs
