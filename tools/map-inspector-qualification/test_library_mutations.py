@@ -2,6 +2,7 @@
 """Prove library bridge controls remain active under normal and optimized Python."""
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -33,9 +34,11 @@ def main():
         root = Path(directory)
         for dependency in (
             'bridge.py', 'check.py', 'repin_bridge.py', 'test_library_bridge.py',
+            'projection.py',
             'library-producer.json', 'library-producer-bridge.json',
             'current-producer.json', 'producer-bridge.json', 'observer.json', 'migration.json'):
             (root / dependency).write_bytes((HERE / dependency).read_bytes())
+        shutil.copytree(HERE / 'pinned', root / 'pinned')
         # Tests authenticate the real repository, while importing each mutated
         # bridge from this private directory.
         check_source = (root / 'check.py').read_text().replace(
