@@ -56,6 +56,5 @@
 - [ ] [Decode the European text engine, font and windows](issues/european-text.md)
 - [ ] [Run the European version at its own timing and sound](issues/european-timing.md)
 - [ ] [Check the European slice against a native route](issues/european-route.md)
-- [ ] [Save at the bedroom desk](issues/save-point.md)
 - [ ] [Continue a saved game in the app and on the page](issues/continue-saved-game.md)
 - [ ] [Open Yomi's box after the frozen return](issues/yomi-menu.md)

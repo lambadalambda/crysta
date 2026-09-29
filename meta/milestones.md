@@ -174,7 +174,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Implement the classic renderer](issues/classic-renderer.md)
 - [Integrate a compatible SPC audio backend](issues/spc-audio-backend.md)
 - [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
-- [Save at the bedroom desk](issues/save-point.md)
 - [Continue a saved game in the app and on the page](issues/continue-saved-game.md)
 - [Open Yomi's box after the frozen return](issues/yomi-menu.md)
 - [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
