@@ -58,4 +58,3 @@
 - [ ] [Check the European slice against a native route](issues/european-route.md)
 - [ ] [Reproduce the European friend's door-scene freeze in the player host](issues/european-friend-scene-freeze.md)
 - [ ] [Reproduce European post-Box Elder and frozen-town progression in the player host](issues/european-post-box-progression.md)
-- [ ] [Replay European route traces against the deployed web page](issues/web-replay-harness.md)

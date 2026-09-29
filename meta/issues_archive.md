@@ -132,3 +132,4 @@
 - [x] [Accept the European ROM in the app and the web page](issues/european-hosts.md)
 - [x] [Play the frozen return and the Elder's mission](issues/frozen-return-mission.md)
 - [x] [Repin the oracle producer source after the audio-port capture](issues/repin-oracle-audio-capture.md)
+- [x] [Replay European route traces against the deployed web page](issues/web-replay-harness.md)
