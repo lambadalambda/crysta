@@ -153,7 +153,7 @@ pub fn name_glyphs(image: &[u8], item: u8) -> Result<(u8, Vec<[u8; 256]>), ShopE
     Ok((head[1], crate::labels::label_glyphs(image, start + 2)?))
 }
 
-fn packet(image: &[u8], at: u32) -> Result<Vec<u8>, ShopError> {
+pub(crate) fn packet(image: &[u8], at: u32) -> Result<Vec<u8>, ShopError> {
     let start = usize::try_from(at & 0x3F_FFFF).map_err(|_| ShopError::Truncated(at))?;
     let input = image.get(start..).ok_or(ShopError::Truncated(at))?;
     compression::decode(input, PACKET)
@@ -161,7 +161,7 @@ fn packet(image: &[u8], at: u32) -> Result<Vec<u8>, ShopError> {
         .map_err(|_| ShopError::Invalid(at, "malformed packet"))
 }
 
-fn colours<const N: usize>(image: &[u8], at: u32) -> Result<[Bgr555; N], ShopError> {
+pub(crate) fn colours<const N: usize>(image: &[u8], at: u32) -> Result<[Bgr555; N], ShopError> {
     let bytes = read(image, at, N * 2)?;
     Ok(std::array::from_fn(|i| {
         Bgr555::new(u16::from_le_bytes([bytes[i * 2], bytes[i * 2 + 1]]))

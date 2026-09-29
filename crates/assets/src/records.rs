@@ -1,7 +1,12 @@
 //! The Records screen ([notes](../../../docs/records-screen.md)): the save
 //! screen the bedroom desk opens, its text requests and its art.
 
+use crate::graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp};
+use crate::labels::{label_glyphs, Glyph};
 use crate::layout::Address;
+use crate::shop_display::{colours, packet};
+use crate::shops::{read, ShopError};
+use crate::sprites::SpriteFrame;
 use crate::text::{DialoguePage, HouseDialogue, Request, TextError};
 
 /// The page: ` 1`–` 3`, the current game's header and the question.
@@ -109,4 +114,88 @@ pub fn saved_text(
     let mut sources: Vec<Request<'_>> = vec![(address(image, SAVED)?, &number)];
     sources.extend(slot_requests(image, slots, &readers)?);
     HouseDialogue::decode_requests(image, &sources)
+}
+
+/// BG1's characters: an LZ packet of 128 4bpp tiles (VRAM `$3000`).
+const BG_TILES: Address = Address::both(0xAB_8ABA, 0xAD_9543);
+/// BG1's 32×32 map, raw (VRAM `$3800`).
+const BG_MAP: Address = Address::both(0xE7_198F, 0xE9_198F);
+/// CGRAM `$20–7F`: BG palettes 2–7; colour `$20` is also the backdrop.
+const BG_COLOURS: Address = Address::both(0xCC_7096, 0xCE_7096);
+/// OBJ tiles `$100–1FF`: an LZ packet (VRAM `$5000`).
+const OBJ_TILES: Address = Address::both(0xC8_0890, 0xC8_777E);
+/// CGRAM `$B0–FF`: OBJ palettes 3–7.
+const OBJ_COLOURS: Address = Address::both(0xCD_0953, 0xCF_0953);
+/// The actors' animation table; the rollers' and the cursor's frames.
+const ANIMATIONS: Address = Address::both(0xB0_BD4F, 0xB2_C159);
+const ROLLER: u32 = 0x42;
+const CURSOR: u32 = 0x18E;
+/// The title's glyphs: 旅のきろく, European "Records".
+const TITLE: Address = Address::both(0x92_CC26, 0x92_E2CA);
+
+/// The screen's art.
+#[derive(Debug, Clone)]
+pub struct RecordsArt {
+    /// BG1's characters.
+    pub bg_tiles: Vec<Tile4bpp>,
+    /// BG1's map entries, 32×32.
+    pub bg_map: Vec<u16>,
+    /// CGRAM `$20–7F`.
+    pub bg_colours: [Bgr555; 0x60],
+    /// OBJ tiles `$100–1FF`.
+    pub obj_tiles: Vec<Tile4bpp>,
+    /// CGRAM `$B0–FF`.
+    pub obj_colours: [Bgr555; 0x50],
+    /// Each roller: 45 pieces, OBJ palette 6.
+    pub roller: SpriteFrame,
+    /// The cursor: one piece, OBJ palette 4.
+    pub cursor: SpriteFrame,
+    /// The title's 16×16 glyphs, in OBJ palette 4.
+    pub title: Vec<Glyph>,
+}
+
+fn located(image: &[u8], address: Address) -> Result<u32, ShopError> {
+    address
+        .of(image)
+        .ok_or(ShopError::Invalid(0, "no Records art in this revision"))
+}
+
+fn tiles(image: &[u8], address: Address, bytes: usize) -> Result<Vec<Tile4bpp>, ShopError> {
+    let at = located(image, address)?;
+    packet(image, at)?
+        .get(..bytes)
+        .ok_or(ShopError::Invalid(at, "short packet"))
+        .and_then(|bytes| decode_tiles_4bpp(bytes).map_err(|_| ShopError::Invalid(at, "tiles")))
+}
+
+/// The sprite frame at `offset` into the animation table.
+fn frame(image: &[u8], offset: u32) -> Result<SpriteFrame, ShopError> {
+    let at = located(image, ANIMATIONS)? + offset;
+    let count = usize::from(read(image, at + 16, 1)?[0]);
+    SpriteFrame::decode(read(image, at, 17 + 7 * count)?)
+        .map_err(|_| ShopError::Invalid(at, "sprite frame"))
+}
+
+impl RecordsArt {
+    /// Decodes the art.
+    ///
+    /// # Errors
+    /// Refuses a packet, map, palette or frame outside the image or
+    /// malformed.
+    pub fn from_rom(image: &[u8]) -> Result<Self, ShopError> {
+        let map = located(image, BG_MAP)?;
+        Ok(Self {
+            bg_tiles: tiles(image, BG_TILES, 0x1000)?,
+            bg_map: read(image, map, 0x800)?
+                .chunks_exact(2)
+                .map(|entry| u16::from_le_bytes([entry[0], entry[1]]))
+                .collect(),
+            bg_colours: colours(image, located(image, BG_COLOURS)?)?,
+            obj_tiles: tiles(image, OBJ_TILES, 0x2000)?,
+            obj_colours: colours(image, located(image, OBJ_COLOURS)?)?,
+            roller: frame(image, ROLLER)?,
+            cursor: frame(image, CURSOR)?,
+            title: label_glyphs(image, located(image, TITLE)?)?,
+        })
+    }
 }

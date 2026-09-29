@@ -51,3 +51,31 @@ fn the_entry_page_places_slots_names_and_the_current_game() {
         );
     }
 }
+
+#[test]
+fn the_art_decodes_as_the_screen_loads_it() {
+    for (name, title) in [(ROMS[0], 5), (ROMS[1], 7)] {
+        let Some(rom) = load(name) else {
+            continue;
+        };
+        let art = records::RecordsArt::from_rom(rom.image()).unwrap();
+        assert_eq!(art.bg_tiles.len(), 128, "{name}");
+        assert_eq!(art.bg_map.len(), 32 * 32, "{name}");
+        assert!(
+            art.bg_map[..9 * 32]
+                .iter()
+                .all(|&entry| entry.trailing_zeros() >= 10),
+            "{name}: rows 0–8 blank"
+        );
+        assert_eq!(art.bg_colours[0].raw(), 0x18A5, "{name}: the backdrop");
+        assert_eq!(art.obj_tiles.len(), 256, "{name}");
+        assert_eq!(art.roller.components().len(), 45, "{name}");
+        assert_eq!(art.cursor.components().len(), 1, "{name}");
+        assert_eq!(
+            art.cursor.components()[0].word() & 0x1FF,
+            0x2A,
+            "{name}: tile `$12A`"
+        );
+        assert_eq!(art.title.len(), title, "{name}");
+    }
+}
