@@ -58,4 +58,3 @@
 - [ ] [Check the European slice against a native route](issues/european-route.md)
 - [ ] [Reproduce the European friend's door-scene freeze in the player host](issues/european-friend-scene-freeze.md)
 - [ ] [Reproduce European post-Box Elder and frozen-town progression in the player host](issues/european-post-box-progression.md)
-- [ ] [Repin the oracle producer source after the audio-port capture](issues/repin-oracle-audio-capture.md)
