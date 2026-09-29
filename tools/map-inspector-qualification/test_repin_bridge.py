@@ -9,6 +9,7 @@ import unittest
 import bridge
 import check
 import library_bridge as library
+import oracle_repin_bridge as oracle
 import repin_bridge as repin
 
 MAIN = bridge.MAIN
@@ -16,11 +17,13 @@ MAIN = bridge.MAIN
 
 class RepinDescriptorGates(unittest.TestCase):
     def setUp(self):
-        self.repo = check.REPO
         self.descriptor = check.load(check.HERE / 'repin-producer.json')
         self.library = check.load(check.HERE / 'library-producer.json')
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
+        # The tree as this frozen stage saw it: the later oracle repin reverted.
+        self.repo = check.REPO
+        self.repo = self.materialize('repin-repo')
         self.path = Path(self.temp.name) / 'descriptor.json'
         self.fixed = Path(self.temp.name) / 'fixed'
         fixed_main = self.fixed / MAIN
@@ -42,10 +45,12 @@ class RepinDescriptorGates(unittest.TestCase):
         next real check instead of a missing-file error.
         """
         root = Path(self.temp.name) / name
-        for source in repin.current_sources(self.descriptor):
+        for source, digest in repin.current_sources(self.descriptor).items():
             target = root / source
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_bytes((self.repo / source).read_bytes())
+            target.write_bytes(oracle.historical_bytes(source, digest)
+                               if source in oracle.REPLACED_FILES
+                               else (self.repo / source).read_bytes())
         if main is not None:
             (root / MAIN).write_bytes(main)
         return root.resolve()

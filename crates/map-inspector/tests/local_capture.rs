@@ -24,8 +24,14 @@ const REPIN_BRIDGE: &str =
     include_str!("../../../tools/map-inspector-qualification/repin-producer-bridge.json");
 const REPIN_SHA: &str = "e58a0f232a8ce9cc86186e515a9156ca32c4fd992c4a7f38cd859c117a247c33";
 const REPIN_BRIDGE_SHA: &str = "5fed82d65b682ca001dfa55b3ce6f9c60f9911d7b9cd0313e461e688b167173f";
-const REPIN_FILES: &[&str] = &["crates/map-inspector/src/main.rs"];
-const REPIN_FIELDS: &[&str] = &[
+const ORACLE_REPIN: &str =
+    include_str!("../../../tools/map-inspector-qualification/oracle-repin-producer.json");
+const ORACLE_REPIN_BRIDGE: &str =
+    include_str!("../../../tools/map-inspector-qualification/oracle-repin-producer-bridge.json");
+const ORACLE_REPIN_SHA: &str = "d57368e0060ccb084a0686250325d9612e6758a9876df8cedf8068c889e6f342";
+const ORACLE_REPIN_BRIDGE_SHA: &str =
+    "19c28e8a76c0231dfa0b2f65360f954082664f0c0164a655d264905bd0ec8b07";
+const STAGE_FIELDS: &[&str] = &[
     "schema_version",
     "kind",
     "epoch",
@@ -35,6 +41,48 @@ const REPIN_FIELDS: &[&str] = &[
     "predecessor_descriptor_sha256",
     "predecessor_bridge_sha256",
     "replaced_source_hashes",
+];
+
+/// One explicit successor stage over the frozen library descriptor. Each
+/// records exactly its own replacements; nothing earlier is rewritten.
+struct Stage {
+    descriptor: &'static str,
+    sha: &'static str,
+    bridge: &'static str,
+    bridge_sha: &'static str,
+    kind: &'static str,
+    report_key: &'static str,
+    files: &'static [&'static str],
+    predecessor_sha: &'static str,
+    predecessor_bridge_sha: &'static str,
+}
+
+/// Oldest first. Each stage's predecessor is the one before it.
+const STAGES: &[Stage] = &[
+    // The rustfmt declaration reorder in main.rs.
+    Stage {
+        descriptor: REPIN,
+        sha: REPIN_SHA,
+        bridge: REPIN_BRIDGE,
+        bridge_sha: REPIN_BRIDGE_SHA,
+        kind: "map-inspector-repin-producer",
+        report_key: "repin_descriptor_sha256",
+        files: &["crates/map-inspector/src/main.rs"],
+        predecessor_sha: LIBRARY_SHA,
+        predecessor_bridge_sha: LIBRARY_BRIDGE_SHA,
+    },
+    // Bounded native frame audio capture and CPU audio-port tracing.
+    Stage {
+        descriptor: ORACLE_REPIN,
+        sha: ORACLE_REPIN_SHA,
+        bridge: ORACLE_REPIN_BRIDGE,
+        bridge_sha: ORACLE_REPIN_BRIDGE_SHA,
+        kind: "map-inspector-oracle-repin-producer",
+        report_key: "oracle_repin_descriptor_sha256",
+        files: &["crates/oracle/src/lib.rs", "vendor/ares/shims.cpp"],
+        predecessor_sha: REPIN_SHA,
+        predecessor_bridge_sha: REPIN_BRIDGE_SHA,
+    },
 ];
 const MAIN: &str = "crates/map-inspector/src/main.rs";
 // The rustfmt declaration-order repair, pinned as an exact byte delta so the
@@ -334,65 +382,101 @@ fn check_library_identity(library: &serde_json::Value, predecessor: &serde_json:
     );
 }
 
-/// The repin stage authenticates the frozen library stage by hash, then records
-/// exactly one replacement over it. Unchanged sources stay derived from the
+fn stage_descriptors() -> Vec<serde_json::Value> {
+    STAGES
+        .iter()
+        .map(|stage| serde_json::from_str(stage.descriptor).unwrap())
+        .collect()
+}
+
+/// The newest recorded identity of `name` across `stages` (oldest first), then
+/// the library stage; `None` means it is still the frozen predecessor's.
+fn staged_identity<'a>(
+    name: &str,
+    stages: &'a [serde_json::Value],
+    library: &'a serde_json::Value,
+) -> Option<&'a str> {
+    stages
+        .iter()
+        .rev()
+        .chain(std::iter::once(library))
+        .find_map(|stage| stage["replaced_source_hashes"][name]["current_sha256"].as_str())
+}
+
+/// A stage authenticates its frozen predecessor by hash, then records exactly
+/// its own replacements over it. Unchanged sources stay derived from the
 /// frozen descriptors; there is deliberately no field in which to reseal one.
-fn check_repin_identity(repin: &serde_json::Value, library: &serde_json::Value) {
+fn check_stage_identity(
+    stage: &Stage,
+    descriptor: &serde_json::Value,
+    earlier: &[serde_json::Value],
+    library: &serde_json::Value,
+) {
     use std::collections::BTreeSet;
-    assert_eq!(sha256(REPIN.as_bytes()), REPIN_SHA);
-    assert_eq!(sha256(REPIN_BRIDGE.as_bytes()), REPIN_BRIDGE_SHA);
+    assert_eq!(sha256(stage.descriptor.as_bytes()), stage.sha);
+    assert_eq!(sha256(stage.bridge.as_bytes()), stage.bridge_sha);
     assert_eq!(
-        repin
+        descriptor
             .as_object()
             .unwrap()
             .keys()
             .map(String::as_str)
             .collect::<BTreeSet<_>>(),
-        REPIN_FIELDS.iter().copied().collect::<BTreeSet<_>>()
+        STAGE_FIELDS.iter().copied().collect::<BTreeSet<_>>()
     );
-    assert_eq!(repin["schema_version"], 1);
-    assert_eq!(repin["kind"], "map-inspector-repin-producer");
-    assert_eq!(repin["epoch"], library["epoch"]);
-    assert_eq!(repin["policy"], library["policy"]);
-    assert_eq!(repin["original_descriptor_sha256"], OBSERVER_SHA);
-    assert_eq!(repin["migration_sha256"], MIGRATION_SHA);
-    assert_eq!(repin["predecessor_descriptor_sha256"], LIBRARY_SHA);
-    assert_eq!(repin["predecessor_bridge_sha256"], LIBRARY_BRIDGE_SHA);
-    check_inventory(&repin["replaced_source_hashes"], REPIN_FILES);
-    for name in REPIN_FILES {
+    assert_eq!(descriptor["schema_version"], 1);
+    assert_eq!(descriptor["kind"], stage.kind);
+    assert_eq!(descriptor["epoch"], library["epoch"]);
+    assert_eq!(descriptor["policy"], library["policy"]);
+    assert_eq!(descriptor["original_descriptor_sha256"], OBSERVER_SHA);
+    assert_eq!(descriptor["migration_sha256"], MIGRATION_SHA);
+    assert_eq!(
+        descriptor["predecessor_descriptor_sha256"],
+        stage.predecessor_sha
+    );
+    assert_eq!(
+        descriptor["predecessor_bridge_sha256"],
+        stage.predecessor_bridge_sha
+    );
+    check_inventory(&descriptor["replaced_source_hashes"], stage.files);
+    for name in stage.files {
         check_inventory(
-            &repin["replaced_source_hashes"][name],
+            &descriptor["replaced_source_hashes"][name],
             &["predecessor_sha256", "current_sha256"],
         );
         assert_ne!(
-            repin["replaced_source_hashes"][name]["current_sha256"],
-            repin["replaced_source_hashes"][name]["predecessor_sha256"]
+            descriptor["replaced_source_hashes"][name]["current_sha256"],
+            descriptor["replaced_source_hashes"][name]["predecessor_sha256"]
         );
         // The declared pre-state must be the frozen stage's actual identity,
         // not a plausible-looking hash. Checked here so a clean checkout, which
         // never runs the Python bridge, still rejects a fabricated predecessor.
         let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
-        let declared = repin["replaced_source_hashes"][name]["predecessor_sha256"]
+        let declared = descriptor["replaced_source_hashes"][name]["predecessor_sha256"]
             .as_str()
             .expect("declared predecessor identity");
-        let frozen = library["replaced_source_hashes"][name]["current_sha256"]
-            .as_str()
+        let frozen = staged_identity(name, earlier, library)
             .unwrap_or_else(|| predecessor_hash(&predecessor, name));
         assert_eq!(
             declared, frozen,
             "declared pre-state is not the frozen stage"
         );
     }
-    check_repin_report(REPIN_BRIDGE, repin);
 }
 
-/// A report whose header and body disagree is exactly the defect this stage
-/// exists to avoid: every retained envelope must bind to this descriptor.
-fn check_repin_report(report: &str, repin: &serde_json::Value) {
+/// A report whose header and body disagree is exactly the defect these stages
+/// exist to avoid: every retained envelope must bind to the stage descriptor.
+fn check_stage_report(stage: &Stage, report: &str, descriptor: &serde_json::Value) {
     let report: serde_json::Value = serde_json::from_str(report).unwrap();
-    assert_eq!(report["repin_descriptor_sha256"], REPIN_SHA);
-    assert_eq!(report["predecessor_descriptor_sha256"], LIBRARY_SHA);
-    assert_eq!(report["predecessor_bridge_sha256"], LIBRARY_BRIDGE_SHA);
+    assert_eq!(report[stage.report_key], stage.sha);
+    assert_eq!(
+        report["predecessor_descriptor_sha256"],
+        stage.predecessor_sha
+    );
+    assert_eq!(
+        report["predecessor_bridge_sha256"],
+        stage.predecessor_bridge_sha
+    );
     assert_eq!(report["migration_sha256"], MIGRATION_SHA);
     assert_eq!(
         report["nonpixel_manifest_sha256"],
@@ -405,16 +489,16 @@ fn check_repin_report(report: &str, repin: &serde_json::Value) {
         "two isolated producer envelopes required"
     );
     for producer in producers {
-        assert_eq!(producer["descriptor_sha256"], REPIN_SHA);
-        assert_eq!(producer["kind"], repin["kind"]);
+        assert_eq!(producer["descriptor_sha256"], stage.sha);
+        assert_eq!(producer["kind"], descriptor["kind"]);
         assert_eq!(
             producer["replaced_source_hashes"],
-            repin["replaced_source_hashes"]
+            descriptor["replaced_source_hashes"]
         );
-        for name in REPIN_FILES {
+        for name in stage.files {
             assert_eq!(
                 producer["source_hashes"][name],
-                repin["replaced_source_hashes"][name]["current_sha256"]
+                descriptor["replaced_source_hashes"][name]["current_sha256"]
             );
         }
     }
@@ -643,15 +727,21 @@ fn bracket_depth(line: &str, depth: usize) -> usize {
 
 fn check_library_sources(root: &Path, library: &serde_json::Value) {
     let predecessor: serde_json::Value = serde_json::from_str(PREDECESSOR).unwrap();
-    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
+    let stages = stage_descriptors();
     check_library_identity(library, &predecessor);
-    check_repin_identity(&repin, library);
+    for (index, stage) in STAGES.iter().enumerate() {
+        if index > 0 {
+            assert_eq!(stage.predecessor_sha, STAGES[index - 1].sha);
+            assert_eq!(stage.predecessor_bridge_sha, STAGES[index - 1].bridge_sha);
+        }
+        check_stage_identity(stage, &stages[index], &stages[..index], library);
+        check_stage_report(stage, stage.bridge, &stages[index]);
+    }
     for field in ["source_hashes", "additional_source_hashes"] {
         for (name, expected) in predecessor[field].as_object().unwrap() {
-            // Latest stage wins: repin over library over frozen predecessor.
-            let expected = repin["replaced_source_hashes"][name]["current_sha256"]
-                .as_str()
-                .or_else(|| library["replaced_source_hashes"][name]["current_sha256"].as_str())
+            // Latest stage wins: oracle repin over repin over library over
+            // frozen predecessor.
+            let expected = staged_identity(name, &stages, library)
                 .unwrap_or_else(|| expected.as_str().unwrap());
             let contents = std::fs::read(root.join(name)).expect("read predecessor source");
             if name == LOCK {
@@ -794,89 +884,127 @@ fn library_identity_inventory_and_delta_mutations_are_rejected() {
 }
 
 #[test]
-fn repin_identity_and_report_binding_mutations_are_rejected() {
+fn stage_identity_mutations_are_rejected() {
+    use std::panic::catch_unwind;
     let library: serde_json::Value = serde_json::from_str(LIBRARY).unwrap();
-    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
-    check_repin_identity(&repin, &library);
-    for field in REPIN_FIELDS {
-        let mut changed = repin.clone();
-        changed.as_object_mut().unwrap().remove(*field);
-        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
-    }
-    let mut extra = repin.clone();
-    extra["fallback"] = serde_json::json!(true);
-    assert!(std::panic::catch_unwind(|| check_repin_identity(&extra, &library)).is_err());
-    for field in [
-        "kind",
-        "epoch",
-        "policy",
-        "original_descriptor_sha256",
-        "migration_sha256",
-        "predecessor_descriptor_sha256",
-        "predecessor_bridge_sha256",
-    ] {
-        let mut changed = repin.clone();
-        changed[field] = serde_json::json!("substitution");
-        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
-    }
-    // Substituting the frozen library descriptor for the repin descriptor, and
-    // resealing a replacement as a non-delta, are both rejected.
-    assert!(std::panic::catch_unwind(|| check_repin_identity(&library, &library)).is_err());
-    for name in REPIN_FILES {
-        for identity in ["predecessor_sha256", "current_sha256"] {
-            let mut changed = repin.clone();
-            changed["replaced_source_hashes"][name]
+    let stages = stage_descriptors();
+    for (index, stage) in STAGES.iter().enumerate() {
+        let (descriptor, earlier) = (&stages[index], &stages[..index]);
+        let check = |changed: &serde_json::Value| {
+            catch_unwind(|| check_stage_identity(stage, changed, earlier, &library)).is_err()
+        };
+        assert!(!check(descriptor), "{} must pass unmutated", stage.kind);
+        for field in STAGE_FIELDS {
+            let mut changed = descriptor.clone();
+            changed.as_object_mut().unwrap().remove(*field);
+            assert!(check(&changed), "{}: missing {field}", stage.kind);
+        }
+        let mut extra = descriptor.clone();
+        extra["fallback"] = serde_json::json!(true);
+        assert!(check(&extra));
+        for field in [
+            "kind",
+            "epoch",
+            "policy",
+            "original_descriptor_sha256",
+            "migration_sha256",
+            "predecessor_descriptor_sha256",
+            "predecessor_bridge_sha256",
+        ] {
+            let mut changed = descriptor.clone();
+            changed[field] = serde_json::json!("substitution");
+            assert!(check(&changed), "{}: substituted {field}", stage.kind);
+        }
+        // Substituting the previous stage's descriptor for this one is rejected.
+        assert!(check(earlier.last().unwrap_or(&library)));
+        for name in stage.files {
+            for identity in ["predecessor_sha256", "current_sha256"] {
+                let mut changed = descriptor.clone();
+                changed["replaced_source_hashes"][name]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove(identity);
+                assert!(check(&changed));
+            }
+            // A fabricated pre-state, and a replacement resealed as a non-delta.
+            let mut changed = descriptor.clone();
+            changed["replaced_source_hashes"][name]["predecessor_sha256"] =
+                serde_json::json!("substitution");
+            assert!(
+                check(&changed),
+                "{}: fabricated pre-state {name}",
+                stage.kind
+            );
+            let mut changed = descriptor.clone();
+            changed["replaced_source_hashes"][name]["current_sha256"] =
+                changed["replaced_source_hashes"][name]["predecessor_sha256"].clone();
+            assert!(check(&changed));
+            let mut changed = descriptor.clone();
+            changed["replaced_source_hashes"][name]["extra"] = serde_json::json!("reseal");
+            assert!(check(&changed));
+            let mut changed = descriptor.clone();
+            changed["replaced_source_hashes"]
                 .as_object_mut()
                 .unwrap()
-                .remove(identity);
-            assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+                .remove(*name);
+            assert!(check(&changed));
         }
-        let mut changed = repin.clone();
-        changed["replaced_source_hashes"][name]["current_sha256"] =
-            changed["replaced_source_hashes"][name]["predecessor_sha256"].clone();
-        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
-        let mut changed = repin.clone();
-        changed["replaced_source_hashes"][name]["extra"] = serde_json::json!("reseal");
-        assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
+        let mut changed = descriptor.clone();
+        changed["replaced_source_hashes"]["unexpected/source"] = serde_json::json!("fallback");
+        assert!(check(&changed));
     }
-    let mut changed = repin.clone();
-    changed["replaced_source_hashes"]["unexpected/source"] = serde_json::json!("fallback");
-    assert!(std::panic::catch_unwind(|| check_repin_identity(&changed, &library)).is_err());
 }
 
 #[test]
-fn repin_report_bodies_must_bind_to_the_repin_descriptor() {
+fn stage_report_bodies_must_bind_to_their_descriptor() {
     // The defect this guards: a report whose header names one descriptor while
     // its retained producer envelopes still describe the previous one.
-    let library: serde_json::Value = serde_json::from_str(LIBRARY).unwrap();
-    let repin: serde_json::Value = serde_json::from_str(REPIN).unwrap();
-    let report: serde_json::Value = serde_json::from_str(REPIN_BRIDGE).unwrap();
-    for index in 0..2 {
-        for field in ["descriptor_sha256", "kind", "replaced_source_hashes"] {
-            let mut changed = report.clone();
-            changed["producers"][index][field] = serde_json::json!("stale");
+    use std::panic::catch_unwind;
+    let stages = stage_descriptors();
+    for (stage, descriptor) in STAGES.iter().zip(&stages) {
+        let report: serde_json::Value = serde_json::from_str(stage.bridge).unwrap();
+        let check = |changed: serde_json::Value| {
             let changed = serde_json::to_string(&changed).unwrap();
-            assert!(
-                std::panic::catch_unwind(|| check_repin_report(&changed, &repin)).is_err(),
-                "stale producers[{index}].{field} must be rejected"
-            );
+            catch_unwind(|| check_stage_report(stage, &changed, descriptor)).is_err()
+        };
+        assert!(!check(report.clone()), "{} must pass unmutated", stage.kind);
+        for field in [
+            stage.report_key,
+            "predecessor_descriptor_sha256",
+            "predecessor_bridge_sha256",
+        ] {
+            let mut changed = report.clone();
+            changed[field] = serde_json::json!("stale");
+            assert!(check(changed), "{}: stale {field}", stage.kind);
         }
-        let mut changed = report.clone();
-        changed["producers"][index]["source_hashes"][REPIN_FILES[0]] =
-            repin["replaced_source_hashes"][REPIN_FILES[0]]["predecessor_sha256"].clone();
-        let changed = serde_json::to_string(&changed).unwrap();
-        assert!(std::panic::catch_unwind(|| check_repin_report(&changed, &repin)).is_err());
+        for index in 0..2 {
+            for field in ["descriptor_sha256", "kind", "replaced_source_hashes"] {
+                let mut changed = report.clone();
+                changed["producers"][index][field] = serde_json::json!("stale");
+                assert!(
+                    check(changed),
+                    "{}: stale producers[{index}].{field} must be rejected",
+                    stage.kind
+                );
+            }
+            for name in stage.files {
+                let mut changed = report.clone();
+                changed["producers"][index]["source_hashes"][name] =
+                    descriptor["replaced_source_hashes"][name]["predecessor_sha256"].clone();
+                assert!(check(changed), "{}: stale {name}", stage.kind);
+            }
+        }
+        let mut shared = report.clone();
+        shared["producers"][1]["process"]["run_id"] =
+            shared["producers"][0]["process"]["run_id"].clone();
+        assert!(check(shared));
+        let mut shared = report.clone();
+        shared["producers"][1]["target_dir"] = shared["producers"][0]["target_dir"].clone();
+        assert!(check(shared));
+        let mut single = report;
+        single["producers"] = serde_json::json!([]);
+        assert!(check(single));
     }
-    let mut shared = report.clone();
-    shared["producers"][1]["process"]["run_id"] =
-        shared["producers"][0]["process"]["run_id"].clone();
-    let shared = serde_json::to_string(&shared).unwrap();
-    assert!(std::panic::catch_unwind(|| check_repin_report(&shared, &repin)).is_err());
-    let mut single = report;
-    single["producers"] = serde_json::json!([]);
-    let single = serde_json::to_string(&single).unwrap();
-    assert!(std::panic::catch_unwind(|| check_repin_report(&single, &repin)).is_err());
-    let _ = library;
 }
 
 #[test]

@@ -11,6 +11,7 @@ import bridge
 import capture
 import check
 import library_bridge
+import oracle_repin_bridge
 import repin_bridge
 
 
@@ -140,10 +141,36 @@ class RecorderGates(unittest.TestCase):
                         repin_descriptor=self.path)
         self.assertFalse(self.out.exists())
 
+    def test_oracle_repin_mode_rechecks_and_records_exact_schema_five(self):
+        descriptor = check.load(check.HERE / 'oracle-repin-producer.json')
+        self.path.write_text(json.dumps(descriptor))
+        with patch.object(oracle_repin_bridge, 'verify_oracle_repin_descriptor',
+                          return_value=descriptor) as verify:
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        fixed_source_repo=self.base / 'fixed',
+                        oracle_repin_descriptor=self.path)
+        self.assertEqual(verify.call_count, 2)
+        producer = check.load(self.out / 'producer.json')
+        self.assertEqual(set(producer), oracle_repin_bridge.PRODUCER_FIELDS)
+        self.assertEqual(producer['schema_version'], 5)
+        self.assertEqual(producer['kind'], oracle_repin_bridge.KIND)
+        self.assertEqual(producer['descriptor_sha256'], check.sha(self.path.read_bytes()))
+        self.assertEqual(producer['source_hashes'],
+                         oracle_repin_bridge.current_sources(descriptor))
+        self.assertEqual(producer['replaced_source_hashes'],
+                         descriptor['replaced_source_hashes'])
+
+    def test_oracle_repin_mode_requires_explicit_fixed_source_repository(self):
+        with self.assertRaisesRegex(ValueError, 'fixed source'):
+            capture.run(self.repo, self.out, self.rom, self.save,
+                        oracle_repin_descriptor=self.path)
+        self.assertFalse(self.out.exists())
+
     def test_descriptor_modes_are_mutually_exclusive(self):
         for extra in ({'library_descriptor': self.path,
                        'predecessor_source_repo': self.base / 'predecessor'},
-                      {'current_descriptor': self.path}):
+                      {'current_descriptor': self.path},
+                      {'oracle_repin_descriptor': self.path}):
             with self.subTest(other=sorted(extra)), \
                     self.assertRaisesRegex(ValueError, 'exactly one explicit descriptor mode'):
                 capture.run(self.repo, self.out, self.rom, self.save,

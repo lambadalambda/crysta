@@ -1,0 +1,20 @@
+{
+  "epoch": "headless-sync-video-v1",
+  "kind": "map-inspector-oracle-repin-producer",
+  "migration_sha256": "db249179718cb6bcf9c1755093d441d0094dd39fc836d079220defd3b289ab3c",
+  "original_descriptor_sha256": "7fabf5688943eca89c43ad5aee02d348187fc3491296b1c401535553fbe3a718",
+  "policy": "one-authenticated-slot3-SRAM-Session; labels0..=1840; Start[400,408),A[1100,1112),Right[1800,1840); observe-after-run_frame1601/1841; no-save/no-restore; process-exit; RGB=256x240-even-columns-of-512x480-ABI-BGR-to-RGB",
+  "predecessor_bridge_sha256": "5fed82d65b682ca001dfa55b3ce6f9c60f9911d7b9cd0313e461e688b167173f",
+  "predecessor_descriptor_sha256": "e58a0f232a8ce9cc86186e515a9156ca32c4fd992c4a7f38cd859c117a247c33",
+  "replaced_source_hashes": {
+    "crates/oracle/src/lib.rs": {
+      "current_sha256": "c0865438da106e5ac294c733fa1258b53db95423292e0826e36a7008c3162490",
+      "predecessor_sha256": "f6dede52613ebab5b0e16de4336546e3061a3d893e996fad1cf35b12a7d04de7"
+    },
+    "vendor/ares/shims.cpp": {
+      "current_sha256": "ecf2b99026ddcdd6d4a2ab058999ad8bba3f2d9e577a052d1b1dfbe3d7fbcf27",
+      "predecessor_sha256": "1bc5dc607c97f1601be89100f0a77d8b01b22a455ee98553d6660f1623ba3231"
+    }
+  },
+  "schema_version": 1
+}

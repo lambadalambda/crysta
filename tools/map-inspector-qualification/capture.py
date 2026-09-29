@@ -11,17 +11,20 @@ import uuid
 
 import bridge
 import library_bridge
+import oracle_repin_bridge
 import repin_bridge
 from check import source_hashes, sha, require, ROM, SRAM, POLICY
 
 
 def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None,
-        library_descriptor=None, predecessor_source_repo=None, repin_descriptor=None):
+        library_descriptor=None, predecessor_source_repo=None, repin_descriptor=None,
+        oracle_repin_descriptor=None):
     current_mode = current_descriptor is not None
     library_mode = library_descriptor is not None
     repin_mode = repin_descriptor is not None
-    any_mode = current_mode or library_mode or repin_mode
-    require(sum((current_mode, library_mode, repin_mode)) <= 1,
+    oracle_mode = oracle_repin_descriptor is not None
+    any_mode = current_mode or library_mode or repin_mode or oracle_mode
+    require(sum((current_mode, library_mode, repin_mode, oracle_mode)) <= 1,
             'select exactly one explicit descriptor mode')
     require((fixed_source_repo is not None) == any_mode,
             'descriptor mode and explicit historical fixed source must be supplied together')
@@ -45,6 +48,11 @@ def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None,
         descriptor = repin_bridge.verify_repin_descriptor(repo, fixed_source_repo, repin_descriptor)
         descriptor_sha = sha(repin_descriptor.read_bytes())
         mode = 'repin'
+    elif oracle_repin_descriptor is not None:
+        descriptor = oracle_repin_bridge.verify_oracle_repin_descriptor(
+            repo, fixed_source_repo, oracle_repin_descriptor)
+        descriptor_sha = sha(oracle_repin_descriptor.read_bytes())
+        mode = 'oracle-repin'
     if descriptor is not None:
         require(sha(rom.read_bytes()) == ROM and sha(save.read_bytes()) == SRAM and save.stat().st_size == 8192,
                 'owned ROM/SRAM mismatch')
@@ -94,10 +102,14 @@ def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None,
             unchanged = library_bridge.verify_library_descriptor(
                 repo, predecessor_source_repo, fixed_source_repo, library_descriptor) == descriptor
             unchanged = unchanged and sha(library_descriptor.read_bytes()) == descriptor_sha
-        else:
+        elif mode == 'repin':
             unchanged = repin_bridge.verify_repin_descriptor(
                 repo, fixed_source_repo, repin_descriptor) == descriptor
             unchanged = unchanged and sha(repin_descriptor.read_bytes()) == descriptor_sha
+        else:
+            unchanged = oracle_repin_bridge.verify_oracle_repin_descriptor(
+                repo, fixed_source_repo, oracle_repin_descriptor) == descriptor
+            unchanged = unchanged and sha(oracle_repin_descriptor.read_bytes()) == descriptor_sha
         require(unchanged, 'sources/descriptor changed during capture')
         provenance.update(fresh_target=True, source_repo=str(repo), rom_path=str(rom), sram_path=str(save),
                           stdout_sha256=sha(stdout), stderr_sha256=sha(stderr),
@@ -115,11 +127,17 @@ def run(repo, out, rom, save, current_descriptor=None, fixed_source_repo=None,
                               source_hashes=library_bridge.current_sources(descriptor, predecessor),
                               **{field: descriptor[field] for field in
                                  ('replaced_source_hashes', *library_bridge.GROUPS)})
-        else:
+        elif mode == 'repin':
             provenance.update(schema_version=4, kind=repin_bridge.KIND,
                               epoch=repin_bridge.EPOCH, policy=POLICY,
                               descriptor_sha256=descriptor_sha,
                               source_hashes=repin_bridge.current_sources(descriptor),
+                              replaced_source_hashes=descriptor['replaced_source_hashes'])
+        else:
+            provenance.update(schema_version=5, kind=oracle_repin_bridge.KIND,
+                              epoch=oracle_repin_bridge.EPOCH, policy=POLICY,
+                              descriptor_sha256=descriptor_sha,
+                              source_hashes=oracle_repin_bridge.current_sources(descriptor),
                               replaced_source_hashes=descriptor['replaced_source_hashes'])
     (out / 'producer.json').write_text(json.dumps(provenance, indent=2, sort_keys=True) + '\n')
     print(out)
@@ -134,4 +152,5 @@ if __name__ == '__main__':
     parser.add_argument('--fixed-source-repo', type=Path)
     parser.add_argument('--predecessor-source-repo', type=Path)
     parser.add_argument('--repin-descriptor', type=Path)
+    parser.add_argument('--oracle-repin-descriptor', type=Path)
     run(**vars(parser.parse_args()))

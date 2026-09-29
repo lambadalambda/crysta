@@ -34,7 +34,7 @@ def main():
         root = Path(directory)
         for dependency in (
             'bridge.py', 'check.py', 'repin_bridge.py', 'test_library_bridge.py',
-            'projection.py',
+            'projection.py', 'oracle_repin_bridge.py',
             'library-producer.json', 'library-producer-bridge.json',
             'current-producer.json', 'producer-bridge.json', 'observer.json', 'migration.json'):
             (root / dependency).write_bytes((HERE / dependency).read_bytes())

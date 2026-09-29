@@ -504,7 +504,8 @@ done
 ### Gates
 
 The Rust sourcegate resolves expected sources latest-stage-first: repin over
-library over frozen predecessor. `check_repin_report` additionally requires
+library over frozen predecessor (and, since the oracle repin below, that stage
+first). `check_stage_report` (formerly `check_repin_report`) additionally requires
 every retained producer envelope in the report to bind to the repin descriptor
 — same `descriptor_sha256`, `kind` and `replaced_source_hashes`, and a
 `source_hashes` main identity equal to the declared replacement, with two
@@ -521,6 +522,68 @@ detected; records are retained under ignored `local/map-inspector-repin/`.
 `test_capture.py` covers the recorder's repin branch: schema-4 envelope shape,
 inherited (not restated) group inventories, the required fixed-source argument
 and descriptor-mode exclusivity.
+
+## Oracle repin: audio capture and CPU audio-port tracing
+
+The European work added bounded native frame audio capture and CPU audio-port
+tracing (`1565a13`, `ae1d8aa`, clippy-only `3553234`). That changed two pinned
+producer sources on both sides of the oracle FFI boundary. This is a **fourth
+stage** over the frozen repin stage (`e58a0f23…7c33`, `5fed82d6…173f`); no
+earlier descriptor, report, epoch or output pin changed.
+
+| Identity | Frozen repin stage | Current |
+| --- | --- | --- |
+| `crates/oracle/src/lib.rs` | `f6dede52…04de7` | `c0865438…62490` |
+| `vendor/ares/shims.cpp` | `1bc5dc60…a3231` | `ecf2b990…fcf27` |
+| `oracle-repin-producer.json` | | `d57368e0060ccb084a0686250325d9612e6758a9876df8cedf8068c889e6f342` |
+| `oracle-repin-producer-bridge.json` | | `19c28e8a76c0231dfa0b2f65360f954082664f0c0164a655d264905bd0ec8b07` |
+
+There is no structural proof for a feature delta like this one, so the
+evidence is only empirical: two fresh isolated builds,
+`local/map-inspector-oracle-repin/{oracle-a,oracle-b}` (own clean target, build
+log, copied binary, one singleton capture each), reproduce all ten capture files
+at 855,207 bytes, byte-identical to each other, to the frozen repin report's
+inventory and to the retained `repin-a` capture. The complete manifest stays
+`a7f23508…664a` and canonical nonpixels stay `7998be25…0cb22`. `main.rs` is
+inherited, so the repin stage's exact two-delta proof is re-run unchanged.
+
+`vendor/ares/ares/sfc/cpu/memory.cpp` also gained the audio-port hook but was
+never in the pinned inventory; the isolated builds compiled it, so the capture
+evidence covers it, but no gate watches it.
+
+Reproduce (the report is byte-identical in normal and `-O` Python):
+
+```sh
+T=tools/map-inspector-qualification
+R=local/map-inspector-oracle-repin
+ROM='local/Tenchi Souzou (Japan).sfc'
+SRAM=local/saves/Terranigma.srm
+FIXED_REPO=../ilar-task-capture-renewal   # git worktree add --detach "$FIXED_REPO" 7c5c90b
+D="$T/oracle-repin-producer.json"
+for OPT in '' -O; do
+  python3 $OPT -B "$T/oracle_repin_bridge.py" "$ROM" "$SRAM" "$R/oracle-a" "$R/oracle-b" \
+    "$FIXED_REPO" . "$D" > "$R/recheck$OPT.json"
+  cmp "$R/recheck$OPT.json" "$T/oracle-repin-producer-bridge.json"
+  python3 $OPT -B "$T/test_oracle_repin_bridge.py"
+done
+python3 -B "$T/test_oracle_repin_mutations.py"
+```
+
+New isolated builds use `capture.py ... --oracle-repin-descriptor "$D"
+--fixed-source-repo "$FIXED_REPO"` into new, refused-if-existing roots.
+
+The Rust sourcegate now walks an ordered stage list (repin, then oracle repin)
+instead of one more `.or_else()`: the newest recorded identity wins. Each stage
+must name the one before it, declare that stage's identity as its pre-state,
+and ship a report whose envelopes bind to it. `test_oracle_repin_mutations.py`
+disables each of the fourteen oracle gates in turn (28/28 red in both Python
+modes). Ten Rust gate removals, from dropping the stage to unbinding a report
+envelope, each turn `local_capture` red; the record is in
+`local/map-inspector-oracle-repin/rust-mutations.json`.
+
+The ROM-free controls of the library and repin stages reconstruct their own
+trees, so they now take the two oracle files' earlier bytes from Git history,
+authenticated by the pinned SHA-256 (`oracle_repin_bridge.historical_bytes`).
 
 ## Build-input pins: two files pinned by projection, not whole file
 

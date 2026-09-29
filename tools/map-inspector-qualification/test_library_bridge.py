@@ -10,6 +10,7 @@ from unittest.mock import patch
 import bridge
 import check
 import library_bridge as library
+import oracle_repin_bridge as oracle
 import repin_bridge as repin
 
 
@@ -17,9 +18,10 @@ class LibraryDescriptorGates(unittest.TestCase):
     def library_repo(self):
         """Materialize the tree as the frozen library producer saw it.
 
-        The working tree has since moved on by exactly one rustfmt reorder (see
-        repin-producer.json), so these ROM-free controls reconstruct the library
-        stage instead of reading whatever HEAD happens to be.
+        The working tree has since moved on by one rustfmt reorder and the
+        oracle audio-capture sources (see repin-producer.json and
+        oracle-repin-producer.json), so these ROM-free controls reconstruct the
+        library stage instead of reading whatever HEAD happens to be.
         """
         root = Path(self.temp.name) / 'library-repo'
         names = set(library.current_sources(self.descriptor, self.predecessor))
@@ -32,6 +34,9 @@ class LibraryDescriptorGates(unittest.TestCase):
         main = (check.REPO / bridge.MAIN).read_bytes()
         (root / bridge.MAIN).write_bytes(
             main.replace(repin.FORMATTED_MODS, repin.PINNED_MODS, 1))
+        library_sources = library.current_sources(self.descriptor, self.predecessor)
+        for name in oracle.REPLACED_FILES:
+            (root / name).write_bytes(oracle.historical_bytes(name, library_sources[name]))
         # Resolved: the envelope gate compares recorded paths against repo.resolve().
         return root.resolve()
 
