@@ -46,6 +46,9 @@ fn invalid(source: u32, reason: &'static str) -> TextError {
     TextError { source, reason }
 }
 
+/// A text request: its source, and how it reads WRAM.
+pub type Request<'a> = (u32, &'a dyn Fn(u16) -> Option<u8>);
+
 /// Text-page boundary semantics; choice dispatch remains with the event caller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Acknowledgement {
@@ -264,9 +267,9 @@ impl HouseDialogue {
         decode_profile(image, source, true)
     }
 
-    /// As [`Self::decode_at`], resolving the indexed calls (`$CE`) through
-    /// `read`, the engine byte at an address: the shop texts pick their
-    /// parts by the shop type (`$0DE8`) and the item (`$0DD0`).
+    /// As [`Self::decode_at`], resolving WRAM through `read`, the engine
+    /// byte at an address: the shop texts pick their parts (`$CE`) by the
+    /// shop type (`$0DE8`) and the item (`$0DD0`).
     ///
     /// # Errors
     /// As [`Self::decode_at`], and an indexed call whose byte `read` does
@@ -277,6 +280,30 @@ impl HouseDialogue {
         read: impl Fn(u16) -> Option<u8>,
     ) -> Result<Vec<DialoguePage>, TextError> {
         decode_reading(image, source, true, &read)
+    }
+
+    /// Requests typed one after another into the window the first opens,
+    /// each reading WRAM through its own `read` (names, `$CD` numbers);
+    /// each request ends its own pages. The Records screen builds its page
+    /// so. Not the Pandora profile: these scripts call no Pandora labels.
+    ///
+    /// # Errors
+    /// As [`Self::decode_reading`].
+    pub fn decode_requests(
+        image: &[u8],
+        requests: &[Request<'_>],
+    ) -> Result<Vec<DialoguePage>, TextError> {
+        let Some(&(first, read)) = requests.first() else {
+            return Ok(Vec::new());
+        };
+        let mut decoder = decoder(image, first, false, read);
+        let mut pages = Vec::new();
+        for &(source, read) in requests {
+            (decoder.pc, decoder.read) = (source, read);
+            decoder.stack.clear();
+            pages.extend(decoder.run()?);
+        }
+        Ok(pages)
     }
 
     /// Source-ID lookup. Page index is a stable zero-based key within the text ID;
@@ -374,7 +401,8 @@ fn glyph_pixels(source: &[u8]) -> Result<[u8; 256], TextError> {
 struct Decoder<'a> {
     image: &'a [u8],
     pandora: bool,
-    /// Engine bytes the indexed calls read.
+    /// WRAM the text reads: the indexed calls' bytes, `$CD` numbers and
+    /// names (`$0610` falls back to the default name's initialization).
     read: &'a dyn Fn(u16) -> Option<u8>,
     transparent: bool,
     dimensions: [u16; 2],
@@ -397,7 +425,14 @@ struct Decoder<'a> {
 }
 impl Decoder<'_> {
     fn next(&mut self) -> Result<u8, TextError> {
-        let value = if (0x610..0x616).contains(&self.pc) {
+        let value = if let Some(value) = u16::try_from(self.pc)
+            .ok()
+            .filter(|&at| at < 0x8000)
+            .and_then(self.read)
+        {
+            // Text in WRAM the engine reads: a slot's name (`$061C`).
+            value
+        } else if (0x610..0x616).contains(&self.pc) {
             // $878C97..8CB6 initializes the default name with six LDA #byte / STA
             // absolute pairs. Read the immediates, not a copied string or capture.
             let source = self.address(DEFAULT_NAME)? + (self.pc - 0x610) * 5;
@@ -560,6 +595,20 @@ impl Decoder<'_> {
         )?;
         self.enter(bank | u32::from(u16::from_le_bytes([entry[0], entry[1]])))
     }
+    /// `$CD addr`: the word at `addr` in decimal, without leading zeros;
+    /// digit `d` is glyph `$73 + d` (European `$63 + d`).
+    fn number(&mut self, at: u32) -> Result<(), TextError> {
+        let address = self.word()?;
+        let byte =
+            |address: u16| (self.read)(address).ok_or_else(|| invalid(at, "unresolved number"));
+        let value = u16::from_le_bytes([byte(address)?, byte(address.wrapping_add(1))?]);
+        let font = self.address(FONT)?;
+        let zero = per_revision(self.image, 0x73, 0x63);
+        for digit in value.to_string().bytes() {
+            self.glyph(at, font + (zero + u32::from(digit - b'0')) * 64)?;
+        }
+        Ok(())
+    }
     /// Whether the image is the European one: its dictionary calls, and no
     /// katakana.
     fn europe(&self) -> bool {
@@ -594,7 +643,7 @@ impl Decoder<'_> {
                 "unsupported or recursive text subroutine",
             ));
         }
-        if destination != 0x610 {
+        if destination >= 0x8000 {
             bytes(self.image, destination, 1)?;
         }
         self.stack.push(self.pc);
@@ -602,8 +651,8 @@ impl Decoder<'_> {
         Ok(())
     }
     fn call(&mut self, index: u8) -> Result<(), TextError> {
-        // $859C7A: the `$92C447` word table. Index 0 is the default name in
-        // WRAM, read from its initialization; the rest are ROM speaker-prefix
+        // $859C7A: the `$92C447` word table. Index 0 is the name in WRAM
+        // (`read`, else its initialization), `$0D` a slot's; the rest are ROM speaker-prefix
         // subroutines, whose commands are validated like any other text. The
         // table holds 25 entries, ending where its first subroutine begins.
         if index >= 25 {
@@ -611,7 +660,8 @@ impl Decoder<'_> {
         }
         let pointer = bytes(self.image, self.address(NAMES)? + u32::from(index) * 2, 2)?;
         let address = u32::from(u16::from_le_bytes([pointer[0], pointer[1]]));
-        let destination = if index == 0 && address == 0x610 {
+        let destination = if (0x600..0x800).contains(&address) {
+            // A name in WRAM: the current one (`$0610`), a slot's (`$061C`).
             address
         } else if address >= 0x8000 {
             0x92_0000 | address
@@ -698,7 +748,15 @@ fn decode_reading(
     pandora: bool,
     read: &dyn Fn(u16) -> Option<u8>,
 ) -> Result<Vec<DialoguePage>, TextError> {
-    let mut d = Decoder {
+    decoder(image, source, pandora, read).run()
+}
+fn decoder<'a>(
+    image: &'a [u8],
+    source: u32,
+    pandora: bool,
+    read: &'a dyn Fn(u16) -> Option<u8>,
+) -> Decoder<'a> {
+    Decoder {
         image,
         pandora,
         read,
@@ -716,97 +774,110 @@ fn decode_reading(
         blip: (Some(0x28), 0x28),
         palette: 0,
         speaker: SPEAKER,
-    };
-    for _ in 0..4096 {
-        let at = d.pc;
-        match d.next()? {
-            c @ 0..=0x7f => {
-                let font = d.address(FONT)?;
-                d.glyph(
-                    at,
-                    font + u32::from(c) * 64 + if d.kana { 0x2000 } else { 0 },
-                )?;
-            }
-            // The European font has no katakana or two-byte glyphs.
-            0x80..=0xbf | 0xd0 if d.europe() => {
-                return Err(invalid(at, "no such glyph in the European font"))
-            }
-            c @ 0x80..=0xbf => {
-                let code = (u32::from(c & 0x3f) << 8) | u32::from(d.next()?);
-                d.glyph(
-                    at,
-                    ((0xb5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64),
-                )?;
-            }
-            c @ (0xc0 | 0xc1 | 0xda) => d.standard_window(at, c)?,
-            0xc2 => d.custom_window(at)?,
-            // `$C4 0` draws the page without its window: the friends' line as
-            // the door breaks, and the Pandora guide's.
-            0xc4 => match d.next()? {
-                1 => d.transparent = false,
-                0 => d.transparent = true,
-                _ => return Err(invalid(at, "unsupported font transformation")),
-            },
-            command @ (0xc5 | 0xc7 | 0xc8) => d.timing(command)?,
-            command @ (0xc6 | 0xdc) => d.text_palette(at, command)?,
-            0xca => {
-                if d.next()? != 5 {
-                    return Err(invalid(at, "unsupported text memory write"));
-                }
-                // The speaker's colour at `$7F:060A`, not event RAM.
-                d.speaker = d.word()?;
-            }
-            // $859A13/$859ECA save the banked return after a three-byte pointer.
-            0xcc => {
-                let address = u32::from(d.word()?);
-                let destination = address | (u32::from(d.next()?) << 16);
-                d.enter(destination)?;
-            }
-            0xce => d.indexed_call(at)?,
-            0xcf => {
-                if d.position[1] + 16 >= d.dimensions[1] {
-                    return Err(invalid(at, "unsupported text scrolling"));
-                }
-                d.position = [0, d.position[1] + 16];
-                d.kana = false;
-            }
-            0xd0 => d.kana = true,
-            0xd1 => d.kana = false,
-            0xd2 => {
-                let index = d.next()?;
-                d.call(index)?;
-            }
-            0xd3 => {
-                d.boundary(at, Acknowledgement::End)?;
-                return Ok(d.pages);
-            }
-            0xd4 => {
-                if let Some(caller) = d.stack.pop() {
-                    d.pc = caller;
-                } else if d.page.glyphs.is_empty() && !d.pages.is_empty() {
-                    // `$D5 $D4`: the last page was acknowledged; return to
-                    // the script with the window open for its next request.
-                    return Ok(d.pages);
-                } else {
-                    d.boundary(at, Acknowledgement::None)?;
-                    return Ok(d.pages);
-                }
-            }
-            0xd5 => d.boundary(at, Acknowledgement::Next)?,
-            // `$85:9D7F` clears the window and closes it without a press (a
-            // two-pass latch on `$0DA4` bit 7). Admitted only on an empty
-            // page, as the spear's presentation uses it.
-            0xd7 if d.page.glyphs.is_empty() && d.stack.is_empty() => return Ok(d.pages),
-            0xe3 if d.pandora => {
-                let mask = d.word()?;
-                let destination = pandora::default_button_source(d.image, mask)?;
-                d.enter(destination)?;
-            }
-            command @ 0xe4..=0xe6 if d.europe() => d.dictionary(command)?,
-            // $859725 calls the bank-$92 item-label pointer table, returning via D4.
-            0xe4 if d.pandora => d.label_call(at)?,
-            _ => return Err(invalid(at, "unsupported text command (including choices)")),
-        }
     }
-    Err(invalid(d.pc, "text instruction budget exceeded"))
+}
+impl Decoder<'_> {
+    /// Runs one request from `pc` to its end.
+    fn run(&mut self) -> Result<Vec<DialoguePage>, TextError> {
+        for _ in 0..4096 {
+            let at = self.pc;
+            match self.next()? {
+                c @ 0..=0x7f => {
+                    let font = self.address(FONT)?;
+                    self.glyph(
+                        at,
+                        font + u32::from(c) * 64 + if self.kana { 0x2000 } else { 0 },
+                    )?;
+                }
+                // The European font has no katakana or two-byte glyphs.
+                0x80..=0xbf | 0xd0 if self.europe() => {
+                    return Err(invalid(at, "no such glyph in the European font"))
+                }
+                c @ 0x80..=0xbf => {
+                    let code = (u32::from(c & 0x3f) << 8) | u32::from(self.next()?);
+                    self.glyph(
+                        at,
+                        ((0xb5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64),
+                    )?;
+                }
+                c @ (0xc0 | 0xc1 | 0xda) => self.standard_window(at, c)?,
+                0xc2 => self.custom_window(at)?,
+                // `$C4 0` draws the page without its window: the friends' line as
+                // the door breaks, and the Pandora guide's.
+                0xc4 => match self.next()? {
+                    1 => self.transparent = false,
+                    0 => self.transparent = true,
+                    _ => return Err(invalid(at, "unsupported font transformation")),
+                },
+                command @ (0xc5 | 0xc7 | 0xc8) => self.timing(command)?,
+                command @ (0xc6 | 0xdc) => self.text_palette(at, command)?,
+                0xca => {
+                    if self.next()? != 5 {
+                        return Err(invalid(at, "unsupported text memory write"));
+                    }
+                    // The speaker's colour at `$7F:060A`, not event RAM.
+                    self.speaker = self.word()?;
+                }
+                // $859A13/$859ECA save the banked return after a three-byte pointer.
+                0xcc => {
+                    let address = u32::from(self.word()?);
+                    let destination = address | (u32::from(self.next()?) << 16);
+                    self.enter(destination)?;
+                }
+                0xce => self.indexed_call(at)?,
+                // `$C3 xx yy`: to line `yy`, `xx` map bytes (4 pixels each) in.
+                0xc3 => {
+                    let [column, line] = [self.next()?, self.next()?];
+                    self.position = [u16::from(column) * 4, u16::from(line) * 16];
+                }
+                0xcd => self.number(at)?,
+                0xcf => {
+                    if self.position[1] + 16 >= self.dimensions[1] {
+                        return Err(invalid(at, "unsupported text scrolling"));
+                    }
+                    self.position = [0, self.position[1] + 16];
+                    self.kana = false;
+                }
+                0xd0 => self.kana = true,
+                0xd1 => self.kana = false,
+                0xd2 => {
+                    let index = self.next()?;
+                    self.call(index)?;
+                }
+                0xd3 => {
+                    self.boundary(at, Acknowledgement::End)?;
+                    return Ok(std::mem::take(&mut self.pages));
+                }
+                0xd4 => {
+                    if let Some(caller) = self.stack.pop() {
+                        self.pc = caller;
+                    } else if self.page.glyphs.is_empty() && !self.pages.is_empty() {
+                        // `$D5 $D4`: the last page was acknowledged; return to
+                        // the script with the window open for its next request.
+                        return Ok(std::mem::take(&mut self.pages));
+                    } else {
+                        self.boundary(at, Acknowledgement::None)?;
+                        return Ok(std::mem::take(&mut self.pages));
+                    }
+                }
+                0xd5 => self.boundary(at, Acknowledgement::Next)?,
+                // `$85:9D7F` clears the window and closes it without a press (a
+                // two-pass latch on `$0DA4` bit 7). Admitted only on an empty
+                // page, as the spear's presentation uses it.
+                0xd7 if self.page.glyphs.is_empty() && self.stack.is_empty() => {
+                    return Ok(std::mem::take(&mut self.pages))
+                }
+                0xe3 if self.pandora => {
+                    let mask = self.word()?;
+                    let destination = pandora::default_button_source(self.image, mask)?;
+                    self.enter(destination)?;
+                }
+                command @ 0xe4..=0xe6 if self.europe() => self.dictionary(command)?,
+                // $859725 calls the bank-$92 item-label pointer table, returning via D4.
+                0xe4 if self.pandora => self.label_call(at)?,
+                _ => return Err(invalid(at, "unsupported text command (including choices)")),
+            }
+        }
+        Err(invalid(self.pc, "text instruction budget exceeded"))
+    }
 }
