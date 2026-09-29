@@ -996,3 +996,45 @@ fn fresh_european_post_box_frozen_town_detour() {
     route.checkpoint("world-map-03");
     route.save_trace();
 }
+
+#[test]
+fn fresh_european_save_at_the_desk() {
+    let Some(bytes) = european_rom("CRYSTA_WEB_EU_DESK_TRACE") else {
+        return;
+    };
+    let mut route = Route::new(&bytes, "CRYSTA_WEB_EU_DESK_TRACE");
+    route.until(400, 0, |route| route.world().dialogue().is_some());
+    route.finish_scene(6000);
+    assert!(flag(&route, 0x20));
+    // To the desk as the native walk goes: round the bed, then up to it.
+    let at = |route: &Route| route.world().position();
+    route.until(200, R, |route| at(route).0 >= 390);
+    route.until(200, D, |route| at(route).1 >= 155);
+    route.until(200, R, |route| at(route).0 >= 424);
+    route.until(200, D, |route| at(route).1 >= 180);
+    route.until(200, U, |route| at(route).1 <= 176);
+    route.until(200, R, |route| at(route).0 >= 472);
+    route.frames(20, 0);
+    route.frames(2, U);
+    route.frames(20, 0);
+    assert_eq!(at(&route), (472, 176));
+    route.press_x();
+    let screen = |route: &Route| {
+        matches!(
+            route.world().records(),
+            Some(crysta_runtime::records::View::Screen(_))
+        )
+    };
+    route.until(100, 0, screen);
+    route.frames(5, 0);
+    route.checkpoint("records");
+    route.press_x();
+    route.frames(40, 0);
+    route.checkpoint("saved");
+    route.until(400, 0, |route| route.world().records().is_none());
+    route.frames(20, 0);
+    route.checkpoint("back");
+    let slot = route.world().sram().slot(0).expect("slot 1 saved");
+    assert_eq!((slot.map(), slot.position()), (0x0F, (472, 176)));
+    route.save_trace();
+}
