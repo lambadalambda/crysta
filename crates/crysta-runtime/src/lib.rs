@@ -21,6 +21,7 @@ pub mod art;
 pub mod audio;
 pub mod inventory;
 pub mod plane;
+pub mod records;
 pub mod residents;
 pub mod save;
 pub mod scene;

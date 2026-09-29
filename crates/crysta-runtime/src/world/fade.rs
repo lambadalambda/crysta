@@ -279,6 +279,13 @@ impl World<'_> {
     /// How the screen is drawn now.
     #[must_use]
     pub fn screen(&self) -> Screen {
+        // The Records screen's fades; the host draws the screen itself.
+        if let Some(view) = self.records() {
+            return match view {
+                crate::records::View::Room(brightness) => Screen::lit(brightness),
+                _ => Screen::lit(0),
+            };
+        }
         match self.fading {
             _ if self.dark > 0 => Screen::lit(0),
             Some(Fading::Out { mode, frame, .. }) => out(mode, frame),

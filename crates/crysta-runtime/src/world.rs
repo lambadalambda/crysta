@@ -8,10 +8,12 @@
 use crate::actors::{is_shop_spawner, Actor, Surroundings, Wait};
 use crate::audio::{map_selection, Audio, Cue};
 use crate::plane::Plane;
+use crate::records::{self, Records};
 use crate::residents::{residents, Resident};
 use crate::save::SaveSlot;
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
 use crate::shop::{Counter, Shop};
+use crate::sram::Sram;
 use crate::{admitted, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
@@ -94,6 +96,8 @@ pub struct World<'a> {
     /// The shops' talk targets here, and the shop open ([`crate::shop`]).
     counters: Vec<assets::shops::Shop>,
     shop: Option<Shop>,
+    /// The desk's Records screen, while it runs ([`crate::records`]).
+    records: Option<Records>,
     /// Dark frames left of the last load ([`transition::dark_frames`]).
     dark: u16,
     /// Frames since the arrival's fade began, which times the area title.
@@ -323,6 +327,7 @@ impl<'a> World<'a> {
             ran: false,
             counters: Vec::new(),
             shop: None,
+            records: None,
             dark: 0,
             arrived: 0,
             dawn: 15,
@@ -944,6 +949,11 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((Step::Stayed, None));
         }
+        if self.records.is_some() {
+            self.records_frame(direction, presses);
+            self.apply_patches()?;
+            return Ok((Step::Stayed, None));
+        }
         if self.scene.is_some() {
             self.answer_scene(presses);
             self.apply_patches()?;
@@ -1296,15 +1306,96 @@ impl<'a> World<'a> {
             self.facing,
         );
         let blocked = self.actors[index].run_callback(&mut around);
-        self.scene = blocked.map(|(pc, wait)| Scene::Callback {
-            actor: index,
-            pc,
-            wait,
-        });
+        self.block_callback(index, blocked);
         if self.scene.is_none() && self.globals.player_script.is_some() {
             self.run_player_actor();
         }
         true
+    }
+
+    /// A frame of the Records screen: its input loop holds the play clock;
+    /// a save writes the slot to SRAM; once closed, the desk goes on.
+    fn records_frame(&mut self, direction: Option<Direction>, presses: Presses) {
+        let Some(records) = &mut self.records else {
+            return;
+        };
+        let choosing = records.choosing();
+        let event = records.step(direction, presses.confirm, presses.cancel);
+        // The input loop holds the clock from its first frame (`$87:877D`).
+        if choosing || records.choosing() {
+            self.globals.slot.hold_clock();
+        }
+        match event {
+            Some(records::Event::Save(slot)) => {
+                self.globals.slot.cap_clock();
+                let saved = self.save_slot();
+                self.globals.sram.write_slot(usize::from(slot), &saved);
+                self.globals.last_slot = slot;
+            }
+            Some(records::Event::Sound(sound)) => self.globals.audio.sound_port3(sound),
+            Some(records::Event::Jingle) => self.globals.audio.play(records::JINGLE, false),
+            Some(records::Event::RoomTrack) => self.globals.audio.select(0xFF),
+            Some(records::Event::Closed) => {
+                self.records = None;
+                self.resume_records();
+            }
+            None => {}
+        }
+    }
+
+    /// Resumes the desk's callback past the screen.
+    fn resume_records(&mut self) {
+        let Some(Scene::Callback { actor, pc, wait }) = self.scene.take() else {
+            return;
+        };
+        self.resume_callback(actor, pc, wait, 0);
+        if self.scene.is_none() && self.globals.player_script.is_some() {
+            self.run_player_actor();
+        }
+    }
+
+    /// Continues resident `actor`'s blocked callback with `answer`.
+    fn resume_callback(&mut self, actor: usize, pc: usize, wait: Wait, answer: u8) {
+        let player = self.position();
+        let occupied = occupied_by_others(&self.actors, &self.residents, actor, player);
+        let mut around = surroundings(
+            self.image,
+            &mut self.globals,
+            &self.base,
+            &occupied,
+            player,
+            self.facing,
+        );
+        let blocked = self.actors[actor].resume_callback(pc, wait, answer, &mut around);
+        self.block_callback(actor, blocked);
+    }
+
+    /// A callback that blocked waits as a scene; on the Records screen,
+    /// the screen opens.
+    fn block_callback(&mut self, actor: usize, blocked: Option<(usize, Wait)>) {
+        if let Some((_, Wait::Records)) = blocked {
+            let europe = assets::layout::per_revision(self.image, false, true);
+            self.records = Some(Records::open(europe, self.globals.last_slot));
+        }
+        self.scene = blocked.map(|(pc, wait)| Scene::Callback { actor, pc, wait });
+    }
+
+    /// What the Records screen shows, while it runs.
+    #[must_use]
+    pub fn records(&self) -> Option<records::View> {
+        self.records.as_ref().map(Records::view)
+    }
+
+    /// The cartridge's SRAM.
+    #[must_use]
+    pub fn sram(&self) -> &Sram {
+        &self.globals.sram
+    }
+
+    /// Puts in the SRAM a host kept, and the slot it loaded.
+    pub fn set_sram(&mut self, sram: Sram, last_slot: u8) {
+        self.globals.sram = sram;
+        self.globals.last_slot = last_slot;
     }
 
     /// Feeds presses to the window a script waits on, and resumes it once
@@ -1325,7 +1416,8 @@ impl<'a> World<'a> {
                 Some(answer) => answer,
                 None => return,
             },
-            Some(Wait::Text) => return,
+            // The Records screen runs in its own frames and resumes the desk.
+            Some(Wait::Text | Wait::Records) => return,
             None => {
                 self.scene = None;
                 return;
@@ -1374,18 +1466,7 @@ impl<'a> World<'a> {
                 }
             }
             Scene::Callback { actor, pc, wait } => {
-                let player = self.position();
-                let occupied = occupied_by_others(&self.actors, &self.residents, actor, player);
-                let mut around = surroundings(
-                    self.image,
-                    &mut self.globals,
-                    &self.base,
-                    &occupied,
-                    player,
-                    self.facing,
-                );
-                let blocked = self.actors[actor].resume_callback(pc, wait, answer, &mut around);
-                self.scene = blocked.map(|(pc, wait)| Scene::Callback { actor, pc, wait });
+                self.resume_callback(actor, pc, wait, answer);
             }
         }
         if self.scene.is_none() && self.globals.player_script.is_some() {
@@ -1926,6 +2007,7 @@ mod tests {
             ran: false,
             counters: Vec::new(),
             shop: None,
+            records: None,
             dark: 0,
             arrived: 0,
             dawn: 15,

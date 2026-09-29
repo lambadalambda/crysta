@@ -230,6 +230,11 @@ const ANIMATE_AND_END: u8 = 0x91;
 const CALL: u8 = 0x00;
 /// Returns from it, or goes on when none is kept; `$80:85B8`.
 const RETURN: u8 = 0x01;
+/// The save screen `COP 00` calls from the desk (`$87:8590`, in place on
+/// both ROMs): it clears flags `$FB` and `$FC` (`COP 07`), then runs a
+/// screen of its own, which the world models.
+const RECORDS: usize = 0x07_8590;
+const RECORDS_CLEARS: [u16; 2] = [0x00FB, 0x00FC];
 /// Starts an eased move: pose, then x and y offsets; `$80:9F4C`.
 const EASE_START: u8 = 0xED;
 /// Steps it by a speed each frame until it ends; `$80:9F93`.
@@ -373,6 +378,8 @@ pub enum Wait {
     Text,
     /// A choice's answer; the jump table's normalized offset.
     Choice(usize),
+    /// The save screen, closed.
+    Records,
 }
 
 /// How a run of commands ended.
@@ -1108,6 +1115,14 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
+                if target == RECORDS {
+                    for flag in RECORDS_CLEARS {
+                        around.globals.write_flag(flag);
+                    }
+                    self.pc = operands + 3;
+                    self.state = State::Blocked(Wait::Records);
+                    return false;
+                }
                 self.call = Some(operands + 3);
                 self.pc = target;
             }
@@ -2442,7 +2457,7 @@ const fn standing_pose(facing: Direction) -> (u8, bool) {
 /// a choice, through its table's entry for the answer (0 cancel, 1, 2).
 fn answered(image: &[u8], pc: usize, wait: Wait, answer: u8) -> Option<usize> {
     match wait {
-        Wait::Text => Some(pc),
+        Wait::Text | Wait::Records => Some(pc),
         Wait::Choice(table) => {
             let target = cadence::word(image, table + 2 * usize::from(answer))?;
             (target >= 0x8000).then_some((table & 0xFF_0000) | usize::from(target))
@@ -3504,6 +3519,35 @@ mod script_service_tests {
         tick(&mut actor, &image);
         assert_eq!(actor.selector, 7, "returned after the call");
         assert_eq!(actor.call, None);
+    }
+
+    #[test]
+    fn a_call_to_the_records_screen_clears_its_flags_and_waits_for_it() {
+        // COP00 $87:8590; pose 7; wait.
+        let (image, mut actor) = actor_running(&[2, 0x00, 0x90, 0x85, 0x87, 2, 0x80, 7, 2, 0x8E]);
+        let mut events = vec![0; 512];
+        events[0xFB / 8] = 0x18;
+        let mut globals = Globals::with_events(events);
+        let mut around = Surroundings {
+            image: &image,
+            globals: &mut globals,
+            cells: &[],
+            width: 0,
+            height: 0,
+            occupied: &[],
+            player: (0, 0),
+            facing: Direction::Down,
+        };
+        actor.tick(&mut around);
+        assert_eq!(actor.blocked(), Some(Wait::Records));
+        assert_eq!(
+            around.globals.events[0xFB / 8],
+            0,
+            "`$FB` and `$FC` cleared"
+        );
+        assert_ne!(actor.selector, 7);
+        actor.resume(0, &mut around);
+        assert_eq!(actor.selector, 7, "the screen returns past the call");
     }
 
     #[test]

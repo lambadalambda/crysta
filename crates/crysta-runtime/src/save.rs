@@ -197,11 +197,18 @@ impl SaveSlot {
         }
     }
 
-    /// A frame with the clock paused: the tick, then `INC $062C` (the
+    /// Holds the clock for a frame after its tick: `INC $062C` (the
     /// Records screen's input wait, `$87:877D`).
-    pub fn pause_clock(&mut self) {
-        self.tick_clock();
+    pub fn hold_clock(&mut self) {
         self.set_word(DIVIDER, self.word(DIVIDER).wrapping_add(1));
+    }
+
+    /// A save's cap (`$87:87DE`): `$100000` seconds or more become
+    /// `$58000`.
+    pub fn cap_clock(&mut self) {
+        if self.seconds() >= 0x10_0000 {
+            self.set_seconds(0x5_8000);
+        }
     }
 
     /// The event flags `$7E:06C0–07FF`.
@@ -349,9 +356,13 @@ mod tests {
         // Paused: the tick, then `INC $062C`; one on a wrap adds a second.
         slot.set_word(DIVIDER, 0);
         for _ in 0..100 {
-            slot.pause_clock();
+            slot.tick_clock();
+            slot.hold_clock();
         }
         assert_eq!((slot.word(DIVIDER), slot.seconds()), (0x3C, 3));
+        slot.set_seconds(0x10_0000);
+        slot.cap_clock();
+        assert_eq!(slot.seconds(), 0x5_8000);
     }
 
     #[test]
