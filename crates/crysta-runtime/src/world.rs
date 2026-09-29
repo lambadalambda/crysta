@@ -9,6 +9,7 @@ use crate::actors::{is_shop_spawner, Actor, Surroundings, Wait};
 use crate::audio::{map_selection, Audio, Cue};
 use crate::plane::Plane;
 use crate::residents::{residents, Resident};
+use crate::save::SaveSlot;
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
 use crate::shop::{Counter, Shop};
 use crate::{admitted, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
@@ -1050,6 +1051,44 @@ impl<'a> World<'a> {
         self.globals.transfer = None;
     }
 
+    /// The native save slot of this moment (`$8D:A6FB`): where the player
+    /// stands, the event flags, the items, money and Prime Blue, over the
+    /// bytes the world does not model.
+    #[must_use]
+    pub fn save_slot(&self) -> SaveSlot {
+        let mut slot = self.globals.slot.clone();
+        slot.set_place(self.map, self.facing as u16, self.position());
+        slot.set_events(&self.globals.events);
+        slot.set_inventory(&self.globals.inventory);
+        slot
+    }
+
+    /// Resumes a world from a save slot, as the native load does
+    /// (`$8D:A764`, `$87:8184`): the saved map, the player at the saved
+    /// position facing as saved, the slot's flags and items. `None` when
+    /// flag `$20` is clear, which natively goes to the prologue.
+    ///
+    /// # Errors
+    /// As [`Self::enter_with_events`].
+    pub fn resume(image: &'a [u8], slot: &SaveSlot) -> Result<Option<Self>, WorldError> {
+        let mut events = vec![0; new_game_flags().len()];
+        events[..crate::save::EVENT_BYTES].copy_from_slice(slot.events());
+        if events[0x20 / 8] & (1 << (0x20 % 8)) == 0 {
+            return Ok(None);
+        }
+        let (x, y) = slot.position();
+        let mut world = Self::enter_with_events(image, slot.map(), x, y, events)?;
+        world.face(match slot.facing() {
+            0 => Direction::Down,
+            1 => Direction::Up,
+            2 => Direction::Left,
+            _ => Direction::Right,
+        });
+        world.globals.inventory = slot.inventory();
+        world.globals.slot = slot.clone();
+        Ok(Some(world))
+    }
+
     /// Adds money; for hosts and tests.
     pub fn give_money(&mut self, amount: u32) {
         self.globals.inventory.add_money(amount);
@@ -1559,6 +1598,7 @@ impl<'a> World<'a> {
             .inventory
             .clone_from(&self.globals.inventory);
         entered.globals.scratch.clone_from(&self.globals.scratch);
+        entered.globals.slot.clone_from(&self.globals.slot);
         entered.globals.audio = audio;
         // The same first layer is not reloaded: its patches stay, and the
         // load's own patches go on top.

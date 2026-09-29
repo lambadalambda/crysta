@@ -22,6 +22,7 @@ pub mod audio;
 pub mod inventory;
 pub mod plane;
 pub mod residents;
+pub mod save;
 pub mod scene;
 pub mod shop;
 pub mod world;

@@ -68,6 +68,9 @@ pub struct Globals {
     pub scratch: crate::actors::Scratch,
     /// Money, Prime Blue and the items scripts have given.
     pub inventory: crate::inventory::Inventory,
+    /// The native save slot the world was loaded from or began with: the
+    /// bytes it does not model pass through a save ([`crate::save`]).
+    pub slot: crate::save::SaveSlot,
     /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
     /// door's hit count. Cleared on every map load (`$8D:8AED`).
     pub counters: Vec<u8>,
@@ -102,6 +105,7 @@ impl Globals {
             transfer: None,
             scratch: crate::actors::Scratch::new(),
             inventory: crate::inventory::Inventory::default(),
+            slot: crate::save::SaveSlot::default(),
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),
