@@ -300,7 +300,10 @@ impl<'a> World<'a> {
             player_turn: PlayerTurn::Ready,
             blocked,
             spawn_events: events.clone(),
-            globals: Globals::with_events(events),
+            globals: Globals {
+                slot: SaveSlot::new_game(image),
+                ..Globals::with_events(events)
+            },
             scene: None,
             patched: Vec::new(),
             pots: None,

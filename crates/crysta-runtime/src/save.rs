@@ -5,6 +5,7 @@
 //! loses nothing.
 
 use crate::inventory::{bcd, Inventory};
+use assets::layout::per_revision;
 
 /// Bytes of one slot's data, before its checksum words.
 pub const SLOT_BYTES: usize = 0x4FA;
@@ -57,6 +58,57 @@ impl SaveSlot {
         Self {
             bytes: Box::new(*bytes),
         }
+    }
+
+    /// The block a new game starts with, the default name confirmed, built
+    /// from the ROM's tables as the native game builds it (`docs/saves.md`,
+    /// "New game").
+    #[must_use]
+    pub fn new_game(image: &[u8]) -> Self {
+        let mut slot = Self::default();
+        let (table, name) = per_revision(image, NEW_GAME_JAPAN, NEW_GAME_EUROPE);
+        for (address, value) in word_pairs(image, BOOT).chain(word_pairs(image, table)) {
+            if let Some(at) = in_block(address, 2) {
+                slot.set_word(at, value);
+            }
+        }
+        slot.bytes[EVENTS + 0xFB / 8] |= 1 << (0xFB % 8);
+        // `LDA #code; STA $06xx` for each byte of the default name.
+        for store in image.get(name..).unwrap_or_default().chunks_exact(5) {
+            let [0xA9, code, 0x8D, low, high] = *store else {
+                break;
+            };
+            if let Some(at) = in_block(u16::from_le_bytes([low, high]), 1) {
+                slot.bytes[at] = code;
+            }
+        }
+        slot.recompute_stats();
+        slot
+    }
+
+    /// `$85:F4BD`'s stats from the base values, without equipment: life,
+    /// strength, defence and the rest.
+    fn recompute_stats(&mut self) {
+        let life = self.word(0x9C).wrapping_add(self.word(0x98));
+        let life = if life == 0 || life & 0x8000 != 0 {
+            1
+        } else {
+            life.min(999)
+        };
+        self.set_word(0x57, life);
+        if self.word(0x5D) > life {
+            self.set_word(0x5D, life);
+        }
+        let strength = self.word(0x9E).wrapping_add(self.word(0x9A));
+        let strength = if strength == 0 || strength & 0x8000 != 0 {
+            1
+        } else {
+            strength
+        };
+        self.bytes[0x61] = strength.to_le_bytes()[0];
+        self.bytes[0x66] = strength.to_le_bytes()[0];
+        self.set_word(0x62, self.word(0xA0));
+        self.set_word(0x5F, self.word(0xA2));
     }
 
     /// The slot's bytes.
@@ -177,6 +229,38 @@ impl SaveSlot {
         self.set_money(inventory.money());
         self.set_prime_blue(inventory.prime_blue());
     }
+}
+
+/// WRAM `$0600`, the slot's first byte.
+const WRAM: usize = 0x0600;
+/// `$86:B93F`: the boot's (address, value) word pairs, both ROMs.
+const BOOT: usize = 0x06_B93F;
+/// The new game's pairs (`$87:CD09`) and the default name's stores
+/// (`$87:8C99`); European `$87:CCC6`, `$87:8C8E`.
+const NEW_GAME_JAPAN: (usize, usize) = (0x07_CD09, 0x07_8C99);
+const NEW_GAME_EUROPE: (usize, usize) = (0x07_CCC6, 0x07_8C8E);
+
+/// Where `len` bytes at a bank-`$7E` address sit in the slot, when all of
+/// them lie in `$0600–07FF`.
+fn in_block(address: u16, len: usize) -> Option<usize> {
+    usize::from(address)
+        .checked_sub(WRAM)
+        .filter(|&at| at + len <= 0x200)
+}
+
+/// (address, value) word pairs from `at` up to a negative address (`BMI`).
+fn word_pairs(image: &[u8], at: usize) -> impl Iterator<Item = (u16, u16)> + '_ {
+    image
+        .get(at..)
+        .unwrap_or_default()
+        .chunks_exact(4)
+        .map(|pair| {
+            (
+                u16::from_le_bytes([pair[0], pair[1]]),
+                u16::from_le_bytes([pair[2], pair[3]]),
+            )
+        })
+        .take_while(|&(address, _)| address & 0x8000 == 0)
 }
 
 /// The byte that ends a name.

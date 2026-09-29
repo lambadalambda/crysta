@@ -88,3 +88,26 @@ fn a_native_save_from_2008_decodes_and_resumes_at_the_desk() {
         (0x0F, (472, 176), Direction::Up)
     );
 }
+
+#[test]
+fn a_new_game_slot_is_the_native_one_byte_for_byte() {
+    // `local/saves/newgame-*.block`: the native block captured at `$87:8164`,
+    // the default name confirmed (`docs/saves.md`, "New game").
+    for (name, block) in [
+        ("Tenchi Souzou (Japan).sfc", "newgame-jp.block"),
+        ("Terranigma (E) [!].smc", "newgame-eu.block"),
+    ] {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/saves")
+            .join(block);
+        let (Ok(native), Some(rom)) = (std::fs::read(path), load(name)) else {
+            continue;
+        };
+        let slot = crysta_runtime::save::SaveSlot::new_game(rom.image());
+        assert_eq!(slot.bytes()[..], native[..], "{name}");
+        // A world that starts a game saves from that block.
+        let world = World::enter(rom.image(), 0x0F, 472, 176).unwrap();
+        let saved = world.save_slot();
+        assert_eq!((saved.name(), saved.level()), (slot.name(), 1), "{name}");
+    }
+}
