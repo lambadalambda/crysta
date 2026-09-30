@@ -456,8 +456,9 @@ impl Session {
             )
         });
         let pot = self.world.pot().and_then(|pot| match (pot.flight, carry) {
-            (Some(at), _) => Some((
-                at,
+            // Drawn at its height above the ground point (`$0999`).
+            (Some((x, y, height)), _) => Some((
+                (x, y.wrapping_add_signed(height)),
                 self.carry_frame((pot.art, CarryArt::FLIGHT, false), self.tick, false)?,
             )),
             (None, Some((pose, tick, once))) => Some((
