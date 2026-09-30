@@ -6,6 +6,7 @@ use crysta_app::frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT, WIDE_WIDTH};
 use crysta_app::music::{Player, Synth};
 use crysta_app::music_data::{extract_driver, extract_track};
 use crysta_app::session::{Buttons, Session};
+use crysta_runtime::sram::Sram;
 use room_core::Direction;
 
 /// Pad bits the page sends each frame.
@@ -100,6 +101,38 @@ impl Game {
                 }
             }
         }
+    }
+
+    /// Which ROM runs, `japan` or `europe`: the page keeps each one's
+    /// SRAM apart.
+    #[must_use]
+    pub fn revision(&self) -> &'static str {
+        match self.cartridge.revision() {
+            rom::Revision::Japan => "japan",
+            rom::Revision::EuropeEnglish => "europe",
+        }
+    }
+
+    /// The cartridge's SRAM, as a native `.srm` holds it.
+    #[must_use]
+    pub fn sram(&self) -> Vec<u8> {
+        self.session.world.sram().bytes().to_vec()
+    }
+
+    /// Puts in SRAM the page kept or a `.srm` it imported.
+    ///
+    /// # Errors
+    /// Bytes that are not 8 KiB.
+    pub fn load_sram(&mut self, bytes: &[u8]) -> Result<(), String> {
+        let sram = Sram::from_bytes(bytes).map_err(|error| error.to_string())?;
+        let last = u8::try_from(sram.last_slot()).unwrap_or(0);
+        self.session.world.set_sram(sram, last);
+        Ok(())
+    }
+
+    /// Whether a save wrote the SRAM since the last call.
+    pub fn take_sram_write(&mut self) -> bool {
+        self.session.world.take_sram_write()
     }
 
     /// The view as RGBA bytes, `width() x height()`.
@@ -243,6 +276,31 @@ mod web {
             self.0.audio(out);
         }
 
+        /// `japan` or `europe`.
+        pub fn revision(&self) -> String {
+            self.0.revision().into()
+        }
+
+        /// The SRAM, as a native `.srm` holds it.
+        pub fn sram(&self) -> Vec<u8> {
+            self.0.sram()
+        }
+
+        /// Loads a kept or imported SRAM.
+        ///
+        /// # Errors
+        /// Bytes that are not 8 KiB.
+        pub fn load_sram(&mut self, bytes: &[u8]) -> Result<(), JsError> {
+            self.0
+                .load_sram(bytes)
+                .map_err(|error| JsError::new(&error))
+        }
+
+        /// Whether a save wrote the SRAM since the last call.
+        pub fn take_sram_write(&mut self) -> bool {
+            self.0.take_sram_write()
+        }
+
         /// The fatal error that stopped the world, if any.
         pub fn fault(&self) -> Option<String> {
             self.0.fault()
@@ -290,6 +348,24 @@ mod tests {
         }
         assert!(game.fault().is_none());
         assert!((game.frame_ms() - 19.997_209).abs() < 1e-6);
+    }
+
+    #[test]
+    fn the_page_loads_and_keeps_native_sram() {
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../local/");
+        let (Ok(bytes), Ok(sram)) = (
+            std::fs::read(format!("{path}Terranigma (E) [!].smc")),
+            std::fs::read(format!("{path}saves/Terranigma.srm")),
+        ) else {
+            return;
+        };
+        let mut game = Game::new(&bytes).unwrap();
+        assert_eq!(game.revision(), "europe");
+        assert!(game.load_sram(&[0; 16]).is_err(), "not SRAM");
+        game.load_sram(&sram).unwrap();
+        assert_eq!(game.sram(), sram, "exports byte-identical");
+        game.frame(0);
+        assert!(!game.take_sram_write(), "no save yet");
     }
 
     #[test]

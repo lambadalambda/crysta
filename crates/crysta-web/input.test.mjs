@@ -8,7 +8,7 @@ import vm from 'node:vm';
 const source = readFileSync(new URL('./www/main.js', import.meta.url), 'utf8')
   .replace(/^import init, \{ WebGame \} from '.\/crysta_web\.js';/m, '');
 
-async function page() {
+async function page(stored = new Map(), full = false) {
   const elements = new Map();
   const listeners = new Map();
   const frames = [];
@@ -16,7 +16,7 @@ async function page() {
   const pad = { mapping: 'standard', buttons: Array.from({ length: 16 }, () => ({ pressed: false })), axes: [0, 0] };
   const element = (id) => {
     if (!elements.has(id)) elements.set(id, {
-      checked: false, classList: { add() {}, remove() {} },
+      checked: false, style: {}, classList: { add() {}, remove() {} },
       addEventListener(name, fn) { listeners.set(`${id}:${name}`, fn); },
       focus() {}, getContext: () => ({ putImageData() {} }),
     });
@@ -27,8 +27,13 @@ async function page() {
     getElementById: element,
     addEventListener(name, fn) { listeners.set(`document:${name}`, fn); },
   };
+  const games = [];
   class WebGame {
-    constructor() { this.frames = frames; }
+    constructor() { this.frames = frames; this.loaded = []; this.written = false; games.push(this); }
+    revision() { return 'europe'; }
+    sram() { return new Uint8Array(8192).fill(7); }
+    load_sram(bytes) { if (bytes.length !== 8192) throw new Error('not SRAM'); this.loaded.push(bytes); }
+    take_sram_write() { const written = this.written; this.written = false; return written; }
     static height() { return 224; }
     frame_ms() { return 20; }
     width() { return 256; }
@@ -44,7 +49,9 @@ async function page() {
     addEventListener(name, fn) { listeners.set(name, fn); },
     requestAnimationFrame(fn) { callbacks.push(fn); },
     AudioContext: class { async resume() {} },
-    ImageData: class {}, Uint8Array, Uint8ClampedArray,
+    ImageData: class {}, Uint8Array, Uint8ClampedArray, btoa, atob,
+    localStorage: { getItem: (key) => stored.get(key) ?? null,
+      setItem: (key, value) => { if (full) throw new Error('quota'); stored.set(key, value); } },
   });
   vm.runInContext(`${source}\nqueueSound = () => {};`, context);
   await listeners.get('rom:change')({ target: { files: [{ arrayBuffer: async () => new ArrayBuffer(1) }] } });
@@ -52,7 +59,8 @@ async function page() {
   const raf = (time) => { assert.ok(callbacks.length); callbacks.shift()(time); };
   const key = (name, code) => listeners.get(name)({ code, preventDefault() {} });
   return { frames, pad, raf, key, document, fire: (name) => listeners.get(name)(),
-    last: () => frames.at(-1) };
+    last: () => frames.at(-1), game: games.at(-1), stored,
+    status: () => element('status').textContent };
 }
 
 const CONFIRM = 16;
@@ -110,4 +118,33 @@ test('blur or hidden page discards unsampled gamepad and keyboard presses until 
     if (event === 'visibilitychange') p.raf(72 + offset);
     assert.deepEqual(p.last(), { held: CONFIRM, pressed: CONFIRM }, `${event}: new press works`);
   }
+});
+
+test('the SRAM a save wrote stays in the browser and loads with the ROM', async () => {
+  const kept = Buffer.from(new Uint8Array(8192).fill(3)).toString('base64');
+  const p = await page(new Map([['crysta-sram:europe', kept]]));
+  assert.deepEqual([...p.game.loaded[0].slice(0, 2)], [3, 3], 'the kept save loads');
+  p.raf(0);
+  p.raf(20);
+  assert.equal(p.stored.get('crysta-sram:europe'), kept, 'nothing written without a save');
+  p.game.written = true;
+  p.raf(40);
+  const saved = Buffer.from(p.stored.get('crysta-sram:europe'), 'base64');
+  assert.deepEqual([saved.length, saved[0]], [8192, 7], 'the save is kept');
+});
+
+test('a kept save that does not load is never written over, and full storage does not stop the game', async () => {
+  const p = await page(new Map([['crysta-sram:europe', 'AAAA']]));
+  assert.match(p.status(), /does not load/);
+  p.raf(0);
+  p.game.written = true;
+  p.raf(20);
+  assert.equal(p.stored.get('crysta-sram:europe'), 'AAAA', 'left as it is');
+  const q = await page(new Map(), true);
+  q.raf(0);
+  q.game.written = true;
+  q.raf(20);
+  q.raf(40);
+  assert.equal(q.frames.length, 2, 'the game goes on');
+  assert.match(q.status(), /not kept/);
 });

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Replays a crysta-web route trace through a real page in headless Chromium:
-//   node tools/web-replay/replay.mjs --url URL --rom ROM --trace TRACE [--shots DIR] [--chrome PATH]
+//   node tools/web-replay/replay.mjs --url URL --rom ROM --trace TRACE [--shots DIR] [--chrome PATH] [--sram SRM]
 //     [--step-timeout MS] [--timeout MS]
 // The ROM goes to the page's file input from disk; the page never uploads it.
 // Screenshots (--shots) show copyrighted art: they must stay under local/.
@@ -79,7 +79,7 @@ async function main() {
   const { values: args } = parseArgs({ options: {
     url: { type: 'string', default: 'https://lambadalambda.github.io/crysta/' },
     rom: { type: 'string', default: join(repo, 'local/Terranigma (E) [!].smc') },
-    trace: { type: 'string' }, shots: { type: 'string' }, chrome: { type: 'string' },
+    trace: { type: 'string' }, shots: { type: 'string' }, chrome: { type: 'string' }, sram: { type: 'string' },
     // One CDP call (a step runs at most a few thousand frames); the whole run.
     'step-timeout': { type: 'string', default: '30000' }, timeout: { type: 'string', default: '600000' },
   } });
@@ -130,6 +130,19 @@ async function replay(browser, args, trace, shots, stepMs) {
   const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#rom' });
   await cdp.send('DOM.setFileInputFiles', { nodeId, files: [resolve(args.rom)] });
   await until("document.getElementById('status').textContent === 'Ready.'", 'ROM accepted');
+  const kept = "Object.keys(localStorage).filter((key) => key.startsWith('crysta-sram:')).map((key) => localStorage.getItem(key))";
+  if (args.sram) {
+    // A native `.srm` through the page's own import; the browser must keep it byte for byte.
+    const { nodeId: input } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#import' });
+    await cdp.send('DOM.setFileInputFiles', { nodeId: input, files: [resolve(args.sram)] });
+    await until("document.getElementById('status').textContent === 'Save imported.'", 'save import');
+    const stored = await evaluate(kept);
+    if (stored.length !== 1 || stored[0] !== readFileSync(args.sram).toString('base64')) {
+      throw new Error('the imported save is not kept byte for byte');
+    }
+    console.log(`sram ${args.sram}: imported and kept`);
+  }
+  const before = await evaluate(kept);
   await evaluate("document.getElementById('start').click()");
   await until('__replay.queue.length === 1', 'Start');
   const period = await evaluate('__replay.begin()');
@@ -177,6 +190,8 @@ async function replay(browser, args, trace, shots, stepMs) {
   }
   if (checked !== trace.checkpoints.length) throw new Error(`checked ${checked} of ${trace.checkpoints.length} checkpoints`);
   if (errors.length) throw new Error(`page errors: ${errors.join('; ')}`);
+  const after = await evaluate(kept);
+  console.log(`sram: ${JSON.stringify(after) === JSON.stringify(before) ? 'unchanged' : 'written by a save'}`);
   console.log(`${failures ? 'FAILED' : 'passed'}: ${frame} frames, ${checked} checkpoints, ${failures} failed`);
   cdp.close();
   return failures ? 1 : 0;

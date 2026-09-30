@@ -18,6 +18,9 @@ const status = document.getElementById('status');
 const start = document.getElementById('start');
 const canvas = document.getElementById('view');
 const wide = document.getElementById('wide');
+const saves = document.getElementById('saves');
+const exportSave = document.getElementById('export');
+const importSave = document.getElementById('import');
 const context = canvas.getContext('2d');
 let game = null;
 let running = null; // The running loop's token; a new game ends the old loop.
@@ -119,6 +122,45 @@ function buttons() {
   };
 }
 
+// Saves: the SRAM stays in this browser, one for each ROM revision, as the
+// bytes of a native `.srm` (base64). It never leaves the page.
+const sramKey = () => `crysta-sram:${game.revision()}`;
+function storage() {
+  try { return globalThis.localStorage ?? null; } catch { return null; }
+}
+function toBase64(bytes) {
+  let text = '';
+  for (const byte of bytes) text += String.fromCharCode(byte);
+  return btoa(text);
+}
+function fromBase64(text) {
+  return Uint8Array.from(atob(text), (char) => char.charCodeAt(0));
+}
+// A kept save that does not load is never written over.
+let keepable = true;
+function restoreSram() {
+  keepable = true;
+  const kept = storage()?.getItem(sramKey());
+  if (!kept) return null;
+  try {
+    game.load_sram(fromBase64(kept));
+    return null;
+  } catch (error) {
+    keepable = false;
+    return `The save kept in this browser does not load, and is left as it is: ${error.message ?? error}`;
+  }
+}
+function keepSram() {
+  if (!keepable) return false;
+  try {
+    storage()?.setItem(sramKey(), toBase64(game.sram()));
+    return true;
+  } catch (error) {
+    say(`The save is not kept in this browser: ${error.message ?? error}`, true);
+    return false;
+  }
+}
+
 function stop() {
   running = null;
   game?.free();
@@ -134,8 +176,10 @@ document.getElementById('rom').addEventListener('change', async (event) => {
   try {
     await init();
     game = new WebGame(new Uint8Array(await file.arrayBuffer()));
+    const problem = restoreSram();
+    saves.classList.remove('hidden');
     applyView();
-    say('Ready.');
+    say(problem ?? 'Ready.', !!problem);
     start.classList.remove('hidden');
   } catch (error) {
     say(`This ROM does not work: ${error.message ?? error}`, true);
@@ -144,7 +188,7 @@ document.getElementById('rom').addEventListener('change', async (event) => {
 
 start.addEventListener('click', async () => {
   start.classList.add('hidden');
-  say('');
+  if (keepable) say(''); // A kept save that did not load stays reported.
   // One context for the page; a new game starts its queue afresh.
   try {
     audio ??= new AudioContext({ sampleRate: RATE });
@@ -166,6 +210,34 @@ start.addEventListener('click', async () => {
   const token = {};
   running = token;
   requestAnimationFrame((now) => loop(now, token));
+});
+
+// A native `.srm` in and out: the file stays on this computer.
+exportSave.addEventListener('click', () => {
+  if (!game) return;
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([game.sram()], { type: 'application/octet-stream' }));
+  link.download = `terranigma-${game.revision()}.srm`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+});
+importSave.addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file || !game) return;
+  const kept = storage()?.getItem(sramKey());
+  if (kept && !confirm('Replace the save kept in this browser? The old one stays as a backup.')) return;
+  try {
+    game.load_sram(new Uint8Array(await file.arrayBuffer()));
+  } catch (error) {
+    say(`This save does not load: ${error.message ?? error}`, true);
+    return;
+  }
+  try {
+    if (kept) storage().setItem(`${sramKey()}:previous`, kept);
+  } catch { /* The backup is best effort; the import goes on. */ }
+  keepable = true;
+  if (keepSram()) say('Save imported.');
 });
 
 // The canvas follows the view: 256 or 400 pixels across, three times over
@@ -203,6 +275,7 @@ function loop(now, token) {
     lastPadActions = padActions;
     while (owed >= frameMs) {
       game.frame_with_presses(held, latched | padLatched);
+      if (game.take_sram_write()) keepSram();
       latched = 0;
       padLatched = 0;
       owed -= frameMs;

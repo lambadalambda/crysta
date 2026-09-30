@@ -24,6 +24,10 @@ node tools/web-replay/replay.mjs --trace $T/eu-detour.trace --shots $T/detour
 node --test tools/web-replay/trace.test.mjs
 ```
 
+`--sram FILE` imports a native `.srm` through the page's import control
+before Start and checks the browser keeps it byte for byte; every run says
+whether a save wrote the kept SRAM.
+
 Options: `--url` (for example a local build served from `local/crysta-web/site`),
 `--rom` (default `local/Terranigma (E) [!].smc`), `--chrome` or `$CHROME`
 (default: Playwright's cached `chrome-headless-shell`). `--shots` saves a PNG
