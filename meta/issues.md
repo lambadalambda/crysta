@@ -61,4 +61,4 @@
 - [ ] [Show the title screen](issues/title-screen.md)
 - [ ] [Enter a name and read the opening text](issues/name-entry-opening.md)
 - [ ] [Play the logos and the intro film](issues/intro-film.md)
-- [ ] [Lift and throw pots as the native game does](issues/throw-pots-freely.md)
+- [ ] [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)

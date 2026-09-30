@@ -27,3 +27,13 @@ A press is lost, so throwing seems random. Reported by the user
 
 - Lifts and throws in all four facings, standing and walking, match native
   traces on both ROMs; the cellar's recorded segments still pass.
+
+## Notes
+
+- 18 native traces per ROM replay frame by frame
+  (`crysta-runtime/tests/local_pot_throws.rs`); the three recorded cellar
+  segments still pass (`room-core/tests/local_pots.rs`). Pots work on every
+  map with pots. The break sound's native one-frame jitter is tolerated;
+  ordinary walking turns a frame early (not a pot matter).
+- Left for [pot-extras](pot-extras.md): dash- and jump-throws, the exit
+  drop's fall, the fragments.
