@@ -1,31 +1,32 @@
-//! The cellar pots in C, driven by the world's pad.
+//! The pots of a room, driven by the world's pad.
 //!
-//! Lifting, carrying, the throw and its door contact are
-//! [`room_core::pots`]'s native-qualified component, unchanged: it admits only
-//! the native lift poses and the two Up lanes from (136,368) and (184,368)
-//! (`docs/pandora-pots.md`). The world owns ordinary walking between actions
-//! and hands it to the component on an A press it admits.
+//! Lifting, carrying, the throw and its flight are [`room_core::pots`]'s
+//! component, by the native rules (`docs/pots.md`). The world owns ordinary
+//! walking between actions and hands it to the component on an A press it
+//! admits, until the pot has broken; it strikes the hittable actors a
+//! flight's box overlaps.
 
 use super::{Step, World, WorldError};
 use crate::actors::Actor;
 use crate::audio::Audio;
 use assets::sprites::PandoraCarryMotion;
-use room_core::pots::{Admission, Input, Output, Phase, PotState, SourceObject};
+use room_core::pots::{Admission, Input, Output, Phase, PotState, Sound, SourceObject};
 use room_core::{AnimationState, Direction, Room};
 
-/// The map whose pots the component is qualified for.
-const CELLAR: u16 = 0x000C;
 /// A source pot's word.
 const POT_WORDS: [u16; 2] = [0x18FA, 0x18FB];
 /// The tile a lifted pot's cell takes.
 const LIFTED_TILE: u16 = 0x00F8;
 /// The carry record `$0988` names for an `$FA` pot; `$FB` has `$098F`.
 const FA_SLOT: u16 = 0x098A;
-/// Port 3's sounds: the lift (`$84:BE6D`), the break (`$84:C6E5`), and
-/// the door's hit after it (`$84:C7A9`).
+/// Port 3's sounds: the lift (`$84:BE6D`), the release (`$84:C6E5`) and
+/// the break (`$84:C7A9`).
 const LIFT_SOUND: u8 = 0x11;
-const BREAK_SOUND: u8 = 0x12;
-const HIT_SOUND: u8 = 0x13;
+const RELEASE_SOUND: u8 = 0x12;
+const BREAK_SOUND: u8 = 0x13;
+/// A flight strikes an actor whose box (x±8, y±8) overlaps its own,
+/// edges included (`$85:D281`, `$85:F835`).
+const REACH: u16 = 16;
 
 /// The pots of a room visit.
 #[derive(Clone)]
@@ -42,13 +43,16 @@ pub(super) struct Pots {
     /// The collision a throw started with; the door patches may not change
     /// its lane (`docs/pandora-pots.md`).
     throw_room: Option<Room>,
-    /// Whether the pot in flight has hit the door.
-    hit: bool,
+    /// The actors the flight has struck, once each, and those whose
+    /// callback runs next frame (`$85:D281` strikes; the target's
+    /// `COP 65` callback runs a frame later).
+    struck: Vec<usize>,
+    pending: Vec<usize>,
 }
 
 impl Pots {
-    /// The source pots of a freshly built room, when it is the cellar.
-    pub(super) fn at_entry(map: u16, cells: &[u16]) -> Option<Self> {
+    /// The source pots of a freshly built room, if it has any.
+    pub(super) fn at_entry(cells: &[u16]) -> Option<Self> {
         let objects: Vec<SourceObject> = cells
             .iter()
             .enumerate()
@@ -61,13 +65,14 @@ impl Pots {
                 })
             })
             .collect();
-        (map == CELLAR && !objects.is_empty()).then_some(Self {
+        (!objects.is_empty()).then_some(Self {
             objects,
             state: None,
             owned: false,
             collision: None,
             throw_room: None,
-            hit: false,
+            struck: Vec::new(),
+            pending: Vec::new(),
         })
     }
 }
@@ -81,8 +86,9 @@ pub struct CarriedPot {
     /// [`assets::sprites::PandoraSprites::get`]: the Japanese addresses,
     /// the art's keys in either revision.
     pub art: u32,
-    /// Where it flies, once released; `None` while in hand.
-    pub flight: Option<(u16, u16)>,
+    /// Where it flies, once released: its ground point and its height
+    /// above it (`$0999`, negative up); `None` while in hand.
+    pub flight: Option<(u16, u16, i16)>,
 }
 
 /// Ark's part in a pot action: the carry pose to draw and how far into
@@ -114,7 +120,10 @@ impl World<'_> {
         Some(CarriedPot {
             tile,
             art,
-            flight: state.flight().map(|flight| (flight.x, flight.y)),
+            flight: state
+                .flight()
+                .zip(state.flight_height())
+                .map(|(flight, height)| (flight.x, flight.y, height)),
         })
     }
 
@@ -151,6 +160,14 @@ impl World<'_> {
         let Some(mut pots) = self.pots.take() else {
             return Ok(None);
         };
+        // A script that takes the pad stops Ark at once, even while the pot
+        // he threw still flies (the door's callback does).
+        if self.globals.input_mask & super::PAD_DIRECTIONS != 0 {
+            if let Some(state) = &mut pots.state {
+                let (x, y) = state.position();
+                let _ = state.rebase(room_core::WalkingState::new(x, y), state.facing());
+            }
+        }
         let step = self.pot_step(&mut pots, direction, lift);
         self.pots = Some(pots);
         let Some(step) = step? else {
@@ -166,7 +183,8 @@ impl World<'_> {
         direction: Option<Direction>,
         lift: bool,
     ) -> Result<Option<Step>, WorldError> {
-        if !pots.owned && (!lift || self.arrival.is_some()) {
+        // Talking wins over a lift (`$87:C783` before `$87:C7F1`).
+        if !pots.owned && (!lift || self.arrival.is_some() || self.faces_resident()) {
             return Ok(None);
         }
         self.refresh_collision(pots)?;
@@ -208,7 +226,7 @@ impl World<'_> {
         let mut refusal = None;
         let mut done = None;
         for &input in tries {
-            match state.step(&admission, input) {
+            match state.step_over(&admission, &self.base.room, input) {
                 Ok(output) => {
                     done = Some((input, output));
                     break;
@@ -223,14 +241,16 @@ impl World<'_> {
                 _ => Ok(None),
             };
         };
-        let flying = pots.state.and_then(|state| state.flight()).is_some();
         let phase = state.phase();
-        pots.throw_room = match (phase, pots.throw_room.take()) {
-            (Phase::Throwing, Some(room)) => Some(room),
-            (Phase::Throwing, None) => pots.collision.as_ref().map(|(_, room)| room.clone()),
-            _ => None,
+        let busy = phase == Phase::Throwing || state.flight().is_some();
+        pots.throw_room = match (busy, pots.throw_room.take()) {
+            (true, Some(room)) => Some(room),
+            (true, None) => pots.collision.as_ref().map(|(_, room)| room.clone()),
+            (false, _) => None,
         };
-        pots.owned = phase != Phase::Empty || input.action;
+        // A flight goes on after Ark's control returns; the component walks
+        // him until it breaks.
+        pots.owned = phase != Phase::Empty || input.action || state.flight().is_some();
         pots.state = Some(state);
         let before = self.position();
         self.walking = *state.walking();
@@ -240,8 +260,7 @@ impl World<'_> {
         } else if output.movement.is_some() {
             self.animation.advance(self.walking.active_direction());
         }
-        let broke = flying && state.flight().is_none();
-        sounds(&mut self.globals.audio, &mut pots.hit, &output, broke);
+        sounds(&mut self.globals.audio, &output);
         if let Some(object) = output.consumed_cell {
             let width = self.base.width;
             self.globals.patches.push((
@@ -250,19 +269,53 @@ impl World<'_> {
                 object.replacement,
             ));
         }
-        if let Some(flight) = output.flight.filter(|_| output.door_hit) {
-            let column = flight.x.saturating_sub(8) / 16;
-            for (resident, actor) in self.residents.iter().zip(&mut self.actors) {
-                if actor.hittable() && resident.collision_cell().0 == column {
-                    actor.strike();
-                }
+        self.strike_under_flight(pots, &output);
+        if self.position() == before {
+            return Ok(Some(Step::Stayed));
+        }
+        self.leave_carrying(pots)?;
+        Ok(Some(Step::Walked))
+    }
+
+    /// An exit under a carry step: Ark drops the pot (`$84:C5CB`, sound
+    /// `$12`, unbroken) and leaves.
+    fn leave_carrying(&mut self, pots: &mut Pots) -> Result<(), WorldError> {
+        self.take_exit()?;
+        if !self.in_transition() {
+            return Ok(());
+        }
+        if let Some(state) = &mut pots.state {
+            if state.drop_held() {
+                self.globals.audio.sound_port3(RELEASE_SOUND);
+                pots.owned = false;
             }
         }
-        Ok(Some(if self.position() == before {
-            Step::Stayed
-        } else {
-            Step::Walked
-        }))
+        Ok(())
+    }
+
+    /// Strikes the hittable actors a flight's box overlaps (x±8, y±8 each,
+    /// edges included), once a flight each; their callback runs a frame
+    /// later, as the native `COP 65` does.
+    fn strike_under_flight(&mut self, pots: &mut Pots, output: &Output) {
+        for index in std::mem::take(&mut pots.pending) {
+            if let Some(actor) = self.actors.get_mut(index) {
+                actor.strike();
+            }
+        }
+        if output.held_changed == Some(None) {
+            pots.struck.clear();
+        }
+        let Some(flight) = output.flight else {
+            return;
+        };
+        for (index, actor) in self.actors.iter().enumerate() {
+            let (x, y) = actor.position;
+            let overlaps = flight.x.abs_diff(x) <= REACH && flight.y.abs_diff(y) <= REACH;
+            if overlaps && actor.hittable() && !pots.struck.contains(&index) {
+                pots.struck.push(index);
+                pots.pending.push(index);
+            }
+        }
     }
 
     fn admission<'r>(&self, objects: &'r [SourceObject], room: &'r Room) -> Admission<'r> {
@@ -301,19 +354,14 @@ impl World<'_> {
     }
 }
 
-/// A step's sounds: the lift, and at the break the break and, when the pot
-/// hit the door, the door's hit -- natively four frames later, here next in
-/// line.
-fn sounds(audio: &mut Audio, hit: &mut bool, output: &Output, broke: bool) {
+/// A step's sounds: the lift, the release and the break.
+fn sounds(audio: &mut Audio, output: &Output) {
     if output.consumed_cell.is_some() {
         audio.sound_port3(LIFT_SOUND);
     }
-    *hit |= output.door_hit;
-    if broke {
-        audio.sound_port3(BREAK_SOUND);
-        if std::mem::take(hit) {
-            audio.flush();
-            audio.sound_port3(HIT_SOUND);
-        }
+    match output.sound {
+        Some(Sound::Release) => audio.sound_port3(RELEASE_SOUND),
+        Some(Sound::Break) => audio.sound_port3(BREAK_SOUND),
+        None => {}
     }
 }

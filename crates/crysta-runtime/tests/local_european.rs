@@ -1596,8 +1596,8 @@ fn european_single_world_replays_bedroom_to_underworld() {
     assert!(!eu_flag(&world, 0x292));
     assert_eq!(
         route_audio(&mut world),
-        [Cue::Sound(0x1100), Cue::Sound(0x1200)],
-        "lift and missed throw; no track restart"
+        [Cue::Sound(0x1100), Cue::Sound(0x1200), Cue::Sound(0x1300)],
+        "lift, release and break (`docs/pots.md`); no track restart"
     );
 
     for (frames, direction) in [
@@ -1733,9 +1733,9 @@ fn european_single_world_replays_bedroom_to_underworld() {
     assert!(eu_flag(&world, 0x292), "the second pot opens the blue door");
     eu_finish_scene(&mut world, 5000);
     // EU $88:B40F sets local $8002 and immediately executes COP 37 $1A:
-    // the second-hit script does not wait for the pot to break. Portable
-    // contact is four frames early; deferring this cue alone would detach it
-    // from its source command and patch sequence.
+    // the second-hit script does not wait for the pot to break. The door is
+    // struck at the first sample, just after the release's `$12`, and its
+    // callback runs a frame later (`docs/pots.md`); the break's `$13` follows.
     assert_eq!(
         rom.image().get(0x08_b40f..0x08_b416),
         Some(&[2, 0x07, 0x02, 0x80, 2, 0x37, 0x1a][..])
@@ -1745,8 +1745,8 @@ fn european_single_world_replays_bedroom_to_underworld() {
         second_hit_audio,
         [
             Cue::Sound(0x1100),
-            Cue::Sound(0x001a),
             Cue::Sound(0x1200),
+            Cue::Sound(0x001a),
             Cue::Sound(0x1300),
             Cue::Track {
                 track: 1,
@@ -1758,11 +1758,6 @@ fn european_single_world_replays_bedroom_to_underworld() {
             },
         ],
         "second hit, door opens, reaction fades, then C music resumes once"
-    );
-    assert_ne!(
-        second_hit_audio.iter().copied().filter(|cue| matches!(cue, Cue::Sound(_))).collect::<Vec<_>>(),
-        [Cue::Sound(0x1100), Cue::Sound(0x1200), Cue::Sound(0x001a), Cue::Sound(0x1300)],
-        "native break -> open -> hit sound order is NOT portable order until contact timing is traced"
     );
     assert!(world.patched_cells().contains(&(11, 21, 0xcb)));
     assert!(world.patched_cells().contains(&(11, 20, 0xf6)));

@@ -765,7 +765,7 @@ impl<'a> World<'a> {
         self.apply_load_patches()?;
         let selection = map_selection(self.image, self.map, &self.globals.events);
         self.globals.audio.load_map(selection);
-        self.pots = pots::Pots::at_entry(self.map, self.base.room.cells());
+        self.pots = pots::Pots::at_entry(self.base.room.cells());
         self.counters = self.shop_counters();
         self.plane = WORLD_MAPS.contains(&self.map).then(|| {
             let cells = self
@@ -992,7 +992,9 @@ impl<'a> World<'a> {
         }
         let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
         let direction = direction.filter(|_| !locked);
-        let lift = presses.confirm && !locked && !busy && !self.globals.dialogue.busy();
+        // A dash takes no A (`$0980 = $0010`); its bump does.
+        let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
+        let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
         if let Some(step) = self.pot_frame(direction, lift)? {
             self.apply_patches()?;
             return Ok((step, None));
@@ -1269,6 +1271,17 @@ impl<'a> World<'a> {
         }
     }
 
+    /// Whether a resident that takes interaction stands on the faced cell.
+    fn faces_resident(&self) -> bool {
+        let (x, y) = self.position();
+        let (dx, dy) = facing_delta(self.facing);
+        let faced = (
+            (x / 16).wrapping_add_signed(dx),
+            (y / 16).wrapping_add_signed(dy),
+        );
+        self.faced_resident(faced).is_some()
+    }
+
     /// The first resident on `cell` that takes interaction.
     ///
     /// Natively `$87:C783` takes the first actor hit whose `+$04` has bit 8
@@ -1397,6 +1410,13 @@ impl<'a> World<'a> {
     /// then, as the cartridge's battery would.
     pub fn take_sram_write(&mut self) -> bool {
         std::mem::take(&mut self.globals.sram_written)
+    }
+
+    /// A map-local counter at `$0640 + op` (`COP 4B`), such as the blue
+    /// door's hit count.
+    #[must_use]
+    pub fn counter(&self, op: u8) -> u16 {
+        self.globals.counter(op)
     }
 
     /// `$0496`: the slot last saved or loaded.

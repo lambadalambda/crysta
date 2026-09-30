@@ -459,8 +459,8 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
 
     cues(&mut world);
     segment(&mut world, (104, 352, Direction::Left), MISS);
-    // The lift, then the break (native `pot-first-held`, `door-hit1`).
-    assert_eq!(cues(&mut world), (vec![], vec![0x1100, 0x1200]));
+    // The lift, the release and the break (`docs/pots.md`).
+    assert_eq!(cues(&mut world), (vec![], vec![0x1100, 0x1200, 0x1300]));
     assert_eq!(world.position(), (136, 368));
     assert!(world.patched_cells().contains(&(5, 21, 0xF8)), "lifted");
     assert!(world.pot().is_none(), "broken");
@@ -479,7 +479,7 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
     );
     read_out(&mut world);
     assert!(!flag(&world, 0x292));
-    // And the door's hit after the break (`door-real-hit1`).
+    // The lift, the release and the break; the door's reaction is silent.
     assert_eq!(cues(&mut world).1, [0x1100, 0x1200, 0x1300]);
 
     segment(&mut world, (88, 352, Direction::Left), FB_HIT);
@@ -582,7 +582,10 @@ fn a_carried_pot_is_shown_in_hand_then_in_flight() {
     replay(&mut world, &FB_HIT[2..10]);
     assert_eq!(world.position(), (184, 368));
     replay(&mut world, &[(4, 1), (5, 19)]);
-    assert_eq!(world.pot().and_then(|pot| pot.flight), Some((184, 357)));
+    assert_eq!(
+        world.pot().and_then(|pot| pot.flight),
+        Some((184, 357, -33))
+    );
 }
 
 /// The story flags after the blue door (`$292`).
