@@ -1331,6 +1331,7 @@ impl<'a> World<'a> {
                 let saved = self.save_slot();
                 self.globals.sram.write_slot(usize::from(slot), &saved);
                 self.globals.last_slot = slot;
+                self.globals.sram_written = true;
             }
             Some(records::Event::Sound(sound)) => self.globals.audio.sound_port3(sound),
             Some(records::Event::Jingle) => self.globals.audio.play(records::JINGLE, false),
@@ -1390,6 +1391,12 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn sram(&self) -> &Sram {
         &self.globals.sram
+    }
+
+    /// Whether a save wrote the SRAM since the last call: the host keeps it
+    /// then, as the cartridge's battery would.
+    pub fn take_sram_write(&mut self) -> bool {
+        std::mem::take(&mut self.globals.sram_written)
     }
 
     /// Puts in the SRAM a host kept, and the slot it loaded.

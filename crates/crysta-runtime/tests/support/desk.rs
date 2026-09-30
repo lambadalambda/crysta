@@ -102,3 +102,9 @@ pub fn assert_desk_slot(world: &World<'_>, name: &str) {
     );
     assert!(world.dialogue().is_none(), "{name}");
 }
+
+/// Checks that the save asks the host to write the SRAM once.
+pub fn assert_sram_written_once(world: &mut World<'_>) {
+    assert!(world.take_sram_write(), "the save wrote the SRAM");
+    assert!(!world.take_sram_write(), "once");
+}

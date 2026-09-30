@@ -76,6 +76,8 @@ pub struct Globals {
     /// `$0496`: the slot last saved or loaded, where the Records screen's
     /// cursor starts.
     pub last_slot: u8,
+    /// Whether a save wrote the SRAM since the host last kept it.
+    pub sram_written: bool,
     /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
     /// door's hit count. Cleared on every map load (`$8D:8AED`).
     pub counters: Vec<u8>,
@@ -113,6 +115,7 @@ impl Globals {
             slot: crate::save::SaveSlot::default(),
             sram: crate::sram::Sram::default(),
             last_slot: 0,
+            sram_written: false,
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),
