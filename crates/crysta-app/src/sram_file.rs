@@ -46,15 +46,17 @@ pub fn load(path: &Path) -> Result<Option<Sram>, SramFileError> {
     }
 }
 
-/// Writes `sram` to `path` whole: a temporary file beside it, then a
-/// rename, so a crash leaves the old file or the new one.
+/// Writes `sram` to `path` whole: a temporary file beside it, flushed to
+/// the disk, then a rename, so a crash leaves the old file or the new one.
 ///
 /// # Errors
 /// Writing or renaming failed.
 pub fn store(path: &Path, sram: &Sram) -> io::Result<()> {
     let mut temporary = path.as_os_str().to_owned();
     temporary.push(".tmp");
-    std::fs::write(&temporary, sram.bytes())?;
+    let mut file = std::fs::File::create(&temporary)?;
+    io::Write::write_all(&mut file, sram.bytes())?;
+    file.sync_all()?;
     std::fs::rename(&temporary, path)
 }
 
