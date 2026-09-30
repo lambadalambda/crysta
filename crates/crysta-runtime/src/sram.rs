@@ -151,6 +151,65 @@ impl Sram {
         }
     }
 
+    /// Whether slot `slot`'s primary copy is valid (`$8D:A82E`).
+    #[must_use]
+    pub fn valid(&self, slot: usize) -> bool {
+        slot < SLOTS && valid(self.stored(PRIMARY, slot)).is_some()
+    }
+
+    /// The slot list's pass (`$87:CB4B`): a valid primary is copied over
+    /// its backup, a bad one is restored from the backup; `$1FFE` becomes 0
+    /// when no slot is valid, else its low two bits. Returns which slots
+    /// are valid.
+    pub fn repair(&mut self) -> [bool; SLOTS] {
+        let valid = std::array::from_fn(|slot| {
+            let (primary, backup) = (offset(PRIMARY, slot), offset(BACKUP, slot));
+            if !self.valid(slot) {
+                self.bytes.copy_within(backup..backup + STORED, primary);
+            }
+            let valid = self.valid(slot);
+            if valid {
+                self.bytes.copy_within(primary..primary + STORED, backup);
+            }
+            valid
+        });
+        let last = if valid.contains(&true) {
+            word(&self.bytes[..], LAST) & 3
+        } else {
+            0
+        };
+        set_word(&mut self.bytes[..], LAST, last);
+        valid
+    }
+
+    /// The SRAM after [`Self::repair`].
+    #[must_use]
+    pub fn repaired(mut self) -> Self {
+        self.repair();
+        self
+    }
+
+    /// Where the Restart screen's cursor starts: `$1FFE`'s low two bits,
+    /// which after [`Self::repair`] may point at New Game (3).
+    #[must_use]
+    pub fn cursor(&self) -> u8 {
+        (word(&self.bytes[..], LAST) & 3) as u8
+    }
+
+    /// Copy Data (`$8D:A7A5`): a valid `source` over `destination`'s
+    /// primary with its checksums, then over its backup; `$1FFE` stays.
+    /// Returns whether it copied.
+    pub fn copy_slot(&mut self, source: usize, destination: usize) -> bool {
+        if !self.valid(source) || destination >= SLOTS {
+            return false;
+        }
+        let (from, to) = (offset(PRIMARY, source), offset(PRIMARY, destination));
+        self.bytes.copy_within(from..from + STORED, to);
+        let backup = offset(BACKUP, destination);
+        self.bytes.copy_within(to..to + STORED, backup);
+        true
+    }
+
     /// The last slot saved (`$1FFE`), where the file select's cursor
     /// starts; the first slot when the word names none.
     #[must_use]
@@ -199,6 +258,55 @@ mod tests {
         let before = corrupt.clone();
         assert_eq!(corrupt.slot(1), None);
         assert_eq!(corrupt, before, "reading changes nothing");
+    }
+
+    #[test]
+    fn the_slot_list_repairs_copies_and_masks_as_natively() {
+        let mut sram = Sram::default();
+        sram.write_slot(0, &slot(0x0F));
+        sram.write_slot(2, &slot(0x10));
+        // A bad primary is restored from its backup.
+        sram.bytes[PRIMARY + 9] ^= 0xFF;
+        // A good primary is copied over a bad backup.
+        sram.bytes[BACKUP + 2 * STRIDE + 9] ^= 0xFF;
+        set_word(&mut sram.bytes[..], LAST, 0x0106);
+        assert_eq!(sram.repair(), [true, false, true]);
+        assert_eq!(
+            sram.bytes[PRIMARY..PRIMARY + STORED],
+            sram.bytes[BACKUP..BACKUP + STORED]
+        );
+        let (third, backup) = (offset(PRIMARY, 2), offset(BACKUP, 2));
+        assert_eq!(
+            sram.bytes[third..third + STORED],
+            sram.bytes[backup..backup + STORED]
+        );
+        assert_eq!(sram.cursor(), 2, "`$1FFE` masked to two bits");
+        set_word(&mut sram.bytes[..], LAST, 0x0107);
+        sram.repair();
+        assert_eq!(sram.cursor(), 3, "New Game");
+        // No slot: the cursor on slot 1.
+        assert_eq!(
+            Sram::from_bytes(&[0xFF; SRAM_BYTES])
+                .unwrap()
+                .repaired()
+                .cursor(),
+            0
+        );
+        // Copy: slot 1 over the empty slot 2, primary and backup; `$1FFE` stays.
+        assert!(sram.copy_slot(0, 1));
+        assert_eq!(sram.slot(1), Some(slot(0x0F)));
+        let (second, backup) = (offset(PRIMARY, 1), offset(BACKUP, 1));
+        assert_eq!(
+            sram.bytes[second..second + STORED],
+            sram.bytes[backup..backup + STORED]
+        );
+        assert_eq!(sram.cursor(), 3);
+        // An erased slot repairs to both copies broken, starting `FF FE`.
+        sram.erase(1);
+        assert_eq!(sram.repair(), [true, false, true]);
+        assert_eq!(&sram.bytes[second..second + 2], &[0xFF, 0xFE]);
+        assert!(!sram.copy_slot(1, 2), "a bad source copies nothing");
+        assert!(!sram.valid(1) && sram.valid(0));
     }
 
     #[test]

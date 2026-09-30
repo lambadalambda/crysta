@@ -118,3 +118,28 @@ fn a_new_game_slot_is_the_native_one_byte_for_byte() {
         assert_eq!(world.save_slot().seconds(), 2, "{name}");
     }
 }
+
+#[test]
+fn copy_and_erase_change_the_bytes_the_native_game_changes() {
+    // `docs/restart-screen.md`: erasing the 2008 save's slot 2 changes 4
+    // bytes; copying slot 1 over slot 3 of `local/restart/copy.srm`, 110.
+    use crysta_runtime::sram::Sram;
+    let local = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../local");
+    let (Ok(saves), Ok(copy)) = (
+        std::fs::read(local.join("saves/Terranigma.srm")),
+        std::fs::read(local.join("restart/copy.srm")),
+    ) else {
+        return;
+    };
+    let changed = |after: &Sram, before: &[u8]| {
+        after.bytes().iter().zip(before).filter(|(a, b)| a != b).count()
+    };
+    let mut sram = Sram::from_bytes(&saves).unwrap().repaired();
+    sram.erase(1);
+    sram.repair();
+    assert_eq!(changed(&sram, &saves), 4);
+    let mut sram = Sram::from_bytes(&copy).unwrap().repaired();
+    assert!(sram.copy_slot(0, 2));
+    sram.repair();
+    assert_eq!(changed(&sram, &copy), 110);
+}
