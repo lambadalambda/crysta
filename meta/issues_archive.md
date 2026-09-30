@@ -139,3 +139,5 @@
 - [x] [Read and write native SRAM](issues/sram-codec.md)
 - [x] [Save at the bedroom desk](issues/save-point.md)
 - [x] [Keep the SRAM between sessions](issues/persist-sram.md)
+- [x] [Choose a game on the Restart screen](issues/restart-file-select.md)
+- [x] [Continue a saved game in the app and on the page](issues/continue-saved-game.md)

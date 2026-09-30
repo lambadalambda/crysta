@@ -20,3 +20,9 @@ storage on the page) and offer the native "Restart" file select at start.
 
 1. [Keep the SRAM between sessions](persist-sram.md)
 2. [Choose a game on the Restart screen](restart-file-select.md)
+
+## Notes
+
+- Both hosts start on the Restart screen with the kept SRAM, its cursor on
+  the last slot saved; see [Keep the SRAM between sessions](persist-sram.md)
+  and [Choose a game on the Restart screen](restart-file-select.md).
