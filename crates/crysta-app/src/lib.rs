@@ -14,6 +14,7 @@ pub mod frame;
 pub mod music;
 pub mod music_data;
 pub mod records;
+pub mod restart;
 pub mod session;
 pub mod shop;
 pub mod sram_file;
