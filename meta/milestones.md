@@ -176,6 +176,12 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
 - [Continue a saved game in the app and on the page](issues/continue-saved-game.md)
 - [Open Yomi's box after the frozen return](issues/yomi-menu.md)
+- [Keep the SRAM between sessions](issues/persist-sram.md)
+- [Choose a game on the Restart screen](issues/restart-file-select.md)
+- [Boot as the native game does](issues/native-boot.md)
+- [Show the title screen](issues/title-screen.md)
+- [Enter a name and read the opening text](issues/name-entry-opening.md)
+- [Play the logos and the intro film](issues/intro-film.md)
 - [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
 
 <a id="m6-full-classic-game"></a>
