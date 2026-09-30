@@ -130,7 +130,7 @@ fn no_pot_no_throw_and_errors_are_atomic() {
 }
 
 #[test]
-fn repeated_or_combined_actions_are_not_new_throws() {
+fn a_second_press_is_ignored_and_a_held_direction_does_not_block_a() {
     let r = room();
     let mut s = state(&r, 104, 352, Direction::Left);
     let action = Input {
@@ -138,19 +138,26 @@ fn repeated_or_combined_actions_are_not_new_throws() {
         direction: None,
     };
     s.step(&admission(&r), action).unwrap();
-    let before = s.encode_snapshot();
-    assert_eq!(s.step(&admission(&r), action), Err(Error::Input));
-    assert_eq!(s.encode_snapshot(), before);
-    assert_eq!(
-        s.step(
-            &admission(&r),
-            Input {
-                action: true,
-                direction: Some(Direction::Up)
-            }
-        ),
-        Err(Error::Input)
-    );
+    // Queued: a second press adds nothing; the lift goes on next frame.
+    let out = s.step(&admission(&r), action).unwrap();
+    assert!(out.consumed_cell.is_some());
+    s.step(&admission(&r), action).unwrap();
+    assert_eq!(s.phase(), Phase::Lifting);
+    // A with a direction held lifts too (`docs/pots.md`).
+    let mut s = state(&r, 104, 352, Direction::Left);
+    s.step(
+        &admission(&r),
+        Input {
+            action: true,
+            direction: Some(Direction::Left),
+        },
+    )
+    .unwrap();
+    assert!(s
+        .step(&admission(&r), Input::default())
+        .unwrap()
+        .consumed_cell
+        .is_some());
 }
 
 #[test]
@@ -254,53 +261,48 @@ fn release_contact_reservation_and_recovery_are_distinct_and_restore_safe() {
 }
 
 #[test]
-fn lane_direction_position_callback_and_busy_input_fail_closed() {
+fn throws_leave_any_position_and_facing_and_ignore_input_until_recovery() {
     let r = room();
-    let mut s = ready(&r);
-    let a = Admission {
-        cellar_up_lanes: false,
-        ..admission(&r)
-    };
-    let before = s.encode_snapshot();
-    assert_eq!(
+    for facing in [Direction::Down, Direction::Left, Direction::Right] {
+        let mut s = ready(&r);
+        let a = admission(&r);
+        s.step(
+            &a,
+            Input {
+                action: false,
+                direction: Some(facing),
+            },
+        )
+        .unwrap();
+        frames(&mut s, &r, None, 20);
+        let at = s.position();
         s.step(
             &a,
             Input {
                 action: true,
-                direction: None
-            }
-        ),
-        Err(Error::ThrowLane)
-    );
-    assert_eq!(s.encode_snapshot(), before);
-    frames(&mut s, &r, Some(Direction::Right), 1);
-    frames(&mut s, &r, None, 20);
-    let before = s.encode_snapshot();
-    assert_eq!(
-        s.step(
-            &admission(&r),
-            Input {
-                action: true,
-                direction: None
-            }
-        ),
-        Err(Error::ThrowLane)
-    );
-    assert_eq!(s.encode_snapshot(), before);
-    frames(&mut s, &r, Some(Direction::Down), 3);
-    frames(&mut s, &r, None, 20);
-    frames(&mut s, &r, Some(Direction::Up), 1);
-    frames(&mut s, &r, None, 20); // wrong Y, even though facing Up
-    assert_eq!(
-        s.step(
-            &admission(&r),
-            Input {
-                action: true,
-                direction: None
-            }
-        ),
-        Err(Error::ThrowLane)
-    );
+                direction: None,
+            },
+        )
+        .unwrap();
+        // Directions and A during the throw change nothing.
+        for _ in 0..32 {
+            let out = s
+                .step(
+                    &a,
+                    Input {
+                        action: false,
+                        direction: Some(Direction::Up),
+                    },
+                )
+                .unwrap();
+            assert!(out.movement.is_none());
+        }
+        assert_eq!(s.position(), at);
+        assert!(s.step(&a, Input::default()).unwrap().control_restored);
+        assert_eq!(s.phase(), Phase::Empty);
+        assert!(s.flight().is_some(), "{facing:?}: the pot flies on");
+    }
+    // Without the door's callback, no hit is counted.
     let mut s = ready(&r);
     let a = Admission {
         door_hit_enabled: false,
@@ -314,19 +316,6 @@ fn lane_direction_position_callback_and_busy_input_fail_closed() {
         },
     )
     .unwrap();
-    s.step(&a, Input::default()).unwrap();
-    let before = s.encode_snapshot();
-    assert_eq!(
-        s.step(
-            &a,
-            Input {
-                action: false,
-                direction: Some(Direction::Up)
-            }
-        ),
-        Err(Error::Input)
-    );
-    assert_eq!(s.encode_snapshot(), before);
     for _ in 0..40 {
         assert!(!s.step(&a, Input::default()).unwrap().door_hit);
     }
@@ -531,24 +520,28 @@ fn type5_remains_partial_not_solid_in_mixed_pair() {
 }
 
 #[test]
-fn launch_coordinates_without_source_door_geometry_do_not_hit() {
+fn a_cleared_door_cell_lets_the_pot_fly_on() {
     let r = room();
     let mut s = ready(&r);
     let mut cells = r.cells().to_vec();
-    cells[21 * 32 + 11] = 0; // no actual closed target at the supposed hit lane
+    cells[21 * 32 + 11] = 0;
     let cleared = Room::new_passive(32, 32, cells).unwrap();
-    let before = s.encode_snapshot();
-    assert_eq!(
-        s.step(
-            &admission(&cleared),
-            Input {
-                action: true,
-                direction: None
-            }
-        ),
-        Err(Error::ThrowLane)
-    );
-    assert_eq!(s.encode_snapshot(), before);
+    let a = admission(&cleared);
+    s.step(
+        &a,
+        Input {
+            action: true,
+            direction: None,
+        },
+    )
+    .unwrap();
+    let mut lowest = u16::MAX;
+    for _ in 0..40 {
+        s.step(&a, Input::default()).unwrap();
+        lowest = s.flight().map_or(lowest, |flight| lowest.min(flight.y));
+    }
+    // The wall row above stops it instead: at 333, its probe 335 in row 20.
+    assert_eq!(lowest, 333);
 }
 
 #[test]
@@ -558,10 +551,11 @@ fn queued_actions_in_snapshots_must_have_an_admitted_source_or_lane() {
     let mut empty = state(&r, 184, 368, Direction::Up).encode_snapshot();
     empty[32] = 1;
     assert_eq!(PotState::decode_snapshot(&a, &empty), Err(Error::Snapshot));
+    // A throw queued with a pot in hand is valid in any facing.
     let mut held = ready(&r).encode_snapshot();
     held[28] = Direction::Down as u8;
     held[32] = 1;
-    assert_eq!(PotState::decode_snapshot(&a, &held), Err(Error::Snapshot));
+    assert!(PotState::decode_snapshot(&a, &held).is_ok());
 
     for mut s in [state(&r, 40, 352, Direction::Right), ready(&r)] {
         s.step(

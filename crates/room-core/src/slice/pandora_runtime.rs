@@ -411,10 +411,10 @@ impl GameState {
         next.tick = next.tick.checked_add(1).ok_or(SliceError::TickOverflow)?;
         next.ensure_pot(spec)?;
         let state = next.pandora.ok_or(SliceError::Data)?;
-        if state
-            .pot
-            .is_some_and(|p| matches!(p.phase(), pots::Phase::Lifting | pots::Phase::Throwing))
-        {
+        if state.pot.is_some_and(|p| {
+            matches!(p.phase(), pots::Phase::Lifting | pots::Phase::Throwing)
+                || p.flight().is_some()
+        }) {
             // Flight/recovery must progress even when the real hit opened a story request.
             next.advance_pot(spec, pots::Input::default())?;
             if state.motion.is_some() || matches!(state.graph.node, Node::Cue(_)) {
