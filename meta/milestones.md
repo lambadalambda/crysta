@@ -176,7 +176,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Port menus, inventory, configuration, and saves](issues/menus-inventory-save.md)
 - [Continue a saved game in the app and on the page](issues/continue-saved-game.md)
 - [Open Yomi's box after the frozen return](issues/yomi-menu.md)
-- [Keep the SRAM between sessions](issues/persist-sram.md)
 - [Choose a game on the Restart screen](issues/restart-file-select.md)
 - [Boot as the native game does](issues/native-boot.md)
 - [Show the title screen](issues/title-screen.md)

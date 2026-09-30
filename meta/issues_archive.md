@@ -138,3 +138,4 @@
 - [x] [Keep the native save slot in the world](issues/save-slot-block.md)
 - [x] [Read and write native SRAM](issues/sram-codec.md)
 - [x] [Save at the bedroom desk](issues/save-point.md)
+- [x] [Keep the SRAM between sessions](issues/persist-sram.md)
