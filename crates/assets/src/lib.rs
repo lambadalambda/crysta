@@ -6,6 +6,7 @@ pub mod graphics;
 pub mod labels;
 pub mod layout;
 pub mod records;
+pub mod restart;
 
 pub mod maps;
 pub mod shop_display;

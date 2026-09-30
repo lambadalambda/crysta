@@ -36,7 +36,7 @@ pub struct Slot<'a> {
     pub name: &'a [u8],
 }
 
-fn address(image: &[u8], address: Address) -> Result<u32, TextError> {
+pub(crate) fn address(image: &[u8], address: Address) -> Result<u32, TextError> {
     address.of(image).ok_or(TextError {
         source: 0,
         reason: "no Records text in this revision",
@@ -53,7 +53,7 @@ fn name_at(base: u16, name: &[u8]) -> impl Fn(u16) -> Option<u8> + '_ {
 
 /// The slot list's requests (`$87:CB4B`): each slot's name, or "No Data",
 /// with the readers of the names (`$061C`).
-fn slot_requests<'a>(
+pub(crate) fn slot_requests<'a>(
     image: &[u8],
     slots: &[Option<Slot<'_>>; 3],
     readers: &'a [impl Fn(u16) -> Option<u8>; 3],
@@ -71,7 +71,9 @@ fn slot_requests<'a>(
 }
 
 /// A slot's name as `$87:CB4B` copies it; an empty slot's script reads none.
-fn slot_names<'a>(slots: &[Option<Slot<'a>>; 3]) -> [impl Fn(u16) -> Option<u8> + 'a; 3] {
+pub(crate) fn slot_names<'a>(
+    slots: &[Option<Slot<'a>>; 3],
+) -> [impl Fn(u16) -> Option<u8> + 'a; 3] {
     slots.map(|slot| name_at(SLOT_NAME, slot.map_or(&[][..], |slot| slot.name)))
 }
 
@@ -154,7 +156,7 @@ pub struct RecordsArt {
     pub title: Vec<Glyph>,
 }
 
-fn located(image: &[u8], address: Address) -> Result<u32, ShopError> {
+pub(crate) fn located(image: &[u8], address: Address) -> Result<u32, ShopError> {
     address
         .of(image)
         .ok_or(ShopError::Invalid(0, "no Records art in this revision"))
