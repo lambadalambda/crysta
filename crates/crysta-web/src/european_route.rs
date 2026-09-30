@@ -39,12 +39,22 @@ fn trace_text(trace: &Trace, checkpoints: &Checkpoints) -> String {
 }
 
 impl Route {
-    fn new(bytes: &[u8], trace_env: &str) -> Self {
+    /// A fresh page on its Restart screen.
+    fn fresh(bytes: &[u8], trace_env: &str) -> Self {
         Self {
             game: Game::new(bytes).unwrap(),
             trace: std::env::var_os(trace_env).map(|path| (path.into(), Vec::new())),
             checkpoints: Vec::new(),
         }
+    }
+
+    /// A fresh page past its Restart screen: A on the empty slot 1.
+    fn new(bytes: &[u8], trace_env: &str) -> Self {
+        let mut route = Self::fresh(bytes, trace_env);
+        route.until(400, 0, |route| route.game.restart_ready());
+        route.frame(X);
+        route.until(100, 0, |route| route.game.session.restart.is_none());
+        route
     }
 
     fn frame(&mut self, held: u32) {
@@ -1036,5 +1046,39 @@ fn fresh_european_save_at_the_desk() {
     route.checkpoint("back");
     let slot = route.world().sram().slot(0).expect("slot 1 saved");
     assert_eq!((slot.map(), slot.position()), (0x0F, (472, 176)));
+    route.save_trace();
+}
+
+#[test]
+fn fresh_european_load_the_2008_save_at_the_desk() {
+    let Some(bytes) = european_rom("CRYSTA_WEB_EU_LOAD_TRACE") else {
+        return;
+    };
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../local/saves/Terranigma.srm"
+    );
+    let Ok(sram) = std::fs::read(path) else {
+        return;
+    };
+    // The page imports the save before Start (`tools/web-replay --sram`).
+    let mut route = Route::fresh(&bytes, "CRYSTA_WEB_EU_LOAD_TRACE");
+    route.game.load_sram(&sram).unwrap();
+    route.until(400, 0, |route| route.game.restart_ready());
+    route.checkpoint("restart");
+    // The cursor starts on slot 3, the last saved; up to slot 1.
+    for _ in 0..2 {
+        route.frame(U);
+        route.frame(0);
+    }
+    route.frame(X);
+    route.until(100, 0, |route| route.game.session.restart.is_none());
+    route.frames(200, 0);
+    route.checkpoint("loaded");
+    let world = route.world();
+    assert_eq!(
+        (world.map(), world.position(), world.facing()),
+        (0x0F, (472, 176), Direction::Up)
+    );
     route.save_trace();
 }

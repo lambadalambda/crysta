@@ -420,11 +420,9 @@ impl App {
         let image = self.image;
         let sram = &self.battery.1;
         self.state.get_or_insert_with(|| {
+            // The cartridge starts on the Restart file select.
             let mut session = Session::new(image);
-            if let Some(sram) = sram {
-                let last = u8::try_from(sram.last_slot()).unwrap_or(0);
-                session.world.set_sram(sram.clone(), last);
-            }
+            session.open_restart(sram.clone().unwrap_or_default());
             session
         })
     }
@@ -434,11 +432,11 @@ impl App {
         let Some(session) = &mut self.state else {
             return;
         };
-        if !session.world.take_sram_write() {
+        if !session.take_sram_write() {
             return;
         }
         if let Some(path) = &self.battery.0 {
-            if let Err(error) = crysta_app::sram_file::store(path, session.world.sram()) {
+            if let Err(error) = crysta_app::sram_file::store(path, session.sram()) {
                 eprintln!("{}: {error}", path.display());
             }
         }
@@ -659,7 +657,7 @@ impl App {
             },
         );
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
-        let cues = session.world.take_cues();
+        let cues = session.take_cues();
         self.keep_sram();
         self.play(&cues);
         if self.log.is_some() {
@@ -863,6 +861,7 @@ mod session_tests {
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
         let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH, None);
+        app.session().restart = None; // Straight into the world.
         app.session().world = World::enter(image, 0xA, 360, 472).unwrap();
         for (direction, count) in [
             (Some(Direction::Right), 3),
@@ -949,6 +948,7 @@ mod session_tests {
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
         let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH, None);
+        app.session().restart = None; // Straight into the world.
         app.session().world = World::enter(image, 0xB, position.0, position.1).unwrap();
         // Exercise trace precedence without needing a naturally coincident
         // refused movement + successful interaction at the same doorway.

@@ -47,8 +47,11 @@ impl Game {
         let cartridge = rom::Rom::load(bytes).map_err(|error| error.to_string())?;
         // The world borrows the image for the page's lifetime.
         let image: &'static [u8] = Box::leak(cartridge.image().to_vec().into_boxed_slice());
+        // The cartridge starts on the Restart file select.
+        let mut session = Session::new(image);
+        session.open_restart(Sram::default());
         Ok(Self {
-            session: Session::new(image),
+            session,
             cartridge,
             canvas: Canvas::new(CLASSIC_WIDTH),
             held: 0,
@@ -93,7 +96,7 @@ impl Game {
                 describe: pressed & buttons::DESCRIBE != 0,
             },
         );
-        let cues = self.session.world.take_cues();
+        let cues = self.session.take_cues();
         if let Some(player) = &mut self.player {
             for cue in cues {
                 if let Err(error) = player.cue(cue) {
@@ -116,7 +119,7 @@ impl Game {
     /// The cartridge's SRAM, as a native `.srm` holds it.
     #[must_use]
     pub fn sram(&self) -> Vec<u8> {
-        self.session.world.sram().bytes().to_vec()
+        self.session.sram().bytes().to_vec()
     }
 
     /// Puts in SRAM the page kept or a `.srm` it imported.
@@ -125,14 +128,22 @@ impl Game {
     /// Bytes that are not 8 KiB.
     pub fn load_sram(&mut self, bytes: &[u8]) -> Result<(), String> {
         let sram = Sram::from_bytes(bytes).map_err(|error| error.to_string())?;
-        let last = u8::try_from(sram.last_slot()).unwrap_or(0);
-        self.session.world.set_sram(sram, last);
+        self.session.set_sram(sram);
         Ok(())
     }
 
     /// Whether a save wrote the SRAM since the last call.
     pub fn take_sram_write(&mut self) -> bool {
-        self.session.world.take_sram_write()
+        self.session.take_sram_write()
+    }
+
+    /// Whether the Restart screen runs and takes input.
+    #[cfg(test)]
+    pub(crate) fn restart_ready(&self) -> bool {
+        self.session
+            .restart
+            .as_ref()
+            .is_some_and(crysta_runtime::restart::Restart::ready)
     }
 
     /// The view as RGBA bytes, `width() x height()`.
@@ -315,6 +326,26 @@ mod european_route;
 mod tests {
     use super::*;
 
+    /// A game past the Restart screen: A on the empty slot 1 starts a new
+    /// game, as a player with no save does.
+    fn new_game(bytes: &[u8]) -> Game {
+        let mut game = Game::new(bytes).unwrap();
+        pass_restart(&mut game);
+        game
+    }
+
+    /// Idle until the Restart screen takes input, A, then idle until the
+    /// world plays.
+    fn pass_restart(game: &mut Game) {
+        while !game.restart_ready() {
+            game.frame(0);
+        }
+        game.frame(buttons::CONFIRM);
+        while game.session.restart.is_some() {
+            game.frame(0);
+        }
+    }
+
     #[test]
     fn the_wide_view_draws_400_pixels_across() {
         let path = concat!(
@@ -384,16 +415,20 @@ mod tests {
         };
         let mut game = Game::new(&bytes).unwrap();
         game.start_audio().unwrap();
+        pass_restart(&mut game);
+        // Rendered into memory a frame at a time, as the page pulls it;
+        // never played.
+        let mut sounded = false;
         for _ in 0..120 {
             game.frame(0);
+            let mut sound = vec![0.0; 1066];
+            game.audio(&mut sound);
+            sounded |= sound.iter().any(|&sample| sample != 0.0);
         }
         let pixels = game.draw();
         assert_eq!(pixels.len(), game.width() * Game::height() * 4);
         assert!(pixels.chunks(4).any(|pixel| pixel[..3] != [0, 0, 0]));
-        // Rendered into memory, never played.
-        let mut sound = vec![0.0; 32_000];
-        game.audio(&mut sound);
-        assert!(sound.iter().any(|&sample| sample != 0.0));
+        assert!(sounded, "the bedroom's music");
         assert!(game.fault().is_none());
     }
 
@@ -406,7 +441,7 @@ mod tests {
         let Ok(bytes) = std::fs::read(path) else {
             return;
         };
-        let mut game = Game::new(&bytes).unwrap();
+        let mut game = new_game(&bytes);
         // Elle speaks some 120 frames in; held A turns only the first page,
         // once it has typed out.
         for _ in 0..130 {
@@ -443,7 +478,7 @@ mod tests {
         let Ok(bytes) = std::fs::read(path) else {
             return;
         };
-        let mut game = Game::new(&bytes).unwrap();
+        let mut game = new_game(&bytes);
         for _ in 0..130 {
             game.frame(0);
         }
@@ -480,7 +515,7 @@ mod tests {
         let Ok(bytes) = std::fs::read(path) else {
             return;
         };
-        let mut game = Game::new(&bytes).unwrap();
+        let mut game = new_game(&bytes);
         // Bounded host continuation: the fresh native route covers the
         // bedroom-to-C prefix. Seed only its prior wake/Elder/weaver flags.
         let mut events = crysta_runtime::world::fresh_game_flags();

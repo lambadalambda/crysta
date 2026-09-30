@@ -8,7 +8,9 @@ use crysta_runtime::art::{
     residents_art, Animation, ArkAtlas, Body, CarryArt, Placeholder, Raster,
 };
 use crysta_runtime::records::View;
+use crysta_runtime::restart::{Outcome, Restart};
 use crysta_runtime::scene::Presses;
+use crysta_runtime::sram::Sram;
 use crysta_runtime::world::{Step, World};
 use frame::Canvas;
 use room_core::Direction;
@@ -69,6 +71,10 @@ pub struct Session {
     pub shop_art: crate::shop::ShopArtCache,
     /// The desk's Records screen art, decoded on first use.
     pub records_art: crate::records::RecordsArtCache,
+    /// The Restart file select while it runs, before the world plays.
+    pub restart: Option<Restart>,
+    /// Its art, decoded on first use.
+    pub restart_art: crate::restart::RestartArtCache,
     /// The area titles.
     pub titles: crate::title::Titles,
     /// The text window's art.
@@ -87,19 +93,23 @@ pub struct Session {
     pub fault: Option<String>,
 }
 
+/// The world a new game starts with.
+fn new_game(image: &'static [u8]) -> World<'static> {
+    World::enter_with_events(
+        image,
+        START.0,
+        START.1,
+        START.2,
+        crysta_runtime::world::fresh_game_flags(),
+    )
+    .expect("the opening house")
+}
+
 impl Session {
     /// A new game in the bedroom, before Elle wakes Ark.
     pub fn new(image: &'static [u8]) -> Self {
         Self {
-            // A new game, before Elle wakes Ark.
-            world: World::enter_with_events(
-                image,
-                START.0,
-                START.1,
-                START.2,
-                crysta_runtime::world::fresh_game_flags(),
-            )
-            .expect("the opening house"),
+            world: new_game(image),
             image,
             atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
             backgrounds: HashMap::new(),
@@ -112,6 +122,8 @@ impl Session {
             carry_frames: HashMap::new(),
             shop_art: crate::shop::ShopArtCache::default(),
             records_art: crate::records::RecordsArtCache::default(),
+            restart: None,
+            restart_art: crate::restart::RestartArtCache::default(),
             titles: crate::title::Titles::default(),
             window_art: WindowArt::from_rom(image).expect("the text window's art"),
             last_direction: None,
@@ -163,6 +175,12 @@ impl Session {
         self.tick += 1;
         self.last_step = None;
         self.last_interaction = None;
+        if let Some(restart) = &mut self.restart {
+            if let Some(outcome) = restart.step(direction, presses.confirm, presses.cancel) {
+                self.finish_restart(outcome);
+            }
+            return;
+        }
         match self.world.update(direction, presses) {
             Ok((step, interaction)) => {
                 self.last_step = Some(step);
@@ -178,6 +196,90 @@ impl Session {
             }
             Err(error) => self.fail_world(&error),
         }
+    }
+
+    /// Opens the Restart file select with the cartridge's SRAM; the world
+    /// waits, a new game, until it ends.
+    pub fn open_restart(&mut self, sram: Sram) {
+        let europe = assets::layout::per_revision(self.image, false, true);
+        self.restart = Some(Restart::open(europe, sram));
+        // The waiting world's music is not the screen's.
+        self.world.take_cues();
+    }
+
+    /// The screen ended: a valid slot resumes its world (the native load;
+    /// one before the wake-up keeps the new game), else the new game plays.
+    fn finish_restart(&mut self, outcome: Outcome) {
+        let Some(mut restart) = self.restart.take() else {
+            return;
+        };
+        let written = restart.take_sram_write();
+        let sram = restart.sram().clone();
+        let slot = match outcome {
+            Outcome::Load(slot) => {
+                let resumed = sram
+                    .slot(usize::from(slot))
+                    .map(|data| World::resume(self.image, &data));
+                // A slot before the wake-up, or one that does not load,
+                // plays a new game (`$87:8160`, `$87:820E`).
+                self.world = match resumed {
+                    Some(Ok(Some(world))) => world,
+                    Some(Err(error)) => {
+                        self.fail_world(&error);
+                        new_game(self.image)
+                    }
+                    Some(Ok(None)) | None => new_game(self.image),
+                };
+                slot
+            }
+            Outcome::NewGame(slot) => {
+                // Built afresh, so it asks for its music now. `$0496` stays
+                // as the power-on's cleared WRAM left it: 0.
+                self.world = new_game(self.image);
+                slot.unwrap_or(0)
+            }
+        };
+        self.world.set_sram(sram, slot);
+        if written {
+            self.world.mark_sram_written();
+        }
+    }
+
+    /// The SRAM as the screen or the world holds it.
+    #[must_use]
+    pub fn sram(&self) -> &Sram {
+        self.restart
+            .as_ref()
+            .map_or_else(|| self.world.sram(), Restart::sram)
+    }
+
+    /// Puts in the SRAM a host kept: into the Restart screen, opened again,
+    /// while it runs, else into the world.
+    pub fn set_sram(&mut self, sram: Sram) {
+        if self.restart.is_some() {
+            self.open_restart(sram);
+        } else {
+            // `$0496` is the world's: an import loads no slot.
+            let last = self.world.last_slot();
+            self.world.set_sram(sram, last);
+        }
+    }
+
+    /// Whether the SRAM changed since the host last kept it.
+    pub fn take_sram_write(&mut self) -> bool {
+        let screen = self.restart.as_mut().is_some_and(Restart::take_sram_write);
+        self.world.take_sram_write() || screen
+    }
+
+    /// Music and sound requests since the last call.
+    pub fn take_cues(&mut self) -> Vec<crysta_runtime::audio::Cue> {
+        let mut cues = self
+            .restart
+            .as_mut()
+            .map(Restart::take_cues)
+            .unwrap_or_default();
+        cues.extend(self.world.take_cues());
+        cues
     }
 
     /// A diagnostic record of the last frame.
@@ -485,6 +587,12 @@ impl Session {
     /// which replaces the room while it shows; returns whether it did.
     fn compose_records(&self, frame: &mut Canvas) -> bool {
         frame.pixels.fill(0);
+        if let Some(restart) = &self.restart {
+            if let Some(art) = self.restart_art.get(self.image) {
+                crate::restart::draw(frame, self.image, art, restart.view(), restart.sram());
+            }
+            return true;
+        }
         match self.world.records() {
             Some(View::Screen(page)) => {
                 if let Some(art) = self.records_art.get(self.image) {
