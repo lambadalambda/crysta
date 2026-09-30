@@ -160,6 +160,12 @@ impl Restart {
         }
     }
 
+    /// Whether the main loop takes input.
+    #[must_use]
+    pub fn ready(&self) -> bool {
+        self.phase == Phase::Main
+    }
+
     /// The SRAM as the screen left it.
     #[must_use]
     pub fn sram(&self) -> &Sram {

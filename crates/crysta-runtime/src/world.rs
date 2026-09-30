@@ -1399,6 +1399,18 @@ impl<'a> World<'a> {
         std::mem::take(&mut self.globals.sram_written)
     }
 
+    /// `$0496`: the slot last saved or loaded.
+    #[must_use]
+    pub fn last_slot(&self) -> u8 {
+        self.globals.last_slot
+    }
+
+    /// Asks the host to keep the SRAM, which a screen before the world
+    /// wrote.
+    pub fn mark_sram_written(&mut self) {
+        self.globals.sram_written = true;
+    }
+
     /// Puts in the SRAM a host kept, and the slot it loaded.
     pub fn set_sram(&mut self, sram: Sram, last_slot: u8) {
         self.globals.sram = sram;
