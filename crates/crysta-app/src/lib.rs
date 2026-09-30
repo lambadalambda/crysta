@@ -16,5 +16,6 @@ pub mod music_data;
 pub mod records;
 pub mod session;
 pub mod shop;
+pub mod sram_file;
 pub mod title;
 pub mod window;

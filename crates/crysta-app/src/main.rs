@@ -89,7 +89,8 @@ fn main() {
     let event_loop = EventLoop::new().expect("an event loop");
     event_loop.set_control_flow(ControlFlow::Wait);
     let log = start_diagnostics(&cartridge, music.is_some(), width);
-    let mut app = App::new(cartridge, image, music, log, width);
+    let battery = crysta_app::sram_file::path(std::path::Path::new(&path));
+    let mut app = App::new(cartridge, image, music, log, width, Some(battery));
     if let Err(error) = event_loop.run_app(&mut app) {
         eprintln!("{error}");
         std::process::exit(1);
@@ -277,6 +278,12 @@ struct App {
     music: Option<music_output::Music>,
     music_controls: music_controls::Controls,
     log: Option<diagnostics::SessionLog>,
+    /// The `.srm` beside the ROM and what it held at start; no path when
+    /// the file could not be read, so it is never overwritten.
+    battery: (
+        Option<std::path::PathBuf>,
+        Option<crysta_runtime::sram::Sram>,
+    ),
 }
 
 impl App {
@@ -286,9 +293,19 @@ impl App {
         music: Option<music_output::Music>,
         log: Option<diagnostics::SessionLog>,
         width: usize,
+        battery: Option<std::path::PathBuf>,
     ) -> Self {
         let period = clock::frame_period(cartridge.revision());
+        let battery = match battery.map(|path| (crysta_app::sram_file::load(&path), path)) {
+            Some((Ok(sram), path)) => (Some(path), sram),
+            Some((Err(error), path)) => {
+                eprintln!("{}: {error}; saves are not kept", path.display());
+                (None, None)
+            }
+            None => (None, None),
+        };
         Self {
+            battery,
             cartridge,
             image,
             window: None,
@@ -401,7 +418,30 @@ impl App {
 
     fn session(&mut self) -> &mut Session {
         let image = self.image;
-        self.state.get_or_insert_with(|| Session::new(image))
+        let sram = &self.battery.1;
+        self.state.get_or_insert_with(|| {
+            let mut session = Session::new(image);
+            if let Some(sram) = sram {
+                let last = u8::try_from(sram.last_slot()).unwrap_or(0);
+                session.world.set_sram(sram.clone(), last);
+            }
+            session
+        })
+    }
+
+    /// Keeps the SRAM once a save wrote it.
+    fn keep_sram(&mut self) {
+        let Some(session) = &mut self.state else {
+            return;
+        };
+        if !session.world.take_sram_write() {
+            return;
+        }
+        if let Some(path) = &self.battery.0 {
+            if let Err(error) = crysta_app::sram_file::store(path, session.world.sram()) {
+                eprintln!("{}: {error}", path.display());
+            }
+        }
     }
 }
 
@@ -620,6 +660,7 @@ impl App {
         );
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));
         let cues = session.world.take_cues();
+        self.keep_sram();
         self.play(&cues);
         if self.log.is_some() {
             let mut event = self.session().trace_frame(before, direction, interact);
@@ -821,7 +862,7 @@ mod session_tests {
         ));
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
-        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH);
+        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH, None);
         app.session().world = World::enter(image, 0xA, 360, 472).unwrap();
         for (direction, count) in [
             (Some(Direction::Right), 3),
@@ -907,7 +948,7 @@ mod session_tests {
         let root = std::env::temp_dir().join(format!("crysta-fatal-trace-{}", std::process::id()));
         let log = diagnostics::SessionLog::start(&root, serde_json::json!({"test":true})).unwrap();
         let path = log.path().to_owned();
-        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH);
+        let mut app = App::new(rom, image, None, Some(log), CLASSIC_WIDTH, None);
         app.session().world = World::enter(image, 0xB, position.0, position.1).unwrap();
         // Exercise trace precedence without needing a naturally coincident
         // refused movement + successful interaction at the same doorway.
