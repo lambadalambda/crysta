@@ -132,7 +132,12 @@ fn copy_and_erase_change_the_bytes_the_native_game_changes() {
         return;
     };
     let changed = |after: &Sram, before: &[u8]| {
-        after.bytes().iter().zip(before).filter(|(a, b)| a != b).count()
+        after
+            .bytes()
+            .iter()
+            .zip(before)
+            .filter(|(a, b)| a != b)
+            .count()
     };
     let mut sram = Sram::from_bytes(&saves).unwrap().repaired();
     sram.erase(1);

@@ -23,6 +23,7 @@ pub mod inventory;
 pub mod plane;
 pub mod records;
 pub mod residents;
+pub mod restart;
 pub mod save;
 pub mod scene;
 pub mod shop;

@@ -54,6 +54,26 @@ const SAVED_LINES: u16 = 4;
 /// Up and Down repeat once held this long, then this often (`$0454`).
 const REPEAT_DELAY: u16 = 16;
 const REPEAT_EVERY: u16 = 5;
+
+/// Up and Down as the menus' input loops see them (`$0454`): the press,
+/// then held [`REPEAT_DELAY`] frames, then every [`REPEAT_EVERY`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) struct Repeat(Option<(Direction, u16)>);
+
+impl Repeat {
+    /// This frame's Up or Down, from the direction held.
+    pub(crate) fn step(&mut self, direction: Option<Direction>) -> Option<Direction> {
+        let direction = direction.filter(|&d| matches!(d, Direction::Up | Direction::Down));
+        let held = match (self.0, direction) {
+            (Some((before, frames)), Some(now)) if before == now => frames + 1,
+            _ => 0,
+        };
+        self.0 = direction.map(|d| (d, held));
+        let fires = held == 0
+            || (held >= REPEAT_DELAY && (held - REPEAT_DELAY).is_multiple_of(REPEAT_EVERY));
+        direction.filter(|_| fires)
+    }
+}
 /// The cursor's sound, on port 3.
 pub const CURSOR_SOUND: u8 = 0x22;
 /// The jingle a save plays.
@@ -140,8 +160,8 @@ pub struct Records {
     cursor: u8,
     /// The cursor as the sprite shows it: it follows a frame late.
     shown: u8,
-    /// Up or Down held, and for how many frames.
-    held: Option<(Direction, u16)>,
+    /// Up or Down held.
+    held: Repeat,
 }
 
 impl Records {
@@ -155,7 +175,7 @@ impl Records {
             frame: 0,
             cursor: cursor.min(2),
             shown: cursor.min(2),
-            held: None,
+            held: Repeat::default(),
         }
     }
 
@@ -202,7 +222,7 @@ impl Records {
         confirm: bool,
         cancel: bool,
     ) -> Option<Event> {
-        let repeated = self.repeat(direction);
+        let repeated = self.held.step(direction);
         if cancel {
             (self.phase, self.frame) = (Phase::Cancelled, 0);
             return None;
@@ -218,20 +238,6 @@ impl Records {
         };
         self.cursor = cursor;
         Some(Event::Sound(CURSOR_SOUND))
-    }
-
-    /// Up or Down as the loop sees it: the press, then held
-    /// [`REPEAT_DELAY`] frames, then every [`REPEAT_EVERY`].
-    fn repeat(&mut self, direction: Option<Direction>) -> Option<Direction> {
-        let direction = direction.filter(|&d| matches!(d, Direction::Up | Direction::Down));
-        let held = match (self.held, direction) {
-            (Some((before, frames)), Some(now)) if before == now => frames + 1,
-            _ => 0,
-        };
-        self.held = direction.map(|d| (d, held));
-        let fires = held == 0
-            || (held >= REPEAT_DELAY && (held - REPEAT_DELAY).is_multiple_of(REPEAT_EVERY));
-        direction.filter(|_| fires)
     }
 
     /// What shows this frame.
