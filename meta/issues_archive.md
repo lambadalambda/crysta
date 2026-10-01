@@ -150,3 +150,6 @@
 - [x] [Hold the weapon over Ark's head when he gets it](issues/weapon-overhead-pose.md)
 - [x] [Run Ark down the screen after Yomi sends him out](issues/yomi-run-out.md)
 - [x] [Draw the save book on Ark's desk](issues/desk-save-book.md)
+- [x] [Show the glow when a voice speaks from the blue door and the Box](issues/voice-glow-effect.md)
+- [x] [Play the freeze: ice crystals, the brightening, a blue Elle](issues/freeze-effect.md)
+- [x] [Freeze the townsfolk after the freeze](issues/frozen-townsfolk.md)

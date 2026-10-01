@@ -15,3 +15,7 @@ When the people freeze, ice crystals fly toward Elle, the screen brightens and E
 ## Acceptance Criteria
 
 - The freeze matches native frames on both ROMs.
+
+## Notes
+
+- Native runs pause at the nested frame (`$80:80DF`), so the whitening plays one step a frame (98 frames white, natively 100); the crystals orbit with `COP D0`/`D1` from the `$81:F563` table; Elle turns blue with `COP BB` (`local_story.rs` frozen return). Checked by eye against `local/effects/jp/freeze`. The crystals' last frame at radius 0 is not drawn (natively it is).

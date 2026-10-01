@@ -63,8 +63,5 @@
 - [ ] [Play the logos and the intro film](issues/intro-film.md)
 - [ ] [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)
 - [ ] [Fix the slice bugs the user reported on 2026-10-01](issues/slice-bug-report.md)
-- [ ] [Show the glow when a voice speaks from the blue door and the Box](issues/voice-glow-effect.md)
-- [ ] [Play the freeze: ice crystals, the brightening, a blue Elle](issues/freeze-effect.md)
-- [ ] [Freeze the townsfolk after the freeze](issues/frozen-townsfolk.md)
 - [ ] [Draw the world map in Mode 7](issues/world-map-mode7.md)
 - [ ] [Enter the towers from the world map](issues/enter-the-towers.md)
