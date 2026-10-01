@@ -19,3 +19,7 @@ which the runtime steps over. Reported by the user on 2026-10-01.
 ## Acceptance Criteria
 
 - The book shows on the desk in the bedroom on both ROMs, and saving still works.
+
+## Notes
+
+- `COP 9C` spawns at the parent plus (dx, dy), dx mirrored (`$80:A56B`); the book clears `+$04`/`+$06`, takes the `$A2:C000` art and loops on pose `$42` (`crysta-runtime/tests/local_art.rs` `the_desk_shows_its_save_book`). Checked on the Japanese ROM and by eye in the app; no native capture of the desk exists.

@@ -149,3 +149,4 @@
 - [x] [Draw the weapon's text icon with a clear background](issues/spear-text-icon.md)
 - [x] [Hold the weapon over Ark's head when he gets it](issues/weapon-overhead-pose.md)
 - [x] [Run Ark down the screen after Yomi sends him out](issues/yomi-run-out.md)
+- [x] [Draw the save book on Ark's desk](issues/desk-save-book.md)

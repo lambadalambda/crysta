@@ -68,4 +68,3 @@
 - [ ] [Freeze the townsfolk after the freeze](issues/frozen-townsfolk.md)
 - [ ] [Draw the world map in Mode 7](issues/world-map-mode7.md)
 - [ ] [Enter the towers from the world map](issues/enter-the-towers.md)
-- [ ] [Draw the save book on Ark's desk](issues/desk-save-book.md)

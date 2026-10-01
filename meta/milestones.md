@@ -184,7 +184,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Show the glow when a voice speaks from the blue door and the Box](issues/voice-glow-effect.md)
 - [Play the freeze: ice crystals, the brightening, a blue Elle](issues/freeze-effect.md)
 - [Freeze the townsfolk after the freeze](issues/frozen-townsfolk.md)
-- [Draw the save book on Ark's desk](issues/desk-save-book.md)
 - [Draw the world map in Mode 7](issues/world-map-mode7.md)
 - [Enter the towers from the world map](issues/enter-the-towers.md)
 - [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
