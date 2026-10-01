@@ -3,7 +3,7 @@
 use assets::sprites::PandoraCarryMotion;
 use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
-use crysta_runtime::world::{fresh_game_flags, World};
+use crysta_runtime::world::{fresh_game_flags, Tint, World};
 use rom::{Revision, Rom};
 use room_core::Direction;
 use std::path::Path;
@@ -1169,16 +1169,47 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     }
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
     let mut run = Vec::new();
+    let mut tints = Vec::new();
     for _ in 0..4000 {
         let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
         run.extend(world.run_pose().map(|(motion, facing, _)| (motion, facing)));
+        tints.push(world.screen().tint);
         if flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
             break;
         }
     }
+    let mut runs: Vec<(Tint, usize)> = Vec::new();
+    for tint in tints {
+        match runs.last_mut() {
+            Some((last, count)) if *last == tint => *count += 1,
+            _ => runs.push((tint, 1)),
+        }
+    }
+    // The whitening (`$88:B507`): one step a frame, 37 in all, then 60
+    // frames white (natively 100 frames, JP 50577..50676; here 98).
+    let Some(start) = runs.iter().position(|&(tint, _)| tint == Tint::Raise(1)) else {
+        panic!("no whitening: {runs:?}");
+    };
+    let steps: Vec<_> = (1..=30).map(|step| (Tint::Raise(step), 1)).collect();
+    assert_eq!(runs[start..start + 30], steps[..]);
+    assert_eq!(runs[start + 30], (Tint::Raise(31), 68));
+    assert_eq!(runs[start + 31].0, Tint::None);
+    // Elle turns blue (`COP BB 0E`).
+    assert!(
+        world
+            .residents()
+            .iter()
+            .any(|resident| resident.palette == 7),
+        "{:?}",
+        world
+            .residents()
+            .iter()
+            .map(|resident| (resident.record, resident.palette))
+            .collect::<Vec<_>>()
+    );
     assert!(flag(&world, 0xFE) && flag(&world, 0x23));
     // Ark runs out as natively (`docs/ark-poses.md`): 36 frames of the dash
     // list `$17` down, 16 of the brake, then he stands facing down.

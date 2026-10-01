@@ -30,6 +30,9 @@ pub struct Display {
     fixed: [u8; 3],
     /// `COP 6A`'s square, while it turns.
     spin: Option<Spin>,
+    /// The palette buffer's steps toward white since it was saved
+    /// (`$8D:A8EA`, `$8D:AA96`), until it is restored (`$8D:A8FD`).
+    whitening: Option<u8>,
 }
 
 /// `COP 6A 00 speed`'s square (`$8D:AFA1`): centred on the actor that
@@ -113,6 +116,27 @@ impl Display {
         if let Some(spin) = &mut self.spin {
             spin.angle = spin.angle.wrapping_add(spin.speed);
         }
+    }
+
+    /// `$8D:A8EA`: the palette buffer is saved, for a whitening.
+    pub fn save_palette(&mut self) {
+        self.whitening = Some(0);
+    }
+
+    /// `$8D:AA96`: each channel of every colour one step toward white.
+    pub fn raise_palette(&mut self) {
+        self.whitening = Some(self.whitening.unwrap_or(0).saturating_add(1).min(31));
+    }
+
+    /// `$8D:A8FD`: the saved palette is back.
+    pub fn restore_palette(&mut self) {
+        self.whitening = None;
+    }
+
+    /// The palette's steps toward white, while a whitening lasts.
+    #[must_use]
+    pub const fn whitening(&self) -> Option<u8> {
+        self.whitening
     }
 
     /// Whether `TM` keeps BG1, the rooms' light rays, on.

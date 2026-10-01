@@ -465,6 +465,8 @@ pub struct Actor {
     pub player_pose: Option<(u8, u8)>,
     /// Its own bytes in bank `$7F`, as native runs keep them.
     own: native::Own,
+    /// A native run paused in a nested frame, to go on next frame.
+    paused: Option<native::Paused>,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -566,6 +568,7 @@ impl Actor {
             palette: 0,
             player_pose: None,
             own: native::Own::new(),
+            paused: None,
             walked: false,
             contact: None,
             ease: None,
@@ -911,14 +914,32 @@ impl Actor {
         if image.get(at..at + NO_DAMAGE.len()) == Some(&NO_DAMAGE) {
             return Some(at + NO_DAMAGE.len());
         }
-        player_pose_mismatch(image, at).or_else(|| {
-            let mut memory = native::Memory {
-                words: &mut globals.scratch,
-                own: &mut self.own,
-                display: &mut globals.display,
-            };
-            native::run(image, at, &mut memory)
-        })
+        if let Some(next) = player_pose_mismatch(image, at) {
+            return Some(next);
+        }
+        let ran = native::run(image, at, &mut self.memory(globals))?;
+        Some(self.ran(ran))
+    }
+
+    /// What a native run may change.
+    fn memory<'m>(&'m mut self, globals: &'m mut Globals) -> native::Memory<'m> {
+        native::Memory {
+            words: &mut globals.scratch,
+            own: &mut self.own,
+            display: &mut globals.display,
+        }
+    }
+
+    /// Where a native run goes on: past it, or, paused for a frame, at the
+    /// script position it started from.
+    fn ran(&mut self, ran: native::Ran) -> usize {
+        match ran {
+            native::Ran::Next(next) => next,
+            native::Ran::Frame(paused) => {
+                self.paused = Some(paused);
+                self.pc
+            }
+        }
     }
 
     /// The actor with its cell marked, as `COP 3B` would; for tests.
@@ -1061,6 +1082,16 @@ impl Actor {
 
     fn run(&mut self, around: &mut Surroundings<'_>) -> Run {
         let image = around.image;
+        // A native run paused in a nested frame goes on first.
+        if let Some(paused) = self.paused.take() {
+            match native::resume(image, paused, &mut self.memory(around.globals)) {
+                Some(ran) => self.pc = self.ran(ran),
+                None => self.state = State::Frozen,
+            }
+            if self.paused.is_some() || self.state == State::Frozen {
+                return Run::Yielded;
+            }
+        }
         // `+$0A` at entry: where an `RTL` comes back to next frame unless
         // `COP BC`/`C0` point it elsewhere first.
         let entry = self.pc;
@@ -1108,6 +1139,9 @@ impl Actor {
                 _ => {
                     if let Some(next) = self.native_idiom(image, bank, around.globals) {
                         self.pc = next;
+                        if self.paused.is_some() {
+                            return Run::Yielded;
+                        }
                         continue;
                     }
                     self.state = State::Frozen;

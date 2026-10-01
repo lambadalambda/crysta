@@ -72,15 +72,19 @@ const STEPS: usize = 512;
 /// save and restore the palette buffer (`MVN $7F,$7F` between `$0600` and
 /// `$0400`), `$8D:AA96` steps it toward white. `$80:80DF` runs a nested
 /// frame, in which `$80:C85E` runs the actors with `+$04` bit 12 -- in the
-/// whitening, the figure and the particles; not modelled, so their timers
-/// do not advance those frames. The calls clobber A and the flags, and
+/// whitening, the figure and the particles; here the run pauses until the
+/// next frame and every actor runs. The calls clobber A and the flags, and
 /// `$8D:AA96` also X.
-const CALLS: [usize; 4] = [0x0D_A8EA, 0x0D_AA96, 0x0D_A8FD, 0x00_80DF];
+const CALLS: [usize; 4] = [SAVE_PALETTE, RAISE_PALETTE, RESTORE_PALETTE, NESTED_FRAME];
+const SAVE_PALETTE: usize = 0x0D_A8EA;
+const RAISE_PALETTE: usize = 0x0D_AA96;
+const RESTORE_PALETTE: usize = 0x0D_A8FD;
+const NESTED_FRAME: usize = 0x00_80DF;
 /// The call among [`CALLS`] that also clobbers X.
-const CLOBBERS_X: usize = 0x0D_AA96;
+const CLOBBERS_X: usize = RAISE_PALETTE;
 
 /// A pushed value: A with its width, or whether X was still the actor's.
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Pushed {
     A(Option<u16>, bool),
     X(bool),
@@ -95,11 +99,32 @@ fn scratch(address: u16) -> bool {
             .any(|&(first, last)| (first..=last).contains(&address))
 }
 
-/// Runs native code at `at` and returns where the script loop takes over, or
-/// `None` when the code is not a run this module admits.
-pub(super) fn run(image: &[u8], at: usize, memory: &mut Memory<'_>) -> Option<usize> {
-    let mut machine = Machine {
-        image,
+/// How a run ended.
+#[derive(Debug)]
+pub enum Ran {
+    /// Before an instruction the script loop owns, at this address.
+    Next(usize),
+    /// In a nested frame (`$80:80DF`): it goes on next frame from here.
+    Frame(Paused),
+}
+
+/// A run waiting for the next frame: its registers.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Paused {
+    pc: usize,
+    a: Option<u16>,
+    zero: Option<bool>,
+    negative: Option<bool>,
+    carry: Option<bool>,
+    narrow: bool,
+    x: bool,
+    stack: Vec<Pushed>,
+}
+
+/// Runs native code at `at` and returns where the script loop takes over,
+/// or `None` when the code is not a run this module admits.
+pub(super) fn run(image: &[u8], at: usize, memory: &mut Memory<'_>) -> Option<Ran> {
+    let fresh = Paused {
         pc: at,
         a: None,
         zero: None,
@@ -109,13 +134,39 @@ pub(super) fn run(image: &[u8], at: usize, memory: &mut Memory<'_>) -> Option<us
         x: true,
         stack: Vec::new(),
     };
+    go(Machine::resumed(image, fresh), memory, true)
+}
+
+/// Goes on with a run paused a frame ago.
+pub(super) fn resume(image: &[u8], paused: Paused, memory: &mut Memory<'_>) -> Option<Ran> {
+    go(Machine::resumed(image, paused), memory, false)
+}
+
+fn go(mut machine: Machine<'_>, memory: &mut Memory<'_>, fresh: bool) -> Option<Ran> {
     for step in 0..STEPS {
-        if !machine.step(memory)? {
-            let settled = step > 0 && !machine.narrow && machine.x && machine.stack.is_empty();
-            return settled.then_some(machine.pc);
+        match machine.step(memory)? {
+            Flow::On => {}
+            Flow::Frame => return Some(Ran::Frame(machine.paused())),
+            Flow::Stop => {
+                let settled = (step > 0 || !fresh)
+                    && !machine.narrow
+                    && machine.x
+                    && machine.stack.is_empty();
+                return settled.then_some(Ran::Next(machine.pc));
+            }
         }
     }
     None
+}
+
+/// What an instruction leaves the run to do.
+enum Flow {
+    /// The next instruction.
+    On,
+    /// Stop before this one.
+    Stop,
+    /// End the frame after this one.
+    Frame,
 }
 
 /// The registers a run uses. A value or flag is `None` until the run sets it:
@@ -136,10 +187,47 @@ struct Machine<'a> {
     stack: Vec<Pushed>,
 }
 
-impl Machine<'_> {
-    /// Executes one instruction. `Some(false)` stops before it, for the
-    /// script loop or another recogniser; `None` refuses the run.
-    fn step(&mut self, memory: &mut Memory<'_>) -> Option<bool> {
+impl<'a> Machine<'a> {
+    fn resumed(image: &'a [u8], paused: Paused) -> Self {
+        let Paused {
+            pc,
+            a,
+            zero,
+            negative,
+            carry,
+            narrow,
+            x,
+            stack,
+        } = paused;
+        Self {
+            image,
+            pc,
+            a,
+            zero,
+            negative,
+            carry,
+            narrow,
+            x,
+            stack,
+        }
+    }
+
+    fn paused(self) -> Paused {
+        Paused {
+            pc: self.pc,
+            a: self.a,
+            zero: self.zero,
+            negative: self.negative,
+            carry: self.carry,
+            narrow: self.narrow,
+            x: self.x,
+            stack: self.stack,
+        }
+    }
+
+    /// Executes one instruction, or stops before it for the script loop or
+    /// another recogniser; `None` refuses the run.
+    fn step(&mut self, memory: &mut Memory<'_>) -> Option<Flow> {
         let words = &mut *memory.words;
         let opcode = *self.image.get(self.pc)?;
         self.pc = match opcode {
@@ -176,12 +264,16 @@ impl Machine<'_> {
             0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A | 0x89 => self.accumulator(opcode, words)?,
             0x48 | 0x68 | 0xDA | 0xFA => self.stack_op(opcode)?,
             0xF0 | 0xD0 | 0x90 | 0xB0 | 0x10 | 0x30 => self.branch(opcode)?,
-            0x22 => self.call()?,
+            0x22 => {
+                let (next, frame) = self.call(memory.display)?;
+                self.pc = next;
+                return Some(if frame { Flow::Frame } else { Flow::On });
+            }
             // The loop's own (`COP`, `RTL`, `JMP`, `BRA`) or another
             // recogniser's: stop before it.
-            _ => return Some(false),
+            _ => return Some(Flow::Stop),
         };
-        Some(true)
+        Some(Flow::On)
     }
 
     /// `STA` / `STZ` on a PPU register, a byte, or two when wide.
@@ -398,22 +490,26 @@ impl Machine<'_> {
     }
 
     /// `JSL` to one of [`CALLS`]: A and the flags are unknown after it.
-    fn call(&mut self) -> Option<usize> {
+    fn call(&mut self, display: &mut Display) -> Option<(usize, bool)> {
         let bytes = self.image.get(self.pc + 1..self.pc + 4)?;
         let target =
             usize::from(bytes[0]) | usize::from(bytes[1]) << 8 | usize::from(bytes[2] & 0x7F) << 16;
         let target = target & 0x3F_FFFF;
         // Named in the image's revision; one unrecorded matches nothing.
         let named = |call: usize| assets::layout::offset(self.image, call) == Some(target);
-        if !CALLS.into_iter().any(named) {
-            return None;
+        let call = CALLS.into_iter().find(|&call| named(call))?;
+        match call {
+            SAVE_PALETTE => display.save_palette(),
+            RAISE_PALETTE => display.raise_palette(),
+            RESTORE_PALETTE => display.restore_palette(),
+            _ => {}
         }
         self.a = None;
         (self.zero, self.negative, self.carry) = (None, None, None);
-        if named(CLOBBERS_X) {
+        if call == CLOBBERS_X {
             self.x = false;
         }
-        Some(self.pc + 4)
+        Some((self.pc + 4, call == NESTED_FRAME))
     }
 }
 
@@ -423,9 +519,9 @@ mod tests {
 
     const AT: usize = 0x09_8000;
 
-    /// A run on `words` alone.
+    /// A run on `words` alone, to where the script loop takes over.
     fn run(image: &[u8], at: usize, words: &mut Scratch) -> Option<usize> {
-        super::run(
+        match super::run(
             image,
             at,
             &mut Memory {
@@ -433,7 +529,17 @@ mod tests {
                 own: &mut Own::new(),
                 display: &mut Display::default(),
             },
-        )
+        )? {
+            Ran::Next(next) => Some(next),
+            Ran::Frame(_) => None,
+        }
+    }
+
+    fn next(ran: Option<Ran>) -> Option<usize> {
+        match ran? {
+            Ran::Next(next) => Some(next),
+            Ran::Frame(_) => None,
+        }
     }
 
     #[test]
@@ -457,18 +563,18 @@ mod tests {
             own: &mut own,
             display: &mut display,
         };
-        assert_eq!(super::run(&fade, AT, &mut memory), Some(AT + 37));
+        assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
         assert_eq!(memory.display.darkening(), None);
         for step in 1..=2 {
-            assert_eq!(super::run(&fade, AT + 38, &mut memory), Some(AT + 56));
+            assert_eq!(next(super::run(&fade, AT + 38, &mut memory)), Some(AT + 56));
             assert_eq!(memory.own.get(&0x201C), Some(&step));
             assert_eq!(memory.display.darkening().unwrap().fixed, [step; 3]);
         }
         // `$88:ABF8`'s door: LDA #0; STA $7E:46E6 stops the square.
         memory.display.spin((184, 352), 3);
         let stop = image(&[0xA9, 0x00, 0x00, 0x8F, 0xE6, 0x46, 0x7E, 0x02]);
-        assert_eq!(super::run(&stop, AT, &mut memory), Some(AT + 7));
+        assert_eq!(next(super::run(&stop, AT, &mut memory)), Some(AT + 7));
         memory.display.write(0x2132, 0xE7);
         assert_eq!(memory.display.darkening().unwrap().spared, None);
     }
@@ -573,12 +679,22 @@ mod tests {
             0x00,
         ];
         let whitening = image(&code);
-        let mut words = BTreeMap::new();
-        assert_eq!(
-            run(&whitening, AT, &mut words),
-            Some(AT + 26),
-            "at the LDA $0004,X"
-        );
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+        };
+        // Each pass raises the palette and ends the frame in `$80:80DF`.
+        let mut ran = super::run(&whitening, AT, &mut memory);
+        for step in 1..=3 {
+            let Some(Ran::Frame(paused)) = ran else {
+                panic!("pass {step}: {ran:?}");
+            };
+            assert_eq!(memory.display.whitening(), Some(step));
+            ran = resume(&whitening, paused, &mut memory);
+        }
+        assert_eq!(next(ran), Some(AT + 26), "at the LDA $0004,X");
         // A call outside the display routines is refused.
         let code = [0x22, 0x00, 0x80, 0x80, 0x02];
         assert_eq!(run(&image(&code), AT, &mut words), None);

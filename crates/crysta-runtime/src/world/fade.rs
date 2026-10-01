@@ -289,11 +289,19 @@ impl World<'_> {
                 _ => Screen::lit(0),
             };
         }
-        match self.fading {
+        let screen = match self.fading {
             _ if self.dark > 0 => Screen::lit(0),
             Some(Fading::Out { mode, frame, .. }) => out(mode, frame),
             Some(Fading::In { mode, frame }) => into(mode, frame),
             None => Screen::lit(self.exit_brightness()),
+        };
+        // A script's whitening (`$8D:AA96`, the freeze).
+        match self.display().whitening() {
+            Some(steps) if screen.tint == Tint::None => Screen {
+                tint: Tint::Raise(steps),
+                ..screen
+            },
+            _ => screen,
         }
     }
 
