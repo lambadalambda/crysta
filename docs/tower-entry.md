@@ -161,3 +161,72 @@ mostly hidden.
 - The writer of the title OBJ (guess: the map load or bank-`$82` scene).
 - The speed table behind index `$80` (only 2 px a frame is measured).
 - Repeat visits (flag `$100` set) are not run natively.
+
+## BG2 of `$100`: source, darkening, order
+
+Read from the ROMs and checked against the oracle dumps (JP `pan1`, `pan2`,
+`p1`; EU `p1`, `ctl` and the EU pan frames 74934/74994/75104). JP and EU
+data are byte-identical; only the addresses differ.
+
+**Tilemap.** It is the map's second layer, as in `SecondLayer`
+(`crates/assets/src/maps/visual.rs`). The `$100` script (entry JP
+`$B3:8543`, EU `$B5:8543`) names:
+
+| Load | Operand | JP source | EU source | Packed / unpacked |
+|---|---|---|---|---|
+| Layer 2 | `10 02` | `$CA:7E71` | `$CC:7E71` | dims `01 01` + 359 → 512 bytes (16×16 cells) |
+| Metatiles set 2 | `20 00 40 00 02` | `$C5:50B8` | `$C7:50B8` | 3004 → `$1000` (same source as set 1) |
+| BG chars | `80 00 20 01` | `$B7:B8D6` | `$B9:B8D6` | 10764 → `$4000` |
+| Map palette | `40 00 60 20` | `$CC:7156` | `$CE:7156` | raw `$C0` bytes → CGRAM `$20..$7F` |
+
+All are the usual LZ packets (the palette is raw). Cell `c` → metatile
+`c & 511` → four tile words TL/TR/BL/BR, placed as tiles (2cx+q%2,
+2cy+q/2). The result equals VRAM `$3C00..$3FFF` word for word (1024/1024,
+JP and EU). The chars are BG1's sheet: the `$4000` bytes sit at VRAM
+`$0000`, and window set 0 writes BG12NBA = `$00`, so BG1 and BG2 share
+them. BG2 uses tiles 0..509, palette 7 only (CGRAM `$70..$7F` = palette
+source + `$A0`, JP `$CC:71F6`, EU `$CE:71F6`), about 40% of words flipped.
+Rows 28-31 are word `$4000` (tile 0, blank). No priority bit is set.
+Scroll: screen line `s` shows BG2 row `s`, column `x` shows column `x`
+(fixed; it does not follow the camera).
+
+**Darkening.** Scene record `$82:88C1` has a fourth element
+`FB 00 AA B4 97` (EU `FB 00 AA BC 97`): script JP `$97:B4AA`, EU `$97:BCAA`:
+
+```
+00 80                 (header)
+02 76 31 82           COP 76: CGADSUB = $82 at the next NMI (profile $12 gave $02)
+02 BC                 COP BC: yield; the actor resumes after it every frame
+02 4E BA B4 97 32     COP 4E: HDMA, table $97:B4BA (EU $97:BCBA), B-bus $32
+6B
+```
+
+COP 4E (`$80:985F` → `$8D:928A`) takes the next free channel slot (DP
+`$8C + 5n`, mask `$88`, enable `$86`). `$80:804A` resets the allocator
+(`$8D:9328`) every frame and the NMI (`$85:FAB5`) writes `$86` to HDMAEN,
+so this is channel 1 every frame: DMAP `$00` (one byte, direct), `$2132`
+COLDATA. The dialogue's palette HDMA takes channels 2 and 3 after it.
+Table (66 bytes): 32 entries `03 vv`, `vv` = `$FF, $FE, … $E0`, then
+`00`. So the fixed colour (all three channels) is 31 for the first lines and
+drops by 1 every 3 lines to 0, which stays to the bottom. CGWSEL `$80`
+(no colour window is set, so no clip; fixed colour as the operand) and
+CGADSUB `$82` subtract it from BG2 pixels only. Fit to the frames, per
+5-bit channel, screen line `s`:
+
+    k(s) = clamp(31 - floor((s - 1) / 3), 0, 31)    c' = max(0, c - k(s))
+
+So lines 0..3 are 31, line 94 on is 0. This is the same in JP `pan1`,
+`pan2` and three EU frames 170 frames apart: it does not change over time.
+It starts with the fade-in (CGADSUB `$82` and HDMA from JP 60513); before
+that, CGADSUB `$02` with fixed colour 0 does nothing. Guess: element `FB`
+is unconditional, so repeat visits get it too.
+
+**Order.** BGMODE `$09` (mode 1, BG3 high on top). All BG2 words are
+priority 0, so BG1 (priority 0 or 1) wins wherever it is opaque, and BG2 is
+the lowest layer except BG3 low. The OBJ seen (statues, title, Ark) are
+priority 2 and 3, above BG2. OBJ, BG1 and BG3 are not darkened.
+
+Oracle frames: JP images have BG2 row 0 at image row 8; EU (PAL framing)
+at image row 28 and shifted 2 px. Not traced: in JP `pan1` the columns
+x 0..7 and 248..255 are black on every line, although no colour window is
+set.
