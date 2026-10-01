@@ -278,7 +278,15 @@ pub struct CarryArt {
     sprites: PandoraSprites,
     /// Ark's brake and dash lists ([`PandoraSprites::run_art`]).
     run: [PandoraArt; 2],
+    /// Ark's thrust lists with the spear ([`Mode4Art::thrust`]); empty when
+    /// they do not decode.
+    thrust: Vec<Mode4Art>,
 }
+
+/// The id [`CarryArt::animation`] knows Ark's thrust by: resource 4's base.
+pub const THRUST: u32 = 0xA5_A000;
+/// The spear, whose colours the thrust takes.
+const SPEAR: u8 = 0x81;
 
 impl CarryArt {
     /// A pot's list in flight, after the throw's release (`$84:C701`).
@@ -292,6 +300,10 @@ impl CarryArt {
         Ok(Self {
             sprites: PandoraSprites::from_rom(image)?,
             run: PandoraSprites::run_art(image)?,
+            thrust: (0..3)
+                .map(|list| Mode4Art::thrust(image, SPEAR, list))
+                .collect::<Result<_, _>>()
+                .unwrap_or_default(),
         })
     }
 
@@ -302,6 +314,17 @@ impl CarryArt {
     /// Refuses an art or a list the decoder does not hold, or frames outside
     /// the qualified shape.
     pub fn animation(&self, art: u32, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
+        if art == THRUST {
+            let thrust = self
+                .thrust
+                .get(usize::from(selector))
+                .ok_or(SpriteError::Invalid("no such thrust list"))?;
+            return animate(
+                thrust.list().frames(),
+                (thrust.graphics(), thrust.palette(), thrust.palette_base()),
+                hflip,
+            );
+        }
         let art = self
             .sprites
             .art()
@@ -506,6 +529,15 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
         Body::mode4(image, descriptor, list)
             .map_err(|error| Placeholder::Refused(error.to_string())),
     )
+}
+
+/// A list of the helper art (`$A2:C000`) as rasters: an enemy's explosion,
+/// a dropped gem.
+///
+/// # Errors
+/// Refuses a list outside the qualified shapes.
+pub fn overlay_animation(image: &[u8], base: u32, selector: u8) -> Result<Animation, ArtError> {
+    list_animation(&PandoraArt::object(image, base, selector)?, selector, false)
 }
 
 /// A Pandora art's list as rasters.

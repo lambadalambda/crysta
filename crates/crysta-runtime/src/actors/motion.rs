@@ -115,6 +115,12 @@ impl Motion {
     }
 
     /// One frame's move.
+    /// Whether either stream still runs (`7F:0010 | 7F:0012`, as `COP E4`
+    /// waits on it).
+    pub(super) const fn running(&self) -> bool {
+        self.x.pointer != 0 || self.y.pointer != 0
+    }
+
     pub(super) fn step(&mut self) -> Option<(i16, i16)> {
         if self.list == Some(self.tick) {
             (self.x, self.y) = self.start;

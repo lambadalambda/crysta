@@ -35,9 +35,10 @@ pub struct Memory<'m> {
     pub random: u16,
 }
 
-/// The actor's own bytes runs may use: the voice fade's intensity
-/// (`$7F:201C,X`, `$88:9CD8`). Other fields are the engine's.
-const OWN: std::ops::RangeInclusive<u16> = 0x201C..=0x201D;
+/// The actor's own bytes runs may use: `COP 46`'s row offset and layer
+/// (`$7F:201A/201B,X`) and the voice fade's intensity (`$7F:201C,X`,
+/// `$88:9CD8`). Other fields are the engine's.
+const OWN: std::ops::RangeInclusive<u16> = 0x201A..=0x201D;
 /// `$0408`: the random generator's word, which runs may read.
 const RANDOM: u16 = 0x0408;
 /// The entity's own scratch words runs may use through `,X`: `+$24` and
@@ -66,9 +67,12 @@ const SCRATCH: [(u16, u16); 3] = [
 /// `$11` does (`$88:A9EF`); the world keeps it in the scratch words.
 pub const PLAYER_ACTION: u16 = 0x097C;
 /// Engine words runs may read but not write: the player's action word,
-/// and the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
-/// the Prime Blue shop `$1D` tests (`$88:C7ED`).
-const READABLE: [u16; 2] = [PLAYER_ACTION, PRIME_BLUE];
+/// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
+/// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
+const READABLE: [u16; 3] = [PLAYER_ACTION, PRIME_BLUE, ENEMIES];
+/// `$0498`, the enemies a room waits on (`docs/combat.md`), as the tower
+/// floors' controllers poll it.
+pub const ENEMIES: u16 = 0x0498;
 /// `$07ED`, the Prime Blue count in BCD, as runs read it.
 pub const PRIME_BLUE: u16 = 0x07ED;
 

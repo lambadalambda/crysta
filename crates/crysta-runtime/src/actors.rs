@@ -15,9 +15,10 @@
 
 mod cadence;
 mod ease;
+mod foe;
 mod motion;
 mod native;
-pub use native::{Scratch, PLAYER_ACTION, PRIME_BLUE};
+pub use native::{Scratch, ENEMIES, PLAYER_ACTION, PRIME_BLUE};
 
 use crate::scene::{Globals, Transfer};
 use assets::maps::actor_script::{
@@ -104,6 +105,10 @@ const TILE_BRANCH: u8 = 0x42;
 /// word: the tile in bits 0-8, and in the high byte, shifted right twice, the
 /// frames to wait after.
 const PATCH: u8 = 0x44;
+/// Copies a block of map cells a row a frame (`$80:9532`,
+/// `docs/block-patch.md`): `n lim sx sy dx dy wait`, with the row offset and
+/// the layer in the actor's own `$7F:201A`/`201B`.
+const BLOCK: u8 = 0x46;
 /// Registers where a hit sends the script (`+$04 |= $0200`); `$80:9D25`.
 /// Operands: the hit target, then a long return address for `COP 66`.
 const HIT_TARGET: u8 = 0x65;
@@ -503,6 +508,16 @@ pub struct Actor {
     subroutine: Option<usize>,
     /// `COP D0`'s orbit, while `COP D1` steps it.
     orbit: Option<Orbit>,
+    /// An enemy's combat state, from its descriptor's profile.
+    pub(crate) foe: Option<foe::Foe>,
+    /// The boxes of its poses.
+    boxes: Option<foe::Boxes>,
+    /// Died this frame, for the world's EXP.
+    pub(crate) died: bool,
+    /// The helper art's list drawn instead of the body.
+    pub(crate) overlay: Option<(u32, u8)>,
+    /// A sleep `COP 46` leaves for the next yield (`E+$0E`).
+    sleep: u16,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -607,6 +622,11 @@ impl Actor {
             paused: None,
             subroutine: None,
             orbit: None,
+            foe: None,
+            boxes: None,
+            died: false,
+            overlay: None,
+            sleep: 0,
             walked: false,
             contact: None,
             ease: None,
@@ -712,6 +732,31 @@ impl Actor {
             .descriptor
             .filter(|_| resident.body)
             .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
+        // An enemy: hittable (header `+$04` bit `$0200`), its descriptor's
+        // byte 4 naming its profile (`$80:FACF`).
+        let hittable = resident
+            .script
+            .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
+            .and_then(|script| image.get(script.checked_sub(4)?..script.checked_sub(2)?))
+            .is_some_and(|word| u16::from_le_bytes([word[0], word[1]]) & 0x0200 != 0);
+        actor.foe = resident
+            .descriptor
+            .filter(|_| resident.body && hittable)
+            .and_then(|descriptor| image.get(descriptor + 4))
+            .and_then(|&index| crate::combat::profile(image, index))
+            .map(|profile| {
+                // A spawn parameter with bit 7 counts in `$0498` (`$80:F94C`).
+                let counted = image
+                    .get(resident.record + 3)
+                    .is_some_and(|&byte| byte & 0x80 != 0);
+                foe::Foe::new(profile, counted)
+            });
+        if actor.foe.is_some() {
+            actor.boxes = resident
+                .descriptor
+                .and_then(|descriptor| cadence::pose_boxes(image, descriptor))
+                .map(std::rc::Rc::new);
+        }
         actor.legs = resident.descriptor.is_some_and(|descriptor| {
             cadence::common_base(image, descriptor) && cadence::common_streams(image)
         });
@@ -783,6 +828,9 @@ impl Actor {
     /// Runs one frame.
     pub fn tick(&mut self, around: &mut Surroundings<'_>) {
         let start = self.position;
+        if self.foe_frame(around.image, &mut around.globals.random) {
+            return;
+        }
         self.frame(around);
         self.walked |= self.walking || self.position != start;
     }
@@ -1264,6 +1312,7 @@ impl Actor {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
+            BLOCK => return self.block_service(operands, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
             | SPAWN_LINKED | SPAWN_AT | MUSIC_WAIT | 0x6A | 0x76 | 0xD9 => {
                 return self.door_service(service, operands, bank, around)
@@ -2074,6 +2123,48 @@ impl Actor {
         }
         self.pc = operands + 6;
         true
+    }
+
+    /// `COP 46 n lim sx sy dx dy wait`: while the row offset `r` (own
+    /// `$7F:201A`) is at most `lim`, copies row `r / 16` of the `n + 1` cells
+    /// from (sx, sy) to (dx, dy), adds 16 and yields; then sleeps `wait` at
+    /// the next yield and goes on. Layer 0 (own `$7F:201B`) is the first,
+    /// with its collision; the second layer's copies change only the
+    /// picture and are not modelled. Returns whether execution continues.
+    fn block_service(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        let Some(&[n, limit, sx, sy, dx, dy, wait]) = around.image.get(operands..operands + 7)
+        else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let row = self.own.get(&0x201A).copied().unwrap_or(0);
+        if limit < row {
+            self.sleep = u16::from(wait);
+            self.pc = operands + 7;
+            return true;
+        }
+        if self.own.get(&0x201B).copied().unwrap_or(0) == 0 && around.width > 0 {
+            let width = around.width;
+            for i in 0..=u16::from(n) {
+                let from = (
+                    (u16::from(sx) + i) % width,
+                    u16::from(sy) + u16::from(row / 16),
+                );
+                let at = usize::from(from.1) * usize::from(width) + usize::from(from.0);
+                let Some(&cell) = around.cells.get(at) else {
+                    continue;
+                };
+                let to = (
+                    (u16::from(dx) + i) % width,
+                    u16::from(dy) + u16::from(row / 16),
+                );
+                around.globals.patches.push((to.0, to.1, cell & 0x1FF));
+            }
+        }
+        self.own.insert(0x201A, row.wrapping_add(16));
+        self.pc = operands - 2;
+        self.state = State::Waiting(std::mem::take(&mut self.sleep));
+        false
     }
 
     /// Placement, map deletion, repeated poses, counters and a bare yield.

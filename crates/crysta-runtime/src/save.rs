@@ -23,6 +23,10 @@ const SECONDS: usize = 0x2E;
 const TICKS: u16 = 0x3B;
 const LEVEL: usize = 0x56;
 const MONEY: usize = 0x94;
+/// `$065D`: the life left.
+const LIFE: usize = 0x5D;
+/// `$0690`: the EXP, three BCD bytes.
+const EXP: usize = 0x90;
 /// `$064A`: the equipped weapon's item (0: none).
 const WEAPON: usize = 0x4A;
 /// `$0659`: the equipped weapon's power.
@@ -237,6 +241,68 @@ impl SaveSlot {
     pub fn set_money(&mut self, money: u32) {
         self.set_word(MONEY, bcd(money % 10_000));
         self.set_word(MONEY + 2, bcd(money / 10_000));
+    }
+
+    /// Ark's combat stats (`$0656`.., `docs/combat.md`).
+    #[must_use]
+    pub fn stats(&self) -> crate::combat::Stats {
+        crate::combat::Stats {
+            level: self.bytes[0x56],
+            max_life: self.word(0x57),
+            weapon: self.word(WEAPON_POWER),
+            armor: self.word(0x5B),
+            life: self.word(LIFE),
+            defense: self.word(0x5F),
+            attack: self.word(0x62),
+            luck: self.bytes[0x66],
+            exp: self.exp(),
+        }
+    }
+
+    /// Raises Ark a level by the table's steps from `from` to `to`
+    /// (`$85:F35B`): the base life, attack, defense and luck (`$069C`..
+    /// `$06A2`) and the values they make, the life left with them.
+    pub fn raise_level(&mut self, from: &crate::combat::Level, to: &crate::combat::Level) {
+        let add = |slot: &mut Self, at: usize, by: u16| {
+            let value = slot.word(at).saturating_add(by);
+            slot.set_word(at, value);
+        };
+        let life = to.life.saturating_sub(from.life);
+        let attack = to.attack.saturating_sub(from.attack);
+        let defense = to.defense.saturating_sub(from.defense);
+        let luck = to.luck.saturating_sub(from.luck);
+        self.bytes[0x56] = self.bytes[0x56].saturating_add(1);
+        for (base, shown, by) in [
+            (0x9C, 0x57, life),
+            (0xA0, 0x62, attack),
+            (0xA2, 0x5F, defense),
+        ] {
+            add(self, base, by);
+            add(self, shown, by);
+        }
+        add(self, LIFE, life);
+        add(self, 0x9E, u16::from(luck));
+        for at in [0x61, 0x66] {
+            self.bytes[at] = self.bytes[at].saturating_add(luck);
+        }
+    }
+
+    /// The life left (`$065D`).
+    pub fn set_life(&mut self, life: u16) {
+        self.set_word(LIFE, life);
+    }
+
+    /// The EXP: six BCD digits at `$0690`.
+    #[must_use]
+    pub fn exp(&self) -> u32 {
+        decimal(self.word(EXP)) + decimal(u16::from(self.bytes[EXP + 2])) * 10_000
+    }
+
+    /// Writes the EXP, capped at 999999.
+    pub fn set_exp(&mut self, exp: u32) {
+        let exp = exp.min(999_999);
+        self.set_word(EXP, bcd(exp % 10_000));
+        self.bytes[EXP + 2] = bcd(exp / 10_000).to_le_bytes()[0];
     }
 
     /// The equipped weapon's item and power, if one is equipped.

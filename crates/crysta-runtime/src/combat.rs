@@ -234,6 +234,25 @@ pub fn enemy_damage(profile: &Profile, kind: usize, stats: &Stats, counter: u16)
     variance(u16::try_from(damage).unwrap_or(u16::MAX), counter).min(9999)
 }
 
+/// The stat table's pointers (`$8D:BDFA`, European `$8D:BCC3`), into bank
+/// `$8D`; entry 0 is Ark's own block.
+const PROFILES: usize = 0x0D_BDFA;
+
+/// Profile `index` (`COP D9`, a descriptor's byte 4), not Ark's.
+#[must_use]
+pub fn profile(image: &[u8], index: u8) -> Option<Profile> {
+    let index = index & 0x7F;
+    if index == 0 {
+        return None;
+    }
+    let table = assets::layout::per_revision(image, PROFILES, PROFILES - 0x137);
+    let at = table + usize::from(index) * 2;
+    let pointer = image.get(at..at + 2)?;
+    let start = 0x0D_0000 | usize::from(u16::from_le_bytes([pointer[0], pointer[1]]));
+    let bytes: &[u8; 25] = image.get(start..start + 25)?.try_into().ok()?;
+    Some(Profile::decode(bytes))
+}
+
 /// One level of the table `$8D:BA61` (EU `$8D:B92A`): the EXP it needs and
 /// the base stats it brings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

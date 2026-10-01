@@ -31,7 +31,9 @@ mod attack;
 mod contact;
 mod door;
 mod fade;
+mod hurt;
 mod pots;
+mod progress;
 mod transition;
 pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
@@ -50,6 +52,12 @@ pub struct World<'a> {
     region: Option<assets::maps::visual::camera::CameraRegion>,
     /// Ark's thrust under way.
     thrust: Option<attack::Thrust>,
+    /// Ark pushed by an enemy's hit.
+    hurt: Option<hurt::Hurt>,
+    /// Frames since Ark went down at no life.
+    down: Option<u16>,
+    /// Frames before an enemy can hurt Ark again.
+    ark_immune: u16,
     /// The thrust lists' records and boxes.
     thrust_records: attack::ThrustRecords,
     walking: WalkingState,
@@ -306,6 +314,9 @@ impl<'a> World<'a> {
             exits,
             region: assets::maps::visual::camera::CameraRegion::from_rom(image, map).ok(),
             thrust: None,
+            hurt: None,
+            down: None,
+            ark_immune: 0,
             thrust_records: attack::ThrustRecords::from_rom(image),
             walking: WalkingState::new(x, y),
             residents: present,
@@ -599,6 +610,11 @@ impl<'a> World<'a> {
         let (x, y) = self.position();
         // The player's action word as runs read it: only a forced action
         // (`$0810`) is modelled; Ark never attacks or jumps here.
+        let enemies = self.actors.iter().filter(|actor| actor.counts()).count();
+        self.globals.scratch.insert(
+            crate::actors::ENEMIES,
+            u16::try_from(enemies).unwrap_or(u16::MAX),
+        );
         self.globals.scratch.insert(
             crate::actors::PLAYER_ACTION,
             if self.globals.player_action {
@@ -642,6 +658,7 @@ impl<'a> World<'a> {
             resident.hidden = actor.hidden;
             resident.priority = actor.priority;
             resident.palette = actor.palette;
+            resident.overlay = actor.overlay;
         }
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
@@ -665,6 +682,7 @@ impl<'a> World<'a> {
             self.room = occupy_cells(self.base.clone(), &cells)?;
             self.blocked = cells;
         }
+        self.collect_deaths();
         Ok(())
     }
 
@@ -879,6 +897,7 @@ impl<'a> World<'a> {
                 hidden: actor.hidden,
                 priority: actor.priority,
                 palette: actor.palette,
+                overlay: None,
             });
             self.actors.push(actor);
         }
@@ -1034,11 +1053,7 @@ impl<'a> World<'a> {
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
-        let held = match self.pot_frame(direction, lift)? {
-            Some(step) => Some(step),
-            None => self.thrust_frame()?,
-        };
-        if let Some(step) = held {
+        if let Some(step) = self.held_frame(direction, lift)? {
             self.apply_patches()?;
             return Ok((step, None));
         }
@@ -1076,6 +1091,7 @@ impl<'a> World<'a> {
         if !entered && !self.in_transition() {
             self.touch();
         }
+        self.hurt_ark();
         self.apply_patches()?;
         Ok((step, opened))
     }
@@ -1481,6 +1497,8 @@ impl<'a> World<'a> {
     /// A frame's clocks: the play clock, the display's square, an item held
     /// up; and the screen the actors see.
     fn tick_clocks(&mut self) {
+        self.globals.frames = self.globals.frames.wrapping_add(1);
+        self.age_digits();
         self.globals.view = self.region.map(|region| {
             let (x, y) = self.camera_focus();
             let [left, top] = region.settled_origin([x, y]);
@@ -1935,7 +1953,8 @@ fn blocking_cells(residents: &[Resident], actors: &[Actor]) -> Vec<(u16, u16)> {
     residents
         .iter()
         .zip(actors)
-        .filter(|(resident, _)| !resident.hidden)
+        // Enemies block nothing, not even each other (`docs/enemy-scripts.md`).
+        .filter(|(resident, actor)| !resident.hidden && actor.foe.is_none())
         .flat_map(|(resident, actor)| {
             let own = if resident.body && actor.holds_its_cell() {
                 Some(resident.collision_cell())
@@ -2125,6 +2144,7 @@ mod tests {
             hidden: false,
             priority: 2,
             palette: 0,
+            overlay: None,
         }
     }
 
@@ -2150,6 +2170,9 @@ mod tests {
             exits: ExitList::from_rom(&bytes, 0xB).unwrap(),
             region: None,
             thrust: None,
+            hurt: None,
+            down: None,
+            ark_immune: 0,
             thrust_records: attack::ThrustRecords::default(),
             walking: WalkingState::new(56, 64),
             residents: vec![],

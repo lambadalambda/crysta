@@ -97,6 +97,10 @@ pub struct Globals {
     pub pan: Option<Pan>,
     /// The game's random generator (`$0408`).
     pub random: crate::random::Random,
+    /// The frame counter (`$42`).
+    pub frames: u16,
+    /// Damage digits floating over the bodies hit.
+    pub digits: Vec<Digits>,
     /// The screen on the map (left, top, right, bottom), when the map has a
     /// camera region: actors off it sleep (`COP 59`).
     pub view: Option<(u16, u16, u16, u16)>,
@@ -111,6 +115,48 @@ pub struct Presentation {
     pub frames: u16,
     /// Frames since the grant.
     pub age: u16,
+}
+
+/// The damage digits a hit shows (`$87:A1BF`, `docs/combat-graphics.md`):
+/// the life taken, over the body, for 48 frames.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Digits {
+    /// Where they start: above the body hit.
+    pub at: (u16, u16),
+    /// The life taken.
+    pub amount: u16,
+    /// Their colours: an enemy's normal or critical hit, or Ark's.
+    pub kind: DigitKind,
+    /// Frames shown.
+    pub age: u16,
+}
+
+/// The colours of damage digits (`COP D5 00 38/3A/36`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DigitKind {
+    /// An enemy hit: OBJ palette 4.
+    Normal,
+    /// A critical hit: palette 5.
+    Critical,
+    /// Ark hit: palette 3.
+    Ark,
+}
+
+impl Digits {
+    /// Frames they float.
+    pub const FRAMES: u16 = 48;
+
+    /// Their height offset now: a pixel down a frame for 8 frames, up for
+    /// 24, then still.
+    #[must_use]
+    pub fn rise(&self) -> i16 {
+        let age = i16::try_from(self.age).unwrap_or(i16::MAX);
+        match age {
+            0..8 => age,
+            8..32 => 8 - (age - 8),
+            _ => -16,
+        }
+    }
 }
 
 /// A camera move a script set (`COP DD`, `$80:B735`): the view's offset
@@ -184,6 +230,8 @@ impl Globals {
             display: crate::display::Display::default(),
             pan: None,
             random: crate::random::Random::default(),
+            frames: 0,
+            digits: Vec::new(),
             view: None,
         }
     }

@@ -117,6 +117,27 @@ pub(super) fn pose_ticks(image: &[u8], descriptor: usize) -> Option<Vec<Option<u
     display_lists(image, offset(image.get(descriptor..descriptor + 3)?)?)
 }
 
+/// The records and boxes of every display list in a descriptor's packet
+/// (`docs/combat.md`), for the hit scans.
+pub(super) fn pose_boxes(
+    image: &[u8],
+    descriptor: usize,
+) -> Option<Vec<Vec<assets::sprites::boxes::Record>>> {
+    let packet = offset(image.get(descriptor..descriptor + 3)?)?;
+    let data = decode(image.get(packet..)?, 0x10000).ok()?.data;
+    let lists = list_ticks(&data)?.len();
+    Some(
+        (0..lists)
+            .map(|list| {
+                u8::try_from(list)
+                    .ok()
+                    .and_then(|list| assets::sprites::boxes::packet_list(&data, list).ok())
+                    .unwrap_or_default()
+            })
+            .collect(),
+    )
+}
+
 /// Ticks of every display list of the packet a `COP D8` pointer names: an
 /// LZ packet, or direct lists as Ark's and his helper's art (`$A2:C000`).
 pub(super) fn packet_ticks(image: &[u8], pointer: &[u8]) -> Option<Vec<Option<u16>>> {

@@ -45,6 +45,9 @@ pub struct Resident {
     pub priority: u8,
     /// Palette field (`COP BB`), added to each frame's OBJ palette.
     pub palette: u8,
+    /// A list of the helper art (`$A2:C000`) drawn instead of the body:
+    /// an enemy's explosion or the gem it dropped.
+    pub overlay: Option<(u32, u8)>,
 }
 
 impl Resident {
@@ -153,6 +156,7 @@ pub fn residents(
                 hidden: false,
                 priority: 2,
                 palette: 0,
+                overlay: None,
             }
         })
         .filter(|resident| {

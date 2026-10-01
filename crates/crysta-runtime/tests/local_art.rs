@@ -208,6 +208,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             hidden: false,
             priority: 2,
             palette: 0,
+            overlay: None,
         })
         .collect();
     let art = residents_art(
@@ -659,6 +660,7 @@ fn the_freezes_crystals_draw_pose_9_of_the_helper_art() {
         hidden: false,
         priority: 2,
         palette: 0,
+        overlay: None,
     };
     let art = residents_art(
         image,
@@ -670,4 +672,22 @@ fn the_freezes_crystals_draw_pose_9_of_the_helper_art() {
     let body = art[0].as_ref().expect("the crystal's art");
     let animation = body.animation(9, false).unwrap();
     assert!(animation.frames.iter().all(Raster::is_visible));
+}
+
+#[test]
+fn every_thrust_pose_rasterizes_with_the_spear() {
+    // `docs/combat-graphics.md`: resource 4 lists `$00`..`$02` from the raw
+    // sheet, palette 1 with the spear's colours.
+    use crysta_runtime::art::{CarryArt, THRUST};
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let art = CarryArt::from_rom(cartridge.image()).unwrap();
+    for list in 0..3 {
+        for hflip in [false, true] {
+            let animation = art.animation(THRUST, list, hflip).unwrap();
+            assert_eq!(animation.frames.len(), 5, "{list}");
+            assert!(animation.frames.iter().all(Raster::is_visible));
+        }
+    }
 }
