@@ -15,3 +15,7 @@ When Ark walks up into a doorway, his head draws over the door's top; natively t
 ## Acceptance Criteria
 
 - Entering a door upward matches native frames: the head is behind the door's top.
+
+## Notes
+
+- Ark's walk up into a door draws the native mask helper (`$84:B988`, a priority-1 sprite anchored at the threshold) over him where the background is opaque (`crysta-runtime/tests/local_depth.rs`, `docs/depth-order.md`). Checked against native traces of the mask's placement, not a whole-frame pixel compare.

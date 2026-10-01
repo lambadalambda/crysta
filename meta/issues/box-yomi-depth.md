@@ -15,3 +15,7 @@ In Yomi's box, Yomi is sometimes cut in half by the bookcases.
 ## Acceptance Criteria
 
 - Yomi's walk past the bookcases matches native frames.
+
+## Notes
+
+- Yomi's `COP BA` sets OBJ priority 3, so he draws over the high bookcase tiles (`local_depth.rs`, `docs/depth-order.md`).

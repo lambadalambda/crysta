@@ -15,3 +15,7 @@ Talking to the weapon shows its page icon with a solid blue background; natively
 ## Acceptance Criteria
 
 - The weapon's text page matches the native frame.
+
+## Notes
+
+- On a page without a window the prompt skips colour 3, as `$85:947F` does (`crysta-app/src/window.rs`). Checked by unit test and the native code, not a pixel compare with the capture.

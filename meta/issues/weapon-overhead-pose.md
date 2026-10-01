@@ -15,3 +15,7 @@ When Ark gets the weapon, he does not hold it over his head as natively.
 ## Acceptance Criteria
 
 - The weapon's presentation matches native frames.
+
+## Notes
+
+- `COP 60` starts a presentation: the lift for 22 frames, its stand to frame 422, the icon 40/44/42 pixels above Ark, the pad locked meanwhile (`local_story.rs` `ark_takes_the_crystal_spear_and_returns_to_the_box_room`, `docs/ark-poses.md`).

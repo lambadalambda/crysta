@@ -15,3 +15,7 @@ In the weapons room the pedestal draws over the weapon, which is barely visible.
 ## Acceptance Criteria
 
 - The weapons room matches native frames with the weapon in place.
+
+## Notes
+
+- The weapon's priority comes from its script (`COP BA`), and its sparkle's frame lengths now come from the uncompressed `$A2:C000` lists (`local_depth.rs`).
