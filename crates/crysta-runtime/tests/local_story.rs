@@ -959,15 +959,38 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
     assert!(flag(&world, 0x241), "consent");
     press_a(&mut world);
     assert!(flag(&world, 0x242), "the second talk takes it");
+    let mut shown = Vec::new();
     for _ in 0..3000 {
         let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
+        shown.push((world.carry().map(|carry| carry.motion), world.held_item()));
         if world.map() == 0x0021 {
             break;
         }
     }
+    // Held over his head (`$84:BEA2`, `docs/ark-poses.md`): the lift for 22
+    // frames, then its stand to frame 422; the icon from frame 1 to 419,
+    // 40, then 44, then 42 pixels above him.
+    let start = shown
+        .iter()
+        .position(|(motion, _)| motion.is_some())
+        .expect("the presentation");
+    let motions: Vec<_> = shown[start..].iter().map(|(motion, _)| *motion).collect();
+    let lifting = Some(assets::sprites::PandoraCarryMotion::Lifting);
+    let standing = Some(assets::sprites::PandoraCarryMotion::Standing);
+    assert!(motions[..22].iter().all(|&motion| motion == lifting));
+    assert!(motions[22..422].iter().all(|&motion| motion == standing));
+    assert_eq!(motions[422], None, "ordinary standing again");
+    let held: Vec<_> = shown[start..start + 419]
+        .iter()
+        .map(|(_, held)| *held)
+        .collect();
+    assert_eq!(held[0], Some((0x81, (-8, -40))));
+    assert_eq!(held[14], Some((0x81, (-8, -44))));
+    assert_eq!(held[22], Some((0x81, (-8, -42))));
+    assert_eq!(shown[start + 419].1, None);
     assert_eq!(world.items(), [0x81], "the Crystal Spear");
     // The fanfare (`COP 60`'s `$34`), the map's music again 420 frames
     // later (`$84:BF0A`) -- entered here directly, `$42` selects nothing,

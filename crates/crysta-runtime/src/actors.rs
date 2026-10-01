@@ -2149,9 +2149,13 @@ impl Actor {
                     return false;
                 };
                 // A full inventory keeps nothing; the presentation goes on.
-                // The player's presentation pose is not drawn.
                 around.globals.inventory.add(item);
                 around.globals.audio.fanfare(track, frames);
+                around.globals.presentation = Some(crate::scene::Presentation {
+                    item,
+                    frames,
+                    age: 0,
+                });
                 self.pc = operands + 4;
             }
             _ => {

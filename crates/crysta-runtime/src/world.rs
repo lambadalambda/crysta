@@ -957,6 +957,7 @@ impl<'a> World<'a> {
         }
         // The frame gate's play clock; a load's dark frames skip the gate.
         self.globals.slot.tick_clock();
+        self.hold_for_presentation();
         self.arrived = self.arrived.saturating_add(1);
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
@@ -1017,7 +1018,7 @@ impl<'a> World<'a> {
             };
             return Ok((movement, None));
         }
-        let locked = self.globals.input_mask & PAD_DIRECTIONS != 0;
+        let locked = self.pad_locked();
         let direction = direction.filter(|_| !locked);
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
@@ -1149,10 +1150,11 @@ impl<'a> World<'a> {
         self.globals.write_flag(0x8000 | flag);
     }
 
-    /// Whether a script has locked the pad's directions (`COP 2A`).
+    /// Whether a script has locked the pad's directions (`COP 2A`), or Ark
+    /// holds an item up.
     #[must_use]
     pub const fn pad_locked(&self) -> bool {
-        self.globals.input_mask & PAD_DIRECTIONS != 0
+        self.globals.input_mask & PAD_DIRECTIONS != 0 || self.globals.presentation.is_some()
     }
 
     /// The items held, in slot order.
@@ -1444,6 +1446,32 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn counter(&self, op: u8) -> u16 {
         self.globals.counter(op)
+    }
+
+    /// A frame of an item held up: Ark stands still until it ends, three
+    /// frames after its count (`$84:BF21`).
+    fn hold_for_presentation(&mut self) {
+        if let Some(presentation) = &mut self.globals.presentation {
+            presentation.age += 1;
+            if presentation.age >= presentation.frames + PRESENTATION_TAIL {
+                self.globals.presentation = None;
+            }
+        }
+    }
+
+    /// The item held over Ark's head and its icon's offset from him: 40,
+    /// then 44, then 42 pixels up (`$84:C020`, `docs/ark-poses.md`).
+    #[must_use]
+    pub fn held_item(&self) -> Option<(u8, (i16, i16))> {
+        let presentation = self.globals.presentation?;
+        let dy = match presentation.age {
+            0 => return None,
+            age if age >= presentation.frames => return None,
+            1..=14 => -40,
+            15..=PRESENTATION_LIFT => -44,
+            _ => -42,
+        };
+        Some((presentation.item, (-8, dy)))
     }
 
     /// `$0496`: the slot last saved or loaded.
@@ -1762,6 +1790,11 @@ impl<'a> World<'a> {
         Ok(entered)
     }
 }
+
+/// Frames an item stays held after its count runs out (`$84:BF21`).
+const PRESENTATION_TAIL: u16 = 3;
+/// Frames of the lift before the held stand (`$84:BEA2`, list `$19`).
+const PRESENTATION_LIFT: u16 = 22;
 
 /// Port 3's sound as a brake starts (`COP 36 0D`).
 const BRAKE_SOUND: u8 = 0x0D;

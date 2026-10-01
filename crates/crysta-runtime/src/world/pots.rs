@@ -130,6 +130,19 @@ impl World<'_> {
     /// Ark's carry pose, from the lift until the throw's recovery ends.
     #[must_use]
     pub fn carry(&self) -> Option<Carry> {
+        // An item held up: the lift, then its stand (`$84:BEA2`).
+        if let Some(presentation) = self.globals.presentation.filter(|p| p.age > 0) {
+            let lifting = presentation.age <= super::PRESENTATION_LIFT;
+            return Some(Carry {
+                motion: if lifting {
+                    PandoraCarryMotion::Lifting
+                } else {
+                    PandoraCarryMotion::Standing
+                },
+                facing: self.facing as u8,
+                tick: u8::try_from(presentation.age - 1).unwrap_or(u8::MAX),
+            });
+        }
         let state = self.pots.as_ref()?.state?;
         let motion = match state.phase() {
             Phase::Empty => return None,

@@ -78,6 +78,8 @@ pub struct Globals {
     pub last_slot: u8,
     /// Whether a save wrote the SRAM since the host last kept it.
     pub sram_written: bool,
+    /// An item held over Ark's head (`COP 60`), while it lasts.
+    pub presentation: Option<Presentation>,
     /// `$0640..$06BF`: map-local counters `COP 4B` keeps, such as the blue
     /// door's hit count. Cleared on every map load (`$8D:8AED`).
     pub counters: Vec<u8>,
@@ -89,6 +91,17 @@ pub struct Globals {
     pub spawns: Vec<(usize, u16, (u16, u16))>,
     /// Music and sound effect requests ([`crate::audio`]).
     pub audio: crate::audio::Audio,
+}
+
+/// An item granted and held up (`COP 60` → `$84:BEA2`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Presentation {
+    /// The item.
+    pub item: u8,
+    /// Frames it is held (`$7F:1020`).
+    pub frames: u16,
+    /// Frames since the grant.
+    pub age: u16,
 }
 
 impl Default for Globals {
@@ -116,6 +129,7 @@ impl Globals {
             sram: crate::sram::Sram::default(),
             last_slot: 0,
             sram_written: false,
+            presentation: None,
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),
