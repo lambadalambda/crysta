@@ -81,3 +81,60 @@ no high bits there; the depth rule is correct.
 Change: apply `COP B2` to the resident's y, and let `COP 8E` wait for the list
 end so that pose 8 cycles. Guess: our `COP 8E` fixed wait plus `COP 80`
 restarting the list holds the first frame.
+
+## 4. Stairs: the same mask actor, three more poses
+
+Native (both ROMs, JP and EU runs of `C`→`E`→`$20`→`$21` and back; scratch
+probes in `/Users/lainsoykaf/.claude/jobs/ef2e9592/tmp/stairs-depth/`,
+`summ3.py`/`tim.py`/`crop.py` on per-frame captures):
+
+- Ark keeps OBJ priority 2 on every frame (`+$08` bits 12-13 stay 0). No other
+  sprite drops to priority 0/1. No high BG tile overlaps the stairwell (the only
+  high tiles nearby are the top wall edge, 65+ px above the anchor). No window.
+- The hiding is again the player-helper (`$0DF6`), first in OAM, tiles `$51`,
+  palette 2 (colour 3 = `$0000`), **priority 1**. Every mask pixel measured lies
+  on opaque low BG (the dark opening is an opaque BG tile), so the mask shows
+  the BG and hides Ark.
+- The four stair routines (bank `$84`, same bytes in JP and EU) do
+  `COP 36 17`, `COP CB` (Ark's list script), then `LDA #pose_script; JSR $BD83`
+  (helper to Ark's position, then the pose script):
+
+| Motion | Routine | Ark list script | Helper | Anchor A |
+|---|---|---|---|---|
+| Down, leaving (14) | `$84:BAFB` | `$BB2F` (list `$16`) | `$BE0B` pose `$3B`; after `COP C1 $11` → `$BE06` pose `$3A` | Ark at the exit |
+| Up, leaving (13) | `$84:BACE` | `$BAEF` (list `$14`) | `$BE01` pose `$39` | Ark at the exit |
+| Down, arriving | `$84:BD46` | `$BD77` (list `$13`) | `$BE10` pose `$39` at Ark + (14, 7) | end position − (0, 16) |
+| Up, arriving | `$84:BD06` | `$BD37` (list `$15`) | `$BE33` pose `$39` at Ark − (6, 8) | end position − (0, 16) |
+
+Anchors measured (JP = EU): leaving C (184,352), E down (104,864), `$20` down
+(360,864), `$21` up (136,112), `$20` up (408,864), E up (152,864); arriving E
+(152,864), `$20` (408,864)/(360,864), `$21` (136,112), E (104,864), C (184,352).
+That is the stair tile, 16 px above where Ark stands after the arrival.
+
+Shapes, world pixels relative to A (inclusive, same convention as section 1):
+
+- `$3B` (14 tiles): x −8..+23, y −40..−33; x +8..+23, y −32..+7.
+- `$3A` (21 tiles): `$3B`, plus x +8..+23, y +8..+15; x −8..+7, y −4..+7;
+  x 0..+7, y +8..+15.
+- `$39` (15 tiles): x −24..−9, y −48..−1; x −8..−1, y −48..−33; x 0..+7, y −40..−33.
+
+Timing (JP; EU the same lengths):
+
+- Down leaving: `$3B` from the exit frame (24987) for 18 frames, `$3A` from
+  25005 until the map changes (it is still in OAM while the screen is dark).
+- Up leaving: `$39` from the exit frame (54017) until the map changes.
+- Arriving (both): the helper starts with the list (`COP C1 $40` waits 64);
+  the mask is in OAM from the first frame that Ark is drawn (list + 3..4
+  frames) until the list ends (down: 25123..25185, end `$BD82`; up:
+  54458..54520, end `$BD45`).
+
+Ours: no occluder; the stair walk draws Ark over the jambs and lintel.
+
+Change: reuse the section 1 occluder. On each stair motion, put the pose
+rectangles above at A for the frames above. Hide every ordinary sprite pixel
+in them where the BG pixel is opaque (low or high). Where the BG is colour 0,
+draw black (not seen in these rooms). Down leaving switches `$3B` → `$3A`
+18 frames after the exit; the other three use `$39` only.
+EU up runs cover `$21`→`$20` only (the route then went down again); it
+matches JP frame by frame. Not decoded: who hides the helper at the
+arrival's end (measured, not read from the pose list).
