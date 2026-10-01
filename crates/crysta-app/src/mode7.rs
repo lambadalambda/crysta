@@ -37,7 +37,7 @@ const fn clip(n: i32) -> i32 {
 
 /// Subtracts per 5-bit channel, clamped at 0 (`CGADSUB` subtract, no
 /// halving).
-fn subtract(a: Bgr555, b: Bgr555) -> Bgr555 {
+pub(crate) fn subtract(a: Bgr555, b: Bgr555) -> Bgr555 {
     let channel = |shift: u16| {
         let (x, y) = (a.raw() >> shift & 31, b.raw() >> shift & 31);
         x.saturating_sub(y) << shift
@@ -46,7 +46,7 @@ fn subtract(a: Bgr555, b: Bgr555) -> Bgr555 {
 }
 
 /// A fixed colour of `intensity` in all three channels (`COLDATA`).
-fn fixed(intensity: u8) -> Bgr555 {
+pub(crate) fn fixed(intensity: u8) -> Bgr555 {
     let i = u16::from(intensity & 31);
     Bgr555::new(i | i << 5 | i << 10)
 }

@@ -1,5 +1,5 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
-use crate::frame::{rgb, Canvas};
+use crate::frame::{rgb, signed, Canvas, CLASSIC_WIDTH, VIEW_HEIGHT};
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
@@ -59,6 +59,7 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
         },
         animation: None,
         second: None,
+        sky: None,
         patches: Patches::default(),
         world: true,
         mode7: assets::maps::visual::mode7::Mode7View::from_rom(cartridge.image())
@@ -106,11 +107,16 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         tiles: scene.tiles().to_vec(),
         palette: *scene.palette(),
     });
+    let sky = second
+        .as_ref()
+        .filter(|second| second.layer.fixed())
+        .map(|second| Sky::new(second, &indices));
     let animation = source.map(|source| Animated::new(scene, source, backdrop));
     Ok(CachedBackground {
         frame: background,
         region,
         animation,
+        sky,
         second,
         patches: Patches::default(),
         world: false,
@@ -175,6 +181,8 @@ pub struct CachedBackground {
     animation: Option<Animated>,
     /// The second layer: the town's clouds, the rooms' light rays.
     second: Option<Second>,
+    /// A fixed second layer behind the first.
+    sky: Option<Sky>,
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
@@ -186,9 +194,13 @@ impl CachedBackground {
     /// Draws the first layer seen from `camera`: a world map in Mode 7
     /// about the player, any other map flat.
     pub fn draw(&self, frame: &mut Canvas, camera: (i32, i32), player: (u16, u16)) {
-        match &self.mode7 {
-            Some(mode7) => crate::mode7::draw(frame, mode7, player),
-            None => crate::frame::draw_background(frame, &self.frame, camera),
+        if let Some(mode7) = &self.mode7 {
+            crate::mode7::draw(frame, mode7, player);
+        } else {
+            crate::frame::draw_background(frame, &self.frame, camera);
+            if let Some(sky) = &self.sky {
+                sky.show(frame, camera, self.frame.width);
+            }
         }
     }
 
@@ -244,7 +256,7 @@ impl CachedBackground {
         camera: (i32, i32),
         age: u64,
     ) {
-        let Some(second) = &self.second else {
+        let Some(second) = self.second.as_ref().filter(|second| !second.layer.fixed()) else {
             return;
         };
         let (tiles, palette) = self
@@ -364,6 +376,74 @@ struct Second {
     layer: SecondLayer,
     tiles: Vec<Tile4bpp>,
     palette: [Bgr555; 128],
+}
+
+/// A fixed second layer behind the first (tower 1's night sky,
+/// `docs/tower-entry.md`): the screen it shows, darkened line by line, and
+/// where the first layer is clear.
+struct Sky {
+    pixels: Vec<u32>,
+    clear: Vec<bool>,
+}
+
+impl Sky {
+    fn new(second: &Second, indices: &[u8]) -> Self {
+        let layer = second.layer.layer();
+        let mut pixels = vec![0; CLASSIC_WIDTH * VIEW_HEIGHT];
+        for (row, line) in pixels.chunks_mut(CLASSIC_WIDTH).enumerate() {
+            let dark = crate::mode7::fixed(sky_subtraction(row));
+            for (column, pixel) in line.iter_mut().enumerate() {
+                let at = (row / 16) * layer.width() + (column / 16) % layer.width();
+                let cell = layer.cells().get(at).map_or(0, |cell| cell.raw() & 511);
+                if let Some(Ok(IndexedPixel::Opaque { palette_index, .. })) = second
+                    .layer
+                    .metatiles()
+                    .get(usize::from(cell))
+                    .map(|words| {
+                        graphics::sample_metatile(words, &second.tiles, column % 16, row % 16)
+                    })
+                {
+                    let colour = second.palette[usize::from(palette_index)];
+                    *pixel = rgb(crate::mode7::subtract(colour, dark));
+                }
+            }
+        }
+        Self {
+            pixels,
+            clear: indices.iter().map(|&index| index == 0).collect(),
+        }
+    }
+
+    /// Shows the sky where the first layer is clear; a wide view repeats
+    /// its 256 columns about the centre.
+    fn show(&self, frame: &mut Canvas, camera: (i32, i32), layer_width: usize) {
+        let left = (signed(frame.width) - signed(CLASSIC_WIDTH)) / 2;
+        for row in 0..VIEW_HEIGHT {
+            for column in 0..frame.width {
+                let world = (camera.0 + signed(column), camera.1 + signed(row));
+                let (Ok(x), Ok(y)) = (usize::try_from(world.0), usize::try_from(world.1)) else {
+                    continue;
+                };
+                if x >= layer_width
+                    || !self
+                        .clear
+                        .get(y * layer_width + x)
+                        .copied()
+                        .unwrap_or(false)
+                {
+                    continue;
+                }
+                let sky_x = usize::try_from((signed(column) - left).rem_euclid(256)).unwrap_or(0);
+                frame.pixels[row * frame.width + column] = self.pixels[row * CLASSIC_WIDTH + sky_x];
+            }
+        }
+    }
+}
+
+/// The sky's subtracted intensity on view row `row` (`$97:B4BA`: 32 entries
+/// of 3 lines, `$1F` down to 0, from line 1).
+fn sky_subtraction(row: usize) -> u8 {
+    u8::try_from(31_usize.saturating_sub(row / 3)).unwrap_or(0)
 }
 
 /// The SNES's colour addition: each channel saturates.
@@ -531,6 +611,15 @@ fn composite_backdrop(pixels: &mut [u32], indices: &[u8], color: u32) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_sky_darkens_less_every_three_lines() {
+        // `$97:B4BA`: 32 entries `03 vv`, `vv` from `$FF` down to `$E0`.
+        assert_eq!(
+            [0, 2, 3, 92, 93, 223].map(sky_subtraction),
+            [31, 31, 30, 1, 0, 0]
+        );
+    }
 
     #[test]
     fn colour_addition_saturates_each_channel() {
