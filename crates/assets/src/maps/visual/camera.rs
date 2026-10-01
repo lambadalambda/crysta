@@ -39,13 +39,12 @@ impl CameraRegion {
             located(0x38000)?
         };
         let prefix = bytes((scenes & 0x3f_0000) + word(scenes + map)?, 2)?;
-        // `$868C77..8C86` indexes `$96BB64 + 2*(selector & $3F)`.
-        if prefix[0] != 0 || prefix[1] & 0xc0 != 0 {
-            return Err(unsupported("unaudited scene prefix"));
-        }
+        // `$86:9581` keeps the first byte in `$048B`; `$868C69..8C86` sets
+        // `$0868` from the selector's top bits and indexes `$96BB64 +
+        // 2*(selector & $3F)`. Neither changes the region.
         // The European table is `$99:C2AE` (the operand at `$86:8C85`).
         let table = located(0x16_bb64)?;
-        let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1]) * 2)?;
+        let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1] & 0x3f) * 2)?;
         // Profile byte +4 bit 6 selects `$0866 = 256`, else 224
         // (`$868CDE..8CE6`; the towers).
         let vertical_extent = if bytes(display + 4, 1)?[0] & 0x40 == 0 {
@@ -134,13 +133,14 @@ mod tests {
         image[0x20002] = 6;
         let tower = CameraRegion::from_rom(&image, 0x11).unwrap();
         assert_eq!(tower.vertical_extent, 256);
-        // So do a nonzero first prefix byte and selector bits above `& $3F`.
+        // The first prefix byte and the selector's top bits leave it alone.
         let mut image = good.clone();
-        image[0x39000] = 1;
-        assert!(refuse(&image));
-        let mut image = good.clone();
-        image[0x39001] |= 0x40;
-        assert!(refuse(&image));
+        image[0x39000] = 0x80;
+        image[0x39001] |= 0x80;
+        assert_eq!(
+            CameraRegion::from_rom(&image, 0x11).unwrap().bounds,
+            [256, 512, 512, 768]
+        );
         // Without bit 6 the clamp height is 224.
         let short = CameraRegion::from_rom(&fixture(0x11, 6, 0x24, [0x11, 0x12]), 0x11).unwrap();
         assert_eq!(short.vertical_extent, 224);
