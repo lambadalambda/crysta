@@ -15,3 +15,7 @@
 ## Acceptance Criteria
 
 - The intro pan matches native frames.
+
+## Notes
+
+- The night sky is drawn: the map's second layer, fixed behind the first, darkened per line as `$97:B4BA`'s HDMA table does (checked by eye). The "Tower 1" title's fly-in is still open; our area title stands still.

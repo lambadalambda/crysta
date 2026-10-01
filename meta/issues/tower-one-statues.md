@@ -19,3 +19,7 @@ instead (`docs/mode4-descriptors.md`).
 ## Acceptance Criteria
 
 - The statues and the plaque match the native frame on both ROMs.
+
+## Notes
+
+- The mode-`$0004` art decodes (one list, two OBJ palettes, the relocation's palette shift) and `COP B1`/`B3` place the actors (`crysta-runtime/tests/local_towers.rs`, both ROMs). Checked by eye against the native frame in `local/mode7/jp/tower-100-bg1-decoded-vs-native.png`.

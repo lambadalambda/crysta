@@ -156,3 +156,4 @@
 - [x] [Load tower 1 from the world map](issues/tower-one-loads.md)
 - [x] [Walk into and out of tower 1](issues/tower-one-arrival-exit.md)
 - [x] [Play tower 1's intro pan and text](issues/tower-one-intro.md)
+- [x] [Draw tower 1's statues and plaque](issues/tower-one-statues.md)
