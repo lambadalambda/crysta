@@ -325,6 +325,21 @@ const MOVE_Y: u8 = 0xB2;
 const OBJ_PRIORITY: u8 = 0xBA;
 /// The palette field.
 const PALETTE: u8 = 0xBB;
+/// Player tests against Ark's probe (x, y - 8) (`docs/enemy-scripts.md`):
+/// jump when it is within a distance on both axes (`$80:B474`).
+const PLAYER_NEAR: u8 = 0xD6;
+/// Jump to the vertical or the horizontal target by the larger offset
+/// (`$80:B4B1`).
+const PLAYER_AXIS: u8 = 0xD7;
+/// Left, even or right of the actor beyond a dead zone (`$80:B362`).
+const PLAYER_SIDE: u8 = 0xD3;
+/// Above, even or below, by Ark's feet (`$80:B38A`).
+const PLAYER_HEIGHT: u8 = 0xD4;
+/// While off screen (entity `+$04` bit 14, which the draw pass keeps), sleep
+/// n frames and try again (`$80:9AC7`, `docs/enemy-scripts.md`).
+const SLEEP_OFF_SCREEN: u8 = 0x59;
+/// One step of the random generator (`$86:8236`, `$80:8E33`).
+const RANDOMIZE: u8 = 0x25;
 /// x += word, negated for a mirrored actor (`$80:A9B9`).
 const MOVE_X: u8 = 0xB1;
 /// The same, then y += a second word (`$80:A9EA`).
@@ -354,16 +369,6 @@ const SET_PACKET: u8 = 0xD8;
 /// which the runtime never sets, and while `$0999` is nonzero, which a
 /// traced conversation never made it.
 const STOP_FOR_PLAYER: u8 = 0x23;
-/// Holds the actor while the scene pauses them; `$80:9AC7`. One operand
-/// byte.
-///
-/// The handler tests bit 14 of the slot word at +4. When it is set the
-/// script pointer is rewound onto the service, the operand becomes the
-/// scheduler's countdown at +$0E, and the actor yields. The game sets that
-/// bit on every actor for a few frames around a map transition and never
-/// during a conversation; the runtime never sets it, so the service
-/// continues.
-const HOLD_WHILE_PAUSED: u8 = 0x59;
 /// Starts a counted loop; `$80:85DF`. Operand: a two-byte count. The count
 /// and the address after the operand are the slot's single loop level.
 const LOOP_START: u8 = 0x02;
@@ -964,6 +969,7 @@ impl Actor {
             words: &mut globals.scratch,
             own: &mut self.own,
             display: &mut globals.display,
+            random: globals.random.word(),
         }
     }
 
@@ -1248,6 +1254,10 @@ impl Actor {
             PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
             | SOUND_WORD => return self.audio_service(service, operands, around),
             CALL => return self.call_service(operands, around),
+            PLAYER_NEAR | PLAYER_AXIS | PLAYER_SIDE | PLAYER_HEIGHT => {
+                return self.player_test(service, operands, bank, around)
+            }
+            RANDOMIZE | SLEEP_OFF_SCREEN => return self.engine_service(service, operands, around),
             RETURN => self.pc = self.call.take().unwrap_or(operands),
             GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, bank, around),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
@@ -1294,7 +1304,6 @@ impl Actor {
             LOOP_END => return self.loop_end(operands),
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
             TIMED_WAIT => return self.timed_wait(operands, image),
-            HOLD_WHILE_PAUSED => self.pc = operands + 1,
             STOP_FOR_PLAYER => return self.stop_for_player(operands, None, bank, around),
             FACE_PLAYER_POSED => {
                 let Some(&base) = image.get(operands) else {
@@ -1832,6 +1841,101 @@ impl Actor {
         self.orbit = (!done).then_some(orbit);
         self.pc = if done { operands } else { operands - 2 };
         done
+    }
+
+    /// `COP 25` (a random step) and `COP 59 n` (sleep while off screen).
+    /// Returns whether execution continues.
+    fn engine_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        if service == RANDOMIZE {
+            around.globals.random.step();
+            self.pc = operands;
+            return true;
+        }
+        let Some(&ticks) = around.image.get(operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        if self.off_screen(around.globals.view) {
+            self.pc = operands - 2;
+            self.state = State::Waiting(u16::from(ticks));
+            return false;
+        }
+        self.pc = operands + 1;
+        true
+    }
+
+    /// Whether the actor is off the screen `view` (`$80:E9A2`, by the
+    /// sprite box; here a 32x32 box standing on the actor's place).
+    fn off_screen(&self, view: Option<(u16, u16, u16, u16)>) -> bool {
+        let Some((left, top, right, bottom)) = view else {
+            return false;
+        };
+        let (x, y) = self.position;
+        x.saturating_add(16) < left
+            || x.saturating_sub(16) >= right
+            || y < top
+            || y.saturating_sub(32) >= bottom
+    }
+
+    /// `COP D6 d t`, `D7 h v`, `D3 w l e r` and `D4 w u e d`: branches on
+    /// Ark's place. Returns whether execution continues.
+    fn player_test(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        let word = |at: usize| cadence::word(image, operands + at);
+        let (x, y) = (i32::from(self.position.0), i32::from(self.position.1));
+        let probe = (i32::from(around.player.0), i32::from(around.player.1) - 8);
+        let (dx, dy) = (probe.0 - x, probe.1 - y);
+        let target = match service {
+            PLAYER_NEAR => {
+                let (Some(&distance), Some(target)) = (image.get(operands), word(1)) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let distance = i32::from(distance);
+                if dx.abs() > distance || dy.abs() > distance {
+                    self.pc = operands + 3;
+                    return true;
+                }
+                Some(target)
+            }
+            PLAYER_AXIS => {
+                if dy.abs() >= dx.abs() {
+                    word(2)
+                } else {
+                    word(0)
+                }
+            }
+            _ => {
+                // `D4` measures from Ark's feet: the probe plus 8.
+                let offset = if service == PLAYER_SIDE { dx } else { dy + 8 };
+                let Some(zone) = word(0).map(i32::from) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                match offset {
+                    0 => word(4),
+                    offset if offset < 0 && -offset > zone => word(2),
+                    offset if offset > 0 && offset > zone => word(6),
+                    _ => word(4),
+                }
+            }
+        };
+        let Some(target) = target else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.jump(bank, target)
     }
 
     /// `COP 00`: a long call, keeping one return; the desk's save screen
@@ -4004,6 +4108,108 @@ mod script_service_tests {
             player: (0, 0),
             facing: Direction::Down,
         });
+    }
+
+    #[test]
+    fn cop_25_steps_the_random_and_native_code_dispatches_on_it() {
+        // COP 25; COP 25; LDA $0408; AND #7; STA $0026,X; DEC; STA $0024,X;
+        // LDA $0026,X; CMP $0024,X; COP BD.
+        let (image, mut actor) = actor_running(&[
+            2, 0x25, 2, 0x25, 0xAD, 0x08, 0x04, 0x29, 0x07, 0x00, 0x9D, 0x26, 0x00, 0x3A, 0x9D,
+            0x24, 0x00, 0xBD, 0x26, 0x00, 0xDD, 0x24, 0x00, 2, 0xBD,
+        ]);
+        tick(&mut actor, &image);
+        assert!(actor.frozen_at().is_none());
+        // Two steps from zero: $0408 = $0101, & 7 = 1.
+        let word = |at: u16| {
+            u16::from_le_bytes([
+                actor.own[&at],
+                actor.own.get(&(at + 1)).copied().unwrap_or(0),
+            ])
+        };
+        assert_eq!((word(0x26), word(0x24)), (1, 0));
+    }
+
+    #[test]
+    fn cop_d6_d7_d3_d4_test_the_players_place() {
+        // The actor stands at (56,64); Ark's probe is (x, y - 8).
+        let site = |offset: u16| {
+            u16::try_from(AT & 0xFFFF)
+                .unwrap()
+                .wrapping_add(offset)
+                .to_le_bytes()
+        };
+        let run = |code: &[u8], player: (u16, u16)| {
+            let (image, mut actor) = actor_running(code);
+            actor.tick(&mut Surroundings {
+                image: &image,
+                globals: &mut Globals::with_events(vec![0; 512]),
+                cells: &[],
+                width: 0,
+                height: 0,
+                occupied: &[],
+                player,
+                facing: Direction::Down,
+            });
+            actor.selector
+        };
+        // D6 $20 →near: pose 1 there, else pose 2.
+        let [n0, n1] = site(10);
+        let near = [
+            2, 0xD6, 0x20, n0, n1, 2, 0x80, 2, 2, 0xBD, 2, 0x80, 1, 2, 0xBD,
+        ];
+        assert_eq!(run(&near, (80, 96)), 1, "dx 24, dy 24");
+        assert_eq!(run(&near, (89, 72)), 2, "dx 33");
+        // D7 →h →v: pose 3 horizontal, 4 vertical.
+        let [h0, h1] = site(6);
+        let [v0, v1] = site(11);
+        let axis = [
+            2, 0xD7, h0, h1, v0, v1, 2, 0x80, 3, 2, 0xBD, 2, 0x80, 4, 2, 0xBD,
+        ];
+        assert_eq!(run(&axis, (100, 72)), 3);
+        assert_eq!(run(&axis, (60, 120)), 4);
+        // D3 4 →left →even →right: poses 5, 6, 7.
+        let [l0, l1] = site(10);
+        let [e0, e1] = site(13);
+        let [r0, r1] = site(18);
+        let sides = [
+            2, 0xD3, 4, 0, l0, l1, e0, e1, r0, r1, 2, 0x80, 5, 2, 0x80, 6, 2, 0xBD, 2, 0x80, 7, 2,
+            0xBD,
+        ];
+        assert_eq!(run(&sides, (40, 72)), 6, "left, then falls into even");
+        assert_eq!(run(&sides, (58, 72)), 6, "within the dead zone");
+        assert_eq!(run(&sides, (70, 72)), 7);
+        // D4 compares Ark's feet: dy = y + 8 - 8 - 64.
+        let mut heights = sides;
+        heights[1] = 0xD4;
+        assert_eq!(run(&heights, (56, 40)), 6, "above, then even");
+        assert_eq!(run(&heights, (56, 90)), 7, "below");
+    }
+
+    #[test]
+    fn cop_59_sleeps_off_screen_and_retries() {
+        // COP 59 3; pose 1; COP BD. The actor stands at (56,64).
+        let run = |view, frames| {
+            let (image, mut actor) = actor_running(&[2, 0x59, 3, 2, 0x80, 1, 2, 0xBD]);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            globals.view = view;
+            for _ in 0..frames {
+                actor.tick(&mut Surroundings {
+                    image: &image,
+                    globals: &mut globals,
+                    cells: &[],
+                    width: 0,
+                    height: 0,
+                    occupied: &[],
+                    player: (0, 0),
+                    facing: Direction::Down,
+                });
+            }
+            actor.selector
+        };
+        assert_eq!(run(Some((0, 0, 256, 224)), 1), 1, "on screen: on");
+        assert_eq!(run(Some((0, 300, 256, 524)), 4), 0, "off screen: asleep");
+        assert_eq!(run(None, 1), 1, "no view: on");
     }
 
     #[test]

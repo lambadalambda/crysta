@@ -95,6 +95,11 @@ pub struct Globals {
     pub display: crate::display::Display,
     /// A script's camera move, while it lasts.
     pub pan: Option<Pan>,
+    /// The game's random generator (`$0408`).
+    pub random: crate::random::Random,
+    /// The screen on the map (left, top, right, bottom), when the map has a
+    /// camera region: actors off it sleep (`COP 59`).
+    pub view: Option<(u16, u16, u16, u16)>,
 }
 
 /// An item granted and held up (`COP 60` → `$84:BEA2`).
@@ -178,6 +183,8 @@ impl Globals {
             audio: crate::audio::Audio::default(),
             display: crate::display::Display::default(),
             pan: None,
+            random: crate::random::Random::default(),
+            view: None,
         }
     }
 

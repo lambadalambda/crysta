@@ -45,6 +45,8 @@ pub struct World<'a> {
     /// The map's room as built, before any cell is marked.
     base: MapRoom,
     exits: ExitList,
+    /// The map's camera region, when it has one (not the world maps).
+    region: Option<assets::maps::visual::camera::CameraRegion>,
     walking: WalkingState,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
@@ -297,6 +299,7 @@ impl<'a> World<'a> {
             room: built,
             base,
             exits,
+            region: assets::maps::visual::camera::CameraRegion::from_rom(image, map).ok(),
             walking: WalkingState::new(x, y),
             residents: present,
             actors,
@@ -1450,8 +1453,13 @@ impl<'a> World<'a> {
     }
 
     /// A frame's clocks: the play clock, the display's square, an item held
-    /// up.
+    /// up; and the screen the actors see.
     fn tick_clocks(&mut self) {
+        self.globals.view = self.region.map(|region| {
+            let (x, y) = self.camera_focus();
+            let [left, top] = region.settled_origin([x, y]);
+            (left, top, left + 256, top + region.vertical_extent)
+        });
         self.globals.slot.tick_clock();
         self.globals.display.tick();
         if let Some(pan) = &mut self.globals.pan {
@@ -2114,6 +2122,7 @@ mod tests {
             room: base.clone(),
             base,
             exits: ExitList::from_rom(&bytes, 0xB).unwrap(),
+            region: None,
             walking: WalkingState::new(56, 64),
             residents: vec![],
             actors: vec![],

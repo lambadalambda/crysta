@@ -31,11 +31,18 @@ pub struct Memory<'m> {
     pub own: &'m mut Own,
     /// The colour math.
     pub display: &'m mut Display,
+    /// `$0408`, the random generator's word.
+    pub random: u16,
 }
 
 /// The actor's own bytes runs may use: the voice fade's intensity
 /// (`$7F:201C,X`, `$88:9CD8`). Other fields are the engine's.
 const OWN: std::ops::RangeInclusive<u16> = 0x201C..=0x201D;
+/// `$0408`: the random generator's word, which runs may read.
+const RANDOM: u16 = 0x0408;
+/// The entity's own scratch words runs may use through `,X`: `+$24` and
+/// `+$26` (the blob's counters, `docs/enemy-scripts.md`).
+const FIELDS: [u16; 2] = [0x24, 0x26];
 /// `$7E:46E6`, `COP 6A`'s square: a run stores 0 to stop it.
 const SPIN: u32 = 0x7E_46E6;
 /// The colour math registers' shadows (`$0468..$046B`), which the NMI
@@ -246,6 +253,15 @@ impl<'a> Machine<'a> {
                 self.pc + 3
             }
             0x09 | 0x29 => self.logic(opcode)?,
+            0xAD if self.operand() == Some(RANDOM) && !self.narrow => {
+                self.set(memory.random);
+                self.pc + 3
+            }
+            0x9D | 0xBD | 0xDD | 0xDE
+                if self.operand().is_some_and(|field| FIELDS.contains(&field)) =>
+            {
+                self.field(opcode, memory.own)?
+            }
             0xBF | 0x9F => self.own(opcode, memory.own)?,
             0x8F => self.stop_spin(memory.display)?,
             // Scratch words are words: a narrow accumulator refuses them.
@@ -315,6 +331,44 @@ impl<'a> Machine<'a> {
             }
         }
         Some(self.pc + 4)
+    }
+
+    /// `STA`, `LDA`, `CMP`, `DEC` on one of the entity's [`FIELDS`] (`,X`,
+    /// X the actor, 16-bit), kept with its own bytes.
+    fn field(&mut self, opcode: u8, own: &mut Own) -> Option<usize> {
+        if self.narrow || !self.x {
+            return None;
+        }
+        let at = self.operand()?;
+        let read = |own: &Own| {
+            u16::from_le_bytes([
+                own.get(&at).copied().unwrap_or(0),
+                own.get(&(at + 1)).copied().unwrap_or(0),
+            ])
+        };
+        let write = |own: &mut Own, value: u16| {
+            let [low, high] = value.to_le_bytes();
+            own.insert(at, low);
+            own.insert(at + 1, high);
+        };
+        match opcode {
+            0x9D => write(own, self.a?),
+            0xBD => self.set(read(own)),
+            0xDD => {
+                let (a, value) = (self.a?, read(own));
+                self.carry = Some(a >= value);
+                let difference = a.wrapping_sub(value);
+                self.zero = Some(difference == 0);
+                self.negative = Some(difference & 0x8000 != 0);
+            }
+            _ => {
+                let value = read(own).wrapping_sub(1);
+                write(own, value);
+                self.zero = Some(value == 0);
+                self.negative = Some(value & 0x8000 != 0);
+            }
+        }
+        Some(self.pc + 3)
     }
 
     /// `STA $7E:46E6` of 0: `COP 6A`'s square stops.
@@ -528,6 +582,7 @@ mod tests {
                 words,
                 own: &mut Own::new(),
                 display: &mut Display::default(),
+                random: 0,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -562,6 +617,7 @@ mod tests {
             words: &mut words,
             own: &mut own,
             display: &mut display,
+            random: 0,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -684,6 +740,7 @@ mod tests {
             words: &mut words,
             own: &mut own,
             display: &mut display,
+            random: 0,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

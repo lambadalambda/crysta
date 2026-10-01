@@ -23,6 +23,7 @@ pub mod combat;
 pub mod display;
 pub mod inventory;
 pub mod plane;
+pub mod random;
 pub mod records;
 pub mod residents;
 pub mod restart;
