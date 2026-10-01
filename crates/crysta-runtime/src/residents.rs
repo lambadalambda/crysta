@@ -41,6 +41,8 @@ pub struct Resident {
     pub descriptor: Option<usize>,
     /// Hidden by its script (entity `+$04` bit 15): not drawn, not blocking.
     pub hidden: bool,
+    /// OBJ priority: 3 draws over the map's high-priority tiles.
+    pub priority: u8,
 }
 
 impl Resident {
@@ -147,6 +149,7 @@ pub fn residents(
                 descriptor: descriptor_owner(&present, index)
                     .and_then(|owner| present[owner].descriptor_offset()),
                 hidden: false,
+                priority: 2,
             }
         })
         .filter(|resident| {

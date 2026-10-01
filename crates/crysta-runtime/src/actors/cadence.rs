@@ -117,6 +117,16 @@ pub(super) fn pose_ticks(image: &[u8], descriptor: usize) -> Option<Vec<Option<u
     display_lists(image, offset(image.get(descriptor..descriptor + 3)?)?)
 }
 
+/// Ticks of every display list of the packet a `COP D8` pointer names: an
+/// LZ packet, or direct lists as Ark's and his helper's art (`$A2:C000`).
+pub(super) fn packet_ticks(image: &[u8], pointer: &[u8]) -> Option<Vec<Option<u16>>> {
+    let packet = offset(pointer)?;
+    display_lists(image, packet).or_else(|| {
+        let end = ((packet >> 16) + 1).checked_mul(0x1_0000)?.min(image.len());
+        list_ticks(image.get(packet..end)?)
+    })
+}
+
 /// Ticks of every direct Ark display list in one `$80:A24F` resource entry.
 ///
 /// Unlike resident packets these lists are uncompressed in the bank named by

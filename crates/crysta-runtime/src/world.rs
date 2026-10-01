@@ -616,6 +616,7 @@ impl<'a> World<'a> {
             resident.pose_age = actor.pose_age;
             resident.walking = actor.walking;
             resident.hidden = actor.hidden;
+            resident.priority = actor.priority;
         }
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
@@ -840,6 +841,7 @@ impl<'a> World<'a> {
                 walking: false,
                 descriptor: None,
                 hidden: actor.hidden,
+                priority: actor.priority,
             });
             self.actors.push(actor);
         }
@@ -1996,6 +1998,7 @@ mod tests {
             walking: false,
             descriptor: None,
             hidden: false,
+            priority: 2,
         }
     }
 

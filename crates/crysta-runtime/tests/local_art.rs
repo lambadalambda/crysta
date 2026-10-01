@@ -206,6 +206,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             walking: false,
             descriptor: None,
             hidden: false,
+            priority: 2,
         })
         .collect();
     let art = residents_art(

@@ -297,6 +297,14 @@ const BRANCH_ON_PLAYER_NEAR: u8 = 0x0F;
 /// `$0400` while Down is. The runtime has no button state to offer an
 /// actor, so it reads the word as zero and never takes the branch.
 const BRANCH_ON_GLOBAL: u8 = 0x2E;
+/// Adds a word to the actor's y (`$80:A9D7`).
+const MOVE_Y: u8 = 0xB2;
+/// Writes a byte into `+$08` bits 8–15 (`$80:AA6F`): bits 12–13 are the
+/// OBJ priority.
+const OBJ_PRIORITY: u8 = 0xBA;
+/// Points the actor at another art packet (`$80:B4DF`): its display lists,
+/// which a `COP 8E` wait plays, are the new packet's.
+const SET_PACKET: u8 = 0xD8;
 /// Stops for a player who stands beside the actor and faces them;
 /// `$80:8D1E`. Operand: a two-byte target.
 ///
@@ -437,6 +445,8 @@ pub struct Actor {
     pub walking: bool,
     /// Entity `+$04` bit 15: not drawn, not animated, not moved.
     pub hidden: bool,
+    /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
+    pub priority: u8,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -534,6 +544,7 @@ impl Actor {
             pose_age: 0,
             walking: false,
             hidden: false,
+            priority: 2,
             walked: false,
             contact: None,
             ease: None,
@@ -1166,6 +1177,7 @@ impl Actor {
                 return self.player_service(service, operands, bank, around)
             }
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
+            MOVE_Y | SET_PACKET | OBJ_PRIORITY => return self.body(service, operands, image),
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
@@ -1205,6 +1217,41 @@ impl Actor {
     /// Ticks of the display list a selector names, when the packet is known.
     fn pose_list(&self, selector: u8) -> Option<u16> {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
+    }
+
+    /// The actor's body: its y (`COP B2`), its art packet (`COP D8`) and its
+    /// OBJ priority (`COP BA`). Returns whether execution continues.
+    fn body(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        match service {
+            MOVE_Y => {
+                let Some(dy) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.position.1 = self.position.1.wrapping_add(dy);
+                self.pc = operands + 2;
+            }
+            SET_PACKET => {
+                let Some(pointer) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if let Some(ticks) = cadence::packet_ticks(image, pointer) {
+                    self.pose_ticks = Some(ticks);
+                }
+                self.pc = operands + 3;
+            }
+            OBJ_PRIORITY => {
+                let Some(&byte) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.priority = (byte >> 4) & 3;
+                self.pc = operands + 1;
+            }
+            _ => self.state = State::Frozen,
+        }
+        self.state != State::Frozen
     }
 
     /// `COP 8E`. Returns whether execution continues this frame. A scripted
@@ -3566,6 +3613,15 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         tick(&mut actor, &image);
         assert!(actor.frozen_at().is_some());
+    }
+
+    #[test]
+    fn cop_b2_moves_y_and_cop_ba_sets_the_obj_priority() {
+        // COP B2 $FFF8; COP BA $30; yield.
+        let (image, mut actor) = actor_running(&[2, 0xB2, 0xF8, 0xFF, 2, 0xBA, 0x30, 2, 0xBD]);
+        let y = actor.position.1;
+        tick(&mut actor, &image);
+        assert_eq!((actor.position.1, actor.priority), (y - 8, 3));
     }
 
     #[test]
