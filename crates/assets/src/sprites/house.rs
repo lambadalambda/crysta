@@ -808,7 +808,10 @@ impl<'a> Loader<'a> {
             // $83:F8A8) and $00A3 ($83:F8C0) differ only in the idle class,
             // the low nibble (`$80:FAA4`).
             [0x20 | 0x22 | 0x23 | 0xA0 | 0xA3, 0] => 0,
-            [0, 0] => 3,
+            // With a second packet; the towers' enemies
+            // (`docs/mode4-descriptors.md`) have idle class 4 and their stat
+            // profile in byte 4 (`$80:FACF`), which the art does not use.
+            [0, 0] | [0x04, _] => 3,
             _ => return Err(SpriteError::Invalid("unsupported house movement resource")),
         };
         let pal = 5 + extra;
@@ -819,7 +822,8 @@ impl<'a> Loader<'a> {
         if extra != 0 {
             pointer(&d[5..8])?;
         }
-        if ![0x80, 0x81, 0x90].contains(&d[pal])
+        // Bit 7: a palette-table entry (`$80:FC72 + (b & $3F) * 3`).
+        if ![0x80, 0x81, 0x90, 0x91].contains(&d[pal])
             || ![0, 2, 4].contains(&d[pal + 1])
             || d[pal + 2] != 2
             || ![8, 10].contains(&d[pal + 3])
@@ -834,7 +838,10 @@ impl<'a> Loader<'a> {
         let graphics_cpu = if reuse {
             None
         } else {
-            if d[gfx..gfx + 3] != [0, 0, 0xc0] || ![0, 3, 0x30].contains(&d[gfx + 3]) {
+            // Source offset 0; any VRAM slot and size (the frames name
+            // source tiles); bit 7 of the size: the one-byte `$80:FDA4`
+            // table form (`docs/mode4-descriptors.md`).
+            if d[gfx] != 0 || d[gfx + 2] & 0x80 == 0 || d[gfx + 3] % 3 != 0 {
                 return Err(SpriteError::Invalid("unsupported house graphics transfer"));
             }
             Some(cpu(self.read(0xfda4 + usize::from(d[gfx + 3]), 3)?))
