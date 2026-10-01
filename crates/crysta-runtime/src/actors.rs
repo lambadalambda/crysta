@@ -154,6 +154,9 @@ const SPAWN: u8 = 0xA2;
 /// than after its parent, and without a parent link; `$80:A4B6`. Spawns all
 /// run from the next frame here.
 const SPAWN_LINKED: u8 = 0x99;
+/// Spawns an actor running a long script at an offset from its parent, dx
+/// mirrored with the parent, without a flags word; `$80:A56B`.
+const SPAWN_AT: u8 = 0x9C;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
 /// Services for the display alone: the spinning window (`6A`, shape 0
@@ -883,6 +886,16 @@ impl Actor {
             }
             return Some(at + 9);
         }
+        // `LDA #0; STA $0004,X` / `$0006,X`: a cleared entity, as the
+        // desk's book starts (`$88:D641`).
+        if let Some(&[0xA9, 0, 0, 0x9D, field @ (4 | 6), 0]) = image.get(at..at + 6) {
+            if field == 4 {
+                (self.hidden, self.touchable) = (false, false);
+            } else {
+                self.interaction = 0;
+            }
+            return Some(at + 6);
+        }
         let code = image.get(at..at + CONTACT.len())?;
         if CONTACT
             .iter()
@@ -1161,7 +1174,7 @@ impl Actor {
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | SPAWN_LINKED | MUSIC_WAIT | 0x6A | 0x76 | 0xD9 => {
+            | SPAWN_LINKED | SPAWN_AT | MUSIC_WAIT | 0x6A | 0x76 | 0xD9 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -1626,17 +1639,7 @@ impl Actor {
                 }
                 self.pc = operands + 3;
             }
-            SPAWN | SPAWN_LINKED => {
-                let (Some(script), Some(flags)) = (
-                    image.get(operands..operands + 3).and_then(long),
-                    cadence::word(image, operands + 3),
-                ) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                around.globals.spawns.push((script, flags, self.position));
-                self.pc = operands + 5;
-            }
+            SPAWN | SPAWN_LINKED | SPAWN_AT => return self.spawn(service, operands, around),
             MUSIC_WAIT => return self.hold(operands, 3),
             cosmetic => {
                 let Some(&(_, length)) = COSMETIC.iter().find(|&&(service, _)| service == cosmetic)
@@ -1658,6 +1661,44 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// `COP A2` and `COP 99` (a script and a flags word, at the actor) and
+    /// `COP 9C` (a script at an offset). Returns whether execution continues.
+    fn spawn(&mut self, service: u8, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        let image = around.image;
+        match service {
+            SPAWN | SPAWN_LINKED => {
+                let (Some(script), Some(flags)) = (
+                    image.get(operands..operands + 3).and_then(long),
+                    cadence::word(image, operands + 3),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.spawns.push((script, flags, self.position));
+                self.pc = operands + 5;
+            }
+            SPAWN_AT => {
+                let (Some(script), Some(dx), Some(dy)) = (
+                    image.get(operands..operands + 3).and_then(long),
+                    cadence::word(image, operands + 3),
+                    cadence::word(image, operands + 5),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let dx = if self.hflip { dx.wrapping_neg() } else { dx };
+                let at = (
+                    self.position.0.wrapping_add(dx),
+                    self.position.1.wrapping_add(dy),
+                );
+                around.globals.spawns.push((script, 0, at));
+                self.pc = operands + 7;
+            }
+            _ => self.state = State::Frozen,
+        }
+        self.state != State::Frozen
     }
 
     /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns

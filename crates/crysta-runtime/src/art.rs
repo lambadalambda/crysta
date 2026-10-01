@@ -536,10 +536,11 @@ pub fn residents_art(
                 .position(|record| record.offset() == resident.record)
                 .and_then(|index| decoded[index].take());
             if let Some(own) = own_art(image, resident) {
-                // The object sheet is qualified in the tour rooms only;
-                // elsewhere what the list draws is not known, and the blue
-                // door's target in C shows nothing natively.
-                return if (0x41..=0x44).contains(&map) {
+                // The object sheet is qualified in the tour rooms and for
+                // the desk's book in the bedroom only; elsewhere what the
+                // list draws is not known, and the blue door's target in C
+                // shows nothing natively.
+                return if (0x41..=0x44).contains(&map) || map == 0x0F {
                     Body::object(image, own)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
                 } else {
@@ -578,9 +579,12 @@ fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
     let mut at = usize::try_from(resident.script? & 0x3F_FFFF).ok()?;
     let mut base = None;
     for _ in 0..8 {
-        let code = image.get(at..at + 5)?;
+        let code = image.get(at..at + 6)?;
         match code[..2] {
             [2, 0x48 | 0xB2] => at += 4,
+            // `LDA #0; STA $0004,X` or `$0006,X`: a cleared entity, as the
+            // desk's book starts (`$88:D641`).
+            [0xA9, 0] if code[2..4] == [0, 0x9D] && matches!(code[4..], [4 | 6, 0]) => at += 6,
             [2, 0xD8] => {
                 base = Some(
                     0x80_0000

@@ -604,3 +604,35 @@ fn the_frozen_townsfolk_draw_in_obj_palette_3() {
     }
     assert!(frozen >= 2, "{frozen}");
 }
+
+#[test]
+fn the_desk_shows_its_save_book() {
+    // `$83:8D4F`'s hidden parent spawns the book 16 pixels up with `COP 9C`
+    // (`$80:A56B`); the book (`$88:D641`) draws pose `$42` of `$A2:C000`.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let events = new_game();
+    let mut world = World::enter_with_events(image, 0x000F, 472, 200, events.clone()).unwrap();
+    for _ in 0..10 {
+        world
+            .update(None, crysta_runtime::scene::Presses::default())
+            .unwrap();
+    }
+    let present = world.residents();
+    let book = present
+        .iter()
+        .position(|resident| resident.position == (472, 144) && !resident.hidden)
+        .expect("the book");
+    let art = residents_art(
+        image,
+        0x000F,
+        present,
+        EventFlags::Bitmap(&events),
+        EventFlags::Bitmap(world.events()),
+    );
+    let body = art[book].as_ref().expect("the book's art");
+    let animation = body.animation(present[book].selector, false).unwrap();
+    assert!(animation.frame_at(0).is_visible());
+}
