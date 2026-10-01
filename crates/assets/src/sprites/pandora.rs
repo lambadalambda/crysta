@@ -464,28 +464,49 @@ impl Mode4Art {
     ///
     /// # Errors
     /// Refuses another mode, palette or graphics form than the qualified
-    /// one (palette flags `$40`, two slots, graphics at offset 0 and slot 0,
-    /// a packet pointer), and a list outside the qualified shapes.
+    /// one (palette flags `$40` or 0, one or two palettes, the sheet's tiles to
+    /// the same OBJ tiles, `d15 == d16`, a packet pointer), and a list
+    /// outside the qualified shapes.
     pub fn from_rom(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, SpriteError> {
         let mut loader = Loader::new(image);
         let d = loader.read(descriptor, 21)?.to_vec();
-        if d[3..5] != [4, 0]
-            || d[8] != 0x40
-            || d[13] != 4
+        // `d15` is the sheet's offset in 64-byte units and `d16` the OBJ
+        // tiles' in 32 words, both two tiles: equal, the frames name sheet
+        // tiles as they are (the top floors' doors `$82:F5B2`, `$10 $10`).
+        if d[3] != 4
+            || ![0x00, 0x40].contains(&d[8])
+            || ![2, 4].contains(&d[13])
             || d[14] & 1 != 0
-            || d[15..17] != [0, 0]
+            || d[15] != d[16]
+            || d[15] & 0x80 != 0
             || d[17] & 0x80 != 0
         {
             return Err(SpriteError::Invalid("unqualified mode-4 descriptor"));
         }
-        // Source slot `d[12] & $0E` in 16-byte units; destination `d[14]`.
-        let colours = loader.read(pointer(&d[9..12])? + usize::from(d[12] & 0x0e) * 16, 64)?;
-        let palette = std::array::from_fn(|i| Bgr555::new(word(colours, i * 2)));
+        // Source slot `d[12] & $0E` in 16-byte units, `d[13]` of them;
+        // destination `d[14]`.
+        let length = usize::from(d[13]) * 16;
+        let colours = loader.read(pointer(&d[9..12])? + usize::from(d[12] & 0x0e) * 16, length)?;
+        let palette = std::array::from_fn(|i| {
+            Bgr555::new(if i * 2 < length {
+                word(colours, i * 2)
+            } else {
+                0
+            })
+        });
         let palette_base = 128 + 8 * d[14];
         let graphics_packet = loader.packet(cpu(&d[18..21]))?;
         let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(&graphics_packet.bytes)?.into();
         let packet = loader.packet(cpu(&d[..3]))?;
-        let shift = (d[14] / 2).wrapping_sub(d[12] / 2) & 7;
+        // Flag `$40`: the source OBJ palette is `d12 / 2`; else the first
+        // frame's first component's (`$80:FBE4`, the hooded guardians).
+        let source = if d[8] & 0x40 != 0 {
+            d[12] / 2
+        } else {
+            let first = usize::from(word(&packet.bytes, frame_table_end(&packet.bytes)? - 2));
+            ((word(take(&packet.bytes, first, 24)?, 22) >> 9) & 7) as u8
+        };
+        let shift = (d[14] / 2).wrapping_sub(source) & 7;
         let list = shifted_pose_list(
             &packet.bytes,
             (packet.cpu, false, selector),

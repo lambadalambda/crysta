@@ -516,7 +516,11 @@ impl Body {
 /// statues and plaque.
 fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placeholder>> {
     let descriptor = resident.descriptor?;
-    if image.get(descriptor + 3..descriptor + 5)? != [4, 0]
+    // Mode `$04` with the plain palette forms (`$40`, or 0 as the hooded
+    // guardians, whose byte 4 names their profile); the table forms are the
+    // house decoder's.
+    if *image.get(descriptor + 3)? != 4
+        || ![0x00, 0x40].contains(image.get(descriptor + 8)?)
         || assets::layout::offset(image, BOX_DESCRIPTOR) == Some(descriptor)
     {
         return None;
@@ -525,8 +529,11 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
         .ok()?
         .checked_sub(5)?;
     let list = *image.get(header)?;
+    // A header byte past the packet's lists (the light room's orb, `$1F`)
+    // is not a list: the pose the record starts in is.
     Some(
         Body::mode4(image, descriptor, list)
+            .or_else(|_| Body::mode4(image, descriptor, resident.initial))
             .map_err(|error| Placeholder::Refused(error.to_string())),
     )
 }
