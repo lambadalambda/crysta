@@ -262,6 +262,16 @@ const ADJUSTMENTS: [(i16, i16); 15] = [
     (-14, -23),
 ];
 
+/// A selector's kind (`$8D:88DF`): its high nibble when set, as the
+/// world map's and the towers' `$55`/`$66` have, else its low nibble.
+const fn kind(selector: u8) -> u8 {
+    if selector & 0xF0 == 0 {
+        selector & 0x0F
+    } else {
+        selector >> 4
+    }
+}
+
 /// A motion under way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Walk {
@@ -368,7 +378,7 @@ impl Arriving {
     /// The arrival `record` leads to, and where it starts: `None` for a
     /// selector without one.
     fn after(record: &ExitRecord) -> Option<(Self, (u16, u16))> {
-        let selector = record.selector();
+        let selector = kind(record.selector());
         let &(dx, dy) = ADJUSTMENTS.get(usize::from(selector))?;
         let (motion, toward) = match (selector, dx.signum(), dy.signum()) {
             (STAIRS, ..) => (STAIRS_DOWN_ARRIVING, Direction::Down),

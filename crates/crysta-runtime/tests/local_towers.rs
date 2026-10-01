@@ -78,3 +78,56 @@ fn the_underworld_entrance_leads_into_tower_one() {
         );
     }
 }
+
+#[test]
+fn ark_walks_in_from_the_bottom_of_tower_one() {
+    // `docs/tower-entry.md`: selector `$66` places Ark at (256,1024) and
+    // walks him up 17 pixels to (256,1007), the pad locked.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0003, 216, 880, after_the_intro()).unwrap();
+        while world.map() != 0x0100 {
+            let up = (!world.in_transition()).then_some(Direction::Up);
+            world.update(up, Presses::default()).unwrap();
+        }
+        assert_eq!(world.position(), (256, 1024), "{:?}", rom.revision());
+        let mut path = Vec::new();
+        while world.in_transition() {
+            world.update(None, Presses::default()).unwrap();
+            path.push(world.position().1);
+        }
+        assert_eq!(path.last(), Some(&1007), "{:?}", rom.revision());
+        assert_eq!(world.position().0, 256);
+    }
+}
+
+#[test]
+fn walking_down_out_of_tower_one_returns_to_the_underworld() {
+    // The exit `$81:C2E2` (cells (0,63) 32x2, selector `$55`) takes Ark at
+    // y 1025; on `$03` he lands at (216,816) and walks down to (216,832).
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0100, 256, 1007, after_the_intro()).unwrap();
+        for _ in 0..10 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        for _ in 0..400 {
+            let down = (!world.in_transition()).then_some(Direction::Down);
+            world.update(down, Presses::default()).unwrap();
+            if world.map() == 0x0003 && !world.in_transition() {
+                break;
+            }
+        }
+        // The plane's own arrival walk (`$84:E337`).
+        for _ in 0..20 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert_eq!(
+            (world.map(), world.position()),
+            (0x0003, (216, 832)),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}
+
