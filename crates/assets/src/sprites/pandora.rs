@@ -471,13 +471,13 @@ impl Mode4Art {
         let mut loader = Loader::new(image);
         let d = loader.read(descriptor, 21)?.to_vec();
         // `d15` is the sheet's offset in 64-byte units and `d16` the OBJ
-        // tiles' in 32 words, both two tiles: equal, the frames name sheet
-        // tiles as they are (the top floors' doors `$82:F5B2`, `$10 $10`).
+        // tiles' in 32 words, both two tiles: the frames name OBJ tiles, the
+        // sheet's moved by `2 * (d16 - d15)` (the doors `$82:F5B2`, `$10
+        // $10`; tower 2's statues `$82:F4BE`, `$00 $60`).
         if d[3] != 4
             || ![0x00, 0x40].contains(&d[8])
             || ![2, 4].contains(&d[13])
             || d[14] & 1 != 0
-            || d[15] != d[16]
             || d[15] & 0x80 != 0
             || d[17] & 0x80 != 0
         {
@@ -496,7 +496,17 @@ impl Mode4Art {
         });
         let palette_base = 128 + 8 * d[14];
         let graphics_packet = loader.packet(cpu(&d[18..21]))?;
-        let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(&graphics_packet.bytes)?.into();
+        let sheet = decode_tiles_4bpp(&graphics_packet.bytes)?;
+        let moved = 2 * (i32::from(d[16]) - i32::from(d[15]));
+        let graphics: Arc<[Tile4bpp]> = match usize::try_from(moved) {
+            Ok(blank) => std::iter::repeat_n(Tile4bpp::decode(&[0; 32])?, blank)
+                .chain(sheet)
+                .collect(),
+            Err(_) => sheet
+                .into_iter()
+                .skip(usize::try_from(-moved).unwrap_or(0))
+                .collect(),
+        };
         let packet = loader.packet(cpu(&d[..3]))?;
         // Flag `$40`: the source OBJ palette is `d12 / 2`; else the first
         // frame's first component's (`$80:FBE4`, the hooded guardians).
