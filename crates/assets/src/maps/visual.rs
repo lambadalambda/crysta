@@ -245,6 +245,7 @@ impl StaticBackground {
             // The rest of the Crysta slice resolves through the loading-script
             // projection. See meta/issues/playable-crysta-slice.md.
             0x000E | 0x0012..=0x0021 => (projected_loads(image, map_id)?, 0x6000),
+            0x0106 => return Self::light_room(image),
             // The towers and the underworld's last maps
             // (`docs/underworld-inventory.md`).
             0x0100..=0x0127 | 0x012A | 0x012B => {
@@ -275,6 +276,36 @@ impl StaticBackground {
             ));
         }
         Self::from_loads(image, &projected_loads(image, map_id)?, 0x6000)
+    }
+
+    /// The light room `$106` (`docs/light-room.md`): the towers' tiles, its
+    /// own `$70` colours to CGRAM `$10`, and no shared palette, so colours
+    /// `$00-$0F` stay the tower rooms' (taken from `$105`, which comes
+    /// before). Only BG1 is drawn.
+    fn light_room(image: &[u8]) -> Result<Self, VisualMapError> {
+        let loads = projected_recipe(image, 0x0106, &LIGHT_LOADS)?;
+        let before = projected_recipe(image, 0x0105, &TOWER_LOADS)?;
+        let graphics = resource(image, loads[0].1, ResourceKind::Graphics, 0x4000, true)?;
+        let colors = resource(image, loads[1].1, ResourceKind::Palette, 0xE0, false)?;
+        let definitions = resource(image, loads[2].1, ResourceKind::Metatiles, 0x1000, true)?;
+        let attributes = resource(image, loads[3].1, ResourceKind::Metatiles, 512, true)?;
+        let shared_colors = resource(image, before[5].1, ResourceKind::Palette, 64, false)?;
+        let layer = StaticLayer::from_rom(image, loads[4].1).map_err(VisualMapError::Layer)?;
+        let mut palette = [Bgr555::new(0); 128];
+        let words = |resource: &VisualResource| {
+            resource
+                .decoded()
+                .chunks_exact(2)
+                .map(|bytes| Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]])))
+                .collect::<Vec<_>>()
+        };
+        palette[..0x10].copy_from_slice(&words(&shared_colors)[..0x10]);
+        palette[0x10..].copy_from_slice(&words(&colors));
+        Self::from_parts(
+            layer,
+            vec![graphics, colors, definitions, attributes, shared_colors],
+            palette,
+        )
     }
 
     fn from_loads(
@@ -679,6 +710,15 @@ const TOWER_LOADS: [(ResourceKind, &[u8]); 6] = [
     WANTED_LOADS[4],
     WANTED_LOADS[5],
 ];
+/// The light room's recipe (`docs/light-room.md`): no shared palette, its
+/// own `$70` colours to CGRAM `$10`.
+const LIGHT_LOADS: [(ResourceKind, &[u8]); 5] = [
+    TOWER_LOADS[0],
+    (ResourceKind::Palette, &[0x00, 0x70, 0x10]),
+    WANTED_LOADS[2],
+    WANTED_LOADS[3],
+    WANTED_LOADS[4],
+];
 /// Whether a load is one this profile knowingly does not consume.
 ///
 /// Listing these explicitly is what lets an unrecognised transfer be refused
@@ -714,6 +754,8 @@ fn is_known_unconsumed(kind: ResourceKind, bytes: &[u8]) -> bool {
         .iter()
         .any(|(want, operand)| kind == *want && bytes.get(1..1 + operand.len()) == Some(*operand))
         || (kind == ResourceKind::Metatiles && bytes.get(3..5) == Some(&[0x1F, 0x11]))
+        // The light room's BG3 screen (`$86:8E9B` mode 3, VRAM `$6800`).
+        || (kind == ResourceKind::Background && bytes.get(5) == Some(&3))
 }
 
 fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {

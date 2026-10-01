@@ -417,3 +417,21 @@ fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_mode
     }
     let _: Bgr555 = scene.palette()[0];
 }
+
+#[test]
+fn the_light_room_loads_its_own_colours_over_the_towers() {
+    // `docs/light-room.md`: `$106` loads `$70` colours to CGRAM `$10` and no
+    // shared palette; colours `$00-$0F` are the tower rooms'.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let light = StaticBackground::from_rom(rom.image(), 0x0106).unwrap();
+    let top = StaticBackground::from_rom(rom.image(), 0x0105).unwrap();
+    assert_eq!(light.palette()[..0x10], top.palette()[..0x10]);
+    assert_ne!(light.palette()[0x10..], top.palette()[0x10..]);
+    assert_eq!(
+        (light.layer().width(), light.layer().height()),
+        (16, 16),
+        "a 1x1 page"
+    );
+}
