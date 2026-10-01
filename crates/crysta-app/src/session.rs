@@ -428,6 +428,13 @@ impl Session {
             });
             return (ark, None);
         }
+        // Stairs play their list of Ark's resource 1 once, unmirrored.
+        if let Some((list, age)) = self.world.stairs_pose() {
+            return (
+                self.carry_frame((0x80_a255, list, false), u64::from(age), true),
+                None,
+            );
+        }
         // Dashing loops its list; the brake holds its one frame.
         if let Some((motion, facing, age)) = self.world.run_pose() {
             let ark = PandoraSprites::run_pose(motion, facing)
