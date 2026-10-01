@@ -15,3 +15,7 @@ The towers' floors (`$100-$123`, `$106`) do not load: backgrounds, collision, ca
 ## Acceptance Criteria
 
 - Every tower floor can be walked and left by its exits; chests open as natively.
+
+## Notes
+
+- 2026-10-02: all floors load (`$106` too). Chests open from the table `$96:D10F` (`docs/chests.md`; the `$0F9` kind and "I have enough" are open). The Magirocks (`$84:DD7E`) show and are taken. Hint texts are not checked.
