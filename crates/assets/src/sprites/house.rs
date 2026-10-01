@@ -155,7 +155,7 @@ pub enum HouseGraphicsKey {
     Compressed(u32),
 }
 /// One bounded ordinary-list record. Duration is retained, not scheduled.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HouseFrame {
     key: HousePoseKey,
     duration: u8,
@@ -210,7 +210,7 @@ struct Resource {
     source_palette: u8,
 }
 /// One immutable, source-derived setup instance. No AI, collision, dialogue or clock.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct HouseActor {
     id: u32,
     map: u16,
@@ -649,6 +649,28 @@ impl<'a> Loader<'a> {
         self.packets.insert(start, p.clone());
         Ok(p)
     }
+    /// The graphics a reusing descriptor at `at` shows: those of the nearest
+    /// mode-`$04` descriptor before it with the same pose packet and a
+    /// one-byte `$80:FDA4` graphics entry.
+    fn donor(&self, at: usize) -> Option<u32> {
+        let image = self.image;
+        let packet = image.get(at..at + 3)?;
+        (at.saturating_sub(0x200)..at).rev().find_map(|o| {
+            let d = image.get(o..o + 16)?;
+            let graphics = d[0..3] == *packet
+                && d[3] == 0x04
+                && d[8] & 0xC0 == 0x80
+                && d[12] == 0
+                && d[14] & 0x80 != 0
+                && d[15] % 3 == 0;
+            if !graphics {
+                return None;
+            }
+            let entry = image.get(0xfda4 + usize::from(d[15])..0xfda7 + usize::from(d[15]))?;
+            Some(cpu(entry))
+        })
+    }
+
     fn graphics(&mut self, cpu: u32) -> Result<Arc<Graphics>, SpriteError> {
         let p = self.packet(cpu)?;
         let start = p.extent.start;
@@ -828,7 +850,8 @@ impl<'a> Loader<'a> {
         if d[pal] & 0xC0 != 0x80
             || d[pal + 1] % 2 != 0
             || d[pal + 2] != 2
-            || ![8, 10].contains(&d[pal + 3])
+            // The OBJ palette slot: 8, 10, or the Cadets' 12 (`$82:EAED`).
+            || ![8, 10, 12].contains(&d[pal + 3])
         {
             return Err(SpriteError::Invalid("unsupported house palette descriptor"));
         }
@@ -861,11 +884,18 @@ impl<'a> Loader<'a> {
         let source_palette = ((word(first, 22) >> 9) & 7) as u8;
         let graphics = if let Some(g) = graphics_cpu {
             self.graphics(g)?
-        } else {
-            let prior =
-                previous.ok_or(SpriteError::Invalid("missing graphics reuse predecessor"))?;
+        } else if let Some(prior) = previous {
             self.ranges.extend(prior.ranges.clone());
             prior.resource.graphics.clone()
+        } else {
+            // No body of this map loaded them: the tiles stay in VRAM from
+            // the map before (the towers' Hiballs and Cadets, `$82:EA41`,
+            // `$82:EAED`). Take them from the descriptor before this one
+            // with the same packet that uploads them.
+            let donor = self
+                .donor(at)
+                .ok_or(SpriteError::Invalid("missing graphics reuse predecessor"))?;
+            self.graphics(donor)?
         };
         Ok(Resource {
             packet: Some(packet),
