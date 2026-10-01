@@ -39,11 +39,18 @@ pub const BOX_MAPS: std::ops::RangeInclusive<u16> = 0x0041..=0x0044;
 /// The world maps the slice reaches: the underworld, from the south gate.
 pub use assets::maps::visual::world::WORLD_MAPS;
 
-/// Whether a map loads in the runtime: the slice, the box's tour and the
-/// underworld.
+/// The towers' maps the runtime loads, reached from the underworld
+/// (`docs/tower-entry.md`): the first tower's ground floor.
+pub const TOWER_MAPS: [u16; 1] = [0x0100];
+
+/// Whether a map loads in the runtime: the slice, the box's tour, the
+/// underworld and the towers.
 #[must_use]
 pub fn admitted(map: u16) -> bool {
-    MAPS.contains(&map) || BOX_MAPS.contains(&map) || WORLD_MAPS.contains(&map)
+    MAPS.contains(&map)
+        || BOX_MAPS.contains(&map)
+        || WORLD_MAPS.contains(&map)
+        || TOWER_MAPS.contains(&map)
 }
 
 /// A map built into a walkable room.
