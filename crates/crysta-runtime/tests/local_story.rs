@@ -1153,6 +1153,54 @@ fn the_frozen_townsfolk_take_the_blue_palette() {
     );
 }
 
+/// The whitening (`$88:B507`): one step a frame, 37 in all, then 60
+/// frames white (natively 100 frames, JP 50577..50676; here 98).
+fn assert_whitening(tints: &[Tint]) {
+    let mut runs: Vec<(Tint, usize)> = Vec::new();
+    for &tint in tints {
+        match runs.last_mut() {
+            Some((last, count)) if *last == tint => *count += 1,
+            _ => runs.push((tint, 1)),
+        }
+    }
+    let Some(start) = runs.iter().position(|&(tint, _)| tint == Tint::Raise(1)) else {
+        panic!("no whitening: {runs:?}");
+    };
+    let steps: Vec<_> = (1..=30).map(|step| (Tint::Raise(step), 1)).collect();
+    assert_eq!(runs[start..start + 30], steps[..]);
+    assert_eq!(runs[start + 30], (Tint::Raise(31), 68));
+    assert_eq!(runs[start + 31].0, Tint::None);
+}
+
+/// Six crystals (`$88:B573..B5F5`, `COP D0`/`D1`) close in on a point 24
+/// above Elle: 60 degrees apart, 4 a frame nearer, from radius 124.
+/// Natively the frame at radius 0 shows too (JP 50576..50607); here
+/// `COP A7` deletes them in it.
+fn assert_crystals(orbits: &[Vec<(u16, u16)>], elle: (u16, u16)) {
+    assert_eq!(orbits.len(), 31, "{orbits:?}");
+    assert!(orbits.iter().all(|crystals| crystals.len() == 6));
+    let centre = (f64::from(elle.0), f64::from(elle.1) - 24.0);
+    let radius = |crystals: &[(u16, u16)]| {
+        crystals
+            .iter()
+            .map(|&(x, y)| {
+                // The first frame's leftmost one is left of the map, at -4.
+                let x = f64::from(x.cast_signed());
+                (x - centre.0).hypot(f64::from(y) - centre.1)
+            })
+            .sum::<f64>()
+            / 6.0
+    };
+    let radii: Vec<f64> = orbits.iter().map(|crystals| radius(crystals)).collect();
+    assert!((radii[0] - 124.0).abs() < 2.0, "{radii:?}");
+    assert!(
+        radii
+            .windows(2)
+            .all(|pair| (pair[0] - pair[1] - 4.0).abs() < 1.5),
+        "{radii:?}"
+    );
+}
+
 #[test]
 fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     // Back in `$21` with the spear: the figure (`$88:B2FF`, a long call into
@@ -1170,6 +1218,7 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
     let mut run = Vec::new();
     let mut tints = Vec::new();
+    let mut orbits = Vec::new();
     for _ in 0..4000 {
         let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
@@ -1177,39 +1226,28 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
             .unwrap();
         run.extend(world.run_pose().map(|(motion, facing, _)| (motion, facing)));
         tints.push(world.screen().tint);
+        let crystals: Vec<(u16, u16)> = world
+            .residents()
+            .iter()
+            .filter(|resident| resident.record == 0 && resident.selector == 9 && !resident.hidden)
+            .map(|resident| resident.position)
+            .collect();
+        if !crystals.is_empty() {
+            orbits.push(crystals);
+        }
         if flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
             break;
         }
     }
-    let mut runs: Vec<(Tint, usize)> = Vec::new();
-    for tint in tints {
-        match runs.last_mut() {
-            Some((last, count)) if *last == tint => *count += 1,
-            _ => runs.push((tint, 1)),
-        }
-    }
-    // The whitening (`$88:B507`): one step a frame, 37 in all, then 60
-    // frames white (natively 100 frames, JP 50577..50676; here 98).
-    let Some(start) = runs.iter().position(|&(tint, _)| tint == Tint::Raise(1)) else {
-        panic!("no whitening: {runs:?}");
-    };
-    let steps: Vec<_> = (1..=30).map(|step| (Tint::Raise(step), 1)).collect();
-    assert_eq!(runs[start..start + 30], steps[..]);
-    assert_eq!(runs[start + 30], (Tint::Raise(31), 68));
-    assert_eq!(runs[start + 31].0, Tint::None);
+    assert_whitening(&tints);
     // Elle turns blue (`COP BB 0E`).
-    assert!(
-        world
-            .residents()
-            .iter()
-            .any(|resident| resident.palette == 7),
-        "{:?}",
-        world
-            .residents()
-            .iter()
-            .map(|resident| (resident.record, resident.palette))
-            .collect::<Vec<_>>()
-    );
+    let elle = world
+        .residents()
+        .iter()
+        .find(|resident| resident.palette == 7)
+        .expect("a blue Elle")
+        .position;
+    assert_crystals(&orbits, elle);
     assert!(flag(&world, 0xFE) && flag(&world, 0x23));
     // Ark runs out as natively (`docs/ark-poses.md`): 36 frames of the dash
     // list `$17` down, 16 of the brake, then he stands facing down.

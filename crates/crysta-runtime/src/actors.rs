@@ -154,6 +154,13 @@ const SPAWN: u8 = 0xA2;
 /// than after its parent, and without a parent link; `$80:A4B6`. Spawns all
 /// run from the next frame here.
 const SPAWN_LINKED: u8 = 0x99;
+/// Starts an orbit about the actor's spawn point (`$80:B136`).
+const ORBIT: u8 = 0xD0;
+/// Steps the orbit a frame, and goes on once it ends (`$80:B1D1`).
+const ORBIT_STEP: u8 = 0xD1;
+/// The sine table, 1024 signed bytes a turn and a quarter more for the
+/// cosine (`$81:F563`, in place on both ROMs).
+const SINE: usize = 0x01_F563;
 /// Spawns an actor running a long script at an offset from its parent, dx
 /// mirrored with the parent, without a flags word; `$80:A56B`.
 const SPAWN_AT: u8 = 0x9C;
@@ -312,7 +319,7 @@ const OBJ_PRIORITY: u8 = 0xBA;
 /// The palette field.
 const PALETTE: u8 = 0xBB;
 /// The services [`Actor::body`] runs.
-const BODY: [u8; 4] = [MOVE_Y, SET_PACKET, OBJ_PRIORITY, PALETTE];
+const BODY: [u8; 6] = [MOVE_Y, SET_PACKET, OBJ_PRIORITY, PALETTE, ORBIT, ORBIT_STEP];
 /// Points the actor at another art packet (`$80:B4DF`): its display lists,
 /// which a `COP 8E` wait plays, are the new packet's.
 const SET_PACKET: u8 = 0xD8;
@@ -467,6 +474,10 @@ pub struct Actor {
     own: native::Own,
     /// A native run paused in a nested frame, to go on next frame.
     paused: Option<native::Paused>,
+    /// Where a script's `JSR` returns to (`RTS`).
+    subroutine: Option<usize>,
+    /// `COP D0`'s orbit, while `COP D1` steps it.
+    orbit: Option<Orbit>,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -569,6 +580,8 @@ impl Actor {
             player_pose: None,
             own: native::Own::new(),
             paused: None,
+            subroutine: None,
+            orbit: None,
             walked: false,
             contact: None,
             ease: None,
@@ -734,6 +747,8 @@ impl Actor {
         };
         self.cooldown = HIT_COOLDOWN;
         self.pc = target;
+        // The hit replaces whatever ran: a paused native run, a JSR.
+        (self.paused, self.subroutine) = (None, None);
         self.state = State::Running;
         self.stream = None;
         self.motion = None;
@@ -881,9 +896,11 @@ impl Actor {
         // (`$88:D33D`).
         if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
             const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
+            // Bit 14, which the crystals set (`$88:B60F`), is not modelled.
+            const ACCEPTED: u16 = INTERACTION | 0x4000;
             let value = u16::from_le_bytes([low, high]);
             match op {
-                0x09 if value & !INTERACTION == 0 => self.interaction |= value,
+                0x09 if value & !ACCEPTED == 0 => self.interaction |= value & INTERACTION,
                 0x29 if !value & !INTERACTION == 0 => self.interaction &= value,
                 _ => return None,
             }
@@ -1082,8 +1099,9 @@ impl Actor {
 
     fn run(&mut self, around: &mut Surroundings<'_>) -> Run {
         let image = around.image;
-        // A native run paused in a nested frame goes on first.
-        if let Some(paused) = self.paused.take() {
+        // A native run paused in a nested frame goes on first; a callback
+        // runs its own code and leaves it paused.
+        if let Some(paused) = self.paused.take_if(|_| self.outer.is_none()) {
             match native::resume(image, paused, &mut self.memory(around.globals)) {
                 Some(ran) => self.pc = self.ran(ran),
                 None => self.state = State::Frozen,
@@ -1116,6 +1134,30 @@ impl Actor {
                     }
                     self.pc = self.continuation.take().unwrap_or(entry);
                     return Run::Yielded;
+                }
+                // JSR into the bank and its RTS, one level deep (the
+                // freeze's crystals, `$88:B60F`).
+                0x20 if self.subroutine.is_none() => {
+                    let Some(&[low, high]) = image.get(self.pc + 1..self.pc + 3) else {
+                        self.state = State::Frozen;
+                        return Run::Yielded;
+                    };
+                    let target = u16::from_le_bytes([low, high]);
+                    if target < 0x8000 {
+                        self.state = State::Frozen;
+                        return Run::Yielded;
+                    }
+                    self.subroutine = Some(self.pc + 3);
+                    self.pc = bank | usize::from(target);
+                    continue;
+                }
+                0x60 => {
+                    let Some(caller) = self.subroutine.take() else {
+                        self.state = State::Frozen;
+                        return Run::Yielded;
+                    };
+                    self.pc = caller;
+                    continue;
                 }
                 // BRA: the loop's back edge.
                 0x80 => {
@@ -1284,10 +1326,12 @@ impl Actor {
     }
 
     /// The actor's body: its y (`COP B2`), its art packet (`COP D8`), its
-    /// OBJ priority (`COP BA`) and palette field (`COP BB`). Returns whether
-    /// execution continues.
+    /// OBJ priority (`COP BA`), palette field (`COP BB`) and orbit (`COP D0`,
+    /// `D1`). Returns whether execution continues.
     fn body(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
         match service {
+            ORBIT => return self.start_orbit(operands, image),
+            ORBIT_STEP => return self.step_orbit(operands, image),
             MOVE_Y => {
                 let Some(dy) = cadence::word(image, operands) else {
                     self.state = State::Frozen;
@@ -1695,6 +1739,75 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// `COP D0 pose target dx dy angle radius turn reach end`: an orbit
+    /// about the actor's own place (where its parent spawned it; target 0)
+    /// plus (dx, dy). Natively `COP D1` reads the parent's place each frame;
+    /// here it is fixed when the orbit starts, as the crystals' Elle stands
+    /// still. Returns whether execution continues.
+    fn start_orbit(&mut self, operands: usize, image: &[u8]) -> bool {
+        let word = |at: usize| cadence::word(image, operands + at);
+        let byte = |at: usize| {
+            image
+                .get(operands + at)
+                .map(|&b| i16::from(i8::from_ne_bytes([b])))
+        };
+        let (Some(pose), Some(0), Some(dx), Some(dy), Some(angle), Some(radius)) =
+            (word(0), word(2), word(4), word(6), word(8), word(10))
+        else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let (Some(turn), Some(reach), Some(end)) = (byte(12), byte(13), word(14)) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let centre = (
+            self.position.0.wrapping_add(dx),
+            self.position.1.wrapping_add(dy),
+        );
+        self.set_pose(u8::try_from(pose).unwrap_or(0), self.hflip);
+        self.orbit = Some(Orbit {
+            centre,
+            angle,
+            radius,
+            turn: turn * 2,
+            reach,
+            end,
+        });
+        self.pc = operands + 16;
+        true
+    }
+
+    /// `COP D1`: the orbit's frame. It ends the frame until the orbit ends
+    /// (its count, or its radius reached), then goes on.
+    fn step_orbit(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(mut orbit) = self.orbit else {
+            self.state = State::Frozen;
+            return false;
+        };
+        orbit.angle = orbit.angle.wrapping_add_signed(orbit.turn) & 0x3FF;
+        orbit.radius = orbit.radius.wrapping_add_signed(orbit.reach) & 0x1FF;
+        let Some(position) = orbit.position(image) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        self.position = position;
+        let done = if orbit.end & 0x8000 == 0 {
+            orbit.end = orbit.end.wrapping_sub(1);
+            orbit.end == 0
+        } else {
+            let target = orbit.end & 0x1FF;
+            if orbit.reach >= 0 {
+                orbit.radius >= target
+            } else {
+                target >= orbit.radius
+            }
+        };
+        self.orbit = (!done).then_some(orbit);
+        self.pc = if done { operands } else { operands - 2 };
+        done
     }
 
     /// `COP A2` and `COP 99` (a script and a flags word, at the actor) and
@@ -2658,6 +2771,44 @@ fn player_pose_mismatch(image: &[u8], at: usize) -> Option<usize> {
     };
     let target = branch(11);
     (image.get(target) == Some(&0xFA) && branch(20) == target).then_some(target + 1)
+}
+
+/// `COP D0`'s orbit (`$7F:2000..2013`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Orbit {
+    /// The point it turns about.
+    centre: (u16, u16),
+    /// 1024 a turn.
+    angle: u16,
+    /// In units of 1/128 of the table's 127.
+    radius: u16,
+    /// Added to the angle each frame.
+    turn: i16,
+    /// Added to the radius each frame.
+    reach: i16,
+    /// Frames left, or with bit 15 the radius it ends at.
+    end: u16,
+}
+
+impl Orbit {
+    /// The position on it (`$87:C701`, `$87:C72F`): the centre plus
+    /// `radius * table / 128` toward the cosine and the sine.
+    fn position(&self, image: &[u8]) -> Option<(u16, u16)> {
+        // `STA $4202` takes the radius's low byte only.
+        let [radius, _] = self.radius.to_le_bytes();
+        let along = |index: usize, base: u16| {
+            let table = i8::from_ne_bytes([*image.get(SINE + index)?]);
+            let length = (i32::from(table.unsigned_abs()) * i32::from(radius) * 2) >> 8;
+            let length = if table < 0 { -length } else { length };
+            Some(base.wrapping_add_signed(i16::try_from(length).ok()?))
+        };
+        let angle = usize::from(self.angle);
+        let clamp = |at: u16| if at & 0x8000 != 0 { 0 } else { at };
+        Some((
+            along(angle + 256, clamp(self.centre.0))?,
+            along(angle, clamp(self.centre.1))?,
+        ))
+    }
 }
 
 /// A long operand as a normalized ROM offset.

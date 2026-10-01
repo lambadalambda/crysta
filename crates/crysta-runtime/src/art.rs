@@ -536,11 +536,11 @@ pub fn residents_art(
                 .position(|record| record.offset() == resident.record)
                 .and_then(|index| decoded[index].take());
             if let Some(own) = own_art(image, resident) {
-                // The object sheet is qualified in the tour rooms and for
-                // the desk's book in the bedroom only; elsewhere what the
-                // list draws is not known, and the blue door's target in C
-                // shows nothing natively.
-                return if (0x41..=0x44).contains(&map) || map == 0x0F {
+                // The object sheet is qualified in the tour rooms, for the
+                // desk's book in the bedroom and the freeze's crystals in
+                // `$21` only; elsewhere what the list draws is not known,
+                // and the blue door's target in C shows nothing natively.
+                return if (0x41..=0x44).contains(&map) || [0x0F, 0x21].contains(&map) {
                     Body::object(image, own)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
                 } else {
@@ -578,13 +578,11 @@ pub fn residents_art(
 fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
     let mut at = usize::try_from(resident.script? & 0x3F_FFFF).ok()?;
     let mut base = None;
+    let mut back = None;
     for _ in 0..8 {
-        let code = image.get(at..at + 6)?;
+        let code = image.get(at..at + 9)?;
         match code[..2] {
             [2, 0x48 | 0xB2] => at += 4,
-            // `LDA #0; STA $0004,X` or `$0006,X`: a cleared entity, as the
-            // desk's book starts (`$88:D641`).
-            [0xA9, 0] if code[2..4] == [0, 0x9D] && matches!(code[4..], [4 | 6, 0]) => at += 6,
             [2, 0xD8] => {
                 base = Some(
                     0x80_0000
@@ -594,7 +592,19 @@ fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
                 );
                 at += 5;
             }
-            [2, 0x80] => return base.map(|base| (base, code[2])),
+            // `COP 80 pose`, or `COP D0`'s orbit with its pose word.
+            [2, 0x80 | 0xD0] => return base.map(|base| (base, code[2])),
+            // `LDA #0; STA $0004,X` or `$0006,X`: a cleared entity, as the
+            // desk's book starts (`$88:D641`).
+            [0xA9, 0] if code[2..4] == [0, 0x9D] && matches!(code[4..6], [4 | 6, 0]) => at += 6,
+            // `LDA $0006,X; ORA #$4000; STA $0006,X`, as the crystals do.
+            [0xBD, 6] if code[2..] == [0, 0x09, 0, 0x40, 0x9D, 6, 0] => at += 9,
+            // `JSR` within the bank and its `RTS`, one level deep.
+            [0x20, low] if back.is_none() => {
+                back = Some(at + 3);
+                at = (at & 0xFF_0000) | usize::from(u16::from_le_bytes([low, code[2]]));
+            }
+            [0x60, _] => at = back.take()?,
             _ => return None,
         }
     }

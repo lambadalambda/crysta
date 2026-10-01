@@ -636,3 +636,38 @@ fn the_desk_shows_its_save_book() {
     let animation = body.animation(present[book].selector, false).unwrap();
     assert!(animation.frame_at(0).is_visible());
 }
+
+#[test]
+fn the_freezes_crystals_draw_pose_9_of_the_helper_art() {
+    // `$88:B573`: `JSR $B60F` (+$06, `COP D8 $A2:C000`), then `COP D0 0009`.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let flags = new_game();
+    let crystal = Resident {
+        position: (120, 300),
+        record: 0,
+        script: Some(0x08_B573),
+        body: false,
+        initial: 0,
+        selector: 9,
+        hflip: false,
+        pose_age: 0,
+        walking: false,
+        descriptor: None,
+        hidden: false,
+        priority: 2,
+        palette: 0,
+    };
+    let art = residents_art(
+        image,
+        0x0021,
+        &[crystal],
+        EventFlags::Bitmap(&flags),
+        EventFlags::Bitmap(&flags),
+    );
+    let body = art[0].as_ref().expect("the crystal's art");
+    let animation = body.animation(9, false).unwrap();
+    assert!(animation.frames.iter().all(Raster::is_visible));
+}
