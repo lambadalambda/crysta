@@ -24,6 +24,7 @@ On the world map the towers cannot be entered.
 3. [Play tower 1's intro pan and text](tower-one-intro.md)
 4. [Draw tower 1's sky backdrop](tower-one-backdrop.md)
 5. [Enter towers 2 to 5](towers-two-to-five.md)
+6. [Draw tower 1's statues and plaque](tower-one-statues.md)
 
 ## Notes
 

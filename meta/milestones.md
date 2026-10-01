@@ -184,6 +184,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw the world map in Mode 7](issues/world-map-mode7.md)
 - [Enter the towers from the world map](issues/enter-the-towers.md)
 - [Load tower 1 from the world map](issues/tower-one-loads.md)
+- [Draw tower 1's statues and plaque](issues/tower-one-statues.md)
 - [Walk into and out of tower 1](issues/tower-one-arrival-exit.md)
 - [Play tower 1's intro pan and text](issues/tower-one-intro.md)
 - [Draw tower 1's sky backdrop](issues/tower-one-backdrop.md)
