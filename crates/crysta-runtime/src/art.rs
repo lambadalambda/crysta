@@ -607,10 +607,12 @@ pub fn residents_art(
                 // desk's book in the bedroom and the freeze's crystals in
                 // `$21` only; elsewhere what the list draws is not known,
                 // and the blue door's target in C shows nothing natively.
-                // The helper art (bullets) is the same everywhere.
+                // The helper art is the same everywhere for the children
+                // scripts spawn (bullets); the blue door's target, a record,
+                // is not drawn.
                 return if (0x41..=0x44).contains(&map)
                     || [0x0F, 0x21].contains(&map)
-                    || own.0 == crate::actors::helper(image)
+                    || (resident.record == 0 && own.0 == crate::actors::helper(image))
                 {
                     Body::object(image, own)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
