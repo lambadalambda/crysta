@@ -119,7 +119,7 @@ fn type8_contract_is_immutable_and_does_not_admit_other_unknown_types() {
         );
         assert_eq!(state.encode_snapshot(), restored.encode_snapshot());
     }
-    for kind in [3, 9, 17, 26, 30, 31] {
+    for kind in [3, 9, 26, 30, 31] {
         let unknown = room(kind, 3, 4).with_passive_directional_type8_special_bit_clear();
         let mut state = WalkingState::new(48, 73);
         let input = FrameInput {
@@ -178,7 +178,7 @@ fn opt_in_preserves_raw_cells_and_default_rejection() {
 
 #[test]
 fn unknown_and_flag_input_dependent8_fail_atomically() {
-    for kind in [3, 8, 9, 17, 26, 30, 31] {
+    for kind in [3, 8, 9, 26, 30, 31] {
         let candidate = room(kind, 3, 4);
         let mut state = WalkingState::new(48, 73);
         let input = FrameInput {

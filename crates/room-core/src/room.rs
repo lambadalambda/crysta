@@ -375,9 +375,10 @@ impl Room {
             return Ok(rule.alias.material());
         }
         match kind {
-            // `1` reads as `0` in both of the player's tables (`$80:E85C`,
-            // `$80:E88F`): the tower tops' floor.
-            0 | 1 | 2 | 22 => Ok(Material::Open),
+            // `1` and `17` take the same handlers as `0` in all sixteen
+            // directional tables (`$80:D542`, `D8E8`, `DC60`, `DFDC`, `$40`
+            // apart): the tower tops' floor, tower 2's statue rows.
+            0 | 1 | 2 | 17 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
