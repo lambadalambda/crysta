@@ -1,4 +1,5 @@
 //! Bounded ROM-backed Ark and house actor sprites, not a sprite VM or scene renderer.
+pub mod boxes;
 mod house;
 pub use house::pandora::{
     Mode4Art, PandoraActorPhase, PandoraArt, PandoraCarryMotion, PandoraCarryPose,

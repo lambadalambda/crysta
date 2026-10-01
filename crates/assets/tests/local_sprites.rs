@@ -121,3 +121,32 @@ fn selected_rom_frames_match_reference_indexed_compositions() {
         "special idle is not ordinary standing"
     );
 }
+
+#[test]
+fn arks_thrust_records_carry_their_attack_boxes() {
+    // `docs/combat.md`: resource 4 list `$01` (Up): 4, 4, 2, 2, 2+2 frames;
+    // attack boxes (dx, w, dy, h).
+    for name in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Ok(bytes) = std::fs::read(format!("{}/../../local/{name}", env!("CARGO_MANIFEST_DIR")))
+        else {
+            continue;
+        };
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let records = assets::sprites::boxes::ark_list(rom.image(), 4, 1).unwrap();
+        let lengths: Vec<u8> = records.iter().map(|record| record.duration + 1).collect();
+        assert_eq!(lengths, [4, 4, 2, 2, 2], "{name}");
+        let attacks: Vec<[i8; 4]> = records.iter().map(|record| record.attack).collect();
+        assert_eq!(
+            attacks,
+            [
+                [-8, 16, -24, 16],
+                [-7, 17, -40, 25],
+                [-7, 17, -42, 24],
+                [-7, 17, -40, 24],
+                [-8, 16, -24, 16]
+            ],
+            "{name}"
+        );
+        assert_eq!(records[0].body, [-5, 10, -15, 14], "{name}");
+    }
+}
