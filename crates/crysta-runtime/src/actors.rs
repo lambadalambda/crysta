@@ -22,8 +22,8 @@ mod native;
 mod sense;
 mod walls;
 
-pub use native::{Scratch, ENEMIES, PLAYER_ACTION, PRIME_BLUE};
 pub(crate) use foe::helper;
+pub use native::{Scratch, ENEMIES, PLAYER_ACTION, PRIME_BLUE};
 use sense::probe;
 
 use crate::scene::{Globals, Transfer};
