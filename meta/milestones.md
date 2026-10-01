@@ -182,6 +182,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)
 - [Fix the slice bugs the user reported on 2026-10-01](issues/slice-bug-report.md)
 - [Draw the world map in Mode 7](issues/world-map-mode7.md)
+- [Hide Ark behind the stairway's frame on the stairs](issues/stair-depth.md)
 - [Enter the towers from the world map](issues/enter-the-towers.md)
 - [Draw tower 1's sky backdrop](issues/tower-one-backdrop.md)
 - [Enter towers 2 to 5](issues/towers-two-to-five.md)

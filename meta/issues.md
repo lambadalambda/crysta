@@ -67,3 +67,4 @@
 - [ ] [Enter the towers from the world map](issues/enter-the-towers.md)
 - [ ] [Draw tower 1's sky backdrop](issues/tower-one-backdrop.md)
 - [ ] [Enter towers 2 to 5](issues/towers-two-to-five.md)
+- [ ] [Hide Ark behind the stairway's frame on the stairs](issues/stair-depth.md)
