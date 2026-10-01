@@ -371,7 +371,7 @@ fn unflagged_new_edge_and_unrelated_types_still_fail_closed() {
         cell_rule(MaterialAlias::ClosedDoorPartial5, 11, 21),
         cell_rule(MaterialAlias::StairOpen29, 11, 21),
     ];
-    for kind in [1, 6, 7, 25, 31] {
+    for kind in [3, 6, 7, 25, 31] {
         let room = grid(11, 21, kind << 9, false)
             .with_material_policy(rules.clone())
             .unwrap();

@@ -2626,7 +2626,7 @@ mod tests {
         world.armed = false;
         let mut cells = vec![0; 64];
         for row in 0..8 {
-            cells[row * 8 + 4] = 1 << 9;
+            cells[row * 8 + 4] = 3 << 9;
         }
         world.base.room = Room::new(8, 8, cells).unwrap();
         world.residents = vec![resident()];
@@ -2653,7 +2653,7 @@ mod tests {
                 } else {
                     world.step_checked(direction).unwrap()
                 };
-                assert_eq!(step, Step::Refused(Unqualified::UnsupportedType(1)));
+                assert_eq!(step, Step::Refused(Unqualified::UnsupportedType(3)));
                 assert_eq!(world.position(), before.position());
                 assert_eq!(
                     world.walking.encode_snapshot(),
@@ -2676,7 +2676,7 @@ mod tests {
             let facing = direction.unwrap_or(before.facing());
             assert_eq!(
                 world.step_interactive(direction).unwrap(),
-                Step::Refused(Unqualified::UnsupportedType(1))
+                Step::Refused(Unqualified::UnsupportedType(3))
             );
             assert_eq!(world.position(), before.position());
             assert_eq!(world.map(), before.map());
@@ -2705,7 +2705,7 @@ mod tests {
         for _ in 0..4 {
             assert_eq!(
                 world.step_interactive(Some(Direction::Right)).unwrap(),
-                Step::Refused(Unqualified::UnsupportedType(1))
+                Step::Refused(Unqualified::UnsupportedType(3))
             );
             assert_eq!(world.position(), position);
             for _ in 0..2 {
@@ -2796,13 +2796,13 @@ mod tests {
     fn checked_step_keeps_core_refusals_distinct() {
         let mut world = synthetic_world();
         world.armed = false;
-        world.room.room = Room::new(8, 8, vec![1 << 9; 64]).unwrap();
+        world.room.room = Room::new(8, 8, vec![3 << 9; 64]).unwrap();
         for _ in 0..2 {
             world.step_checked(Some(Direction::Right)).unwrap();
         }
         assert_eq!(
             world.step_checked(Some(Direction::Right)).unwrap(),
-            Step::Refused(Unqualified::UnsupportedType(1))
+            Step::Refused(Unqualified::UnsupportedType(3))
         );
     }
 

@@ -122,7 +122,7 @@ impl Room {
         let raw = self.directional_raw(cell)?;
         let kind = ((raw >> 9) & 31) as u8;
         match kind {
-            0 | 2 | 22 => Ok(0),
+            0 | 1 | 2 | 22 => Ok(0),
             6 | 7 => Ok(kind),
             // Both $E85C[8] and $E88F[8] are $0F, even with raw bit15 set.
             8 if self.type8_special_bit_clear => Ok(15),
@@ -344,7 +344,7 @@ impl Room {
             return self.pair_response(edge, 16, second);
         }
         if edge.q() == 0 {
-            return Ok(if matches!(first, 0 | 2 | 22 | 29) {
+            return Ok(if matches!(first, 0 | 1 | 2 | 22 | 29) {
                 Response::Pass
             } else {
                 Response::Block(0)
@@ -374,7 +374,7 @@ impl Room {
     }
 
     fn pair_response(&self, edge: Edge, first: u8, second: u8) -> Result<Response, Unqualified> {
-        let open = |k| matches!(k, 0 | 2 | 22 | 29);
+        let open = |k| matches!(k, 0 | 1 | 2 | 22 | 29);
         let partial = |k| matches!(k, 5 | 16);
         let plus = Response::Block(i32::from(edge.q() >= 8));
         let minus = Response::Block(-i32::from(edge.q() < 8));
