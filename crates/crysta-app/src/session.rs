@@ -59,9 +59,9 @@ pub struct Session {
     /// Resident art for the roster it was computed for, keyed by map and by
     /// which records were present, since the flags can change the roster.
     pub art: Option<RosterArt>,
-    /// Rasterized sequences by record, selector and mirror; `None` when the
-    /// packet has no such sequence.
-    pub sprites: HashMap<(usize, u8, bool), Option<Animation>>,
+    /// Rasterized sequences by record, selector, mirror and palette field;
+    /// `None` when the packet has no such sequence.
+    pub sprites: HashMap<(usize, u8, bool, u8), Option<Animation>>,
     /// Ark's carry poses and the pots; `None` when the decoder refused them,
     /// and then Ark carries in his ordinary frames and no pot is drawn.
     pub carry_art: Option<CarryArt>,
@@ -497,8 +497,10 @@ impl Session {
             art,
             atlas,
             sprites,
+            image,
             ..
         } = self;
+        let image: &[u8] = image;
         let position = world.position();
         let player = carried
             .as_ref()
@@ -540,28 +542,18 @@ impl Session {
                 frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
             };
             match bodies.get(index) {
-                Some(Ok(body)) => {
-                    let key = (resident.record, resident.selector, resident.hflip);
-                    let animation = sprites.entry(key).or_insert_with(|| {
-                        // A sequence the packet lacks falls back to the setup
-                        // one rather than a block.
-                        body.animation(key.1, key.2)
-                            .or_else(|_| body.animation(body.initial(), key.2))
-                            .ok()
-                    });
-                    match animation {
-                        Some(animation) => {
-                            let raster = animation.frame_at(u64::from(resident.pose_age));
-                            let draw = if resident.priority >= 3 {
-                                frame::draw_sprite_over
-                            } else {
-                                frame::draw_sprite
-                            };
-                            draw(frame, background, camera, raster, resident.position);
-                        }
-                        None => placeholder(frame),
+                Some(Ok(body)) => match resident_animation(sprites, image, body, resident) {
+                    Some(animation) => {
+                        let raster = animation.frame_at(u64::from(resident.pose_age));
+                        let draw = if resident.priority >= 3 {
+                            frame::draw_sprite_over
+                        } else {
+                            frame::draw_sprite
+                        };
+                        draw(frame, background, camera, raster, resident.position);
                     }
-                }
+                    None => placeholder(frame),
+                },
                 Some(Err(Placeholder::Invisible)) | None => {}
                 Some(Err(Placeholder::Refused(_) | Placeholder::PredecessorRefused)) => {
                     placeholder(frame);
@@ -671,4 +663,28 @@ fn draw_dialogue(
     if let Some(cursor) = view.cursor {
         crate::window::draw_cursor(frame, art, origin, cursor);
     }
+}
+
+/// A resident's sequence as its body and palette field show it, cached. A
+/// sequence the packet lacks falls back to the setup one rather than a block.
+fn resident_animation<'s>(
+    sprites: &'s mut HashMap<(usize, u8, bool, u8), Option<Animation>>,
+    image: &[u8],
+    body: &Body,
+    resident: &crysta_runtime::residents::Resident,
+) -> Option<&'s Animation> {
+    let key = (
+        resident.record,
+        resident.selector,
+        resident.hflip,
+        resident.palette,
+    );
+    sprites
+        .entry(key)
+        .or_insert_with(|| {
+            body.shown(image, (key.1, key.2), key.3)
+                .or_else(|_| body.shown(image, (body.initial(), key.2), key.3))
+                .ok()
+        })
+        .as_ref()
 }
