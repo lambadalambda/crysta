@@ -521,8 +521,9 @@ mod tests {
     fn the_slices_tracks_and_the_sound_bank_extract() {
         let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").expect("CRYSTA_JP_ROM")).unwrap();
         let rom = Rom::load(&bytes).unwrap();
-        // Map selections 0, 1, 3, 5, $1B, and the scenes' $31 and $34.
-        for track in [1, 2, 4, 6, 0x1c, 0x31, 0x34] {
+        // Map selections 0, 1, 3, 5, $10 (tower 1), $1B, and the scenes'
+        // $31 and $34.
+        for track in [1, 2, 4, 6, 0x11, 0x1c, 0x31, 0x34] {
             let music = extract_track(&rom, track).unwrap();
             assert!(!music.upload.samples.blocks.is_empty(), "{track:#x}");
             assert!(music
