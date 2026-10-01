@@ -23,6 +23,10 @@ const SECONDS: usize = 0x2E;
 const TICKS: u16 = 0x3B;
 const LEVEL: usize = 0x56;
 const MONEY: usize = 0x94;
+/// `$064A`: the equipped weapon's item (0: none).
+const WEAPON: usize = 0x4A;
+/// `$0659`: the equipped weapon's power.
+const WEAPON_POWER: usize = 0x59;
 const EVENTS: usize = 0xC0;
 /// The event flags the slot keeps: `$7E:06C0–07FF`.
 pub const EVENT_BYTES: usize = 0x200 - EVENTS;
@@ -233,6 +237,19 @@ impl SaveSlot {
     pub fn set_money(&mut self, money: u32) {
         self.set_word(MONEY, bcd(money % 10_000));
         self.set_word(MONEY + 2, bcd(money / 10_000));
+    }
+
+    /// The equipped weapon's item and power, if one is equipped.
+    #[must_use]
+    pub fn weapon(&self) -> Option<(u8, u16)> {
+        let item = self.word(WEAPON).to_le_bytes()[0];
+        (item != 0).then(|| (item, self.word(WEAPON_POWER)))
+    }
+
+    /// Equips `item` with `power` (`$85:B009`, `$85:F4BD`).
+    pub fn set_weapon(&mut self, item: u8, power: u16) {
+        self.set_word(WEAPON, u16::from(item));
+        self.set_word(WEAPON_POWER, power);
     }
 
     /// The Prime Blue word `$07ED`.

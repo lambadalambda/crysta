@@ -27,6 +27,7 @@ use room_core::{
 };
 use std::fmt;
 
+mod attack;
 mod contact;
 mod door;
 mod fade;
@@ -47,6 +48,10 @@ pub struct World<'a> {
     exits: ExitList,
     /// The map's camera region, when it has one (not the world maps).
     region: Option<assets::maps::visual::camera::CameraRegion>,
+    /// Ark's thrust under way.
+    thrust: Option<attack::Thrust>,
+    /// The thrust lists' records and boxes.
+    thrust_records: attack::ThrustRecords,
     walking: WalkingState,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
@@ -300,6 +305,8 @@ impl<'a> World<'a> {
             base,
             exits,
             region: assets::maps::visual::camera::CameraRegion::from_rom(image, map).ok(),
+            thrust: None,
+            thrust_records: attack::ThrustRecords::from_rom(image),
             walking: WalkingState::new(x, y),
             residents: present,
             actors,
@@ -1027,10 +1034,25 @@ impl<'a> World<'a> {
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
-        if let Some(step) = self.pot_frame(direction, lift)? {
+        let held = match self.pot_frame(direction, lift)? {
+            Some(step) => Some(step),
+            None => self.thrust_frame()?,
+        };
+        if let Some(step) = held {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        self.walk_frame(direction, presses, (busy, locked))
+    }
+
+    /// The rest of an ordinary frame: Ark walks, then A talks, opens a
+    /// door, thrusts or interacts, and touching runs.
+    fn walk_frame(
+        &mut self,
+        direction: Option<Direction>,
+        presses: Presses,
+        (busy, locked): (bool, bool),
+    ) -> Result<(Step, Option<Step>), WorldError> {
         let step = self.step_interactive(direction)?;
         // On the plane, not while arriving or mid-step.
         let free = !busy
@@ -1041,7 +1063,11 @@ impl<'a> World<'a> {
         // doors and the host doorway action wait: a reaction's lock keeps
         // Ark where he is, as natively.
         let opened = if presses.confirm && free && !self.talk() && !locked && !self.open_door() {
-            Some(self.interact_checked()?)
+            Some(if self.thrust() {
+                Step::Stayed
+            } else {
+                self.interact_checked()?
+            })
         } else {
             None
         };
@@ -2123,6 +2149,8 @@ mod tests {
             base,
             exits: ExitList::from_rom(&bytes, 0xB).unwrap(),
             region: None,
+            thrust: None,
+            thrust_records: attack::ThrustRecords::default(),
             walking: WalkingState::new(56, 64),
             residents: vec![],
             actors: vec![],
