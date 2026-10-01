@@ -4,7 +4,9 @@ jp_address	eu_address	kind	method	confidence	note
 80:A24F	80:A24F	sprite	exact	high	run 0x1cc bytes +code; code; crates/assets/src/sprites/pandora.rs:663 (+1)
 80:A255	80:A255	sprite	aligned	medium	gap 0x2e bytes, same length; code; crates/assets/src/sprites/pandora.rs:662 (+2)
 80:A261	80:A261	sprite	aligned	medium	gap 0x2e bytes, same length; code; crates/assets/src/sprites/pandora.rs:678 (+2)
+80:BBC7	80:BBC7	script	exact	high	run 0x1171 bytes +code; code; crates/crysta-runtime/src/actors/native.rs:113
 80:E85C	80:E85C	map	exact	high	run 0x2af0 bytes +code +table; code; crates/assets/src/maps/collision.rs:17
+80:ED75	80:ED75	script	exact	high	run 0x2af0 bytes +code +shape; code; crates/crysta-runtime/src/actors/native.rs:115
 81:8000	81:8000	music	exact	high	run 0x6840 bytes +code +table +shape; code; crates/assets/src/maps/exits.rs:15 (+5)
 81:8001	81:8001	music	exact	high	run 0x6840 bytes +code +table +shape; test; crates/crysta-app/src/music_data.rs:334
 81:8002	81:8002	music	exact	high	run 0x6840 bytes +code +table +shape; test; crates/crysta-app/src/music_data.rs:333 (+1)

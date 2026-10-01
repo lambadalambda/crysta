@@ -619,7 +619,7 @@ pub struct Actor {
     frozen_at: Option<usize>,
     /// Entity `+$26`: the spawn record's fourth byte (`$80:F541`), which
     /// `COP 22` switches on.
-    parameter: u8,
+    pub(crate) parameter: u8,
     /// Entry of the one fully authenticated map `$21` frozen-return stream.
     /// Other player scripts keep the prior generic skipped-service behavior.
     frozen_return: Option<usize>,
@@ -810,6 +810,11 @@ impl Actor {
                     .is_some_and(|&byte| byte & 0x80 != 0);
                 foe::Foe::new(profile, counted)
             });
+        // `+$26` holds the spawn parameter; an enemy's set-up clears it
+        // (`$80:F974`).
+        if actor.foe.is_none() && actor.parameter != 0 {
+            actor.own.insert(0x26, actor.parameter);
+        }
         if actor.foe.is_some() {
             // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan.
             actor.hidden |= header & 0x8000 != 0;
@@ -1111,6 +1116,7 @@ impl Actor {
             display: &mut globals.display,
             random: globals.random.word(),
             probe,
+            events: &globals.events,
         }
     }
 
@@ -1157,6 +1163,17 @@ impl Actor {
             && !matches!(self.state, State::Frozen | State::Gone)
             && (self.interaction & INTERACT_ANY_SIDE != 0
                 || (self.interaction & INTERACT_FACING != 0 && facing.opposite() == self.facing))
+    }
+
+    /// Where the registered interaction callback runs (normalized), if any.
+    #[must_use]
+    pub(crate) fn callback_at(&self) -> Option<usize> {
+        Some((self.pc & 0xFF_0000) | usize::from(self.callback?))
+    }
+
+    /// Leaves the map (`COP A7`), as a pickup taken.
+    pub(crate) fn remove(&mut self) {
+        self.state = State::Gone;
     }
 
     /// Runs the registered callback as the dispatcher does, as a subroutine

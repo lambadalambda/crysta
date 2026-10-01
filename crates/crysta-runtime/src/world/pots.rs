@@ -143,6 +143,19 @@ impl World<'_> {
                 tick: u8::try_from(presentation.age - 1).unwrap_or(u8::MAX),
             });
         }
+        // A Magirock lifted (`$84:DDFA`).
+        if let Some(pickup) = self.pickup {
+            let tick = pickup.frame().saturating_sub(1);
+            return Some(Carry {
+                motion: if tick < super::PRESENTATION_LIFT {
+                    PandoraCarryMotion::Lifting
+                } else {
+                    PandoraCarryMotion::Standing
+                },
+                facing: self.facing as u8,
+                tick: u8::try_from(tick).unwrap_or(u8::MAX),
+            });
+        }
         let state = self.pots.as_ref()?.state?;
         let motion = match state.phase() {
             Phase::Empty => return None,

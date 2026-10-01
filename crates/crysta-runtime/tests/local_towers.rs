@@ -300,3 +300,58 @@ fn the_first_chest_gives_a_bulb_once() {
         assert!(again.patched_cells().contains(&(12, 37, 0xF1)));
     }
 }
+
+#[test]
+fn ark_takes_the_magirock_on_the_second_floor() {
+    // `docs/chests.md` §5: the stone at (744,496) on `$102`; facing it, A
+    // lifts it, the text names it, then one more Magirock and its flag.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0102, 744, 512, after_the_intro()).unwrap();
+        world.face(Direction::Up);
+        for _ in 0..4 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        let before = world.residents().len();
+        let stone = world
+            .residents()
+            .iter()
+            .position(|resident| resident.position == (744, 496))
+            .expect("the stone");
+        let number = rom.image()[world.residents()[stone].record + 3];
+        let a = Presses {
+            confirm: true,
+            ..Presses::default()
+        };
+        world.update(None, a).unwrap();
+        let mut shown = false;
+        for _ in 0..200 {
+            shown |= world.dialogue().is_some();
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+        }
+        assert!(shown, "{:?}", rom.revision());
+        assert_eq!(world.save_slot().prime_blue(), 1, "{:?}", rom.revision());
+        let flag = 0x900 + usize::from(number);
+        assert!(world.events()[flag / 8] & (1 << (flag % 8)) != 0);
+        assert!(world.residents().len() <= before);
+        // Taken, it is not there on the next visit.
+        let events = world.events().to_vec();
+        let again = World::enter_with_events(rom.image(), 0x0102, 744, 512, events).unwrap();
+        let mut again = again;
+        for _ in 0..3 {
+            again.update(None, Presses::default()).unwrap();
+        }
+        assert!(
+            again
+                .residents()
+                .iter()
+                .zip(0..)
+                .all(|(resident, _)| resident.position != (744, 496) || resident.hidden),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

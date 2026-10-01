@@ -35,6 +35,8 @@ pub struct Memory<'m> {
     pub random: u16,
     /// `$0966`/`$0968`: Ark's probe (x, y - 8), which enemies aim at.
     pub probe: (u16, u16),
+    /// The event flags, which `$80:BBC7` tests.
+    pub events: &'m [u8],
 }
 
 /// The actor's own bytes runs may use: the wake callbacks and the attack
@@ -42,7 +44,7 @@ pub struct Memory<'m> {
 /// (`$7F:2004..2007,X`), `COP 46`'s row offset and layer (`$7F:201A/201B,X`)
 /// and the voice fade's intensity (`$7F:201C,X`, `$88:9CD8`). Other fields
 /// are the engine's.
-const OWN: [std::ops::RangeInclusive<u16>; 3] = [0x1000..=0x102D, 0x2004..=0x2007, 0x201A..=0x201D];
+const OWN: [std::ops::RangeInclusive<u16>; 3] = [0x1000..=0x102D, 0x2004..=0x200B, 0x201A..=0x201D];
 /// `$0966`/`$0968`, Ark's probe, which runs may read.
 const PROBE: [u16; 2] = [0x0966, 0x0968];
 /// `$0408`: the random generator's word, which runs may read.
@@ -93,11 +95,23 @@ const STEPS: usize = 512;
 /// whitening, the figure and the particles; here the run pauses until the
 /// next frame and every actor runs. The calls clobber A and the flags, and
 /// `$8D:AA96` also X.
-const CALLS: [usize; 4] = [SAVE_PALETTE, RAISE_PALETTE, RESTORE_PALETTE, NESTED_FRAME];
+const CALLS: [usize; 6] = [
+    SAVE_PALETTE,
+    RAISE_PALETTE,
+    RESTORE_PALETTE,
+    NESTED_FRAME,
+    FLAG_TEST,
+    POSE_STEP,
+];
 const SAVE_PALETTE: usize = 0x0D_A8EA;
 const RAISE_PALETTE: usize = 0x0D_AA96;
 const RESTORE_PALETTE: usize = 0x0D_A8FD;
 const NESTED_FRAME: usize = 0x00_80DF;
+/// `$80:BBC7`: carry = event flag `A & $FFF` (the Magirock's taken flag,
+/// `$84:DD8D`).
+const FLAG_TEST: usize = 0x00_BBC7;
+/// `$80:ED75`: one step of the pose, which the runtime's pose clock keeps.
+const POSE_STEP: usize = 0x00_ED75;
 /// The call among [`CALLS`] that also clobbers X.
 const CLOBBERS_X: usize = RAISE_PALETTE;
 
@@ -106,6 +120,14 @@ const CLOBBERS_X: usize = RAISE_PALETTE;
 enum Pushed {
     A(Option<u16>, bool),
     X(bool),
+}
+
+/// Whether event flag `word & $FFF` is set (`$80:BBA6`).
+fn flag_set(events: &[u8], word: u16) -> bool {
+    let flag = usize::from(word & 0x0FFF);
+    events
+        .get(flag / 8)
+        .is_some_and(|byte| byte & (1 << (flag % 8)) != 0)
 }
 
 /// Whether an address is a scratch word's: even, so that no two words
@@ -300,8 +322,13 @@ impl<'a> Machine<'a> {
             0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A | 0x89 => self.accumulator(opcode, words)?,
             0x48 | 0x68 | 0xDA | 0xFA => self.stack_op(opcode)?,
             0xF0 | 0xD0 | 0x90 | 0xB0 | 0x10 | 0x30 => self.branch(opcode)?,
+            0x18 | 0x38 => {
+                self.carry = Some(opcode == 0x38);
+                self.pc + 1
+            }
+            0x69 | 0xE9 => self.add(opcode)?,
             0x22 => {
-                let (next, frame) = self.call(memory.display)?;
+                let (next, frame) = self.call(memory)?;
                 self.pc = next;
                 return Some(if frame { Flow::Frame } else { Flow::On });
             }
@@ -567,8 +594,25 @@ impl<'a> Machine<'a> {
         Some((self.pc & 0xFF_0000) | (next.wrapping_add_signed(isize::from(displacement)) & 0xFFFF))
     }
 
+    /// `ADC #` and `SBC #`, wide, the carry known.
+    fn add(&mut self, opcode: u8) -> Option<usize> {
+        if self.narrow {
+            return None;
+        }
+        let (a, value, carry) = (u32::from(self.a?), u32::from(self.operand()?), self.carry?);
+        let sum = if opcode == 0x69 {
+            a + value + u32::from(carry)
+        } else {
+            a + (value ^ 0xFFFF) + u32::from(carry)
+        };
+        self.set(u16::try_from(sum & 0xFFFF).ok()?);
+        self.carry = Some(sum > 0xFFFF);
+        Some(self.pc + 3)
+    }
+
     /// `JSL` to one of [`CALLS`]: A and the flags are unknown after it.
-    fn call(&mut self, display: &mut Display) -> Option<(usize, bool)> {
+    fn call(&mut self, memory: &mut Memory<'_>) -> Option<(usize, bool)> {
+        let display = &mut *memory.display;
         let bytes = self.image.get(self.pc + 1..self.pc + 4)?;
         let target =
             usize::from(bytes[0]) | usize::from(bytes[1]) << 8 | usize::from(bytes[2] & 0x7F) << 16;
@@ -582,8 +626,14 @@ impl<'a> Machine<'a> {
             RESTORE_PALETTE => display.restore_palette(),
             _ => {}
         }
+        let flag = (call == FLAG_TEST)
+            .then(|| self.a.map(|a| flag_set(memory.events, a)))
+            .flatten();
+        if call == FLAG_TEST && flag.is_none() {
+            return None;
+        }
         self.a = None;
-        (self.zero, self.negative, self.carry) = (None, None, None);
+        (self.zero, self.negative, self.carry) = (None, None, flag);
         if call == CLOBBERS_X {
             self.x = false;
         }
@@ -608,6 +658,7 @@ mod tests {
                 display: &mut Display::default(),
                 random: 0,
                 probe: (0, 0),
+                events: &[],
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -644,6 +695,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0),
+            events: &[],
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -683,6 +735,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0x0123, 0x0456),
+            events: &[],
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -690,6 +743,33 @@ mod tests {
             .map(|at| own[at])
             .collect();
         assert_eq!(bytes, [0x23, 0x01, 0x56, 0x04, 0x92, 0xBB]);
+    }
+
+    #[test]
+    fn the_magirock_tests_its_taken_flag() {
+        // `$84:DD83`: LDA $0026,X; AND #$FF; CLC; ADC #$0900; JSL $80:BBC7;
+        // BCC +3; COP A7; RTL; COP.
+        let mut code = vec![
+            0xBD, 0x26, 0x00, 0x29, 0xFF, 0x00, 0x18, 0x69, 0x00, 0x09, 0x22, 0xC7, 0xBB, 0x80,
+            0x90, 0x03, 0x02, 0xA7, 0x6B, 0x02,
+        ];
+        code.resize(code.len() + 4, 0);
+        let magirock = image(&code);
+        let mut events = vec![0; 0x200];
+        for (taken, at) in [(false, AT + 19), (true, AT + 16)] {
+            events[0x905 / 8] = u8::from(taken) << (0x905 % 8);
+            let (mut words, mut display) = (Scratch::new(), Display::default());
+            let mut own = Own::from([(0x26, 5), (0x27, 0)]);
+            let mut memory = Memory {
+                words: &mut words,
+                own: &mut own,
+                display: &mut display,
+                random: 0,
+                probe: (0, 0),
+                events: &events,
+            };
+            assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
+        }
     }
 
     #[test]
@@ -793,6 +873,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0),
+            events: &[],
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

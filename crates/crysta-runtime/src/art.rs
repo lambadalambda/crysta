@@ -608,12 +608,11 @@ pub fn residents_art(
                 // `$21` only; elsewhere what the list draws is not known,
                 // and the blue door's target in C shows nothing natively.
                 // The helper art is the same everywhere for the children
-                // scripts spawn (bullets); the blue door's target, a record,
-                // is not drawn.
-                return if (0x41..=0x44).contains(&map)
-                    || [0x0F, 0x21].contains(&map)
-                    || (resident.record == 0 && own.0 == crate::actors::helper(image))
-                {
+                // scripts spawn (bullets) and in the towers (the
+                // Magirocks); the blue door's target in C is not drawn.
+                let helper = own.0 == crate::actors::helper(image)
+                    && (resident.record == 0 || crate::TOWER_MAPS.contains(&map));
+                return if (0x41..=0x44).contains(&map) || [0x0F, 0x21].contains(&map) || helper {
                     Body::object(image, own)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
                 } else {
@@ -650,13 +649,21 @@ pub fn residents_art(
 /// its first pose: `COP D8 base`, then `COP 80 list`, with `COP B2`
 /// (an offset) and `COP 48` (a flag check) allowed first, as the spear's
 /// display `$89:D9FE` and the blue door's hit target `$88:AAEE` do, and a
-/// bullet's set-up (`$97:BA9C`: `COP D9`, its own words, `COP 82`). Its
+/// bullet's set-up (`$97:BA9C`: `COP D9`, its own words, `COP 82`) and
+/// the Magirock's taken test (`$84:DD83`). Its
 /// descriptor, often reused from the record before, is not what it draws.
 fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
     let mut at = usize::try_from(resident.script? & 0x3F_FFFF).ok()?;
     let mut base = None;
     let mut back = None;
     for _ in 0..12 {
+        // The Magirock's taken test (`$84:DD83`): on to its art when not.
+        if let Some(&[0xBD, 0x26, 0, 0x29, 0xFF, 0, 0x18, 0x69, _, _, 0x22, _, _, _, 0x90, skip]) =
+            image.get(at..at + 16)
+        {
+            at += 16 + usize::from(skip);
+            continue;
+        }
         let code = image.get(at..at + 9)?;
         match code[..2] {
             [2, 0x48 | 0xB2] => at += 4,

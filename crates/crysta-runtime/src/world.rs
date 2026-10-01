@@ -33,6 +33,7 @@ mod contact;
 mod door;
 mod fade;
 mod hurt;
+mod magirock;
 mod pots;
 mod progress;
 mod transition;
@@ -97,6 +98,8 @@ pub struct World<'a> {
     opening: Option<door::Opening>,
     /// A chest the player is opening.
     chest: Option<chest::Opening>,
+    /// A Magirock the player is taking.
+    pickup: Option<magirock::Pickup>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -340,6 +343,7 @@ impl<'a> World<'a> {
             recoil: None,
             opening: None,
             chest: None,
+            pickup: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -1030,6 +1034,10 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        if let Some(step) = self.pickup_frame(presses)? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
         if let Some(step) = self.chest_frame(presses)? {
             self.apply_patches()?;
             return Ok((step, None));
@@ -1149,6 +1157,7 @@ impl<'a> World<'a> {
         if self.chest.take().is_some() {
             self.globals.presentation = None;
         }
+        self.pickup = None;
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
@@ -1400,6 +1409,9 @@ impl<'a> World<'a> {
 
     /// Runs the callback of resident `index`.
     fn talk_to(&mut self, index: usize) -> bool {
+        if self.pick_up(index) {
+            return true;
+        }
         let player = self.position();
         let occupied = occupied_by_others(&self.actors, &self.residents, index, player);
         let mut around = surroundings(
@@ -2206,6 +2218,7 @@ mod tests {
             recoil: None,
             opening: None,
             chest: None,
+            pickup: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
