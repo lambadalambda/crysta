@@ -20,6 +20,40 @@ pub struct Record {
     pub body: [i8; 4],
 }
 
+/// A box on the map: left, top, right, bottom (edges inclusive in hits).
+pub type Rect = (i32, i32, i32, i32);
+
+/// The record a list shows `age` frames in, the last held after its end.
+#[must_use]
+pub fn at_age(records: &[Record], age: u32) -> Option<&Record> {
+    let mut left = age;
+    records
+        .iter()
+        .find(|record| {
+            let length = u32::from(record.duration) + 1;
+            let inside = left < length;
+            left = left.saturating_sub(length);
+            inside
+        })
+        .or_else(|| records.last())
+}
+
+/// A box (dx, w, dy, h) of a body at `at`, mirrored about its x when
+/// `mirrored`: x1 = x - dx, x0 = x1 - w (`docs/combat.md`).
+#[must_use]
+pub fn place([dx, width, dy, height]: [i8; 4], at: (u16, u16), mirrored: bool) -> Rect {
+    let [dx, width, dy, height] = [dx, width, dy, height].map(i32::from);
+    let (x, y) = (i32::from(at.0), i32::from(at.1));
+    let left = if mirrored { x - dx - width } else { x + dx };
+    (left, y + dy, left + width, y + dy + height)
+}
+
+/// Whether two boxes touch, edges included (`$85:F835`).
+#[must_use]
+pub const fn overlap(a: Rect, b: Rect) -> bool {
+    a.0 <= b.2 && b.0 <= a.2 && a.1 <= b.3 && b.1 <= a.3
+}
+
 /// Ark's resource table (`$80:A24F`), six bytes per resource.
 const ARK_RESOURCES: usize = 0x00_A24F;
 /// Records one list may hold.

@@ -500,6 +500,55 @@ impl Mode4Art {
         })
     }
 
+    /// List `selector` of Ark's thrust (resource 4: `$00` Down, `$01` Up,
+    /// `$02` Right; `docs/combat-graphics.md`) with `weapon`'s colours: the
+    /// raw sheet the resource names, Ark's palette (`$B1:D831`) and palette
+    /// 1 (`$B1:D851`, colours 2-7 the weapon's from `$B1:D871`, 15 `$7BDE`).
+    ///
+    /// # Errors
+    /// Refuses a list outside the qualified shapes.
+    pub fn thrust(image: &[u8], weapon: u8, selector: u8) -> Result<Self, SpriteError> {
+        let mut loader = Loader::new(image);
+        let entry = loader.read(located(image, 0xa24f)? + 4 * 6, 6)?.to_vec();
+        let sheet = loader.read(pointer(&entry[3..])?, 0x4000)?;
+        let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(sheet)?.into();
+        let colours =
+            |japan: usize, europe: usize, count: usize| -> Result<Vec<Bgr555>, SpriteError> {
+                let at = crate::layout::per_revision(image, japan, europe);
+                let bytes = take(image, at, count * 2)?;
+                Ok((0..count)
+                    .map(|i| Bgr555::new(word(bytes, i * 2)))
+                    .collect())
+            };
+        // `$85:D25E`: the weapon's colour set, items from `$80`.
+        let map = crate::layout::per_revision(image, 0x05_D25E, 0x05_D2F6);
+        let set = usize::from(
+            *take(image, map + usize::from(weapon.wrapping_sub(0x80) & 31), 1)?
+                .first()
+                .unwrap_or(&0),
+        );
+        let mut palette = [Bgr555::new(0); 32];
+        palette[..16].copy_from_slice(&colours(0x31_D831, 0x33_DDB2, 16)?);
+        palette[16..24].copy_from_slice(&colours(0x31_D851, 0x33_DDD2, 8)?);
+        palette[18..24].copy_from_slice(&colours(0x31_D871 + set * 12, 0x33_DDF2 + set * 12, 6)?);
+        palette[31] = Bgr555::new(0x7BDE);
+        let base = cpu(&entry[..3]);
+        let at = pointer(&entry[..3])?;
+        let bytes = take(image, at, 0x1_0000 - (at & 0xFFFF))?;
+        let list = shifted_pose_list(
+            bytes,
+            (base, true, selector),
+            Palettes::Shift(0),
+            graphics.len(),
+        )?;
+        Ok(Self {
+            graphics,
+            palette_base: 128,
+            palette,
+            list,
+        })
+    }
+
     /// The decoded tiles, indexed as the frames' components name them.
     #[must_use]
     pub fn graphics(&self) -> &[Tile4bpp] {
