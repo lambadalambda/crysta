@@ -1,7 +1,7 @@
 //! Bounded per-map actor spawn lists, not an actor runtime.
 //!
-//! `$80:F3FD` reads `$0480` and indexes `$83:8000` by map ID times two to reach
-//! a list. The list is a stream: positioned spawn records interleaved with
+//! `$80:F3FD` reads `$0480` and indexes `$82:8000`, then `$83:8000`, by map ID
+//! times two to reach a list in that bank (the towers' are in `$82`). The list is a stream: positioned spawn records interleaved with
 //! control opcodes, ending at `$FF`. Every element length here is read from
 //! the interpreter at `$80:F4EA` and its handlers, never fitted by requiring a
 //! walk to land on a plausible record — a wrong length emits positions taken
@@ -14,9 +14,8 @@
 //! conditions; see `docs/house-scene.md`.
 use std::fmt;
 
-const TABLE: usize = 0x03_8000;
-const BANK: usize = 0x03_0000;
-const BANK_END: usize = 0x04_0000;
+/// The lists' pointer tables, by bank: `$82` is read first.
+const TABLES: [usize; 2] = [0x02_8000, 0x03_8000];
 /// Map IDs addressable in the table, matching the loading-script projection.
 pub const SUPPORTED_MAP_COUNT: u16 = super::scripts::MAP_COUNT;
 /// Hard decoding budget for one list.
@@ -141,6 +140,8 @@ impl SpawnRecord {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpawnList {
     map_id: u16,
+    /// The list's bank, as a normalized offset.
+    bank: usize,
     entry: u16,
     records: Vec<SpawnRecord>,
     world_layer: Option<WorldLayerRecord>,
@@ -168,15 +169,20 @@ impl SpawnList {
         if map_id >= SUPPORTED_MAP_COUNT {
             return Err(ActorError::MapIndex { index: map_id });
         }
-        let at = TABLE + usize::from(map_id) * 2;
-        let head = image
-            .get(at..at + 2)
-            .ok_or(ActorError::Truncated { offset: at })?;
-        let entry = u16::from_le_bytes([head[0], head[1]]);
-        if entry == 0 {
-            return Err(ActorError::Absent { index: map_id });
+        let mut found = None;
+        for table in TABLES {
+            let at = table + usize::from(map_id) * 2;
+            let head = image
+                .get(at..at + 2)
+                .ok_or(ActorError::Truncated { offset: at })?;
+            let entry = u16::from_le_bytes([head[0], head[1]]);
+            if entry != 0 {
+                found = Some((table & 0xFF_0000, entry));
+                break;
+            }
         }
-        let base = BANK | usize::from(entry);
+        let (bank, entry) = found.ok_or(ActorError::Absent { index: map_id })?;
+        let base = bank | usize::from(entry);
         // Two-byte list header, skipped by the loader's own INC A / INC A.
         let mut cursor = base + 2;
         let mut records = Vec::new();
@@ -185,7 +191,7 @@ impl SpawnList {
             if records.len() > MAX_RECORDS {
                 return Err(ActorError::Budget);
             }
-            if cursor + 2 > BANK_END {
+            if cursor + 2 > bank + 0x1_0000 {
                 return Err(ActorError::Truncated { offset: cursor });
             }
             let window = image
@@ -226,6 +232,7 @@ impl SpawnList {
             if opcode == 0xFF {
                 return Ok(Self {
                     map_id,
+                    bank,
                     entry,
                     records,
                     world_layer,
@@ -269,11 +276,11 @@ impl SpawnList {
         events: super::scripts::EventFlags<'_>,
     ) -> Result<(Vec<SpawnRecord>, usize), ResolveError> {
         let list = Self::from_rom(image, map_id).map_err(ResolveError::Decode)?;
-        let base = BANK | usize::from(list.entry);
+        let base = list.bank | usize::from(list.entry);
         let mut cursor = base + 2;
         let mut records = Vec::new();
         for _ in 0..MAX_RECORDS {
-            if cursor + 2 > BANK_END {
+            if cursor + 2 > list.bank + 0x1_0000 {
                 return Err(ResolveError::Runaway {
                     offset: cursor.saturating_sub(base),
                 });
@@ -348,7 +355,7 @@ impl SpawnList {
                     if condition_takes_branch(sense, parity) {
                         let target =
                             u16::from_le_bytes([bytes[bytes.len() - 2], bytes[bytes.len() - 1]]);
-                        cursor = BANK | usize::from(target);
+                        cursor = list.bank | usize::from(target);
                         continue;
                     }
                 }
