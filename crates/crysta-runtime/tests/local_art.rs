@@ -521,3 +521,22 @@ fn every_dash_and_brake_pose_rasterizes_with_pixels() {
         }
     }
 }
+
+#[test]
+fn every_stair_pose_rasterizes_with_pixels() {
+    // Ark resource 1 (`$80:A255`) lists `$13..$16` (`docs/ark-poses.md`):
+    // eight records of 8 frames each, none mirrored.
+    use crysta_runtime::art::CarryArt;
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let art = CarryArt::from_rom(cartridge.image()).unwrap();
+    for list in 0x13..=0x16 {
+        let animation = art
+            .animation(0x80_a255, list, false)
+            .unwrap_or_else(|error| panic!("{list:#x}: {error}"));
+        assert_eq!(animation.frames.len(), 8, "{list:#x}");
+        assert!(animation.durations.iter().all(|&duration| duration == 7));
+        assert!(animation.frames.iter().all(Raster::is_visible));
+    }
+}

@@ -144,7 +144,8 @@ fn pose_list(
             }
             return Ok(PandoraPoseList { selector, frames });
         }
-        if prefix[0] >= 128 || ![0, 1, 3].contains(&prefix[1]) {
+        // Facings 4..7 are the stairs' own (`docs/ark-poses.md`).
+        if prefix[0] >= 128 || prefix[1] > 7 {
             return Err(SpriteError::Invalid("unsupported Pandora list command"));
         }
         let anchor = usize::from(word(take(bytes, at + 2, 2)?, 0));
@@ -686,7 +687,8 @@ pub struct PandoraCarryPose {
 }
 impl PandoraSprites {
     /// Ark's run lists, apart from the Pandora art: the brake's (resource 0,
-    /// lists 9..11) and the dash's (resource 1, lists 23..25), keyed by the
+    /// lists 9..11) and the stairs' and dash's (resource 1, lists `$13..$16`
+    /// and 23..25), keyed by the
     /// same source ids as [`Self::run_pose`] names.
     ///
     /// # Errors
@@ -695,7 +697,7 @@ impl PandoraSprites {
         let mut loader = Loader::new(image);
         Ok([
             ark_art(&mut loader, 0, &[9, 10, 11])?,
-            ark_art(&mut loader, 1, &[23, 24, 25])?,
+            ark_art(&mut loader, 1, &[0x13, 0x14, 0x15, 0x16, 23, 24, 25])?,
         ])
     }
     /// Ark's art, list and mirror for a run motion and facing (0 Down, 1 Up,
