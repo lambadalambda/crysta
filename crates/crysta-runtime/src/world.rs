@@ -667,8 +667,8 @@ impl<'a> World<'a> {
         }
         // The light room asks for `$07` (`$90:8B0C`): the tower's end.
         if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
-            let before = self.globals.scratch.get(&crate::actors::PREVIOUS_MAP);
-            self.resurrection = before.copied().and_then(resurrection::Resurrection::after);
+            let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);
+            self.resurrection = Some(resurrection::Resurrection::of(tower));
         }
         let mut gone = Vec::new();
         for (index, (resident, actor)) in self.residents.iter_mut().zip(&self.actors).enumerate() {
@@ -1938,6 +1938,9 @@ impl<'a> World<'a> {
         Ok(entered)
     }
 }
+
+/// `$04CC`, the tower whose end the light room plays (`$90:8B31`).
+const TOWER_INDEX: u16 = 0x04CC;
 
 /// Frames an item stays held after its count runs out (`$84:BF21`).
 const PRESENTATION_TAIL: u16 = 3;

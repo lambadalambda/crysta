@@ -301,6 +301,8 @@ impl StaticBackground {
         };
         palette[..0x10].copy_from_slice(&words(&shared_colors)[..0x10]);
         palette[0x10..].copy_from_slice(&words(&colors));
+        // The backdrop shows black (the longplay); its source is not traced.
+        palette[0] = Bgr555::new(0);
         Self::from_parts(
             layer,
             vec![graphics, colors, definitions, attributes, shared_colors],

@@ -1,6 +1,6 @@
 //! A tower's end (`docs/light-room.md`): the light room's orb writes the
-//! pending map `$07` (`$90:8B0C`) and the tower's index `$04CC` from the map
-//! before (`$0482`). Natively `$07` plays the ocean, the Earth, the spiral
+//! pending map `$07` (`$90:8B0C`) and the tower's index `$04CC`, which it
+//! picks by the map before (`$0482`; any other map is tower 1's). Natively `$07` plays the ocean, the Earth, the spiral
 //! and the flyover, then the parchment map with "On this day, Eurasia was
 //! resurrected.", and the souls map `$3C` sets the tower's flag and leaves
 //! for the underworld (`$87:F7A4`).
@@ -35,15 +35,18 @@ pub(super) struct Resurrection {
     /// The tower's index, 0 to 4.
     tower: usize,
     frame: u16,
+    /// The transfer is queued: the screen stays dark until the load.
+    leaving: bool,
 }
 
 impl Resurrection {
-    /// The end of the tower whose top is `map`, if it is one (`$90:8B12`).
-    pub(super) fn after(map: u16) -> Option<Self> {
-        let tower = [0x105, 0x10C, 0x113, 0x11A, 0x123]
-            .iter()
-            .position(|&top| top == map)?;
-        Some(Self { tower, frame: 0 })
+    /// The end of tower `index` (`$04CC`).
+    pub(super) fn of(index: u16) -> Self {
+        Self {
+            tower: usize::from(index).min(TEXTS[0].len() - 1),
+            frame: 0,
+            leaving: false,
+        }
     }
 }
 
@@ -57,7 +60,7 @@ impl World<'_> {
     /// A frame of the tower's end: the text once the screen is black, then,
     /// once it is read, the flag and the transfer to the underworld.
     pub(super) fn resurrection_frame(&mut self, presses: Presses) -> Option<Step> {
-        let mut end = self.resurrection?;
+        let mut end = self.resurrection.filter(|end| !end.leaving)?;
         self.globals.dialogue.press(presses);
         end.frame = end.frame.saturating_add(1);
         if end.frame == BLACK {
@@ -77,7 +80,8 @@ impl World<'_> {
                 position: (x + 8, y + 16),
                 mode: MODE,
             });
-            self.resurrection = None;
+            end.leaving = true;
+            self.resurrection = Some(end);
             return Some(Step::Stayed);
         }
         self.resurrection = Some(end);
@@ -90,9 +94,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn each_tower_top_names_its_end() {
-        assert_eq!(Resurrection::after(0x105).map(|end| end.tower), Some(0));
-        assert_eq!(Resurrection::after(0x123).map(|end| end.tower), Some(4));
-        assert_eq!(Resurrection::after(0x104), None);
+    fn the_tower_index_picks_the_end() {
+        assert_eq!(Resurrection::of(0).tower, 0);
+        assert_eq!(Resurrection::of(4).tower, 4);
+        assert_eq!(Resurrection::of(9).tower, 4);
     }
 }

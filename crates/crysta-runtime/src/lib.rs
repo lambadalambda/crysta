@@ -41,9 +41,12 @@ pub const BOX_MAPS: std::ops::RangeInclusive<u16> = 0x0041..=0x0044;
 /// The world maps the slice reaches: the underworld, from the south gate.
 pub use assets::maps::visual::world::WORLD_MAPS;
 
+/// The light room every tower's top leads to (`docs/light-room.md`).
+pub const LIGHT_ROOM: u16 = 0x0106;
+
 /// The towers' maps and the underworld's last ones the runtime loads
-/// (`docs/underworld-inventory.md`): every floor of towers 1 to 5, the Hole
-/// `$127`, Mu `$12A` and Polynesia `$12B`. Not yet: the light room `$106`.
+/// (`docs/underworld-inventory.md`): every floor of towers 1 to 5, the
+/// light room `$106`, the Hole `$127`, Mu `$12A` and Polynesia `$12B`.
 pub const TOWER_MAPS: [u16; 38] = [
     0x100, 0x101, 0x102, 0x103, 0x104, 0x105, 0x106, 0x107, 0x108, 0x109, 0x10A, 0x10B, 0x10C,
     0x10E, 0x10F, 0x110, 0x111, 0x112, 0x113, 0x114, 0x115, 0x116, 0x117, 0x118, 0x119, 0x11A,
