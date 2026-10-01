@@ -45,3 +45,39 @@ fn yomi_draws_over_the_bookcases_and_the_weapon_sparkles_on_its_pedestal() {
         assert_eq!(ages.iter().max(), Some(&23), "{name}");
     }
 }
+
+#[test]
+fn walking_up_into_a_door_raises_the_mask_over_ark() {
+    // The door-walk helper's priority-1 mask (`docs/depth-order.md`): from
+    // 17 pixels into the walk, anchored 16 pixels above where it began.
+    let up = Some(room_core::Direction::Up);
+    let a = Presses {
+        confirm: true,
+        ..Presses::NONE
+    };
+    // The native recipe (`local/depth/README.txt`): Up, open the door with
+    // A, wait, then hold Up through it.
+    let steps = [
+        (8, up, Presses::NONE),
+        (20, None, Presses::NONE),
+        (1, up, a),
+        (100, None, Presses::NONE),
+        (120, up, Presses::NONE),
+    ];
+    for name in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Some(rom) = load(name) else {
+            continue;
+        };
+        let mut world = World::enter(rom.image(), 0x0C, 136, 352).unwrap();
+        let mut seen = None;
+        for (frames, direction, presses) in steps {
+            for _ in 0..frames {
+                world.update(direction, presses).unwrap();
+                if let Some(anchor) = world.door_mask() {
+                    seen.get_or_insert((world.position(), anchor));
+                }
+            }
+        }
+        assert_eq!(seen, Some(((136, 335), (136, 336))), "{name}");
+    }
+}

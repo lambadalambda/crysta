@@ -309,6 +309,8 @@ fn moved((x, y): (u16, u16), (dx, dy): (i16, i16)) -> (u16, u16) {
 pub(super) struct Leaving {
     record: ExitRecord,
     walk: Walk,
+    /// An upward door walk's threshold: the top of the cell it began in.
+    door_up: Option<(u16, u16)>,
 }
 
 /// Arriving after one.
@@ -320,7 +322,11 @@ pub(super) struct Arriving {
 impl Leaving {
     /// Leaving through `record`, facing `facing`; `plain` for a world map's
     /// side, which has no walk.
-    pub(super) fn new(record: &ExitRecord, facing: Direction, plain: bool) -> Self {
+    pub(super) fn new(
+        record: &ExitRecord,
+        (facing, start): (Direction, (u16, u16)),
+        plain: bool,
+    ) -> Self {
         let motion = match record.selector() {
             _ if plain => STILL,
             STAIRS => STAIRS_DOWN_LEAVING,
@@ -336,6 +342,8 @@ impl Leaving {
         Self {
             record: record.clone(),
             walk: Walk::new(motion, toward),
+            door_up: (motion == DOOR_LEAVING && toward == Direction::Up)
+                .then_some((start.0, start.1 & !15)),
         }
     }
 }
@@ -378,9 +386,19 @@ impl World<'_> {
             return false;
         };
         let plain = self.plane.is_some() || WORLD_MAPS.contains(&destination);
-        self.leaving = Some(Leaving::new(record, self.facing, plain));
+        self.leaving = Some(Leaving::new(record, (self.facing, self.position()), plain));
         self.globals.audio.sound_port3(EXIT_SOUND);
         true
+    }
+
+    /// While Ark walks up into a door, the helper's mask that hides him
+    /// behind the wall above it (`$84:B988`, pose `$37`,
+    /// `docs/depth-order.md`): anchored at the doorway's threshold, from the
+    /// first pixel past it.
+    #[must_use]
+    pub fn door_mask(&self) -> Option<(u16, u16)> {
+        let (x, threshold) = self.leaving.as_ref()?.door_up?;
+        (self.position().1 < threshold).then_some((x, threshold))
     }
 
     /// The brightness of an exit's fades, 0 dark to 15 full.
