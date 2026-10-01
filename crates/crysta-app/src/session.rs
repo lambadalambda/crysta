@@ -511,7 +511,7 @@ impl Session {
         let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
-        let camera = background.camera(position, frame.width);
+        let camera = background.camera(world.camera_focus(), frame.width);
         background.draw(frame, camera, position);
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
