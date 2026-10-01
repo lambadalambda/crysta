@@ -18,3 +18,7 @@ on 2026-10-01.
 ## Acceptance Criteria
 
 - Stair walks in both directions match native frames on both ROMs.
+
+## Notes
+
+- The player-helper's mask poses `$39`/`$3A`/`$3B` are placed at the native anchors for each stair motion (`crysta-runtime/tests/local_depth.rs`, both ROMs); the app shows the background inside them. Checked by eye in the app; when the helper hides at an arrival's end is measured, not decoded.
