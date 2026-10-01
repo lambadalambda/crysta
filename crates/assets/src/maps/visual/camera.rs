@@ -19,8 +19,7 @@ pub struct CameraRegion {
 impl CameraRegion {
     /// Reads the camera record and the scene's display profile.
     /// # Errors
-    /// Refuses truncated input, a scene outside bank `$83`, a display profile
-    /// whose clamp height is not the audited 256, and a region too small to clamp in.
+    /// Refuses truncated input, and a region too small to clamp in.
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
         let unsupported = VisualMapError::Unsupported;
         let map = usize::from(map_id) * 2;
@@ -31,11 +30,14 @@ impl CameraRegion {
         };
         let word = |at: usize| bytes(at, 2).map(|b| usize::from(u16::from_le_bytes([b[0], b[1]])));
         let located = |japan: usize| relocated(image, japan, "unrecorded camera source");
-        // `$86955C..959B` takes bank `$83` only after a zero bank-`$82` entry.
-        if word(located(0x28000)? + map)? != 0 {
-            return Err(unsupported("scene outside bank $83"));
-        }
-        let scenes = located(0x38000)?;
+        // `$86955C..959B` reads bank `$82`'s entry first (the towers'), then
+        // bank `$83`'s.
+        let first = located(0x28000)?;
+        let scenes = if word(first + map)? != 0 {
+            first
+        } else {
+            located(0x38000)?
+        };
         let prefix = bytes((scenes & 0x3f_0000) + word(scenes + map)?, 2)?;
         // `$868C77..8C86` indexes `$96BB64 + 2*(selector & $3F)`.
         if prefix[0] != 0 || prefix[1] & 0xc0 != 0 {
@@ -44,11 +46,13 @@ impl CameraRegion {
         // The European table is `$99:C2AE` (the operand at `$86:8C85`).
         let table = located(0x16_bb64)?;
         let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1]) * 2)?;
-        // Profile byte +4 bit 6 selects `$0866 = 256` at `$868CDE..8CE6`.
-        if bytes(display + 4, 1)?[0] & 0x40 == 0 {
-            return Err(unsupported("unaudited camera clamp height"));
-        }
-        let vertical_extent = 256;
+        // Profile byte +4 bit 6 selects `$0866 = 256`, else 224
+        // (`$868CDE..8CE6`; the towers).
+        let vertical_extent = if bytes(display + 4, 1)?[0] & 0x40 == 0 {
+            224
+        } else {
+            256
+        };
         // European `$99:C57A`, the operand at `$86:9375`.
         let record_offset = located(0x16_be30)? + map;
         let record = bytes(record_offset, 2)?;
@@ -124,10 +128,12 @@ mod tests {
         let good = fixture(0x11, 6, 0x64, [0x11, 0x12]);
         let refuse = |image: &[u8]| CameraRegion::from_rom(image, 0x11).is_err();
         assert!(!refuse(&good));
-        // A bank-$82 scene entry takes a path not audited here.
+        // A bank-$82 scene entry is read first, from that bank.
         let mut image = good.clone();
         image[0x28000 + 0x22] = 1;
-        assert!(refuse(&image));
+        image[0x20002] = 6;
+        let tower = CameraRegion::from_rom(&image, 0x11).unwrap();
+        assert_eq!(tower.vertical_extent, 256);
         // So do a nonzero first prefix byte and selector bits above `& $3F`.
         let mut image = good.clone();
         image[0x39000] = 1;
@@ -135,8 +141,9 @@ mod tests {
         let mut image = good.clone();
         image[0x39001] |= 0x40;
         assert!(refuse(&image));
-        // Clamp height other than the audited bit-6 256.
-        assert!(refuse(&fixture(0x11, 6, 0x24, [0x11, 0x12])));
+        // Without bit 6 the clamp height is 224.
+        let short = CameraRegion::from_rom(&fixture(0x11, 6, 0x24, [0x11, 0x12]), 0x11).unwrap();
+        assert_eq!(short.vertical_extent, 224);
         // A region with no page, or shorter than its clamp height.
         assert!(refuse(&fixture(0x11, 6, 0x64, [0x01, 0x12])));
         assert!(refuse(&fixture(0x11, 6, 0x64, [0x11, 0x02])));
