@@ -113,6 +113,16 @@ impl PandoraArt {
     }
 }
 
+/// How a list's components take their OBJ palettes.
+#[derive(Clone, Copy)]
+enum Palettes {
+    /// One palette for every component of a frame, moved to this base.
+    One(u8),
+    /// Each component's palette moved by this many slots, modulo 8, as the
+    /// mode-`$0004` relocation does (`$80:FE8F`).
+    Shift(u8),
+}
+
 fn pose_list(
     bytes: &[u8],
     base: u32,
@@ -124,6 +134,20 @@ fn pose_list(
     if palette_base < 128 || !palette_base.is_multiple_of(16) {
         return Err(SpriteError::Invalid("Pandora palette base"));
     }
+    shifted_pose_list(
+        bytes,
+        (base, direct, selector),
+        Palettes::One(palette_base),
+        tile_count,
+    )
+}
+
+fn shifted_pose_list(
+    bytes: &[u8],
+    (base, direct, selector): (u32, bool, u8),
+    palettes: Palettes,
+    tile_count: usize,
+) -> Result<PandoraPoseList, SpriteError> {
     let table = usize::from(selector) * 2;
     if !direct && table + 2 > frame_table_end(bytes)? - 2 {
         return Err(SpriteError::Invalid(
@@ -157,7 +181,8 @@ fn pose_list(
         for (j, c) in source.components().iter().enumerate() {
             let word = c.word();
             let tile = usize::from(word & 511);
-            if (word >> 9) & 7 != source_palette
+            let palette = (word >> 9) & 7;
+            if matches!(palettes, Palettes::One(_)) && palette != source_palette
                 || tile + if c.size() == 16 { 17 } else { 0 } >= tile_count
                 || (c.size() == 16 && tile & 15 == 15)
             {
@@ -165,7 +190,11 @@ fn pose_list(
                     "Pandora component palette/tile boundary",
                 ));
             }
-            let adjusted = (word & !0x0e00) | (u16::from((palette_base - 128) / 16) << 9);
+            let slot = match palettes {
+                Palettes::One(palette_base) => u16::from((palette_base - 128) / 16),
+                Palettes::Shift(by) => (palette + u16::from(by)) & 7,
+            };
+            let adjusted = (word & !0x0e00) | (slot << 9);
             relocated[22 + j * 7..24 + j * 7].copy_from_slice(&adjusted.to_le_bytes());
         }
         let offset =
@@ -418,6 +447,83 @@ fn ark_art(
 #[cfg(test)]
 #[path = "pandora_tests.rs"]
 mod tests;
+
+/// One list of a mode-`$0004` descriptor's art (`docs/mode4-descriptors.md`),
+/// as tower 1's statues and plaque use: graphics uploaded 1:1 to the second
+/// OBJ name table and a palette of two OBJ slots.
+#[derive(Debug)]
+pub struct Mode4Art {
+    graphics: Arc<[Tile4bpp]>,
+    palette_base: u8,
+    palette: [Bgr555; 32],
+    list: PandoraPoseList,
+}
+
+impl Mode4Art {
+    /// List `selector` of the descriptor at normalized offset `descriptor`.
+    ///
+    /// # Errors
+    /// Refuses another mode, palette or graphics form than the qualified
+    /// one (palette flags `$40`, two slots, graphics at offset 0 and slot 0,
+    /// a packet pointer), and a list outside the qualified shapes.
+    pub fn from_rom(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, SpriteError> {
+        let mut loader = Loader::new(image);
+        let d = loader.read(descriptor, 21)?.to_vec();
+        if d[3..5] != [4, 0]
+            || d[8] != 0x40
+            || d[13] != 4
+            || d[14] & 1 != 0
+            || d[15..17] != [0, 0]
+            || d[17] & 0x80 != 0
+        {
+            return Err(SpriteError::Invalid("unqualified mode-4 descriptor"));
+        }
+        // Source slot `d[12] & $0E` in 16-byte units; destination `d[14]`.
+        let colours = loader.read(pointer(&d[9..12])? + usize::from(d[12] & 0x0e) * 16, 64)?;
+        let palette = std::array::from_fn(|i| Bgr555::new(word(colours, i * 2)));
+        let palette_base = 128 + 8 * d[14];
+        let graphics_packet = loader.packet(cpu(&d[18..21]))?;
+        let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(&graphics_packet.bytes)?.into();
+        let packet = loader.packet(cpu(&d[..3]))?;
+        let shift = (d[14] / 2).wrapping_sub(d[12] / 2) & 7;
+        let list = shifted_pose_list(
+            &packet.bytes,
+            (packet.cpu, false, selector),
+            Palettes::Shift(shift),
+            graphics.len(),
+        )?;
+        Ok(Self {
+            graphics,
+            palette_base,
+            palette,
+            list,
+        })
+    }
+
+    /// The decoded tiles, indexed as the frames' components name them.
+    #[must_use]
+    pub fn graphics(&self) -> &[Tile4bpp] {
+        &self.graphics
+    }
+
+    /// The first OBJ colour the palette fills.
+    #[must_use]
+    pub const fn palette_base(&self) -> u8 {
+        self.palette_base
+    }
+
+    /// Two OBJ palettes' colours.
+    #[must_use]
+    pub const fn palette(&self) -> &[Bgr555; 32] {
+        &self.palette
+    }
+
+    /// The list.
+    #[must_use]
+    pub const fn list(&self) -> &PandoraPoseList {
+        &self.list
+    }
+}
 
 /// Pandora's Box's descriptor, its art's identity.
 const BOX: u32 = 0x83_f984;
