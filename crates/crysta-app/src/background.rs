@@ -1,5 +1,5 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
-use crate::frame::rgb;
+use crate::frame::{rgb, Canvas};
 use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
@@ -34,8 +34,8 @@ impl VisitClock {
     }
 }
 
-/// A world map's flat Mode 7 plane, its whole extent as the region. The
-/// native view is in perspective and wraps; neither is drawn.
+/// A world map's flat Mode 7 plane, its whole extent as the region, and
+/// the perspective view the hosts draw of it ([`crate::mode7`]).
 fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String> {
     let world = assets::maps::visual::world::WorldMap::from_rom(cartridge.image(), map)
         .map_err(|error| error.to_string())?;
@@ -61,6 +61,10 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
         second: None,
         patches: Patches::default(),
         world: true,
+        mode7: assets::maps::visual::mode7::Mode7View::from_rom(cartridge.image())
+            .inspect_err(|error| eprintln!("world map drawn flat: {error}"))
+            .ok()
+            .map(|view| Box::new(crate::mode7::Mode7 { map: world, view })),
     })
 }
 
@@ -110,6 +114,7 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         second,
         patches: Patches::default(),
         world: false,
+        mode7: None,
     })
 }
 
@@ -173,9 +178,29 @@ pub struct CachedBackground {
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
+    /// A world map's Mode 7 view, drawn in place of the flat plane.
+    pub mode7: Option<Box<crate::mode7::Mode7>>,
 }
 
 impl CachedBackground {
+    /// Draws the first layer seen from `camera`: a world map in Mode 7
+    /// about the player, any other map flat.
+    pub fn draw(&self, frame: &mut Canvas, camera: (i32, i32), player: (u16, u16)) {
+        match &self.mode7 {
+            Some(mode7) => crate::mode7::draw(frame, mode7, player),
+            None => crate::frame::draw_background(frame, &self.frame, camera),
+        }
+    }
+
+    /// Extends the region's edges into a wide view
+    /// ([`crate::frame::extend_edges`]); the Mode 7 view wraps and fills the
+    /// screen itself.
+    pub fn extend_edges(&self, frame: &mut Canvas, camera: (i32, i32)) {
+        if self.mode7.is_none() {
+            crate::frame::extend_edges(frame, camera, self.region.bounds);
+        }
+    }
+
     /// Adds the second layer onto the view: a subscreen layer the scene
     /// adds to the main screen in full, over the sprites too, as in the game
     /// -- the town's crystal clouds (`CGADSUB $33`, `docs/house-exterior.md`)

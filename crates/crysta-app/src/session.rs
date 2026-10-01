@@ -502,9 +502,8 @@ impl Session {
         let Some(background) = backgrounds.get(&world.map()) else {
             return (0, 0);
         };
-        let region = background.region;
         let camera = background.camera(position, frame.width);
-        frame::draw_background(frame, &background.frame, camera);
+        background.draw(frame, camera, position);
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
         let clouds = background;
@@ -567,7 +566,7 @@ impl Session {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
         clouds.add_second_layer(frame, camera, self.background_clock.tick());
-        frame::extend_edges(frame, camera, region.bounds);
+        clouds.extend_edges(frame, camera);
         self.draw_labels(frame, camera);
         let world = &self.world;
         frame::tint(frame, screen.tint);

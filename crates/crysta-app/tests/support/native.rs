@@ -1,10 +1,11 @@
 //! Comparing composed frames with native captures: 256×240 RGB frames
 //! from the reference emulator, up to its colour curve.
 #![allow(
+    dead_code,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_sign_loss,
-    reason = "frame coordinates fit every width"
+    reason = "frame coordinates fit every width; each pixel test uses part"
 )]
 use crysta_app::frame::{Canvas, CLASSIC_WIDTH, VIEW_HEIGHT};
 use std::path::Path;
@@ -22,12 +23,25 @@ pub fn local(name: &str) -> Option<Vec<u8>> {
 /// emulator's colour curve: every native colour must stand for one of ours
 /// and each of ours for one native colour, and each channel must go
 /// through one curve; a pixel off the most common pairing counts.
-pub fn unlike(canvas: &Canvas, native: &[u8], (dx, dy): (i32, i32)) -> usize {
+pub fn unlike(canvas: &Canvas, native: &[u8], offset: (i32, i32)) -> usize {
+    unlike_where(canvas, native, offset, |_, _| true)
+}
+
+/// As [`unlike`], over the canvas pixels `keep` selects.
+pub fn unlike_where(
+    canvas: &Canvas,
+    native: &[u8],
+    (dx, dy): (i32, i32),
+    keep: impl Fn(usize, usize) -> bool,
+) -> usize {
     use std::collections::HashMap;
     let mut pairs: HashMap<(u32, u32), usize> = HashMap::new();
     // Line 0 is never shown natively: the capture has it black.
     for y in 1..VIEW_HEIGHT {
         for x in 0..CLASSIC_WIDTH {
+            if !keep(x, y) {
+                continue;
+            }
             let (nx, ny) = (x as i32 + dx, y as i32 + dy);
             if !(0..256).contains(&nx) || !(0..240).contains(&ny) {
                 continue;
