@@ -131,3 +131,44 @@ fn walking_down_out_of_tower_one_returns_to_the_underworld() {
     }
 }
 
+#[test]
+fn the_first_visit_pans_down_to_ark_then_he_speaks() {
+    // `$90:8F28`: `COP DD` puts the camera 768 above Ark, `COP DE` brings it
+    // back at 2 a frame (384 frames), two pages of text, then `COP 29`
+    // unlocks the pad (`docs/tower-entry.md`).
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0100, 256, 1007, fresh_game_flags()).unwrap();
+        let mut offsets = Vec::new();
+        let mut pages = 0;
+        for _ in 0..1000 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            pages += u32::from(reading);
+            let a = Presses {
+                confirm: reading,
+                ..Presses::default()
+            };
+            world.update(None, a).unwrap();
+            offsets.push(world.camera_offset());
+            if !world.pad_locked() {
+                break;
+            }
+        }
+        assert!(!world.pad_locked(), "{:?}", rom.revision());
+        assert_eq!(offsets[0], (0, -768), "{:?}", rom.revision());
+        let panning = offsets
+            .iter()
+            .take_while(|&&offset| offset != (0, 0))
+            .count();
+        assert!(
+            (383..=387).contains(&panning),
+            "{:?}: {panning}",
+            rom.revision()
+        );
+        assert!(offsets
+            .windows(2)
+            .take(panning - 1)
+            .all(|pair| pair[1].1 - pair[0].1 == 2));
+        assert_eq!(pages, 2, "{:?}", rom.revision());
+    }
+}

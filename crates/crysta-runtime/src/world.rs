@@ -1454,6 +1454,9 @@ impl<'a> World<'a> {
     fn tick_clocks(&mut self) {
         self.globals.slot.tick_clock();
         self.globals.display.tick();
+        if let Some(pan) = &mut self.globals.pan {
+            pan.tick();
+        }
         self.hold_for_presentation();
     }
 
@@ -1481,6 +1484,21 @@ impl<'a> World<'a> {
             _ => -42,
         };
         Some((presentation.item, (-8, dy)))
+    }
+
+    /// The camera's offset from where it follows the player, while a
+    /// script moves it (`COP DD`).
+    #[must_use]
+    pub fn camera_offset(&self) -> (i16, i16) {
+        self.globals.pan.map_or((0, 0), |pan| pan.offset)
+    }
+
+    /// What the camera follows: the player, shifted by a script's camera
+    /// move.
+    #[must_use]
+    pub fn camera_focus(&self) -> (u16, u16) {
+        let ((x, y), (dx, dy)) = (self.position(), self.camera_offset());
+        (x.saturating_add_signed(dx), y.saturating_add_signed(dy))
     }
 
     /// The colour math scripts set ([`crate::display`]).
@@ -1742,7 +1760,7 @@ impl<'a> World<'a> {
             // Stairs settle at the raw anchor plus (8,16): the adjustment
             // (`$8D:8985`, down (-14,-23), up (8,-6)) and the stair walk
             // back by the same; [`transition`] plays the walk.
-            (None, None) if matches!(record.selector(), STAIRS | STAIRS_UP) => {
+            (None, None) if matches!(transition::kind(record.selector()), STAIRS | STAIRS_UP) => {
                 let (x, y) = record.destination_position();
                 (x + 8, y + 16)
             }
@@ -1761,7 +1779,7 @@ impl<'a> World<'a> {
             audio.sound_port3(EXIT_SOUND);
             audio.flush();
         }
-        if matches!(record.selector(), STAIRS | STAIRS_UP) {
+        if matches!(transition::kind(record.selector()), STAIRS | STAIRS_UP) {
             audio.sound_port3(STAIR_SOUND);
         }
         let mut entered = self.enter_destination(destination, x, y, audio)?;

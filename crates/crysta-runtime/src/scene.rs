@@ -93,6 +93,8 @@ pub struct Globals {
     pub audio: crate::audio::Audio,
     /// The colour math scripts set ([`crate::display`]).
     pub display: crate::display::Display,
+    /// A script's camera move, while it lasts.
+    pub pan: Option<Pan>,
 }
 
 /// An item granted and held up (`COP 60` → `$84:BEA2`).
@@ -104,6 +106,44 @@ pub struct Presentation {
     pub frames: u16,
     /// Frames since the grant.
     pub age: u16,
+}
+
+/// A camera move a script set (`COP DD`, `$80:B735`): the view's offset
+/// from where it follows the player, moving to its target once `COP DE`
+/// (`$80:B7D6`) starts it. It lasts until it arrives or the map changes,
+/// even if its script stops first.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Pan {
+    /// The offset now, in pixels.
+    pub offset: (i16, i16),
+    /// Where it ends.
+    pub target: (i16, i16),
+    /// Whether `COP DE` started it.
+    pub moving: bool,
+}
+
+/// Pixels a frame of the towers' speed index `$80` (measured; no other
+/// index is).
+const PAN_SPEED: i16 = 2;
+
+impl Pan {
+    /// A frame: a step toward the target on each axis.
+    pub fn tick(&mut self) {
+        if !self.moving {
+            return;
+        }
+        let step = |from: i16, to: i16| from + (to - from).clamp(-PAN_SPEED, PAN_SPEED);
+        self.offset = (
+            step(self.offset.0, self.target.0),
+            step(self.offset.1, self.target.1),
+        );
+    }
+
+    /// Whether it has reached its target.
+    #[must_use]
+    pub fn arrived(&self) -> bool {
+        self.offset == self.target
+    }
 }
 
 impl Default for Globals {
@@ -137,6 +177,7 @@ impl Globals {
             spawns: Vec::new(),
             audio: crate::audio::Audio::default(),
             display: crate::display::Display::default(),
+            pan: None,
         }
     }
 

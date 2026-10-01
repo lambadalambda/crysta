@@ -263,8 +263,9 @@ const ADJUSTMENTS: [(i16, i16); 15] = [
 ];
 
 /// A selector's kind (`$8D:88DF`): its high nibble when set, as the
-/// world map's and the towers' `$55`/`$66` have, else its low nibble.
-const fn kind(selector: u8) -> u8 {
+/// world map's and the towers' `$55`/`$66` have, else its low nibble. The
+/// game stores it back to `$0490`, so leaving and arriving both use it.
+pub(super) const fn kind(selector: u8) -> u8 {
     if selector & 0xF0 == 0 {
         selector & 0x0F
     } else {
@@ -353,7 +354,7 @@ impl Leaving {
         (facing, start): (Direction, (u16, u16)),
         plain: bool,
     ) -> Self {
-        let motion = match record.selector() {
+        let motion = match kind(record.selector()) {
             _ if plain => STILL,
             STAIRS => STAIRS_DOWN_LEAVING,
             STAIRS_UP => STAIRS_UP_LEAVING,

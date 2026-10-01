@@ -154,6 +154,13 @@ const SPAWN: u8 = 0xA2;
 /// than after its parent, and without a parent link; `$80:A4B6`. Spawns all
 /// run from the next frame here.
 const SPAWN_LINKED: u8 = 0x99;
+/// Sets up a camera move (`$80:B735`): a new camera, offsets from the
+/// player, start and target in 16-pixel units, a speed index.
+const PAN: u8 = 0xDD;
+/// Starts the move and holds the script until it ends (`$80:B7D6`).
+const PAN_WAIT: u8 = 0xDE;
+/// The speed index the towers use, 2 pixels a frame (measured).
+const PAN_SPEED: u8 = 0x80;
 /// Starts an orbit about the actor's spawn point (`$80:B136`).
 const ORBIT: u8 = 0xD0;
 /// Steps the orbit a frame, and goes on once it ends (`$80:B1D1`).
@@ -1227,22 +1234,7 @@ impl Actor {
             POSE_MOVING | REPEAT_MOVING => return self.moving_pose(service, operands, image),
             PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
             | SOUND_WORD => return self.audio_service(service, operands, around),
-            CALL => {
-                let Some(target) = image.get(operands..operands + 3).and_then(long) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                if target == RECORDS {
-                    for flag in RECORDS_CLEARS {
-                        around.globals.write_flag(flag);
-                    }
-                    self.pc = operands + 3;
-                    self.state = State::Blocked(Wait::Records);
-                    return false;
-                }
-                self.call = Some(operands + 3);
-                self.pc = target;
-            }
+            CALL => return self.call_service(operands, around),
             RETURN => self.pc = self.call.take().unwrap_or(operands),
             GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, bank, around),
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
@@ -1284,6 +1276,7 @@ impl Actor {
             }
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
             _ if BODY.contains(&service) => return self.body(service, operands, image),
+            PAN | PAN_WAIT => return self.pan(service, operands, around),
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
@@ -1808,6 +1801,67 @@ impl Actor {
         self.orbit = (!done).then_some(orbit);
         self.pc = if done { operands } else { operands - 2 };
         done
+    }
+
+    /// `COP 00`: a long call, keeping one return; the desk's save screen
+    /// blocks for the world instead. Returns whether execution continues.
+    fn call_service(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        let Some(target) = around.image.get(operands..operands + 3).and_then(long) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        if target == RECORDS {
+            for flag in RECORDS_CLEARS {
+                around.globals.write_flag(flag);
+            }
+            self.pc = operands + 3;
+            self.state = State::Blocked(Wait::Records);
+            return false;
+        }
+        self.call = Some(operands + 3);
+        self.pc = target;
+        true
+    }
+
+    /// `COP DD new relative sx sy tx ty speed` (a new camera, offsets from
+    /// the player, at the towers' speed only) and `COP DE speed`, which
+    /// starts the move and ends the frame until it arrives; its speed
+    /// operand is not read. Returns whether execution continues.
+    fn pan(&mut self, service: u8, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        let pan = &mut around.globals.pan;
+        let units = |byte: u8| i16::from(i8::from_ne_bytes([byte])) * 16;
+        match (service, around.image.get(operands..operands + 7), *pan) {
+            (PAN, Some(&[0, 0, sx, sy, tx, ty, PAN_SPEED]), _) => {
+                *pan = Some(crate::scene::Pan {
+                    offset: (units(sx), units(sy)),
+                    target: (units(tx), units(ty)),
+                    moving: false,
+                });
+                self.pc = operands + 7;
+                true
+            }
+            (PAN_WAIT, _, Some(started)) if started.arrived() && started.moving => {
+                *pan = None;
+                self.pc = operands + 1;
+                true
+            }
+            (PAN_WAIT, _, Some(mut started)) => {
+                started.moving = true;
+                *pan = Some(started);
+                self.pc = operands - 2;
+                false
+            }
+            // Other moves are stepped over, as before they were modelled.
+            (PAN, ..) | (PAN_WAIT, _, None) => {
+                self.cadence = None;
+                self.pc = operands + if service == PAN { 7 } else { 1 };
+                true
+            }
+            _ => {
+                self.state = State::Frozen;
+                false
+            }
+        }
     }
 
     /// `COP A2` and `COP 99` (a script and a flags word, at the actor) and
