@@ -5,6 +5,7 @@
 
 use assets::graphics::Bgr555;
 use assets::maps::visual::camera::CameraRegion;
+use crysta_runtime::display::Darkening;
 use crysta_runtime::world::Tint;
 
 /// Classic view width in pixels.
@@ -150,6 +151,30 @@ pub fn dim(canvas: &mut Canvas, brightness: u8) {
     for pixel in &mut canvas.pixels {
         let channel = |shift: u32| (((*pixel >> shift) & 0xFF) * scale / 16) << shift;
         *pixel = channel(16) | channel(8) | channel(0);
+    }
+}
+
+/// Colour math on the background (`docs/scene-effects.md`): the fixed
+/// colour subtracted per 5-bit channel, but not inside the spared square.
+/// `camera` places the canvas on the map.
+pub fn darken(canvas: &mut Canvas, camera: (i32, i32), darkening: Darkening) {
+    let width = canvas.width;
+    let spared = darkening.spared.map(|spin| spin.window());
+    for (at, pixel) in canvas.pixels.iter_mut().enumerate() {
+        let offset = |n: usize| f64::from(u32::try_from(n).unwrap_or(u32::MAX));
+        let map = (
+            f64::from(camera.0) + offset(at % width),
+            f64::from(camera.1) + offset(at / width),
+        );
+        if spared.as_ref().is_some_and(|inside| inside(map)) {
+            continue;
+        }
+        let channel = |shift: u32, fixed: u8| {
+            let wide = ((*pixel >> shift & 0xFF) >> 3).saturating_sub(u32::from(fixed));
+            (wide << 3 | wide >> 2) << shift
+        };
+        let [red, green, blue] = darkening.fixed;
+        *pixel = channel(16, red) | channel(8, green) | channel(0, blue);
     }
 }
 
@@ -344,6 +369,22 @@ pub fn present(canvas: &Canvas, target: &mut [u32], size: (usize, usize)) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn darkening_subtracts_outside_the_square_only() {
+        use crysta_runtime::display::Display;
+        let mut display = Display::default();
+        for (register, value) in [(0x2132, 0xE7), (0x2130, 0x20), (0x2125, 0x21)] {
+            display.write(register, value);
+        }
+        display.spin((100, 120), 3);
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
+        canvas.pixels.fill(0x00FF_FFFF);
+        darken(&mut canvas, (20, 40), display.darkening().unwrap());
+        let at = |x: usize, y: usize| canvas.pixels[y * CLASSIC_WIDTH + x];
+        assert_eq!(at(80, 80), 0x00FF_FFFF, "the square's centre");
+        assert_eq!(at(0, 0), 0x00C6_C6C6, "31 - 7 = 24 a channel");
+    }
 
     fn region(bounds: [u16; 4]) -> CameraRegion {
         CameraRegion {

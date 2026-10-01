@@ -515,6 +515,9 @@ impl Session {
         background.draw(frame, camera, position);
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
+        if let Some(darkening) = world.display().darkening() {
+            frame::darken(frame, camera, darkening);
+        }
         let clouds = background;
         let background = &background.frame;
         let count = residents.len();
@@ -564,7 +567,10 @@ impl Session {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
         clouds.cover_door(frame, camera, self.world.door_mask());
-        clouds.add_second_layer(frame, camera, self.background_clock.tick());
+        // `TM` may take BG1, the light rays, off (`$88:9CD8`).
+        if self.world.display().shows_bg1() {
+            clouds.add_second_layer(frame, camera, self.background_clock.tick());
+        }
         clouds.extend_edges(frame, camera);
         self.draw_labels(frame, camera);
         let world = &self.world;
