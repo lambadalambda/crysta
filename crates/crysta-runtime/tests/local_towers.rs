@@ -476,3 +476,28 @@ fn the_top_floors_door_and_the_light_rooms_orb_draw() {
         }
     }
 }
+
+#[test]
+fn tower_twos_gate_opens_once_tower_one_is_done() {
+    // `$90:8F83`: unless flag `$100 + 1` is set, `COP 3F` seals the door
+    // cells (16,56), (17,56); Ark's position (`$0954`) gates the rest.
+    for rom in roms() {
+        for done in [false, true] {
+            let mut events = after_the_intro();
+            if done {
+                events[0x101 / 8] |= 1 << (0x101 % 8);
+            }
+            let mut world =
+                World::enter_with_events(rom.image(), 0x0107, 256, 1007, events).unwrap();
+            for _ in 0..600 {
+                let up = (!world.in_transition() && !world.pad_locked()).then_some(Direction::Up);
+                world.update(up, Presses::default()).unwrap();
+                if world.map() != 0x0107 {
+                    break;
+                }
+            }
+            let entered = world.map() == 0x0108;
+            assert_eq!(entered, done, "{:?}", rom.revision());
+        }
+    }
+}

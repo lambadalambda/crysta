@@ -99,11 +99,23 @@ pub const FRAMES: u16 = 0x0042;
 /// `$097C`, the player's action word: runs may read it, as a watcher in
 /// `$11` does (`$88:A9EF`); the world keeps it in the scratch words.
 pub const PLAYER_ACTION: u16 = 0x097C;
-/// Engine words runs may read but not write: the map before and the frame
-/// counter, the player's action word,
+/// Engine words runs may read but not write: Ark's position, the map
+/// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 5] = [PLAYER_ACTION, PRIME_BLUE, ENEMIES, PREVIOUS_MAP, FRAMES];
+const READABLE: [u16; 7] = [
+    PLAYER_ACTION,
+    PRIME_BLUE,
+    ENEMIES,
+    PREVIOUS_MAP,
+    FRAMES,
+    PLAYER_X,
+    PLAYER_Y,
+];
+/// `$0952`, Ark's x less 8.
+pub const PLAYER_X: u16 = 0x0952;
+/// `$0954`, Ark's y less 16, as the towers' gates read it (`$90:8F8F`).
+pub const PLAYER_Y: u16 = 0x0954;
 /// `$0498`, the enemies a room waits on (`docs/combat.md`), as the tower
 /// floors' controllers poll it.
 pub const ENEMIES: u16 = 0x0498;

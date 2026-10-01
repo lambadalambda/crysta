@@ -642,6 +642,12 @@ impl<'a> World<'a> {
         self.globals
             .scratch
             .insert(crate::actors::FRAMES, self.globals.frames);
+        self.globals
+            .scratch
+            .insert(crate::actors::PLAYER_X, x.wrapping_sub(8));
+        self.globals
+            .scratch
+            .insert(crate::actors::PLAYER_Y, y.wrapping_sub(16));
         for index in 0..self.actors.len() {
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(

@@ -23,7 +23,10 @@ mod sense;
 mod walls;
 
 pub(crate) use foe::helper;
-pub use native::{Scratch, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PREVIOUS_MAP, PRIME_BLUE};
+pub use native::{
+    Scratch, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP,
+    PRIME_BLUE,
+};
 use sense::probe;
 
 use crate::scene::{Globals, Transfer};
@@ -161,6 +164,11 @@ const PLAYER_POSE_TEST: [Option<u8>; 23] = [
 /// Operands: a mode (0: offsets from the actor), then column and row.
 const STAMP: u8 = 0x3D;
 const UNSTAMP: u8 = 0x3E;
+/// Sets a cell's collision attribute (`$80:9393`): `a` (bit 7: absolute
+/// cells, else offsets from the actor; `a << 9` the cell's high bits), then
+/// column and row. The towers' gates seal their doors so (`$90:8FA4`); a
+/// solid attribute marks the cell as [`STAMP`] does, an open one clears it.
+const SEAL: u8 = 0x3F;
 /// Spawns an actor running a long script with a flags word; `$80:A71B`.
 const SPAWN: u8 = 0xA2;
 /// Spawns one the same way, at the head of the actor list (`$0DFA`) rather
@@ -317,7 +325,7 @@ const GUARD_06: u16 = 0x0030;
 /// keeps one layer for both, so the test always holds.
 const SAME_LAYER: [u8; 6] = [0xB9, 0x16, 0x00, 0xDD, 0x16, 0x00];
 /// `LDY $0DEA`.
-const PLAYER_Y: [u8; 3] = [0xAC, 0xEA, 0x0D];
+const LOAD_PLAYER_Y: [u8; 3] = [0xAC, 0xEA, 0x0D];
 /// `LDA $0004,X; BIT #$4000`: the actor off screen.
 const OFF_SCREEN_TEST: [u8; 6] = [0xBD, 0x04, 0x00, 0x89, 0x00, 0x40];
 /// Inline native code that makes the player immune to damage (`+$06 |=
@@ -1051,7 +1059,7 @@ impl Actor {
             self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
             return Some(at + 9);
         }
-        let layer_test = if image.get(at..at + 3) == Some(&PLAYER_Y) {
+        let layer_test = if image.get(at..at + 3) == Some(&LOAD_PLAYER_Y) {
             at + 3
         } else {
             at
@@ -1443,9 +1451,9 @@ impl Actor {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
-            BLOCK => return self.block_service(operands, around),
-            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | SPAWN_LINKED | SPAWN_AT | SPAWN_OFFSET | MUSIC_WAIT | 0x6A | 0x76 => {
+            STAMP | UNSTAMP | SEAL | BLOCK => return self.cell_service(service, operands, around),
+            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | SPAWN | SPAWN_LINKED
+            | SPAWN_AT | SPAWN_OFFSET | MUSIC_WAIT | 0x6A | 0x76 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -2046,22 +2054,6 @@ impl Actor {
                 }
                 self.pc = operands + 5;
             }
-            STAMP | UNSTAMP => {
-                let Some(&[0, dx, dy]) = image.get(operands..operands + 3) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                let (column, row) = self.collision_cell();
-                let offset = |base: u16, by: u8| {
-                    base.wrapping_add_signed(i16::from(i8::from_ne_bytes([by])))
-                };
-                let cell = (offset(column, dx), offset(row, dy));
-                self.stamps.retain(|&stamped| stamped != cell);
-                if service == STAMP {
-                    self.stamps.push(cell);
-                }
-                self.pc = operands + 3;
-            }
             SPAWN | SPAWN_LINKED | SPAWN_AT | SPAWN_OFFSET => {
                 return self.spawn(service, operands, around)
             }
@@ -2375,6 +2367,60 @@ impl Actor {
         child.guard.0 = flags & GUARD_04;
         child.spawned = true;
         child
+    }
+
+    /// `COP 3D`/`3E` mark and unmark a cell beside the actor; `COP 3F` sets
+    /// one's collision attribute; `COP 46` copies cells. Returns whether
+    /// execution continues.
+    fn cell_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            BLOCK => return self.block_service(operands, around),
+            STAMP | UNSTAMP => {
+                let Some(&[0, dx, dy]) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let (column, row) = self.collision_cell();
+                let offset = |base: u16, by: u8| {
+                    base.wrapping_add_signed(i16::from(i8::from_ne_bytes([by])))
+                };
+                let cell = (offset(column, dx), offset(row, dy));
+                self.stamps.retain(|&stamped| stamped != cell);
+                if service == STAMP {
+                    self.stamps.push(cell);
+                }
+                self.pc = operands + 3;
+            }
+            _ => {
+                let Some(&[mode, dx, dy]) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let signed = |by: u8| i16::from(i8::from_ne_bytes([by])) * 16;
+                let base = if mode & 0x80 == 0 {
+                    self.position
+                } else {
+                    (0, 0)
+                };
+                let cell = (
+                    base.0.wrapping_add_signed(signed(dx)) / 16,
+                    base.1.wrapping_add_signed(signed(dy)) / 16,
+                );
+                let attribute = (u16::from(mode) << 9 >> 9) & 0x1F;
+                self.stamps.retain(|&stamped| stamped != cell);
+                if !matches!(attribute, 0 | 1 | 2 | 22) {
+                    self.stamps.push(cell);
+                }
+                self.pc = operands + 3;
+            }
+        }
+        true
     }
 
     /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns
