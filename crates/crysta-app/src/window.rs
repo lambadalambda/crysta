@@ -94,12 +94,18 @@ pub fn draw_window(
         let [x, y] = page.end().map(|at| signed(usize::from(at)));
         for (at, &index) in art.prompt[frame].iter().enumerate() {
             let (px, py) = (x + signed(at % 16), y + signed(at / 16));
-            if index != 0 && px < signed(width) {
+            if prompt_shows(index, windowed) && px < signed(width) {
                 let at = (origin.0 + px, origin.1 + py);
                 canvas.set(at, rgb(colour(usize::from(last.palette), index, at.1)));
             }
         }
     }
+}
+
+/// Whether the prompt's pixel of `index` shows: colour 3 is its
+/// background, clear on a page without a window (`$85:947F`).
+const fn prompt_shows(index: u8, windowed: bool) -> bool {
+    index != 0 && (windowed || index != 3)
 }
 
 /// The frame one tile outside `(columns, rows)` of content at `origin`.
@@ -219,6 +225,19 @@ mod tests {
                 .collect::<Vec<_>>()
         };
         assert_ne!(prompt(&done), prompt(&draw(all - 1)), "the prompt");
+    }
+
+    #[test]
+    fn a_windowless_page_clears_the_prompts_background() {
+        // `$85:947F`: colour 3 is clear without a window, as the glyphs'.
+        assert_eq!(
+            (1..4)
+                .map(|index| prompt_shows(index, false))
+                .collect::<Vec<_>>(),
+            [true, true, false]
+        );
+        assert!((1..4).all(|index| prompt_shows(index, true)));
+        assert!(!prompt_shows(0, true));
     }
 
     #[test]
