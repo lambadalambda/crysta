@@ -447,6 +447,8 @@ pub struct Actor {
     pub hidden: bool,
     /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
     pub priority: u8,
+    /// The player's pose a `COP 84` selected: Ark's resource and list.
+    pub player_pose: Option<(u8, u8)>,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -545,6 +547,7 @@ impl Actor {
             walking: false,
             hidden: false,
             priority: 2,
+            player_pose: None,
             walked: false,
             contact: None,
             ease: None,
@@ -1357,6 +1360,7 @@ impl Actor {
             return false;
         };
         self.set_pose(pose, hflip);
+        self.player_pose = Some((resource, pose));
         self.pose_age = 0;
         self.stream = None;
         self.motion = Some(motion);

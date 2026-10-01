@@ -992,16 +992,30 @@ fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
         events[set / 8] |= 1 << (set % 8);
     }
     let mut world = World::enter_with_events(image, 0x0021, 136, 368, events).unwrap();
+    let mut run = Vec::new();
     for _ in 0..4000 {
         let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
         world
             .update(None, if reading { A } else { Presses::default() })
             .unwrap();
+        run.extend(world.run_pose().map(|(motion, facing, _)| (motion, facing)));
         if flag(&world, 0x23) && !world.pad_locked() && world.dialogue().is_none() {
             break;
         }
     }
     assert!(flag(&world, 0xFE) && flag(&world, 0x23));
+    // Ark runs out as natively (`docs/ark-poses.md`): 36 frames of the dash
+    // list `$17` down, 16 of the brake, then he stands facing down.
+    let count = |wanted| run.iter().filter(|&&pose| pose == wanted).count();
+    let (dashing, braking) = (
+        assets::sprites::PandoraRunMotion::Dashing,
+        assets::sprites::PandoraRunMotion::Braking,
+    );
+    assert_eq!(
+        (count((dashing, 0)), count((braking, 0)), run.len()),
+        (36, 16, 52)
+    );
+    assert_eq!(world.facing(), Direction::Down);
     assert!(!world.pad_locked());
     // Only the whitening's particles stay frozen: spawned, bodiless.
     assert!(

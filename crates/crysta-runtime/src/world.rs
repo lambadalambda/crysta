@@ -389,13 +389,27 @@ impl<'a> World<'a> {
     /// Ark's run pose while he dashes or brakes: the motion, the facing
     /// (0 Down, 1 Up, 2 Left, 3 Right) and frames into it.
     #[must_use]
-    pub const fn run_pose(&self) -> Option<(PandoraRunMotion, u8, u16)> {
+    pub fn run_pose(&self) -> Option<(PandoraRunMotion, u8, u16)> {
         let (motion, direction) = match self.run {
             Some(Run::Dash { direction, .. }) => (PandoraRunMotion::Dashing, direction),
             Some(Run::Brake { direction, .. }) => (PandoraRunMotion::Braking, direction),
-            None => return None,
+            None => return self.scripted_run_pose(),
         };
         Some((motion, direction as u8, self.run_age))
+    }
+
+    /// A player script's run (`COP 84`, `docs/ark-poses.md`): the dash list
+    /// `$17` of resource 1 and the brake list 9 of resource 0, facing down,
+    /// as Yomi sends Ark out.
+    fn scripted_run_pose(&self) -> Option<(PandoraRunMotion, u8, u16)> {
+        let actor = self.player_actor.as_ref()?;
+        let motion = match actor.player_pose? {
+            (1, 0x17) => PandoraRunMotion::Dashing,
+            (0, 0x09) => PandoraRunMotion::Braking,
+            _ => return None,
+        };
+        let age = u16::try_from(actor.pose_age).unwrap_or(u16::MAX);
+        Some((motion, Direction::Down as u8, age))
     }
 
     /// Faces the run and counts frames into its motion, from 0 when it
@@ -684,6 +698,17 @@ impl<'a> World<'a> {
             }
         }
         self.project_player_actor_turn(position, actor_before, moving_before);
+        // A script's standing list faces Ark: resource 0's 0 down, 1 up, 2
+        // sideways by the mirror.
+        if let Some(actor) = &self.player_actor {
+            match actor.player_pose {
+                Some((0, 0)) => self.facing = Direction::Down,
+                Some((0, 1)) => self.facing = Direction::Up,
+                Some((0, 2)) if actor.hflip => self.facing = Direction::Left,
+                Some((0, 2)) => self.facing = Direction::Right,
+                _ => {}
+            }
+        }
     }
 
     /// Projects one player-script turn into Ark's world position. Both ordinary

@@ -17,6 +17,7 @@
 
 use super::{Step, World, WorldError};
 use crate::scene::Transfer;
+use room_core::Direction;
 
 /// A transfer's fades under way.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -265,7 +266,9 @@ impl World<'_> {
         let (x, y) = transfer.position;
         let audio = self.globals.audio.clone();
         let mut entered = self.enter_destination(transfer.map, x, y, audio)?;
-        entered.face(self.facing);
+        // A script's transfer lands Ark facing down (`$84:A303`; measured
+        // from `$42` into `$21`, `docs/ark-poses.md`).
+        entered.face(Direction::Down);
         entered.fading = next;
         let from = self.map;
         entered.dark = super::transition::dark_frames(self.image, from, transfer.map);
