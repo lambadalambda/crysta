@@ -28,6 +28,7 @@ use room_core::{
 use std::fmt;
 
 mod attack;
+mod chest;
 mod contact;
 mod door;
 mod fade;
@@ -94,6 +95,8 @@ pub struct World<'a> {
     recoil: Option<contact::Recoil>,
     /// A wooden door the player is opening.
     opening: Option<door::Opening>,
+    /// A chest the player is opening.
+    chest: Option<chest::Opening>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -336,6 +339,7 @@ impl<'a> World<'a> {
             touched: None,
             recoil: None,
             opening: None,
+            chest: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -818,6 +822,8 @@ impl<'a> World<'a> {
     /// loading script's music is selected, then the pots are found.
     fn finish_load(&mut self) -> Result<(), WorldError> {
         self.apply_load_patches()?;
+        self.open_opened_chests();
+        self.apply_patches()?;
         let selection = map_selection(self.image, self.map, &self.globals.events);
         self.globals.audio.load_map(selection);
         self.pots = pots::Pots::at_entry(self.base.room.cells());
@@ -1024,6 +1030,10 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        if let Some(step) = self.chest_frame(presses)? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
         if self.opening.is_some() {
             self.door_frame()?;
             self.apply_patches()?;
@@ -1075,7 +1085,13 @@ impl<'a> World<'a> {
         // A talks while a script holds the pad (`$FF50` leaves A free), but
         // doors and the host doorway action wait: a reaction's lock keeps
         // Ark where he is, as natively.
-        let opened = if presses.confirm && free && !self.talk() && !locked && !self.open_door() {
+        let opened = if presses.confirm
+            && free
+            && !self.talk()
+            && !locked
+            && !self.open_door()
+            && !self.open_chest()
+        {
             Some(if self.thrust() {
                 Step::Stayed
             } else {
@@ -1130,6 +1146,9 @@ impl<'a> World<'a> {
     /// tests, like a debug warp. Scripts and patches stay as they are.
     pub fn place(&mut self, x: u16, y: u16) {
         self.opening = None;
+        if self.chest.take().is_some() {
+            self.globals.presentation = None;
+        }
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
@@ -2186,6 +2205,7 @@ mod tests {
             touched: None,
             recoil: None,
             opening: None,
+            chest: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

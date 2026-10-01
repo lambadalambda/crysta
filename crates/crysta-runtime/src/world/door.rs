@@ -62,31 +62,37 @@ pub(super) const fn sample((x, y): (u16, u16)) -> (u16, u16) {
 }
 
 impl World<'_> {
-    /// Starts opening the wooden door the player faces Up at, if there is
-    /// one. Returns whether it did.
-    pub(super) fn open_door(&mut self) -> bool {
-        // `$87:C7F1` acts only on a sample aligned to a cell's top:
-        // `(sample_y - 8) & $F == 0`, the player's y a multiple of 16.
+    /// The cell `$87:C7F1` samples for a player facing Up, when its tile
+    /// (the low nine bits) is `tile`: it acts only on a sample aligned to a
+    /// cell's top, `(sample_y - 8) & $F == 0`, the player's y a multiple of
+    /// 16.
+    pub(super) fn faced_tile(&self, tile: u16) -> Option<(u16, u16)> {
         if self.facing != Direction::Up
             || self.arrival.is_some()
             || !self.position().1.is_multiple_of(16)
         {
-            return false;
+            return None;
         }
         let (column, row) = sample(self.position());
         let width = usize::from(self.base.width);
-        let closed = row > 0
-            && column < self.base.width
+        (column < self.base.width
             && self
                 .base
                 .room
                 .cells()
                 .get(usize::from(row) * width + usize::from(column))
-                .is_some_and(|word| word & 0x1FF == CLOSED_LOWER);
-        if closed {
-            self.opening = Some(Opening::new((column, row)));
-        }
-        closed
+                .is_some_and(|word| word & 0x1FF == tile))
+        .then_some((column, row))
+    }
+
+    /// Starts opening the wooden door the player faces Up at, if there is
+    /// one. Returns whether it did.
+    pub(super) fn open_door(&mut self) -> bool {
+        let Some(lower) = self.faced_tile(CLOSED_LOWER).filter(|&(_, row)| row > 0) else {
+            return false;
+        };
+        self.opening = Some(Opening::new(lower));
+        true
     }
 
     /// A frame of the door script: its patches, the player held, and the

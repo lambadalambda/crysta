@@ -259,3 +259,44 @@ fn the_tower_door_leads_to_the_first_floor() {
         );
     }
 }
+
+#[test]
+fn the_first_chest_gives_a_bulb_once() {
+    // `docs/chests.md`: `$103` cell (12,37) holds S.Bulb `$10`, flag `$580`;
+    // Ark faces Up from (200,624), the cell 24 pixels above his feet.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0103, 200, 624, after_the_intro()).unwrap();
+        world.face(Direction::Up);
+        for _ in 0..4 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        let a = Presses {
+            confirm: true,
+            ..Presses::default()
+        };
+        world.update(None, a).unwrap();
+        let mut shown = false;
+        for _ in 0..200 {
+            shown |= world.dialogue().is_some();
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+        }
+        assert!(shown, "{:?}", rom.revision());
+        assert!(world.items().contains(&0x10), "{:?}", rom.revision());
+        let flag = |world: &World<'_>| world.events()[0x580 / 8] & (1 << (0x580 % 8)) != 0;
+        assert!(flag(&world), "{:?}", rom.revision());
+        assert!(world.patched_cells().contains(&(12, 37, 0xF1)));
+        // A second A on the open lid does nothing.
+        world.update(None, a).unwrap();
+        world.update(None, Presses::default()).unwrap();
+        assert!(world.dialogue().is_none(), "{:?}", rom.revision());
+        // Opened, it stays open and gives nothing more.
+        let events = world.events().to_vec();
+        let mut again = World::enter_with_events(rom.image(), 0x0103, 200, 624, events).unwrap();
+        again.update(None, Presses::default()).unwrap();
+        assert!(again.patched_cells().contains(&(12, 37, 0xF1)));
+    }
+}
