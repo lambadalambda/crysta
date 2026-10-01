@@ -100,7 +100,8 @@ pub fn first_background(image: &[u8], map_id: u16) -> Result<StaticBackground, V
     }
 }
 
-/// A map's second layer, a subscreen layer the scene adds onto the view:
+/// A map's second layer, a subscreen layer the scene adds onto the view
+/// (or tower 1's fixed night sky behind it):
 /// the town's crystal clouds (`$0A`, `docs/house-exterior.md`), drawn from
 /// the animated `$1F0..$1FF` in palette 6, and the rooms' light rays, from
 /// the same shared sheet (cells `$08..$24`, palette 7; the indoor profile
@@ -111,18 +112,22 @@ pub struct SecondLayer {
     layer: StaticLayer,
     metatiles: Vec<[BgTileWord; 4]>,
     drifts: bool,
+    fixed: bool,
 }
+
+/// Tower 1's ground floor, whose second layer is a fixed backdrop.
+const TOWER_ONE: u16 = 0x0100;
 
 impl SecondLayer {
     /// Decodes the second layer (`10 02`) and its metatiles
     /// (`20 00 40 00 02`) the map's loading script names.
     ///
     /// # Errors
-    /// Rejects maps outside the Crysta slice `$0A..=$21`, a script that
+    /// Rejects maps outside the Crysta slice `$0A..=$21` and tower 1, a script that
     /// names either resource not with one source (the cellars name none), and
     /// resources that do not decode.
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
-        if !(0x000A..=0x0021).contains(&map_id) {
+        if !(0x000A..=0x0021).contains(&map_id) && map_id != TOWER_ONE {
             return Err(VisualMapError::Unsupported(
                 "unqualified second layer map ID",
             ));
@@ -174,7 +179,16 @@ impl SecondLayer {
             layer,
             metatiles,
             drifts: map_id == 0x000A,
+            fixed: map_id == TOWER_ONE,
         })
+    }
+
+    /// Whether it stands still on the screen behind the first layer, as
+    /// tower 1's night sky does (`docs/tower-entry.md`), rather than being
+    /// added onto the view.
+    #[must_use]
+    pub const fn fixed(&self) -> bool {
+        self.fixed
     }
 
     /// Whether it drifts a pixel left and down every three frames, as the

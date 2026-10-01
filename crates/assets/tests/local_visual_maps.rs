@@ -353,6 +353,23 @@ fn the_rooms_second_layer_holds_the_light_rays() {
 }
 
 #[test]
+fn tower_ones_second_layer_is_its_fixed_night_sky() {
+    // `docs/tower-entry.md`: 16x16 cells in palette 7, fixed on the screen
+    // behind the first layer, rows 28..31 empty.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let sky = assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x0100).unwrap();
+    assert!(sky.fixed() && !sky.drifts());
+    let layer = sky.layer();
+    assert_eq!((layer.width(), layer.height()), (16, 16));
+    let used = |cell: u16| sky.metatiles()[usize::from(cell & 511)];
+    assert!(layer.cells()[..16 * 14]
+        .iter()
+        .all(|cell| used(cell.raw()).iter().all(|word| word.palette() == 7)));
+}
+
+#[test]
 fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_model() {
     use assets::graphics::Bgr555;
     use assets::maps::actors::SpawnList;
