@@ -172,3 +172,54 @@ fn the_first_visit_pans_down_to_ark_then_he_speaks() {
         assert_eq!(pages, 2, "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn tower_ones_statues_and_plaque_stand_and_draw() {
+    // `docs/mode4-descriptors.md`: the plaque at (256,888) (`COP B3 8,8`),
+    // the statues at (152,992) and, mirrored, (360,992) (`COP B1`, `B7`),
+    // all from descriptor `$82:F65A`.
+    for rom in roms() {
+        let image = rom.image();
+        let events = after_the_intro();
+        let mut world = World::enter_with_events(image, 0x0100, 256, 1007, events.clone()).unwrap();
+        for _ in 0..5 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        let present = world.residents();
+        let placed: Vec<_> = present
+            .iter()
+            .filter(|resident| resident.descriptor.is_some())
+            .map(|resident| (resident.position, resident.hflip))
+            .collect();
+        assert_eq!(
+            placed,
+            [((256, 888), false), ((152, 992), false), ((360, 992), true)],
+            "{:?}",
+            rom.revision()
+        );
+        let art = crysta_runtime::art::residents_art(
+            image,
+            0x0100,
+            present,
+            assets::maps::scripts::EventFlags::Bitmap(&events),
+            assets::maps::scripts::EventFlags::Bitmap(world.events()),
+        );
+        for (resident, body) in present.iter().zip(&art) {
+            if resident.descriptor.is_none() {
+                continue;
+            }
+            let body = body
+                .as_ref()
+                .unwrap_or_else(|error| panic!("{:?}: {error:?}", rom.revision()));
+            let animation = body.animation(body.initial(), resident.hflip).unwrap();
+            let raster = animation.frame_at(0);
+            assert!(raster.is_visible());
+            assert!(
+                raster.height >= 96,
+                "{:?}: {}",
+                rom.revision(),
+                raster.height
+            );
+        }
+    }
+}

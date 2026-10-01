@@ -11,8 +11,8 @@ use assets::graphics::{Bgr555, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{
-    ArkSprites, HouseActor, HouseFrame, PandoraArt, PandoraSprites, RecordRefusal, ResidentPose,
-    SpriteError, SpriteFrame, SpritePixel,
+    ArkSprites, HouseActor, HouseFrame, Mode4Art, PandoraArt, PandoraSprites, RecordRefusal,
+    ResidentPose, SpriteError, SpriteFrame, SpritePixel,
 };
 use room_core::{AnimationFrame, AnimationSet};
 use std::fmt;
@@ -87,7 +87,7 @@ impl From<SpriteError> for ArtError {
 pub fn raster(
     frame: &SpriteFrame,
     tiles: &[Tile4bpp],
-    palette: &[Bgr555; 16],
+    palette: &[Bgr555],
     palette_base: u8,
     mirror: bool,
 ) -> Result<Raster, ArtError> {
@@ -405,7 +405,7 @@ impl Body {
         &self,
         selector: u8,
         hflip: bool,
-        palette: &[Bgr555; 16],
+        palette: &[Bgr555],
     ) -> Result<Animation, ArtError> {
         match &self.art {
             BodyArt::House(actor) => animate(
@@ -460,6 +460,20 @@ impl Body {
         Self::list(&PandoraArt::object(image, base, selector)?, selector)
     }
 
+    fn mode4(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, ArtError> {
+        let art = Mode4Art::from_rom(image, descriptor, selector)?;
+        let animate = |hflip| {
+            animate(
+                art.list().frames(),
+                (art.graphics(), art.palette(), art.palette_base()),
+                hflip,
+            )
+        };
+        Ok(Self {
+            art: BodyArt::List(selector, [animate(false)?, animate(true)?]),
+        })
+    }
+
     fn list(art: &PandoraArt, selector: u8) -> Result<Self, ArtError> {
         Ok(Self {
             art: BodyArt::List(
@@ -471,6 +485,27 @@ impl Body {
             ),
         })
     }
+}
+
+/// A resident whose descriptor (its own, or the one it reuses) is mode
+/// `$0004` and not the Box's: its header's list (byte 0, five bytes before
+/// the script) of that art (`docs/mode4-descriptors.md`), as tower 1's
+/// statues and plaque.
+fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placeholder>> {
+    let descriptor = resident.descriptor?;
+    if image.get(descriptor + 3..descriptor + 5)? != [4, 0]
+        || assets::layout::offset(image, BOX_DESCRIPTOR) == Some(descriptor)
+    {
+        return None;
+    }
+    let header = usize::try_from(resident.script? & 0x3F_FFFF)
+        .ok()?
+        .checked_sub(5)?;
+    let list = *image.get(header)?;
+    Some(
+        Body::mode4(image, descriptor, list)
+            .map_err(|error| Placeholder::Refused(error.to_string())),
+    )
 }
 
 /// A Pandora art's list as rasters.
@@ -488,7 +523,7 @@ fn list_animation(art: &PandoraArt, selector: u8, hflip: bool) -> Result<Animati
 /// Frames as rasters from their graphics, palette and palette base.
 fn animate(
     frames: &[HouseFrame],
-    (graphics, palette, base): (&[Tile4bpp], &[Bgr555; 16], u8),
+    (graphics, palette, base): (&[Tile4bpp], &[Bgr555], u8),
     hflip: bool,
 ) -> Result<Animation, ArtError> {
     Ok(Animation {
@@ -546,6 +581,9 @@ pub fn residents_art(
                 } else {
                     Err(Placeholder::Invisible)
                 };
+            }
+            if let Some(body) = mode4_body(image, resident) {
+                return body;
             }
             match found {
                 None | Some(Err(RecordRefusal::NoDescriptor)) => Err(Placeholder::Invisible),
