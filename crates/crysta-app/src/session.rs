@@ -515,9 +515,7 @@ impl Session {
         background.draw(frame, camera, position);
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
-        if let Some(darkening) = world.display().darkening() {
-            frame::darken(frame, camera, darkening);
-        }
+        let backdrop = frame::Backdrop::keep(frame, world.display().darkening());
         let clouds = background;
         let background = &background.frame;
         let count = residents.len();
@@ -574,7 +572,7 @@ impl Session {
         clouds.extend_edges(frame, camera);
         self.draw_labels(frame, camera);
         let world = &self.world;
-        frame::tint(frame, screen.tint);
+        frame::tint_and_darken(frame, camera, screen.tint, backdrop);
         frame::dim(frame, screen.brightness);
         draw_dialogue(
             frame,

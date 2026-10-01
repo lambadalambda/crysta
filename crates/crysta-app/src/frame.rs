@@ -154,13 +154,60 @@ pub fn dim(canvas: &mut Canvas, brightness: u8) {
     }
 }
 
+/// The background as drawn, before the sprites, for colour math after the
+/// palette's tint: native colour math comes after the palette, on the
+/// background alone.
+pub struct Backdrop {
+    darkening: Darkening,
+    pixels: Vec<u32>,
+}
+
+impl Backdrop {
+    /// Keeps the canvas's background when there is a darkening.
+    #[must_use]
+    pub fn keep(canvas: &Canvas, darkening: Option<Darkening>) -> Option<Self> {
+        darkening.map(|darkening| Self {
+            darkening,
+            pixels: canvas.pixels.clone(),
+        })
+    }
+
+    /// The pixels the sprites left of the background.
+    fn left(&self, canvas: &Canvas) -> Vec<bool> {
+        canvas
+            .pixels
+            .iter()
+            .zip(&self.pixels)
+            .map(|(now, was)| now == was)
+            .collect()
+    }
+}
+
+/// The palette's tint, then the backdrop's darkening on what the sprites
+/// left of the background.
+pub fn tint_and_darken(
+    canvas: &mut Canvas,
+    camera: (i32, i32),
+    change: Tint,
+    backdrop: Option<Backdrop>,
+) {
+    let left = backdrop.map(|backdrop| (backdrop.left(canvas), backdrop.darkening));
+    tint(canvas, change);
+    if let Some((background, darkening)) = left {
+        darken(canvas, camera, darkening, &background);
+    }
+}
+
 /// Colour math on the background (`docs/scene-effects.md`): the fixed
-/// colour subtracted per 5-bit channel, but not inside the spared square.
-/// `camera` places the canvas on the map.
-pub fn darken(canvas: &mut Canvas, camera: (i32, i32), darkening: Darkening) {
+/// colour subtracted per 5-bit channel from the pixels `background` marks,
+/// but not inside the spared square. `camera` places the canvas on the map.
+pub fn darken(canvas: &mut Canvas, camera: (i32, i32), darkening: Darkening, background: &[bool]) {
     let width = canvas.width;
     let spared = darkening.spared.map(|spin| spin.window());
     for (at, pixel) in canvas.pixels.iter_mut().enumerate() {
+        if !background.get(at).copied().unwrap_or(false) {
+            continue;
+        }
         let offset = |n: usize| f64::from(u32::try_from(n).unwrap_or(u32::MAX));
         let map = (
             f64::from(camera.0) + offset(at % width),
@@ -371,6 +418,22 @@ mod tests {
     use super::*;
 
     #[test]
+    fn the_whitening_raises_first_then_greys_the_background_only() {
+        // `$88:B507`: the palette toward white, then fixed colour 7
+        // subtracted from BG (`CGADSUB $A3`); sprites stay white.
+        use crysta_runtime::display::Display;
+        let mut display = Display::default();
+        display.write(0x2132, 0xE7);
+        let mut canvas = Canvas::new(CLASSIC_WIDTH);
+        canvas.pixels.fill(0x0084_8484);
+        let backdrop = Backdrop::keep(&canvas, display.darkening());
+        canvas.pixels[0] = 0x0000_0084;
+        tint_and_darken(&mut canvas, (0, 0), Tint::Raise(37), backdrop);
+        assert_eq!(canvas.pixels[0], 0x00FF_FFFF, "a sprite: white");
+        assert_eq!(canvas.pixels[1], 0x00C6_C6C6, "the room: 24 a channel");
+    }
+
+    #[test]
     fn darkening_subtracts_outside_the_square_only() {
         use crysta_runtime::display::Display;
         let mut display = Display::default();
@@ -380,10 +443,18 @@ mod tests {
         display.spin((100, 120), 3);
         let mut canvas = Canvas::new(CLASSIC_WIDTH);
         canvas.pixels.fill(0x00FF_FFFF);
-        darken(&mut canvas, (20, 40), display.darkening().unwrap());
+        let mut background = vec![true; canvas.pixels.len()];
+        background[1] = false;
+        darken(
+            &mut canvas,
+            (20, 40),
+            display.darkening().unwrap(),
+            &background,
+        );
         let at = |x: usize, y: usize| canvas.pixels[y * CLASSIC_WIDTH + x];
         assert_eq!(at(80, 80), 0x00FF_FFFF, "the square's centre");
         assert_eq!(at(0, 0), 0x00C6_C6C6, "31 - 7 = 24 a channel");
+        assert_eq!(at(1, 0), 0x00FF_FFFF, "a sprite's pixel");
     }
 
     fn region(bounds: [u16; 4]) -> CameraRegion {
