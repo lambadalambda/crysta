@@ -170,6 +170,24 @@ const STAIRS_UP_ARRIVING: Motion = &[
     (4, 0, 1),
     (2, 0, 0),
 ];
+/// Mask shapes relative to their anchor, half-open (`docs/depth-order.md`):
+/// the wall above a doorway (pose `$37`).
+const DOOR_MASK: &[(i32, i32, i32, i32)] = &[(-8, -64, 8, -56), (-16, -56, 16, -32)];
+/// Down the stairs, the right jamb and the lintel (pose `$3B`).
+const STAIRS_DOWN_MASK: &[(i32, i32, i32, i32)] = &[(-8, -40, 24, -32), (8, -32, 24, 8)];
+/// Then also the threshold (pose `$3A`), from this frame of the walk.
+const STAIRS_THRESHOLD_MASK: u16 = 18;
+const STAIRS_THRESHOLD_MASK_SHAPE: &[(i32, i32, i32, i32)] = &[
+    (-8, -40, 24, -32),
+    (8, -32, 24, 8),
+    (8, 8, 24, 16),
+    (-8, -4, 8, 8),
+    (0, 8, 8, 16),
+];
+/// Up the stairs and arriving, the left jamb and the lintel (pose `$39`).
+const STAIRWELL_MASK: &[(i32, i32, i32, i32)] =
+    &[(-24, -48, -8, 0), (-8, -48, 0, -32), (0, -40, 8, -32)];
+
 /// Frames of a stair arrival before its list's second frame is due, less
 /// the first record's 8: the list starts at frame 9 and holds 10 frames.
 const STAIRS_ARRIVING_START: u16 = 12;
@@ -317,7 +335,6 @@ impl Walk {
     }
 
     /// Where the whole motion leads from `from`.
-    #[cfg(test)]
     fn end(mut self, from: (u16, u16)) -> (u16, u16) {
         let mut at = from;
         while let Some(delta) = self.step() {
@@ -338,12 +355,16 @@ pub(super) struct Leaving {
     walk: Walk,
     /// An upward door walk's threshold: the top of the cell it began in.
     door_up: Option<(u16, u16)>,
+    /// Where the player stood on the exit frame, the stairs' mask anchor.
+    start: (u16, u16),
 }
 
 /// Arriving after one.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Arriving {
     walk: Walk,
+    /// The stair tile, 16 above where the walk ends: the mask's anchor.
+    anchor: (u16, u16),
 }
 
 impl Leaving {
@@ -371,6 +392,7 @@ impl Leaving {
             walk: Walk::new(motion, toward),
             door_up: (motion == DOOR_LEAVING && toward == Direction::Up)
                 .then_some((start.0, start.1 & !15)),
+            start,
         }
     }
 }
@@ -392,9 +414,11 @@ impl Arriving {
         };
         let (x, y) = record.destination_position();
         let start = moved((x, y), (dx + 8, dy + 16));
+        let walk = Walk::new(motion, toward);
         Some((
             Self {
-                walk: Walk::new(motion, toward),
+                walk,
+                anchor: moved(walk.end(start), (0, -16)),
             },
             start,
         ))
@@ -418,14 +442,44 @@ impl World<'_> {
         true
     }
 
-    /// While Ark walks up into a door, the helper's mask that hides him
-    /// behind the wall above it (`$84:B988`, pose `$37`,
-    /// `docs/depth-order.md`): anchored at the doorway's threshold, from the
-    /// first pixel past it.
+    /// The player-helper's mask (`docs/depth-order.md`), as world
+    /// rectangles (left, top, right, bottom; half-open): sprites inside show
+    /// the background instead. Walking up into a door (`$84:B988`, pose
+    /// `$37`), anchored at the threshold, from the first pixel past it; on
+    /// the stairs (poses `$39`/`$3A`/`$3B`), at Ark's place on the exit frame
+    /// or, arriving, at the stair tile.
     #[must_use]
-    pub fn door_mask(&self) -> Option<(u16, u16)> {
-        let (x, threshold) = self.leaving.as_ref()?.door_up?;
-        (self.position().1 < threshold).then_some((x, threshold))
+    pub fn masks(&self) -> Vec<(i32, i32, i32, i32)> {
+        let (shape, (x, y)) = match (&self.leaving, &self.arriving) {
+            (Some(leaving), _) if leaving.walk.motion == STAIRS_DOWN_LEAVING => {
+                let shape = if leaving.walk.frame < STAIRS_THRESHOLD_MASK {
+                    STAIRS_DOWN_MASK
+                } else {
+                    STAIRS_THRESHOLD_MASK_SHAPE
+                };
+                (shape, leaving.start)
+            }
+            (Some(leaving), _) if leaving.walk.motion == STAIRS_UP_LEAVING => {
+                (STAIRWELL_MASK, leaving.start)
+            }
+            (Some(leaving), _) => match leaving.door_up {
+                Some((x, threshold)) if self.position().1 < threshold => {
+                    (DOOR_MASK, (x, threshold))
+                }
+                _ => return Vec::new(),
+            },
+            (None, Some(arriving))
+                if stair_list(arriving.walk.motion).is_some() && arriving.walk.frame > 0 =>
+            {
+                (STAIRWELL_MASK, arriving.anchor)
+            }
+            _ => return Vec::new(),
+        };
+        let (x, y) = (i32::from(x), i32::from(y));
+        shape
+            .iter()
+            .map(|&(left, top, right, bottom)| (x + left, y + top, x + right, y + bottom))
+            .collect()
     }
 
     /// Ark's stair list (resource 1) and its age while he walks stairs

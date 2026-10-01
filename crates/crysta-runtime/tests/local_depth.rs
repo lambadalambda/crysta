@@ -3,6 +3,7 @@
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::World;
 use rom::Rom;
+use room_core::Direction;
 use std::path::Path;
 
 fn load(name: &str) -> Option<Rom> {
@@ -73,11 +74,66 @@ fn walking_up_into_a_door_raises_the_mask_over_ark() {
         for (frames, direction, presses) in steps {
             for _ in 0..frames {
                 world.update(direction, presses).unwrap();
-                if let Some(anchor) = world.door_mask() {
-                    seen.get_or_insert((world.position(), anchor));
+                let masks = world.masks();
+                if !masks.is_empty() {
+                    seen.get_or_insert((world.position(), masks));
                 }
             }
         }
-        assert_eq!(seen, Some(((136, 335), (136, 336))), "{name}");
+        // Anchored at the threshold (136,336): x -8..+8 on rows -64..-56,
+        // x -16..+16 on rows -56..-32.
+        assert_eq!(
+            seen,
+            Some(((136, 335), vec![(128, 272, 144, 280), (120, 280, 152, 304)])),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn the_stairs_mask_hides_ark_in_the_stairwell() {
+    // `docs/depth-order.md` section 4: going down from E, pose `$3B` at Ark's
+    // place on the exit frame (104,864) for 18 frames, then `$3A`; arriving
+    // in `$20`, pose `$39` at the stair tile (408,864).
+    let up = Some(Direction::Up);
+    for name in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Some(rom) = load(name) else {
+            continue;
+        };
+        let mut events = crysta_runtime::world::fresh_game_flags();
+        for set in [0x26, 0x27, 0x28, 0x2E] {
+            events[set / 8] |= 1 << (set % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0E, 104, 880, events).unwrap();
+        let mut leaving = Vec::new();
+        let mut arriving = Vec::new();
+        for _ in 0..400 {
+            let direction = (!world.in_transition()).then_some(up).flatten();
+            world.update(direction, Presses::NONE).unwrap();
+            let masks = world.masks();
+            match world.map() {
+                0x0E if world.in_transition() => leaving.push(masks),
+                0x20 if world.in_transition() => arriving.push(masks),
+                0x20 => break,
+                _ => {}
+            }
+        }
+        let three_b = vec![(96, 824, 128, 832), (112, 832, 128, 872)];
+        assert_eq!(leaving[0], three_b, "{name}");
+        assert_eq!(leaving[17], three_b, "{name}");
+        let mut three_a = three_b.clone();
+        three_a.extend([
+            (112, 872, 128, 880),
+            (96, 860, 112, 872),
+            (104, 872, 112, 880),
+        ]);
+        assert_eq!(leaving[18], three_a, "{name}");
+        let three_nine = vec![
+            (384, 816, 400, 864),
+            (400, 816, 408, 832),
+            (408, 824, 416, 832),
+        ];
+        assert!(arriving.contains(&three_nine), "{name}");
+        assert!(world.masks().is_empty(), "{name}");
     }
 }
