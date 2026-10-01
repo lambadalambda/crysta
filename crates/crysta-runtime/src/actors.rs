@@ -16,9 +16,15 @@
 mod cadence;
 mod ease;
 mod foe;
+mod line;
 mod motion;
 mod native;
+mod sense;
+mod walls;
+
 pub use native::{Scratch, ENEMIES, PLAYER_ACTION, PRIME_BLUE};
+pub(crate) use foe::helper;
+use sense::probe;
 
 use crate::scene::{Globals, Transfer};
 use assets::maps::actor_script::{
@@ -35,6 +41,8 @@ const SELECT_POSE: u8 = 0x80;
 const CLEAR_HFLIP: u8 = 0xB6;
 /// Sets the horizontal mirror.
 const SET_HFLIP: u8 = 0xB7;
+/// Toggles the horizontal mirror (`$80:AA51`).
+const TOGGLE_HFLIP: u8 = 0xB8;
 /// Resolves the pose and yields until it is done.
 const WAIT: u8 = 0x8E;
 /// Shows the published text and blocks the world until it is acknowledged;
@@ -176,12 +184,17 @@ const SINE: usize = 0x01_F563;
 /// Spawns an actor running a long script at an offset from its parent, dx
 /// mirrored with the parent, without a flags word; `$80:A56B`.
 const SPAWN_AT: u8 = 0x9C;
+/// As [`SPAWN_AT`] with a flags word (`$80:A79D`): the flyers' bullets.
+const SPAWN_OFFSET: u8 = 0xA4;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
 /// Services for the display alone: the spinning window (`6A`, shape 0
 /// only), PPU register writes (`76`), both into [`crate::display`], and the
 /// hit profile (`D9`, `$7F:1022` from `$8D:BDFA`, stepped over).
-const COSMETIC: [(u8, usize); 3] = [(SPIN, 2), (PPU_WRITE, 2), (0xD9, 1)];
+const COSMETIC: [(u8, usize); 2] = [(SPIN, 2), (PPU_WRITE, 2)];
+/// Sets the combat profile (`$80:B501`): `$8D:BDFA[n & $7F]`, and without
+/// bit 7 the life too.
+const PROFILE: u8 = 0xD9;
 /// `COP 6A shape speed` (`$80:9DD6`).
 const SPIN: u8 = 0x6A;
 /// `COP 76 register value` (`$80:A127`): `$21rr = value` at the next NMI.
@@ -202,6 +215,11 @@ const PLAYER_POSE_MOVING: u8 = 0x84;
 /// Selects a pose and starts the movement streams of the same selector
 /// (`$80:A1B9`).
 const POSE_MOVING: u8 = 0x81;
+/// As [`POSE_MOVING`] with another selector (`$80:A1DE`): pose, selector.
+const POSE_SELECTOR: u8 = 0x82;
+/// Sets the next `COP 8F`'s repetitions, then [`POSE_MOVING`]
+/// (`$80:A1AF`): count, pose.
+const REPEAT_POSE_MOVING: u8 = 0x86;
 /// Sets the next `COP 8F`'s repetitions, a pose, and another selector's
 /// movement streams (`$80:A1D4`).
 const REPEAT_MOVING: u8 = 0x87;
@@ -278,6 +296,21 @@ const CONTACT: [Option<u8>; 7] = [
     Some(0x10),
     Some(0x7F),
 ];
+/// `+$04` bits enemies set and clear: `$0001` a projectile (shields block
+/// it), `$0002` and `$0020` not a target of hits, `$0010` not attacking
+/// (the hit scan `$85:D281`).
+const GUARD_04: u16 = 0x0033;
+/// `+$06` bits: `$0010` the script handles knockback (none), `$0020` takes
+/// no damage.
+const GUARD_06: u16 = 0x0030;
+/// `LDA $0016,Y; CMP $0016,X`, Y Ark's entity (`LDY $0DEA` before it, or
+/// left so by `COP 59`, `$97:B99A`): Ark on the actor's layer. The runtime
+/// keeps one layer for both, so the test always holds.
+const SAME_LAYER: [u8; 6] = [0xB9, 0x16, 0x00, 0xDD, 0x16, 0x00];
+/// `LDY $0DEA`.
+const PLAYER_Y: [u8; 3] = [0xAC, 0xEA, 0x0D];
+/// `LDA $0004,X; BIT #$4000`: the actor off screen.
+const OFF_SCREEN_TEST: [u8; 6] = [0xBD, 0x04, 0x00, 0x89, 0x00, 0x40];
 /// Inline native code that makes the player immune to damage (`+$06 |=
 /// $20` through `$0DEA`); the runtime has no damage.
 const NO_DAMAGE: [u8; 12] = [
@@ -340,6 +373,13 @@ const PLAYER_AXIS: u8 = 0xD7;
 const PLAYER_SIDE: u8 = 0xD3;
 /// Above, even or below, by Ark's feet (`$80:B38A`).
 const PLAYER_HEIGHT: u8 = 0xD4;
+/// Starts a line move toward `$7F:2004/2006,X` (`$80:AE38`): legs, pose,
+/// speed, frame limit, selector (`FF` none).
+const LINE_START: u8 = 0xCC;
+/// One frame of the line move, until it ends (`$80:AF22`).
+const LINE_STEP: u8 = 0xCD;
+/// Ark's probe in the box in front, the facings admitted (`$80:B26E`).
+const PLAYER_FRONT: u8 = 0xD2;
 /// While off screen (entity `+$04` bit 14, which the draw pass keeps), sleep
 /// n frames and try again (`$80:9AC7`, `docs/enemy-scripts.md`).
 const SLEEP_OFF_SCREEN: u8 = 0x59;
@@ -530,6 +570,17 @@ pub struct Actor {
     /// box's `$5220` is natively before any script runs; how the loader
     /// derives `+$04` is not traced.
     touchable: bool,
+    /// Combat bits scripts write (`docs/enemy-scripts.md` §4), kept as
+    /// written: `+$04` [`GUARD_04`] and `+$06` [`GUARD_06`].
+    guard: (u16, u16),
+    /// `+$04 & $0006 == $0004`: moves stop at walls.
+    walls: bool,
+    /// The frame's move, applied at its end against the walls.
+    pending: (i16, i16),
+    /// A line move under way (`COP CC`).
+    line: Option<line::Line>,
+    /// Spawned by another actor's script.
+    spawned: bool,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -632,6 +683,11 @@ impl Actor {
             ease: None,
             call: None,
             touchable: true,
+            guard: (0, 0),
+            walls: false,
+            pending: (0, 0),
+            line: None,
+            spawned: false,
             parameter: 0,
             frozen_return: None,
             base: Base::Common,
@@ -734,11 +790,14 @@ impl Actor {
             .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         // An enemy: hittable (header `+$04` bit `$0200`), its descriptor's
         // byte 4 naming its profile (`$80:FACF`).
-        let hittable = resident
+        let header = resident
             .script
             .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
             .and_then(|script| image.get(script.checked_sub(4)?..script.checked_sub(2)?))
-            .is_some_and(|word| u16::from_le_bytes([word[0], word[1]]) & 0x0200 != 0);
+            .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]));
+        let hittable = header & 0x0200 != 0;
+        // Wall collision (`docs/enemy-scripts.md` §6) for enemies' bodies.
+        actor.walls = resident.body && hittable && header & 0x0006 == 0x0004;
         actor.foe = resident
             .descriptor
             .filter(|_| resident.body && hittable)
@@ -752,6 +811,9 @@ impl Actor {
                 foe::Foe::new(profile, counted)
             });
         if actor.foe.is_some() {
+            // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan.
+            actor.hidden |= header & 0x8000 != 0;
+            actor.guard.0 = header & GUARD_04;
             actor.boxes = resident
                 .descriptor
                 .and_then(|descriptor| cadence::pose_boxes(image, descriptor))
@@ -828,10 +890,14 @@ impl Actor {
     /// Runs one frame.
     pub fn tick(&mut self, around: &mut Surroundings<'_>) {
         let start = self.position;
-        if self.foe_frame(around.image, &mut around.globals.random) {
-            return;
+        if !self.foe_frame(around.image, &mut around.globals.random) {
+            self.frame(around);
         }
-        self.frame(around);
+        self.settle(&walls::Layer {
+            cells: around.cells,
+            width: around.width,
+            height: around.height,
+        });
         self.walked |= self.walking || self.position != start;
     }
 
@@ -946,12 +1012,17 @@ impl Actor {
     /// - [`CONTACT`] registers the contact callback.
     /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`], and runs on script scratch
     ///   words and the display ([`native::run`]).
-    fn native_idiom(&mut self, image: &[u8], bank: usize, globals: &mut Globals) -> Option<usize> {
+    fn native_idiom(
+        &mut self,
+        image: &[u8],
+        bank: usize,
+        around: &mut Surroundings<'_>,
+    ) -> Option<usize> {
         // Bits 12 and 8 are accepted and not modelled: the guide clears and
         // sets 12 around the freezing's whitening (`$88:B507`, `$88:B53F`)
         // and clears 8, the dispatcher's target bit, before it leaves
         // (`$88:AF1A`).
-        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100;
+        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100 | GUARD_04;
         let at = self.pc;
         if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
             let value = u16::from_le_bytes([low, high]);
@@ -962,19 +1033,39 @@ impl Actor {
             };
             self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
             self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
+            self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
             return Some(at + 9);
+        }
+        let layer_test = if image.get(at..at + 3) == Some(&PLAYER_Y) {
+            at + 3
+        } else {
+            at
+        };
+        if image.get(layer_test..layer_test + SAME_LAYER.len()) == Some(&SAME_LAYER) {
+            return tested_branch(image, layer_test + SAME_LAYER.len(), true);
+        }
+        if image.get(at..at + OFF_SCREEN_TEST.len()) == Some(&OFF_SCREEN_TEST) {
+            let on_screen = !self.off_screen(around.globals.view);
+            return tested_branch(image, at + OFF_SCREEN_TEST.len(), on_screen);
         }
         // `+$06`'s interaction bits (`$0200` any side, `$0100` facing), as
         // the figure in `$21` sets them before registering its callback
         // (`$88:D33D`).
         if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
             const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
-            // Bit 14, which the crystals set (`$88:B60F`), is not modelled.
-            const ACCEPTED: u16 = INTERACTION | 0x4000;
+            // Bit 14, which the crystals and bullets set (`$88:B60F`,
+            // `$97:BAAC`), is not modelled.
+            const ACCEPTED: u16 = INTERACTION | GUARD_06 | 0x4000;
             let value = u16::from_le_bytes([low, high]);
             match op {
-                0x09 if value & !ACCEPTED == 0 => self.interaction |= value & INTERACTION,
-                0x29 if !value & !INTERACTION == 0 => self.interaction &= value,
+                0x09 if value & !ACCEPTED == 0 => {
+                    self.interaction |= value & INTERACTION;
+                    self.guard.1 |= value & GUARD_06;
+                }
+                0x29 if !value & !(INTERACTION | GUARD_06) == 0 => {
+                    self.interaction &= value;
+                    self.guard.1 &= value;
+                }
                 _ => return None,
             }
             return Some(at + 9);
@@ -983,9 +1074,9 @@ impl Actor {
         // desk's book starts (`$88:D641`).
         if let Some(&[0xA9, 0, 0, 0x9D, field @ (4 | 6), 0]) = image.get(at..at + 6) {
             if field == 4 {
-                (self.hidden, self.touchable) = (false, false);
+                (self.hidden, self.touchable, self.guard.0) = (false, false, 0);
             } else {
-                self.interaction = 0;
+                (self.interaction, self.guard.1) = (0, 0);
             }
             return Some(at + 6);
         }
@@ -1007,17 +1098,19 @@ impl Actor {
         if let Some(next) = player_pose_mismatch(image, at) {
             return Some(next);
         }
-        let ran = native::run(image, at, &mut self.memory(globals))?;
+        let probe = probe(around.player);
+        let ran = native::run(image, at, &mut self.memory(around.globals, probe))?;
         Some(self.ran(ran))
     }
 
     /// What a native run may change.
-    fn memory<'m>(&'m mut self, globals: &'m mut Globals) -> native::Memory<'m> {
+    fn memory<'m>(&'m mut self, globals: &'m mut Globals, probe: (u16, u16)) -> native::Memory<'m> {
         native::Memory {
             words: &mut globals.scratch,
             own: &mut self.own,
             display: &mut globals.display,
             random: globals.random.word(),
+            probe,
         }
     }
 
@@ -1176,7 +1269,11 @@ impl Actor {
         // A native run paused in a nested frame goes on first; a callback
         // runs its own code and leaves it paused.
         if let Some(paused) = self.paused.take_if(|_| self.outer.is_none()) {
-            match native::resume(image, paused, &mut self.memory(around.globals)) {
+            match native::resume(
+                image,
+                paused,
+                &mut self.memory(around.globals, probe(around.player)),
+            ) {
                 Some(ran) => self.pc = self.ran(ran),
                 None => self.state = State::Frozen,
             }
@@ -1253,7 +1350,7 @@ impl Actor {
                     continue;
                 }
                 _ => {
-                    if let Some(next) = self.native_idiom(image, bank, around.globals) {
+                    if let Some(next) = self.native_idiom(image, bank, around) {
                         self.pc = next;
                         if self.paused.is_some() {
                             return Run::Yielded;
@@ -1298,11 +1395,13 @@ impl Actor {
             PLAYER_POSE_MOVING if self.frozen_return.is_some() => {
                 return self.frozen_return_pose(operands, image)
             }
-            POSE_MOVING | REPEAT_MOVING => return self.moving_pose(service, operands, image),
+            POSE_MOVING | POSE_SELECTOR | REPEAT_POSE_MOVING | REPEAT_MOVING => {
+                return self.moving_pose(service, operands, image)
+            }
             PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
             | SOUND_WORD => return self.audio_service(service, operands, around),
             CALL => return self.call_service(operands, around),
-            PLAYER_NEAR | PLAYER_AXIS | PLAYER_SIDE | PLAYER_HEIGHT => {
+            PLAYER_NEAR | PLAYER_AXIS | PLAYER_SIDE | PLAYER_HEIGHT | PLAYER_FRONT => {
                 return self.player_test(service, operands, bank, around)
             }
             RANDOMIZE | SLEEP_OFF_SCREEN => return self.engine_service(service, operands, around),
@@ -1314,7 +1413,7 @@ impl Actor {
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
             BLOCK => return self.block_service(operands, around),
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | STAMP | UNSTAMP | SPAWN
-            | SPAWN_LINKED | SPAWN_AT | MUSIC_WAIT | 0x6A | 0x76 | 0xD9 => {
+            | SPAWN_LINKED | SPAWN_AT | SPAWN_OFFSET | MUSIC_WAIT | 0x6A | 0x76 => {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
@@ -1335,9 +1434,14 @@ impl Actor {
                 self.continuation = Some(operands + 1);
                 self.pc = operands + 1;
             }
-            CLEAR_HFLIP | SET_HFLIP => {
-                let selector = self.selector;
-                self.set_pose(selector, service == SET_HFLIP);
+            LINE_START | LINE_STEP => return self.line_service(service, operands, image),
+            PROFILE => return self.profile_service(operands, image),
+            CLEAR_HFLIP | SET_HFLIP | TOGGLE_HFLIP => {
+                let (selector, hflip) = (self.selector, self.hflip);
+                self.set_pose(
+                    selector,
+                    service == SET_HFLIP || (service == TOGGLE_HFLIP && !hflip),
+                );
                 self.pc = operands;
             }
             WAIT => return self.wait_for_pose(operands),
@@ -1429,6 +1533,10 @@ impl Actor {
                 };
                 if let Some(ticks) = cadence::packet_ticks(image, pointer) {
                     self.pose_ticks = Some(ticks);
+                }
+                // An enemy's or a bullet's boxes follow its art.
+                if self.foe.is_some() || self.boxes.is_some() || self.spawned {
+                    self.boxes = cadence::packet_boxes(image, pointer).map(std::rc::Rc::new);
                 }
                 self.pc = operands + 3;
             }
@@ -1572,14 +1680,23 @@ impl Actor {
         true
     }
 
-    /// `COP 81 pose` and `COP 87 count pose selector`: a pose that moves
-    /// by its movement streams through the next wait. Returns whether
-    /// execution continues this frame.
+    /// `COP 81 pose`, `82 pose selector`, `86 count pose` and `87 count
+    /// pose selector`: a pose that moves by its movement streams through
+    /// the next wait. Returns whether execution continues this frame.
     fn moving_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
-        let length = if service == POSE_MOVING { 1 } else { 3 };
-        let (pose, selector) = match image.get(operands..operands + length) {
-            Some(&[pose]) => (pose, pose),
-            Some(&[count, pose, selector]) => {
+        let length = match service {
+            POSE_MOVING => 1,
+            REPEAT_MOVING => 3,
+            _ => 2,
+        };
+        let (pose, selector) = match (service, image.get(operands..operands + length)) {
+            (_, Some(&[pose])) => (pose, pose),
+            (POSE_SELECTOR, Some(&[pose, selector])) => (pose, selector),
+            (_, Some(&[count, pose])) => {
+                self.repeats = Some(u16::from(count));
+                (pose, pose)
+            }
+            (_, Some(&[count, pose, selector])) => {
                 self.repeats = Some(u16::from(count));
                 (pose, selector)
             }
@@ -1633,6 +1750,120 @@ impl Actor {
         self.resources[slot].clone()
     }
 
+    /// `COP D9 n`: the profile, and without bit 7 the life too; a spawned
+    /// child (a bullet) becomes an enemy that counts for no room.
+    fn profile_service(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(&index) = image.get(operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        if let Some(profile) = crate::combat::profile(image, index) {
+            match &mut self.foe {
+                Some(foe) => {
+                    foe.profile = profile;
+                    if index & 0x80 == 0 {
+                        foe.life = profile.life;
+                    }
+                }
+                // A bullet's: it strikes Ark; it counts for no room.
+                None if self.spawned => self.foe = Some(foe::Foe::new(profile, false)),
+                None => {}
+            }
+        }
+        self.pc = operands + 1;
+        true
+    }
+
+    /// `COP CC a p c d s` and `COP CD` (`docs/enemy-scripts.md` §6): the
+    /// target is the script's `$7F:2004/2006,X`; `CC` goes on in the same
+    /// frame, `CD` steps once a frame and goes on the frame after the end.
+    /// A selector besides `FF`, which no chapter 1 script uses, freezes.
+    fn line_service(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        if service == LINE_STEP {
+            // A knockback ends the move (`$80:B04C`).
+            let Some(line) = &mut self.line else {
+                self.pc = operands;
+                return false;
+            };
+            match line.frame() {
+                line::Frame::Moving(dx, dy) => self.displace((dx, dy)),
+                line::Frame::Ended(dx, dy) => {
+                    self.displace((dx, dy));
+                    self.line = None;
+                    self.continuation = Some(operands);
+                    self.pc = operands;
+                }
+            }
+            return false;
+        }
+        let Some(&[legs, pose, speed, limit, 0xFF]) = image.get(operands..operands + 5) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let word = |at: u16| {
+            u16::from_le_bytes([
+                self.own.get(&at).copied().unwrap_or(0),
+                self.own.get(&(at + 1)).copied().unwrap_or(0),
+            ])
+        };
+        let target = (word(0x2004), word(0x2006));
+        self.line = Some(line::Line::start(self.position, target, legs, speed, limit));
+        let hflip = self.hflip;
+        self.set_pose(pose, hflip);
+        self.pose_age = 0;
+        (self.motion, self.stream) = (None, None);
+        self.continuation = Some(operands + 5);
+        self.pc = operands + 5;
+        true
+    }
+
+    /// Moves by `delta`; an actor that collides with walls keeps it for
+    /// the frame's end ([`Self::settle`]), as `7F:0018`/`001A` wait for
+    /// `$80:D0CF`.
+    fn displace(&mut self, (dx, dy): (i16, i16)) {
+        if self.walls {
+            self.pending = (
+                self.pending.0.wrapping_add(dx),
+                self.pending.1.wrapping_add(dy),
+            );
+        } else {
+            self.position = (
+                self.position.0.wrapping_add_signed(dx),
+                self.position.1.wrapping_add_signed(dy),
+            );
+        }
+    }
+
+    /// The frame's pending move against the walls (`$80:D101`): the box is
+    /// the first record's of the pose, a blocked axis is clamped and its
+    /// stream stops.
+    fn settle(&mut self, layer: &walls::Layer<'_>) {
+        let delta = std::mem::take(&mut self.pending);
+        if delta == (0, 0) {
+            return;
+        }
+        let shape = self
+            .boxes
+            .as_ref()
+            .and_then(|boxes| boxes.get(usize::from(self.selector))?.first())
+            .map(|record| record.sprite);
+        let Some(shape) = shape else {
+            self.position = (
+                self.position.0.wrapping_add_signed(delta.0),
+                self.position.1.wrapping_add_signed(delta.1),
+            );
+            return;
+        };
+        let (position, blocked) = walls::step(self.position, delta, shape, layer);
+        self.position = position;
+        if let Some(motion) = &mut self.motion {
+            motion.stop(blocked);
+        }
+        if blocked.0 || blocked.1 {
+            self.stream = None;
+        }
+    }
+
     /// One frame of a scripted leg or a pose's movement; cleared once the
     /// pose wait is over.
     fn apply_stream(&mut self) {
@@ -1650,10 +1881,7 @@ impl Actor {
         } else {
             return;
         };
-        self.position = (
-            self.position.0.wrapping_add_signed(dx),
-            self.position.1.wrapping_add_signed(dy),
-        );
+        self.displace((dx, dy));
         self.walking = self.stream.is_some() || (dx, dy) != (0, 0);
         let ends = match self.state {
             State::Waiting(frames) => frames <= 1,
@@ -1799,7 +2027,9 @@ impl Actor {
                 }
                 self.pc = operands + 3;
             }
-            SPAWN | SPAWN_LINKED | SPAWN_AT => return self.spawn(service, operands, around),
+            SPAWN | SPAWN_LINKED | SPAWN_AT | SPAWN_OFFSET => {
+                return self.spawn(service, operands, around)
+            }
             MUSIC_WAIT => return self.hold(operands, 3),
             cosmetic => {
                 let Some(&(_, length)) = COSMETIC.iter().find(|&&(service, _)| service == cosmetic)
@@ -1946,6 +2176,22 @@ impl Actor {
         let probe = (i32::from(around.player.0), i32::from(around.player.1) - 8);
         let (dx, dy) = (probe.0 - x, probe.1 - y);
         let target = match service {
+            PLAYER_FRONT => {
+                let (Some(&[w, l, mode]), Some(target)) =
+                    (image.get(operands..operands + 3), word(3))
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let facing = self.facing_code();
+                let (left, top, right, bottom) = sense::front(facing, self.position, w, l);
+                let inside = (left..=right).contains(&probe.0) && (top..=bottom).contains(&probe.1);
+                if !inside || !sense::admits(mode, facing, sense::code(around.facing)) {
+                    self.pc = operands + 5;
+                    return true;
+                }
+                Some(target)
+            }
             PLAYER_NEAR => {
                 let (Some(&distance), Some(target)) = (image.get(operands), word(1)) else {
                     self.state = State::Frozen;
@@ -2052,38 +2298,48 @@ impl Actor {
     /// `COP 9C` (a script at an offset). Returns whether execution continues.
     fn spawn(&mut self, service: u8, operands: usize, around: &mut Surroundings<'_>) -> bool {
         let image = around.image;
-        match service {
-            SPAWN | SPAWN_LINKED => {
-                let (Some(script), Some(flags)) = (
-                    image.get(operands..operands + 3).and_then(long),
-                    cadence::word(image, operands + 3),
-                ) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                around.globals.spawns.push((script, flags, self.position));
-                self.pc = operands + 5;
-            }
-            SPAWN_AT => {
-                let (Some(script), Some(dx), Some(dy)) = (
-                    image.get(operands..operands + 3).and_then(long),
-                    cadence::word(image, operands + 3),
-                    cadence::word(image, operands + 5),
-                ) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                let dx = if self.hflip { dx.wrapping_neg() } else { dx };
-                let at = (
-                    self.position.0.wrapping_add(dx),
-                    self.position.1.wrapping_add(dy),
-                );
-                around.globals.spawns.push((script, 0, at));
-                self.pc = operands + 7;
-            }
-            _ => self.state = State::Frozen,
-        }
-        self.state != State::Frozen
+        let script = image.get(operands..operands + 3).and_then(long);
+        let word = |at: usize| cadence::word(image, operands + at);
+        let (script, flags, offset, length) = match service {
+            SPAWN | SPAWN_LINKED => (script, word(3), Some((0, 0)), 5),
+            SPAWN_AT => (script, Some(0), word(3).zip(word(5)), 7),
+            _ => (script, word(7), word(3).zip(word(5)), 9),
+        };
+        let (Some(script), Some(flags), Some((dx, dy))) = (script, flags, offset) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let dx = if self.hflip { dx.wrapping_neg() } else { dx };
+        let at = (
+            self.position.0.wrapping_add(dx),
+            self.position.1.wrapping_add(dy),
+        );
+        around
+            .globals
+            .spawns
+            .push((script, self.child(script, flags, at)));
+        self.pc = operands + length;
+        true
+    }
+
+    /// A child as the spawns make it (`$80:BCA4`): the parent's mirror,
+    /// palette, priority and movement base, `+$04` from `flags` (bit 15
+    /// hidden, `$0006` walls).
+    fn child(&self, script: usize, flags: u16, at: (u16, u16)) -> Self {
+        let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
+        let mut child = Self::new(at, Some(runtime), 0, 1);
+        child.hflip = self.hflip;
+        child.palette = self.palette;
+        child.priority = self.priority;
+        child.base = self.base;
+        child.resources.clone_from(&self.resources);
+        child.descriptor = self.descriptor;
+        child.legs = self.legs;
+        child.hidden = flags & 0x8000 != 0;
+        child.walls = flags & 0x0006 == 0x0004;
+        child.guard.0 = flags & GUARD_04;
+        child.spawned = true;
+        child
     }
 
     /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns
@@ -3026,6 +3282,24 @@ fn answered(image: &[u8], pc: usize, wait: Wait, answer: u8) -> Option<usize> {
             (target >= 0x8000).then_some((table & 0xFF_0000) | usize::from(target))
         }
     }
+}
+
+/// Where the `BEQ` or `BNE` at `at` goes after a test that left Z as
+/// `zero`.
+fn tested_branch(image: &[u8], at: usize, zero: bool) -> Option<usize> {
+    let (&opcode, &offset) = (image.get(at)?, image.get(at + 1)?);
+    let taken = match opcode {
+        0xF0 => zero,
+        0xD0 => !zero,
+        _ => return None,
+    };
+    let next = at + 2;
+    Some(if taken {
+        (at & 0xFF_0000)
+            | (next.wrapping_add_signed(isize::from(i8::from_ne_bytes([offset]))) & 0xFFFF)
+    } else {
+        next
+    })
 }
 
 /// The end of a run of inline native code that only touches the display:
@@ -4169,7 +4443,10 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         let mut globals = Globals::with_events(vec![0; 512]);
         tick_at(&mut actor, &image, &mut globals, (0, 0));
-        assert_eq!(globals.spawns, [(0x08_8029, 0x4000, actor.position)]);
+        let [(script, child)] = &globals.spawns[..] else {
+            panic!("one spawn");
+        };
+        assert_eq!((*script, child.position), (0x08_8029, actor.position));
     }
 
     #[test]
@@ -4199,6 +4476,65 @@ mod script_service_tests {
             player: (0, 0),
             facing: Direction::Down,
         });
+    }
+
+    #[test]
+    fn enemies_test_the_layer_and_keep_their_combat_bits() {
+        // Same layer: BNE +3 falls through to COP 80 7; the flyer's
+        // `ORA #$0030` on `+$04` and `ORA #$0010` on `+$06`; yield.
+        let code = [
+            0xAC, 0xEA, 0x0D, 0xB9, 0x16, 0x00, 0xDD, 0x16, 0x00, 0xD0, 0x03, 2, 0x80, 7, 0xBD,
+            0x04, 0x00, 0x09, 0x30, 0x00, 0x9D, 0x04, 0x00, 0xBD, 0x06, 0x00, 0x09, 0x10, 0x00,
+            0x9D, 0x06, 0x00, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!(
+            (actor.frozen_at(), actor.selector, actor.guard),
+            (None, 7, (0x30, 0x10))
+        );
+    }
+
+    #[test]
+    fn cop_cc_and_cd_walk_a_line_toward_the_target() {
+        // The flyer's chase: COP CC 00 08 01 18 FF; COP CD; COP 80 7; yield.
+        let code = [2, 0xCC, 0, 8, 1, 0x18, 0xFF, 2, 0xCD, 2, 0x80, 7, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        for (at, byte) in [(0x2004, 96), (0x2005, 0), (0x2006, 94), (0x2007, 0)] {
+            actor.own.insert(at, byte);
+        }
+        for _ in 0..24 {
+            tick(&mut actor, &image);
+        }
+        // 24 frames, the last moving: (+23,+17), the script not yet on.
+        assert_eq!((actor.position, actor.selector), ((79, 81), 8));
+        tick(&mut actor, &image);
+        assert_eq!((actor.position, actor.selector), ((79, 81), 7));
+    }
+
+    #[test]
+    fn cop_b8_toggles_the_mirror() {
+        // COP B7; COP B8; yield; COP B8; yield.
+        let (image, mut actor) = actor_running(&[2, 0xB7, 2, 0xB8, 2, 0xBD, 2, 0xB8, 2, 0xBD]);
+        tick(&mut actor, &image);
+        assert!(!actor.hflip);
+        tick(&mut actor, &image);
+        assert!(actor.hflip);
+    }
+
+    #[test]
+    fn cop_82_and_86_select_a_pose_with_a_selector_or_a_count() {
+        // COP 82 5 9; yield.
+        let (image, mut actor) = actor_running(&[2, 0x82, 5, 9, 2, 0xBD]);
+        tick(&mut actor, &image);
+        assert_eq!((actor.frozen_at(), actor.selector), (None, 5));
+        // COP 86 3 4; yield.
+        let (image, mut actor) = actor_running(&[2, 0x86, 3, 4, 2, 0xBD]);
+        tick(&mut actor, &image);
+        assert_eq!(
+            (actor.frozen_at(), actor.selector, actor.repeats),
+            (None, 4, Some(3))
+        );
     }
 
     #[test]

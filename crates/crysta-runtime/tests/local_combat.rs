@@ -294,3 +294,45 @@ fn nobody_in_crysta_is_an_enemy() {
         }
     }
 }
+
+#[test]
+fn blobs_stay_off_the_walls() {
+    // `docs/enemy-scripts.md` §6: an enemy's box (x-8..x+8, y-16..y) stops
+    // at cells whose attribute is not 0, 1, 17 or 22.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x100 / 8] |= 1 << (0x100 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0101, 128, 400, events).unwrap();
+        let blocks = |world: &World<'_>, x: u16, y: u16| {
+            world
+                .base_cell(x >> 4, y >> 4)
+                .is_none_or(|word| !matches!((word >> 9) & 0x1F, 0 | 1 | 17 | 22))
+        };
+        let mut moved = 0;
+        for _ in 0..3000 {
+            let before: Vec<_> = world.residents().iter().map(|r| r.position).collect();
+            world.update(None, Presses::NONE).unwrap();
+            for (resident, was) in world.residents().iter().zip(before) {
+                if world.foe_life(resident.record).is_none() || resident.position == was {
+                    continue;
+                }
+                moved += 1;
+                let (x, y) = resident.position;
+                for (cx, cy) in [
+                    (x - 8, y - 16),
+                    (x + 7, y - 16),
+                    (x - 8, y - 1),
+                    (x + 7, y - 1),
+                ] {
+                    assert!(
+                        !blocks(&world, cx, cy),
+                        "{:?}: a blob at {:?} overlaps a wall",
+                        rom.revision(),
+                        resident.position
+                    );
+                }
+            }
+        }
+        assert!(moved > 100, "{:?}: {moved}", rom.revision());
+    }
+}

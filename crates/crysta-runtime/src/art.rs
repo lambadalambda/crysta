@@ -607,7 +607,11 @@ pub fn residents_art(
                 // desk's book in the bedroom and the freeze's crystals in
                 // `$21` only; elsewhere what the list draws is not known,
                 // and the blue door's target in C shows nothing natively.
-                return if (0x41..=0x44).contains(&map) || [0x0F, 0x21].contains(&map) {
+                // The helper art (bullets) is the same everywhere.
+                return if (0x41..=0x44).contains(&map)
+                    || [0x0F, 0x21].contains(&map)
+                    || own.0 == crate::actors::helper(image)
+                {
                     Body::object(image, own)
                         .map_err(|error| Placeholder::Refused(error.to_string()))
                 } else {
@@ -643,13 +647,14 @@ pub fn residents_art(
 /// The object sheet and list a resident's script points its art at before
 /// its first pose: `COP D8 base`, then `COP 80 list`, with `COP B2`
 /// (an offset) and `COP 48` (a flag check) allowed first, as the spear's
-/// display `$89:D9FE` and the blue door's hit target `$88:AAEE` do. Its
+/// display `$89:D9FE` and the blue door's hit target `$88:AAEE` do, and a
+/// bullet's set-up (`$97:BA9C`: `COP D9`, its own words, `COP 82`). Its
 /// descriptor, often reused from the record before, is not what it draws.
 fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
     let mut at = usize::try_from(resident.script? & 0x3F_FFFF).ok()?;
     let mut base = None;
     let mut back = None;
-    for _ in 0..8 {
+    for _ in 0..12 {
         let code = image.get(at..at + 9)?;
         match code[..2] {
             [2, 0x48 | 0xB2] => at += 4,
@@ -662,13 +667,19 @@ fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
                 );
                 at += 5;
             }
-            // `COP 80 pose`, or `COP D0`'s orbit with its pose word.
-            [2, 0x80 | 0xD0] => return base.map(|base| (base, code[2])),
+            // `COP 80 pose`, `81`/`82` with movement, or `COP D0`'s orbit
+            // with its pose word.
+            [2, 0x80..=0x82 | 0xD0] => return base.map(|base| (base, code[2])),
             // `LDA #0; STA $0004,X` or `$0006,X`: a cleared entity, as the
             // desk's book starts (`$88:D641`).
             [0xA9, 0] if code[2..4] == [0, 0x9D] && matches!(code[4..6], [4 | 6, 0]) => at += 6,
             // `LDA $0006,X; ORA #$4000; STA $0006,X`, as the crystals do.
             [0xBD, 6] if code[2..] == [0, 0x09, 0, 0x40, 0x9D, 6, 0] => at += 9,
+            // `COP D9`'s profile; `LDA #n` into the entity's own words:
+            // `STA $7F:xxxx,X`, the direction `STA`/`STZ $0014,X`.
+            [2, 0xD9] | [0xA9, _] => at += 3,
+            [0x9F, _] if code[3] == 0x7F => at += 4,
+            [0x9D | 0x9E, 0x14] if code[2] == 0 => at += 3,
             // `JSR` within the bank and its `RTS`, one level deep.
             [0x20, low] if back.is_none() => {
                 back = Some(at + 3);

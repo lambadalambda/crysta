@@ -19,6 +19,14 @@ const GEM_SHOWN: u16 = 16;
 const GEM_BLINKS: u16 = 256;
 const GEM_GONE: u16 = 288;
 
+/// `+$04` bits that keep a body out of the hit scan (`$85:D2CB`) as a
+/// target, and as an attacker (`$85:D2A7`).
+const NOT_TARGET: u16 = 0x0022;
+const NOT_ATTACKING: u16 = 0x0010;
+/// `+$06` bits: no knockback, no damage.
+const NO_KNOCKBACK: u16 = 0x0010;
+const NO_DAMAGE: u16 = 0x0020;
+
 /// The helper art (`$A2:C000`, European `$A4:C000`).
 pub(crate) fn helper(image: &[u8]) -> u32 {
     assets::layout::per_revision(image, 0xA2_C000, 0xA4_C000)
@@ -93,6 +101,17 @@ impl Actor {
         boxes::at_age(records, self.pose_age.checked_rem(total)?)
     }
 
+    /// Entity `+$14`: the facing code of the record shown (`$80:EDA4`), a
+    /// mirrored Right turned Left (`$80:EE05`); without boxes, the actor's
+    /// facing.
+    pub(crate) fn facing_code(&self) -> u8 {
+        match self.record().map(|record| record.facing) {
+            Some(3) if self.hflip => 2,
+            Some(facing) => facing,
+            None => super::sense::code(self.facing),
+        }
+    }
+
     /// A box of the pose shown, on the map.
     fn place(&self, shape: [i8; 4]) -> Rect {
         boxes::place(shape, self.position, self.hflip)
@@ -106,7 +125,7 @@ impl Actor {
     /// The body box an attack must touch, while the enemy can be hit.
     pub(crate) fn body_box(&self) -> Option<Rect> {
         self.foe.as_ref().filter(|foe| foe.hittable())?;
-        if self.hidden {
+        if self.hidden || self.guard.0 & NOT_TARGET != 0 {
             return None;
         }
         Some(self.place(self.record()?.body))
@@ -115,22 +134,45 @@ impl Actor {
     /// The attack box that hurts Ark, while the enemy is up and about.
     pub(crate) fn hurt_box(&self) -> Option<Rect> {
         let foe = self.foe.as_ref()?;
-        if self.hidden || foe.knocked || foe.exploding.is_some() || foe.dead || foe.gem.is_some() {
+        if self.hidden
+            || self.guard.0 & NOT_ATTACKING != 0
+            || foe.knocked
+            || foe.exploding.is_some()
+            || foe.dead
+            || foe.gem.is_some()
+        {
             return None;
         }
         Some(self.place(self.record()?.attack))
     }
 
+    /// Whether a hit does it no damage (`+$06 & $0020`).
+    pub(crate) const fn unharmed(&self) -> bool {
+        self.guard.1 & NO_DAMAGE != 0
+    }
+
     /// Takes `damage` from a hit that pushes toward `away` (`$85:D578`,
     /// knockback `$85:E03D`): selector 0 pushes Down, 1 Up, 2 sideways
-    /// (mirrored for Left), on the enemy's own movement.
+    /// (mirrored for Left), on the enemy's own movement. A script that
+    /// handles knockback itself (`+$06 & $0010`) is not pushed: the death
+    /// check comes at once.
     pub(crate) fn take_hit(&mut self, damage: u16, away: Direction, image: &[u8]) {
-        let Some(foe) = &mut self.foe else {
+        let steady = self.guard.1 & NO_KNOCKBACK != 0;
+        let Some(mut foe) = self.foe.take() else {
             return;
         };
         foe.life = foe.life.saturating_sub(damage);
         foe.immune = IMMUNE;
+        if steady {
+            if foe.life == 0 {
+                self.explode(&mut foe, image);
+            }
+            self.foe = Some(foe);
+            return;
+        }
         foe.knocked = true;
+        self.foe = Some(foe);
+        self.line = None;
         let (selector, mirrored) = match away {
             Direction::Down => (0, false),
             Direction::Up => (1, false),
@@ -189,24 +231,28 @@ impl Actor {
             .as_mut()
             .filter(|motion| motion.running())
             .and_then(motion::Motion::step);
-        if let Some((dx, dy)) = step {
-            self.position = (
-                self.position.0.wrapping_add_signed(dx),
-                self.position.1.wrapping_add_signed(dy),
-            );
+        if let Some(delta) = step {
+            self.displace(delta);
             return;
         }
         // The script goes on past the wait it was in.
         foe.knocked = false;
         self.motion = None;
         if foe.life == 0 {
-            foe.exploding = Some(EXPLOSION);
-            self.died = true;
-            self.overlay = Some((helper(image), EXPLODING));
-            self.pose_age = 0;
+            self.explode(foe, image);
         } else if matches!(self.state, State::Waiting(_)) {
             self.state = State::Waiting(0);
         }
+    }
+
+    /// The death script's start (`$85:E27B`): the explosion.
+    fn explode(&mut self, foe: &mut Foe, image: &[u8]) {
+        foe.exploding = Some(EXPLOSION);
+        self.died = true;
+        self.motion = None;
+        self.stream = None;
+        self.overlay = Some((helper(image), EXPLODING));
+        self.pose_age = 0;
     }
 
     /// The drop roll after the explosion (`$85:E2E9`): a gem, or gone.

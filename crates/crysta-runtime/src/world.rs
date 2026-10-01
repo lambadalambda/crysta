@@ -878,19 +878,17 @@ impl<'a> World<'a> {
 
     /// Adds the actors scripts spawned (`COP A2`); they run from next frame.
     fn spawn_actors(&mut self) {
-        for (script, flags, position) in std::mem::take(&mut self.globals.spawns) {
-            let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
-            let mut actor = Actor::new(position, Some(runtime), 0, 1);
+        for (script, mut actor) in std::mem::take(&mut self.globals.spawns) {
             actor.set_map(self.map);
-            actor.hidden = flags & 0x8000 != 0;
+            let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
             self.residents.push(Resident {
-                position,
+                position: actor.position,
                 record: 0,
                 script: Some(runtime),
                 body: false,
                 initial: 0,
                 selector: 0,
-                hflip: false,
+                hflip: actor.hflip,
                 pose_age: 0,
                 walking: false,
                 descriptor: None,

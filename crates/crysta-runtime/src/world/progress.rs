@@ -149,4 +149,16 @@ impl World<'_> {
     pub fn set_exp(&mut self, exp: u32) {
         self.globals.slot.set_exp(exp);
     }
+
+    /// The first layer's cell word at (column, row), as enemies probe it,
+    /// for tests.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn base_cell(&self, column: u16, row: u16) -> Option<u16> {
+        if column >= self.base.width || row >= self.base.height {
+            return None;
+        }
+        let at = usize::from(row) * usize::from(self.base.width) + usize::from(column);
+        self.base.room.cells().get(at).copied()
+    }
 }

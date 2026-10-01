@@ -10,6 +10,7 @@ use assets::compression::decode;
 use assets::layout;
 use assets::maps::actors::rom_offset as offset;
 use assets::maps::scripts::unpack_pointer;
+use assets::sprites::boxes::Record;
 use room_core::Direction;
 
 /// Ticks of one COP26 action, by the source chain of one resident.
@@ -119,19 +120,33 @@ pub(super) fn pose_ticks(image: &[u8], descriptor: usize) -> Option<Vec<Option<u
 
 /// The records and boxes of every display list in a descriptor's packet
 /// (`docs/combat.md`), for the hit scans.
-pub(super) fn pose_boxes(
-    image: &[u8],
-    descriptor: usize,
-) -> Option<Vec<Vec<assets::sprites::boxes::Record>>> {
+pub(super) fn pose_boxes(image: &[u8], descriptor: usize) -> Option<Vec<Vec<Record>>> {
     let packet = offset(image.get(descriptor..descriptor + 3)?)?;
-    let data = decode(image.get(packet..)?, 0x10000).ok()?.data;
-    let lists = list_ticks(&data)?.len();
+    lists_boxes(&decode(image.get(packet..)?, 0x10000).ok()?.data)
+}
+
+/// The same for the packet a `COP D8` pointer names: an LZ packet, or
+/// direct lists as the helper art's (`$A2:C000`).
+pub(super) fn packet_boxes(image: &[u8], pointer: &[u8]) -> Option<Vec<Vec<Record>>> {
+    let packet = offset(pointer)?;
+    if let Some(boxes) = decode(image.get(packet..)?, 0x10000)
+        .ok()
+        .and_then(|packet| lists_boxes(&packet.data))
+    {
+        return Some(boxes);
+    }
+    let end = ((packet >> 16) + 1).checked_mul(0x1_0000)?.min(image.len());
+    lists_boxes(image.get(packet..end)?)
+}
+
+fn lists_boxes(data: &[u8]) -> Option<Vec<Vec<Record>>> {
+    let lists = list_ticks(data)?.len();
     Some(
         (0..lists)
             .map(|list| {
                 u8::try_from(list)
                     .ok()
-                    .and_then(|list| assets::sprites::boxes::packet_list(&data, list).ok())
+                    .and_then(|list| assets::sprites::boxes::packet_list(data, list).ok())
                     .unwrap_or_default()
             })
             .collect(),

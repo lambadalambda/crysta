@@ -33,17 +33,24 @@ pub struct Memory<'m> {
     pub display: &'m mut Display,
     /// `$0408`, the random generator's word.
     pub random: u16,
+    /// `$0966`/`$0968`: Ark's probe (x, y - 8), which enemies aim at.
+    pub probe: (u16, u16),
 }
 
-/// The actor's own bytes runs may use: `COP 46`'s row offset and layer
-/// (`$7F:201A/201B,X`) and the voice fade's intensity (`$7F:201C,X`,
-/// `$88:9CD8`). Other fields are the engine's.
-const OWN: std::ops::RangeInclusive<u16> = 0x201A..=0x201D;
+/// The actor's own bytes runs may use: the wake callbacks and the attack
+/// kind (`$7F:1000..102D,X`, `docs/enemy-scripts.md` §5), `COP CC`'s target
+/// (`$7F:2004..2007,X`), `COP 46`'s row offset and layer (`$7F:201A/201B,X`)
+/// and the voice fade's intensity (`$7F:201C,X`, `$88:9CD8`). Other fields
+/// are the engine's.
+const OWN: [std::ops::RangeInclusive<u16>; 3] = [0x1000..=0x102D, 0x2004..=0x2007, 0x201A..=0x201D];
+/// `$0966`/`$0968`, Ark's probe, which runs may read.
+const PROBE: [u16; 2] = [0x0966, 0x0968];
 /// `$0408`: the random generator's word, which runs may read.
 const RANDOM: u16 = 0x0408;
-/// The entity's own scratch words runs may use through `,X`: `+$24` and
-/// `+$26` (the blob's counters, `docs/enemy-scripts.md`).
-const FIELDS: [u16; 2] = [0x24, 0x26];
+/// The entity's own words runs may use through `,X`: `+$14`, a bullet's
+/// direction, and `+$24` and `+$26` (the blob's counters,
+/// `docs/enemy-scripts.md`).
+const FIELDS: [u16; 3] = [0x14, 0x24, 0x26];
 /// `$7E:46E6`, `COP 6A`'s square: a run stores 0 to stop it.
 const SPIN: u32 = 0x7E_46E6;
 /// The colour math registers' shadows (`$0468..$046B`), which the NMI
@@ -261,7 +268,16 @@ impl<'a> Machine<'a> {
                 self.set(memory.random);
                 self.pc + 3
             }
-            0x9D | 0xBD | 0xDD | 0xDE
+            0xAD if !self.narrow && self.operand().is_some_and(|at| PROBE.contains(&at)) => {
+                let (x, y) = memory.probe;
+                self.set(if self.operand() == Some(PROBE[0]) {
+                    x
+                } else {
+                    y
+                });
+                self.pc + 3
+            }
+            0x9D | 0x9E | 0xBD | 0xDD | 0xDE
                 if self.operand().is_some_and(|field| FIELDS.contains(&field)) =>
             {
                 self.field(opcode, memory.own)?
@@ -321,7 +337,10 @@ impl<'a> Machine<'a> {
         let long = self.long()?;
         let width: u16 = if self.narrow { 1 } else { 2 };
         let address = u16::try_from(long & 0xFFFF).ok()?;
-        if long >> 16 != 0x7F || !self.x || !OWN.contains(&(address + width - 1)) {
+        let owned = OWN
+            .iter()
+            .any(|own| own.contains(&address) && own.contains(&(address + width - 1)));
+        if long >> 16 != 0x7F || !self.x || !owned {
             return None;
         }
         if opcode == 0xBF {
@@ -337,7 +356,7 @@ impl<'a> Machine<'a> {
         Some(self.pc + 4)
     }
 
-    /// `STA`, `LDA`, `CMP`, `DEC` on one of the entity's [`FIELDS`] (`,X`,
+    /// `STA`, `STZ`, `LDA`, `CMP`, `DEC` on one of the entity's [`FIELDS`] (`,X`,
     /// X the actor, 16-bit), kept with its own bytes.
     fn field(&mut self, opcode: u8, own: &mut Own) -> Option<usize> {
         if self.narrow || !self.x {
@@ -357,6 +376,7 @@ impl<'a> Machine<'a> {
         };
         match opcode {
             0x9D => write(own, self.a?),
+            0x9E => write(own, 0),
             0xBD => self.set(read(own)),
             0xDD => {
                 let (a, value) = (self.a?, read(own));
@@ -587,6 +607,7 @@ mod tests {
                 own: &mut Own::new(),
                 display: &mut Display::default(),
                 random: 0,
+                probe: (0, 0),
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -622,6 +643,7 @@ mod tests {
             own: &mut own,
             display: &mut display,
             random: 0,
+            probe: (0, 0),
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -643,6 +665,31 @@ mod tests {
         let mut image = vec![0; AT];
         image.extend_from_slice(code);
         image
+    }
+
+    #[test]
+    fn a_flyer_aims_at_arks_probe_and_registers_a_callback() {
+        // `$97:B9DA`: LDA $0966; STA $7F:2004,X; LDA $0968; STA $7F:2006,X;
+        // `$97:BB92`: LDA #$BB92; STA $7F:1016,X; COP.
+        let code = [
+            0xAD, 0x66, 0x09, 0x9F, 0x04, 0x20, 0x7F, 0xAD, 0x68, 0x09, 0x9F, 0x06, 0x20, 0x7F,
+            0xA9, 0x92, 0xBB, 0x9F, 0x16, 0x10, 0x7F, 0x02,
+        ];
+        let flyer = image(&code);
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0,
+            probe: (0x0123, 0x0456),
+        };
+        assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
+        let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
+            .iter()
+            .map(|at| own[at])
+            .collect();
+        assert_eq!(bytes, [0x23, 0x01, 0x56, 0x04, 0x92, 0xBB]);
     }
 
     #[test]
@@ -745,6 +792,7 @@ mod tests {
             own: &mut own,
             display: &mut display,
             random: 0,
+            probe: (0, 0),
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

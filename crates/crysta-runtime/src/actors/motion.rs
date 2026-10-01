@@ -121,6 +121,17 @@ impl Motion {
         self.x.pointer != 0 || self.y.pointer != 0
     }
 
+    /// Stops the blocked axes' streams (`7F:0010`/`0012` = 0); the pose's
+    /// next repetition starts them again.
+    pub(super) fn stop(&mut self, (x, y): (bool, bool)) {
+        if x {
+            self.x.pointer = 0;
+        }
+        if y {
+            self.y.pointer = 0;
+        }
+    }
+
     pub(super) fn step(&mut self) -> Option<(i16, i16)> {
         if self.list == Some(self.tick) {
             (self.x, self.y) = self.start;

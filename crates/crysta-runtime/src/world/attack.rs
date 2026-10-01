@@ -111,7 +111,8 @@ impl World<'_> {
 
     /// The hit scan (`$85:D281`): the thrust's attack box against each
     /// enemy's body box, edges included; a hit that does damage takes it
-    /// and pushes the enemy away from Ark (a 0 is only a strike).
+    /// and pushes the enemy away from Ark (a 0 is only a strike); one that
+    /// takes no damage (`+$06 & $0020`) is passed over.
     fn strike_foes(&mut self) {
         let Some(attack) = self.attack_box() else {
             return;
@@ -124,7 +125,7 @@ impl World<'_> {
             else {
                 continue;
             };
-            if !boxes::overlap(attack, body) {
+            if !boxes::overlap(attack, body) || actor.unharmed() {
                 continue;
             }
             self.globals.random.step();
