@@ -231,6 +231,8 @@ impl StaticBackground {
             // The rest of the Crysta slice resolves through the loading-script
             // projection. See meta/issues/playable-crysta-slice.md.
             0x000E | 0x0012..=0x0021 => (projected_loads(image, map_id)?, 0x6000),
+            // The first tower's ground floor (`docs/tower-entry.md`).
+            0x0100 => (projected_recipe(image, map_id, &TOWER_LOADS)?, 0x4000),
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
@@ -650,6 +652,16 @@ const WANTED_LOADS: [(ResourceKind, &[u8]); 6] = [
     (ResourceKind::Layer, &[0x01]),
     (ResourceKind::Palette, &[0x00, 0x20, 0x00]),
 ];
+/// The towers' recipe (`docs/world-map-mode7.md`): the same loads, but BG1's
+/// tiles come as `$4000` bytes to `$2000`.
+const TOWER_LOADS: [(ResourceKind, &[u8]); 6] = [
+    (ResourceKind::Graphics, &[0x00, 0x20, 0x01]),
+    WANTED_LOADS[1],
+    WANTED_LOADS[2],
+    WANTED_LOADS[3],
+    WANTED_LOADS[4],
+    WANTED_LOADS[5],
+];
 /// Whether a load is one this profile knowingly does not consume.
 ///
 /// Listing these explicitly is what lets an unrecognised transfer be refused
@@ -686,6 +698,14 @@ fn is_known_unconsumed(kind: ResourceKind, bytes: &[u8]) -> bool {
 }
 
 fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
+    projected_recipe(image, id, &WANTED_LOADS)
+}
+
+fn projected_recipe(
+    image: &[u8],
+    id: u16,
+    wanted: &[(ResourceKind, &[u8])],
+) -> Result<Vec<Load>, VisualMapError> {
     let program =
         scripts::resolve_map(image, id, Limits::default()).map_err(VisualMapError::Script)?;
     let loads: Vec<Load> = program
@@ -698,8 +718,8 @@ fn projected_loads(image: &[u8], id: u16) -> Result<Vec<Load>, VisualMapError> {
             _ => None,
         })
         .collect();
-    let mut selected = Vec::with_capacity(WANTED_LOADS.len());
-    for (kind, operand) in WANTED_LOADS {
+    let mut selected = Vec::with_capacity(wanted.len());
+    for &(kind, operand) in wanted {
         let mut matching = loads
             .iter()
             .filter(|(k, _, bytes)| *k == kind && bytes.get(1..1 + operand.len()) == Some(operand));
