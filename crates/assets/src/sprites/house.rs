@@ -822,9 +822,10 @@ impl<'a> Loader<'a> {
         if extra != 0 {
             pointer(&d[5..8])?;
         }
-        // Bit 7: a palette-table entry (`$80:FC72 + (b & $3F) * 3`); the
+        // Bit 7: a palette-table entry (`$80:FC72 + (b & $3F) * 3`, the
+        // knight's `$9E` too); the
         // row offset, in 16-byte units, even (the Four Hiballs' `$0E`, `$82:EA21`).
-        if ![0x80, 0x81, 0x90, 0x91].contains(&d[pal])
+        if d[pal] & 0xC0 != 0x80
             || d[pal + 1] % 2 != 0
             || d[pal + 2] != 2
             || ![8, 10].contains(&d[pal + 3])

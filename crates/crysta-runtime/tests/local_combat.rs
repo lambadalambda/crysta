@@ -336,3 +336,34 @@ fn blobs_stay_off_the_walls() {
         assert!(moved > 100, "{:?}: {moved}", rom.revision());
     }
 }
+
+#[test]
+fn the_knight_guards_and_thrusts_at_ark() {
+    // `$95:EFB0` (`docs/enemy-scripts.md` §8): an enemy (profile `$0E`, 23
+    // life, its palette table entry `$9E`) that thrusts when Ark stands in
+    // its front box and walks at him.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x100 / 8] |= 1 << (0x100 % 8);
+        let world =
+            World::enter_with_events(rom.image(), 0x0103, 128, 400, events.clone()).unwrap();
+        let knight = world
+            .residents()
+            .iter()
+            .find(|resident| world.foe_life(resident.record) == Some(23))
+            .unwrap_or_else(|| panic!("{:?}: no knight", rom.revision()));
+        let (at, record) = (knight.position, knight.record);
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0103, at.0, at.1 + 40, events).unwrap();
+        for _ in 0..120 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert!(
+            world.life().0 < 28,
+            "{:?}: {:?}",
+            rom.revision(),
+            world.life()
+        );
+        assert_eq!(world.foe_life(record), Some(23));
+    }
+}
