@@ -302,6 +302,10 @@ const MOVE_Y: u8 = 0xB2;
 /// Writes a byte into `+$08` bits 8–15 (`$80:AA6F`): bits 12–13 are the
 /// OBJ priority.
 const OBJ_PRIORITY: u8 = 0xBA;
+/// The palette field.
+const PALETTE: u8 = 0xBB;
+/// The services [`Actor::body`] runs.
+const BODY: [u8; 4] = [MOVE_Y, SET_PACKET, OBJ_PRIORITY, PALETTE];
 /// Points the actor at another art packet (`$80:B4DF`): its display lists,
 /// which a `COP 8E` wait plays, are the new packet's.
 const SET_PACKET: u8 = 0xD8;
@@ -447,6 +451,9 @@ pub struct Actor {
     pub hidden: bool,
     /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
     pub priority: u8,
+    /// Palette field (entity `+$08` bits 9–11, `COP BB`): added to each
+    /// frame's OBJ palette, modulo 8.
+    pub palette: u8,
     /// The player's pose a `COP 84` selected: Ark's resource and list.
     pub player_pose: Option<(u8, u8)>,
     /// Whether the actor has ever moved.
@@ -547,6 +554,7 @@ impl Actor {
             walking: false,
             hidden: false,
             priority: 2,
+            palette: 0,
             player_pose: None,
             walked: false,
             contact: None,
@@ -1180,7 +1188,7 @@ impl Actor {
                 return self.player_service(service, operands, bank, around)
             }
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
-            MOVE_Y | SET_PACKET | OBJ_PRIORITY => return self.body(service, operands, image),
+            _ if BODY.contains(&service) => return self.body(service, operands, image),
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
@@ -1222,8 +1230,9 @@ impl Actor {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
     }
 
-    /// The actor's body: its y (`COP B2`), its art packet (`COP D8`) and its
-    /// OBJ priority (`COP BA`). Returns whether execution continues.
+    /// The actor's body: its y (`COP B2`), its art packet (`COP D8`), its
+    /// OBJ priority (`COP BA`) and palette field (`COP BB`). Returns whether
+    /// execution continues.
     fn body(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
         match service {
             MOVE_Y => {
@@ -1250,6 +1259,21 @@ impl Actor {
                     return false;
                 };
                 self.priority = (byte >> 4) & 3;
+                self.pc = operands + 1;
+            }
+            // +$08 = (+$08 & $F1FF) | operand << 8.
+            PALETTE => {
+                let Some(&byte) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                self.palette = (byte >> 1) & 7;
+                self.priority |= (byte >> 4) & 3;
+                // From $40 it sets the flip bit too, which the timing
+                // derivation does not follow.
+                if byte >= 0x40 {
+                    self.cadence = None;
+                }
                 self.pc = operands + 1;
             }
             _ => self.state = State::Frozen,
@@ -3630,6 +3654,15 @@ mod script_service_tests {
         let y = actor.position.1;
         tick(&mut actor, &image);
         assert_eq!((actor.position.1, actor.priority), (y - 8, 3));
+    }
+
+    #[test]
+    fn cop_bb_sets_the_palette_field() {
+        // COP BB $0E (`$80:AA8A`: +$08 bits 9-11 = 7); yield.
+        let (image, mut actor) = actor_running(&[2, 0xBB, 0x0E, 2, 0xBD]);
+        tick(&mut actor, &image);
+        assert_eq!((actor.palette, actor.priority), (7, 2));
+        assert!(actor.frozen_at().is_none());
     }
 
     #[test]

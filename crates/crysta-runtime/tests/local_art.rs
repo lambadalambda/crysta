@@ -207,6 +207,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             descriptor: None,
             hidden: false,
             priority: 2,
+            palette: 0,
         })
         .collect();
     let art = residents_art(
@@ -539,4 +540,67 @@ fn every_stair_pose_rasterizes_with_pixels() {
         assert!(animation.durations.iter().all(|&duration| duration == 7));
         assert!(animation.frames.iter().all(Raster::is_visible));
     }
+}
+
+#[test]
+fn the_frozen_townsfolk_draw_in_obj_palette_3() {
+    // `docs/scene-effects.md`: `COP BB` shifts palettes 4 and 5 to 3,
+    // `$CC:2A6C` with colour 14 `$08DF`.
+    use crysta_runtime::art::{frozen_palette, FROZEN_SLOT};
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let palette = frozen_palette(image).unwrap();
+    assert_eq!(palette[14].raw(), 0x08DF);
+    assert_eq!(
+        palette[1].raw(),
+        u16::from_le_bytes([image[0x0C_2A6E], image[0x0C_2A6F]])
+    );
+    let mut events = new_game();
+    for set in [
+        0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2E, 0xFE, 0x240, 0x241, 0x242, 0x243, 0x244,
+        0x292, 0x296,
+    ] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000A, 0x200, 0x200, events.clone()).unwrap();
+    for _ in 0..30 {
+        world
+            .update(None, crysta_runtime::scene::Presses::default())
+            .unwrap();
+    }
+    let present = world.residents();
+    let art = residents_art(
+        image,
+        0x000A,
+        present,
+        EventFlags::Bitmap(&events),
+        EventFlags::Bitmap(world.events()),
+    );
+    let colours: Vec<u32> = palette
+        .iter()
+        .map(|colour| {
+            let [r, g, b] = colour.rgb8();
+            0xFF00_0000 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
+        })
+        .collect();
+    let mut frozen = 0;
+    for (resident, body) in present.iter().zip(&art) {
+        let Ok(body) = body else { continue };
+        if body.shown_slot(resident.palette) != Some(FROZEN_SLOT) {
+            continue;
+        }
+        frozen += 1;
+        let raster = body
+            .recoloured(resident.selector, resident.hflip, &palette)
+            .unwrap()
+            .frame_at(0)
+            .clone();
+        assert!(raster
+            .pixels
+            .iter()
+            .all(|pixel| pixel >> 24 == 0 || colours.contains(pixel)));
+    }
+    assert!(frozen >= 2, "{frozen}");
 }

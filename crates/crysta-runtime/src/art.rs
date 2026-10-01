@@ -342,6 +342,22 @@ enum BodyArt {
     List(u8, [Animation; 2]),
 }
 
+/// The OBJ palette the frozen townsfolk show (`docs/scene-effects.md`).
+pub const FROZEN_SLOT: u8 = 3;
+
+/// OBJ palette 3 after the freeze: `$CC:2A6C` (European `$CE:2A6C`), with
+/// colour 14 patched to `$08DF` (its source is not found).
+#[must_use]
+pub fn frozen_palette(image: &[u8]) -> Option<[Bgr555; 16]> {
+    let at = assets::layout::per_revision(image, 0x0C_2A6C, 0x0E_2A6C);
+    let bytes = image.get(at..at + 32)?;
+    let mut palette: [Bgr555; 16] = std::array::from_fn(|index| {
+        Bgr555::new(u16::from_le_bytes([bytes[index * 2], bytes[index * 2 + 1]]))
+    });
+    palette[14] = Bgr555::new(0x08DF);
+    Some(palette)
+}
+
 /// Pandora's Box in `$21` (`$83:928F`): descriptor `$83:F984`, mode
 /// `$0004`, which the ordinary loader does not take; [`PandoraSprites`]
 /// decodes it with its one list, selector 3, under the Japanese address in
@@ -368,6 +384,57 @@ impl Body {
                 Ok(animations[usize::from(hflip)].clone())
             }
             BodyArt::List(..) => Err(SpriteError::Invalid("no such list").into()),
+        }
+    }
+
+    /// The OBJ palette slot the body shows under a `COP BB` field: its own
+    /// plus the field, modulo 8. `None` for a list body, which keeps its own.
+    #[must_use]
+    pub const fn shown_slot(&self, field: u8) -> Option<u8> {
+        match &self.art {
+            BodyArt::House(actor) => Some((actor.palette_base() / 16 + field) & 7),
+            BodyArt::List(..) => None,
+        }
+    }
+
+    /// [`Self::animation`] in another palette's colours.
+    ///
+    /// # Errors
+    /// As [`Self::animation`].
+    pub fn recoloured(
+        &self,
+        selector: u8,
+        hflip: bool,
+        palette: &[Bgr555; 16],
+    ) -> Result<Animation, ArtError> {
+        match &self.art {
+            BodyArt::House(actor) => animate(
+                &actor.sequence(selector, hflip)?,
+                (actor.graphics(), palette, actor.palette_base()),
+                hflip,
+            ),
+            BodyArt::List(..) => self.animation(selector, hflip),
+        }
+    }
+
+    /// [`Self::animation`] as a `COP BB` field shows it: in the frozen
+    /// palette when the field moves the body to [`FROZEN_SLOT`], in its own
+    /// otherwise (other shifted slots are not known).
+    ///
+    /// # Errors
+    /// As [`Self::animation`].
+    pub fn shown(
+        &self,
+        image: &[u8],
+        (selector, hflip): (u8, bool),
+        field: u8,
+    ) -> Result<Animation, ArtError> {
+        let frozen = (field != 0 && self.shown_slot(field) == Some(FROZEN_SLOT))
+            .then(|| frozen_palette(image))
+            .flatten();
+        match frozen {
+            Some(palette) => self.recoloured(selector, hflip, &palette),
+            None => self.animation(selector, hflip),
         }
     }
 

@@ -43,6 +43,8 @@ pub struct Resident {
     pub hidden: bool,
     /// OBJ priority: 3 draws over the map's high-priority tiles.
     pub priority: u8,
+    /// Palette field (`COP BB`), added to each frame's OBJ palette.
+    pub palette: u8,
 }
 
 impl Resident {
@@ -150,6 +152,7 @@ pub fn residents(
                     .and_then(|owner| present[owner].descriptor_offset()),
                 hidden: false,
                 priority: 2,
+                palette: 0,
             }
         })
         .filter(|resident| {

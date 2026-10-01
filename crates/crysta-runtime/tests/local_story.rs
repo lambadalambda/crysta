@@ -1044,6 +1044,37 @@ fn ark_takes_the_crystal_spear_and_returns_to_the_box_room() {
 }
 
 #[test]
+fn the_frozen_townsfolk_take_the_blue_palette() {
+    // After the freeze each resident script falls through to `COP BB 0E`
+    // or `0C` (`docs/scene-effects.md`): the field turns OBJ palettes 4 and
+    // 5 into 3.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = fresh_game_flags();
+    for set in [
+        0x20, 0x21, 0x22, 0x23, 0x26, 0x27, 0x28, 0x2E, 0xFE, 0x240, 0x241, 0x242, 0x243, 0x244,
+        0x292, 0x296,
+    ] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world =
+        World::enter_with_events(cartridge.image(), 0x000A, 0x200, 0x200, events).unwrap();
+    for _ in 0..30 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    let palettes: Vec<u8> = world
+        .residents()
+        .iter()
+        .map(|resident| resident.palette)
+        .collect();
+    assert!(
+        palettes.contains(&7) && palettes.contains(&6),
+        "{palettes:?}"
+    );
+}
+
+#[test]
 fn the_frozen_return_sets_fe_and_23_and_frees_ark() {
     // Back in `$21` with the spear: the figure (`$88:B2FF`, a long call into
     // `$88:D33D`'s scene) and the guide (`$88:AEB8`, the whitening, then
