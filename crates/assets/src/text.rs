@@ -609,6 +609,22 @@ impl Decoder<'_> {
         }
         Ok(())
     }
+    /// `$D8 addr`: the BCD word at `addr & $7FFF` without leading zeros,
+    /// as the chests print gems (`$D8 $89CB`, `docs/chests.md`). Bit 15's
+    /// meaning is not traced.
+    fn bcd_number(&mut self, at: u32) -> Result<(), TextError> {
+        let address = self.word()? & 0x7FFF;
+        let byte =
+            |address: u16| (self.read)(address).ok_or_else(|| invalid(at, "unresolved number"));
+        let value = u16::from_le_bytes([byte(address)?, byte(address.wrapping_add(1))?]);
+        let font = self.address(FONT)?;
+        let zero = per_revision(self.image, 0x73, 0x63);
+        for digit in format!("{value:X}").bytes() {
+            let digit = u32::from(digit.wrapping_sub(b'0')).min(9);
+            self.glyph(at, font + (zero + digit) * 64)?;
+        }
+        Ok(())
+    }
     /// Whether the image is the European one: its dictionary calls, and no
     /// katakana.
     fn europe(&self) -> bool {
@@ -630,7 +646,7 @@ impl Decoder<'_> {
     }
     fn label_call(&mut self, at: u32) -> Result<(), TextError> {
         let index = self.next()?;
-        if ![0x06, 0x25].contains(&index) {
+        if ![0x06, 0x08, 0x25].contains(&index) {
             return Err(invalid(at, "unsupported Pandora label call"));
         }
         let pointer = bytes(self.image, 0x92_c5e7 + u32::from(index) * 2, 2)?;
@@ -831,6 +847,7 @@ impl Decoder<'_> {
                     self.position = [u16::from(column) * 4, u16::from(line) * 16];
                 }
                 0xcd => self.number(at)?,
+                0xd8 => self.bcd_number(at)?,
                 0xcf => {
                     if self.position[1] + 16 >= self.dimensions[1] {
                         return Err(invalid(at, "unsupported text scrolling"));

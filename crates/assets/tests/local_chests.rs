@@ -36,3 +36,29 @@ fn the_tower_chests_hold_what_the_table_says() {
         assert!(chests(&image, 0x0F).is_empty());
     }
 }
+
+#[test]
+fn the_chest_texts_decode_with_the_item_and_the_gems() {
+    // Gems, item, empty, fanfare item, its close, overloaded (JP, EU).
+    let sources = [
+        [
+            0x92_810E, 0x92_812C, 0x92_8164, 0x92_8147, 0x92_8162, 0x92_8096,
+        ],
+        [
+            0x92_8131, 0x92_8151, 0x92_818F, 0x92_816F, 0x92_818D, 0x92_80B0,
+        ],
+    ];
+    for image in images() {
+        let europe = assets::layout::per_revision(&image, 0, 1);
+        for source in sources[europe] {
+            let pages =
+                assets::text::HouseDialogue::decode_reading(&image, source, |at| match at {
+                    0x09C7 => Some(0x10),
+                    0x09CB => Some(0x30),
+                    0x09C8 | 0x09CC => Some(0),
+                    _ => None,
+                });
+            assert!(pages.is_ok(), "{source:x}: {pages:?}");
+        }
+    }
+}
