@@ -325,8 +325,21 @@ const MOVE_Y: u8 = 0xB2;
 const OBJ_PRIORITY: u8 = 0xBA;
 /// The palette field.
 const PALETTE: u8 = 0xBB;
+/// x += word, negated for a mirrored actor (`$80:A9B9`).
+const MOVE_X: u8 = 0xB1;
+/// The same, then y += a second word (`$80:A9EA`).
+const MOVE_XY: u8 = 0xB3;
 /// The services [`Actor::body`] runs.
-const BODY: [u8; 6] = [MOVE_Y, SET_PACKET, OBJ_PRIORITY, PALETTE, ORBIT, ORBIT_STEP];
+const BODY: [u8; 8] = [
+    MOVE_X,
+    MOVE_Y,
+    MOVE_XY,
+    SET_PACKET,
+    OBJ_PRIORITY,
+    PALETTE,
+    ORBIT,
+    ORBIT_STEP,
+];
 /// Points the actor at another art packet (`$80:B4DF`): its display lists,
 /// which a `COP 8E` wait plays, are the new packet's.
 const SET_PACKET: u8 = 0xD8;
@@ -1318,7 +1331,7 @@ impl Actor {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
     }
 
-    /// The actor's body: its y (`COP B2`), its art packet (`COP D8`), its
+    /// The actor's body: its x and y (`COP B1`, `B2`, `B3`), its art packet (`COP D8`), its
     /// OBJ priority (`COP BA`), palette field (`COP BB`) and orbit (`COP D0`,
     /// `D1`). Returns whether execution continues.
     fn body(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
@@ -1332,6 +1345,24 @@ impl Actor {
                 };
                 self.position.1 = self.position.1.wrapping_add(dy);
                 self.pc = operands + 2;
+            }
+            MOVE_X | MOVE_XY => {
+                let words = if service == MOVE_X { 1 } else { 2 };
+                let (Some(dx), Some(dy)) = (
+                    cadence::word(image, operands),
+                    cadence::word(image, operands + 2)
+                        .filter(|_| words == 2)
+                        .or(Some(0)),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let dx = if self.hflip { dx.wrapping_neg() } else { dx };
+                self.position = (
+                    self.position.0.wrapping_add(dx),
+                    self.position.1.wrapping_add(dy),
+                );
+                self.pc = operands + 2 * words;
             }
             SET_PACKET => {
                 let Some(pointer) = image.get(operands..operands + 3) else {
