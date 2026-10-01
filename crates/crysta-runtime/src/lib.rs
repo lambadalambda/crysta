@@ -39,9 +39,14 @@ pub const BOX_MAPS: std::ops::RangeInclusive<u16> = 0x0041..=0x0044;
 /// The world maps the slice reaches: the underworld, from the south gate.
 pub use assets::maps::visual::world::WORLD_MAPS;
 
-/// The towers' maps the runtime loads, reached from the underworld
-/// (`docs/tower-entry.md`): the first tower's ground floor.
-pub const TOWER_MAPS: [u16; 1] = [0x0100];
+/// The towers' maps and the underworld's last ones the runtime loads
+/// (`docs/underworld-inventory.md`): every floor of towers 1 to 5, the Hole
+/// `$127`, Mu `$12A` and Polynesia `$12B`. Not yet: the light room `$106`.
+pub const TOWER_MAPS: [u16; 37] = [
+    0x100, 0x101, 0x102, 0x103, 0x104, 0x105, 0x107, 0x108, 0x109, 0x10A, 0x10B, 0x10C, 0x10E,
+    0x10F, 0x110, 0x111, 0x112, 0x113, 0x114, 0x115, 0x116, 0x117, 0x118, 0x119, 0x11A, 0x11B,
+    0x11C, 0x11D, 0x11E, 0x11F, 0x120, 0x121, 0x122, 0x123, 0x127, 0x12A, 0x12B,
+];
 
 /// Whether a map loads in the runtime: the slice, the box's tour, the
 /// underworld and the towers.
@@ -51,6 +56,16 @@ pub fn admitted(map: u16) -> bool {
         || BOX_MAPS.contains(&map)
         || WORLD_MAPS.contains(&map)
         || TOWER_MAPS.contains(&map)
+}
+
+/// Whether an exit from `from` may lead to `to`: an admitted map, but never
+/// from Crysta's maps straight into a tower. The towers are reached from
+/// the underworld only; the bedroom `$0F` holds an exit record into
+/// `$122` (cell (27,5)) that the frame walker never reaches and the route
+/// discovery's walker can.
+#[must_use]
+pub fn admitted_from(from: u16, to: u16) -> bool {
+    admitted(to) && !(MAPS.contains(&from) && TOWER_MAPS.contains(&to))
 }
 
 /// A map built into a walkable room.

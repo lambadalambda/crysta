@@ -223,3 +223,39 @@ fn tower_ones_statues_and_plaque_stand_and_draw() {
         }
     }
 }
+
+#[test]
+fn every_tower_floor_loads() {
+    // `docs/underworld-inventory.md`; the light room `$106` comes with the
+    // towers' tops.
+    for rom in roms() {
+        for &map in &crysta_runtime::TOWER_MAPS {
+            World::enter_with_events(rom.image(), map, 128, 128, after_the_intro())
+                .unwrap_or_else(|error| panic!("{:?} {map:#x}: {error}", rom.revision()));
+        }
+        assert!(crysta_runtime::TOWER_MAPS.len() >= 36);
+    }
+}
+
+#[test]
+fn the_tower_door_leads_to_the_first_floor() {
+    // `$81:C2EE`: cell (15,54) 2x2, selector `$62` -> `$101`, natively
+    // arriving at (128,623) (`tools/tower-approach-qualification/TOWER.md`).
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0100, 256, 1007, after_the_intro()).unwrap();
+        for _ in 0..600 {
+            let up = (!world.in_transition()).then_some(Direction::Up);
+            world.update(up, Presses::default()).unwrap();
+            if world.map() == 0x0101 && !world.in_transition() {
+                break;
+            }
+        }
+        assert_eq!(
+            (world.map(), world.position()),
+            (0x0101, (128, 623)),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

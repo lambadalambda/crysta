@@ -17,7 +17,7 @@
 //! fade by their mode ([`super::fade`]).
 
 use super::{Step, World, WorldError, EXIT_SOUND, STAIRS, STAIRS_UP};
-use crate::{admitted, WORLD_MAPS};
+use crate::WORLD_MAPS;
 use assets::maps::exits::ExitRecord;
 use room_core::{AnimationState, Direction, WalkingState};
 
@@ -432,7 +432,7 @@ impl World<'_> {
         let Some(destination) = record
             .direct_destination()
             .ok()
-            .filter(|&map| admitted(map))
+            .filter(|&map| crate::admitted_from(self.map, map))
         else {
             return false;
         };

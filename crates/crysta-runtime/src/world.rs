@@ -14,7 +14,7 @@ use crate::save::SaveSlot;
 use crate::scene::{Globals, Presses, View, PAD_DIRECTIONS};
 use crate::shop::{Counter, Shop};
 use crate::sram::Sram;
-use crate::{admitted, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
+use crate::{admitted_from, room, room_candidate, MapRoom, RoomError, WORLD_MAPS};
 use assets::maps::actors::ResolveError;
 use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::flag_patches::{self, Patch};
@@ -1751,7 +1751,7 @@ impl<'a> World<'a> {
         let Ok(destination) = record.direct_destination() else {
             return Ok(None);
         };
-        if !admitted(destination) {
+        if !admitted_from(self.map, destination) {
             return Ok(None);
         }
         let (x, y) = match (arrival, placement) {
