@@ -958,8 +958,7 @@ impl<'a> World<'a> {
             return Ok((Step::Stayed, None));
         }
         // The frame gate's play clock; a load's dark frames skip the gate.
-        self.globals.slot.tick_clock();
-        self.hold_for_presentation();
+        self.tick_clocks();
         self.arrived = self.arrived.saturating_add(1);
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
@@ -1450,6 +1449,14 @@ impl<'a> World<'a> {
         self.globals.counter(op)
     }
 
+    /// A frame's clocks: the play clock, the display's square, an item held
+    /// up.
+    fn tick_clocks(&mut self) {
+        self.globals.slot.tick_clock();
+        self.globals.display.tick();
+        self.hold_for_presentation();
+    }
+
     /// A frame of an item held up: Ark stands still until it ends, three
     /// frames after its count (`$84:BF21`).
     fn hold_for_presentation(&mut self) {
@@ -1474,6 +1481,12 @@ impl<'a> World<'a> {
             _ => -42,
         };
         Some((presentation.item, (-8, dy)))
+    }
+
+    /// The colour math scripts set ([`crate::display`]).
+    #[must_use]
+    pub const fn display(&self) -> &crate::display::Display {
+        &self.globals.display
     }
 
     /// `$0496`: the slot last saved or loaded.

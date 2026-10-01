@@ -10,12 +10,39 @@
 //! and X the actor's again. Anything else -- another address, another call,
 //! a register or flag the run has not set -- is refused, so the script freezes
 //! as before rather than guessing. A scratch word never written reads 0, as
-//! the words start cleared.
+//! the words start cleared. Writes to the PPU's colour math registers go to
+//! the [`Display`]; an actor's own bytes in bank `$7F` (`$7F:xxxx,X`) are
+//! its [`Own`] bytes, 0 until written.
 
+use crate::display::Display;
 use std::collections::BTreeMap;
 
 /// Scratch words by address.
 pub type Scratch = BTreeMap<u16, u16>;
+/// An actor's own bytes in bank `$7F`, by address less the actor's offset.
+pub type Own = BTreeMap<u16, u8>;
+
+/// What a run may change: the scratch words, the actor's own bytes and the
+/// display.
+pub struct Memory<'m> {
+    /// The scratch words.
+    pub words: &'m mut Scratch,
+    /// The running actor's own bytes.
+    pub own: &'m mut Own,
+    /// The colour math.
+    pub display: &'m mut Display,
+}
+
+/// The actor's own bytes runs may use: the voice fade's intensity
+/// (`$7F:201C,X`, `$88:9CD8`). Other fields are the engine's.
+const OWN: std::ops::RangeInclusive<u16> = 0x201C..=0x201D;
+/// `$7E:46E6`, `COP 6A`'s square: a run stores 0 to stop it.
+const SPIN: u32 = 0x7E_46E6;
+/// The colour math registers' shadows (`$0468..$046B`), which the NMI
+/// copies only with `$091C` set; runs write the registers too.
+const SHADOWS: std::ops::RangeInclusive<u16> = 0x0468..=0x046B;
+/// The PPU's registers.
+const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
@@ -70,7 +97,7 @@ fn scratch(address: u16) -> bool {
 
 /// Runs native code at `at` and returns where the script loop takes over, or
 /// `None` when the code is not a run this module admits.
-pub(super) fn run(image: &[u8], at: usize, words: &mut Scratch) -> Option<usize> {
+pub(super) fn run(image: &[u8], at: usize, memory: &mut Memory<'_>) -> Option<usize> {
     let mut machine = Machine {
         image,
         pc: at,
@@ -83,7 +110,7 @@ pub(super) fn run(image: &[u8], at: usize, words: &mut Scratch) -> Option<usize>
         stack: Vec::new(),
     };
     for step in 0..STEPS {
-        if !machine.step(words)? {
+        if !machine.step(memory)? {
             let settled = step > 0 && !machine.narrow && machine.x && machine.stack.is_empty();
             return settled.then_some(machine.pc);
         }
@@ -112,17 +139,27 @@ struct Machine<'a> {
 impl Machine<'_> {
     /// Executes one instruction. `Some(false)` stops before it, for the
     /// script loop or another recogniser; `None` refuses the run.
-    fn step(&mut self, words: &mut Scratch) -> Option<bool> {
+    fn step(&mut self, memory: &mut Memory<'_>) -> Option<bool> {
+        let words = &mut *memory.words;
         let opcode = *self.image.get(self.pc)?;
         self.pc = match opcode {
             0xE2 | 0xC2 => self.width(opcode)?,
-            0x8D if self
-                .operand()
-                .is_some_and(|address| (0x2100..=0x213F).contains(&address)) =>
+            0x8D | 0x9C if self.operand().is_some_and(|address| PPU.contains(&address)) => {
+                self.register(opcode, memory.display)?
+            }
+            0x8D | 0x9C
+                if self
+                    .operand()
+                    .is_some_and(|address| SHADOWS.contains(&address)) =>
             {
-                self.a?;
+                if opcode == 0x8D {
+                    self.a?;
+                }
                 self.pc + 3
             }
+            0x09 | 0x29 => self.logic(opcode)?,
+            0xBF | 0x9F => self.own(opcode, memory.own)?,
+            0x8F => self.stop_spin(memory.display)?,
             // Scratch words are words: a narrow accumulator refuses them.
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xC9 | 0xCD | 0x0C | 0x1C if self.narrow => {
                 return None;
@@ -147,6 +184,71 @@ impl Machine<'_> {
         Some(true)
     }
 
+    /// `STA` / `STZ` on a PPU register, a byte, or two when wide.
+    fn register(&self, opcode: u8, display: &mut Display) -> Option<usize> {
+        let address = self.operand()?;
+        let value = if opcode == 0x8D { self.a? } else { 0 };
+        let [low, high] = value.to_le_bytes();
+        display.write(address, low);
+        if !self.narrow {
+            display.write(address + 1, high);
+        }
+        Some(self.pc + 3)
+    }
+
+    /// `ORA #` and `AND #` at the accumulator's width.
+    fn logic(&mut self, opcode: u8) -> Option<usize> {
+        let (value, next) = self.immediate()?;
+        let a = self.a?;
+        self.set(if opcode == 0x09 { a | value } else { a & value });
+        Some(next)
+    }
+
+    /// `LDA` / `STA $7F:xxxx,X` on [`OWN`], X still the actor.
+    fn own(&mut self, opcode: u8, own: &mut Own) -> Option<usize> {
+        let long = self.long()?;
+        let width: u16 = if self.narrow { 1 } else { 2 };
+        let address = u16::try_from(long & 0xFFFF).ok()?;
+        if long >> 16 != 0x7F || !self.x || !OWN.contains(&(address + width - 1)) {
+            return None;
+        }
+        if opcode == 0xBF {
+            let byte = |at: u16| u16::from(own.get(&at).copied().unwrap_or(0));
+            let high = if self.narrow { 0 } else { byte(address + 1) };
+            self.set(byte(address) | high << 8);
+        } else {
+            let value = self.a?.to_le_bytes();
+            for (at, byte) in (address..address + width).zip(value) {
+                own.insert(at, byte);
+            }
+        }
+        Some(self.pc + 4)
+    }
+
+    /// `STA $7E:46E6` of 0: `COP 6A`'s square stops.
+    fn stop_spin(&self, display: &mut Display) -> Option<usize> {
+        if self.long()? != SPIN || self.a? != 0 {
+            return None;
+        }
+        display.stop_spin();
+        Some(self.pc + 4)
+    }
+
+    /// An immediate operand at the accumulator's width, and the next pc.
+    fn immediate(&self) -> Option<(u16, usize)> {
+        Some(if self.narrow {
+            (u16::from(*self.image.get(self.pc + 1)?), self.pc + 2)
+        } else {
+            (self.operand()?, self.pc + 3)
+        })
+    }
+
+    /// A long operand.
+    fn long(&self) -> Option<u32> {
+        let bytes = self.image.get(self.pc + 1..self.pc + 4)?;
+        Some(u32::from(bytes[0]) | u32::from(bytes[1]) << 8 | u32::from(bytes[2]) << 16)
+    }
+
     fn operand(&self) -> Option<u16> {
         let bytes = self.image.get(self.pc + 1..self.pc + 3)?;
         Some(u16::from_le_bytes([bytes[0], bytes[1]]))
@@ -167,9 +269,14 @@ impl Machine<'_> {
         if *self.image.get(self.pc + 1)? != 0x20 {
             return None;
         }
+        let widened = self.narrow && opcode == 0xC2;
         self.narrow = opcode == 0xE2;
         if self.narrow {
             self.a = self.a.map(|value| value & 0xFF);
+        }
+        // B, the hidden high byte, is not tracked: wide again, A is unknown.
+        if widened {
+            self.a = None;
         }
         Some(self.pc + 2)
     }
@@ -224,11 +331,7 @@ impl Machine<'_> {
             }
             0x89 => None,
             0xA9 => {
-                let (value, next) = if self.narrow {
-                    (u16::from(*self.image.get(self.pc + 1)?), self.pc + 2)
-                } else {
-                    (self.operand()?, self.pc + 3)
-                };
+                let (value, next) = self.immediate()?;
                 self.set(value);
                 Some(next)
             }
@@ -319,6 +422,56 @@ mod tests {
     use super::*;
 
     const AT: usize = 0x09_8000;
+
+    /// A run on `words` alone.
+    fn run(image: &[u8], at: usize, words: &mut Scratch) -> Option<usize> {
+        super::run(
+            image,
+            at,
+            &mut Memory {
+                words,
+                own: &mut Own::new(),
+                display: &mut Display::default(),
+            },
+        )
+    }
+
+    #[test]
+    fn the_voice_fade_writes_the_colour_math_and_steps_its_own_byte() {
+        // `$88:9CD8`'s set-up, then one step of its ramp:
+        // SEP #$20; LDA #$16; STA $212C; STA $0468; LDA #$20; STA $2130;
+        // LDA #$A3; STA $2131; LDA #$21; STA $2125; STZ $2127; REP #$20;
+        // LDA #0; STA $7F:201C,X; COP; SEP #$20; LDA $7F:201C,X; INC;
+        // STA $7F:201C,X; ORA #$E0; STA $2132; REP #$20; COP.
+        let code = [
+            0xE2, 0x20, 0xA9, 0x16, 0x8D, 0x2C, 0x21, 0x8D, 0x68, 0x04, 0xA9, 0x20, 0x8D, 0x30,
+            0x21, 0xA9, 0xA3, 0x8D, 0x31, 0x21, 0xA9, 0x21, 0x8D, 0x25, 0x21, 0x9C, 0x27, 0x21,
+            0xC2, 0x20, 0xA9, 0x00, 0x00, 0x9F, 0x1C, 0x20, 0x7F, 0x02, 0xE2, 0x20, 0xBF, 0x1C,
+            0x20, 0x7F, 0x1A, 0x9F, 0x1C, 0x20, 0x7F, 0x09, 0xE0, 0x8D, 0x32, 0x21, 0xC2, 0x20,
+            0x02,
+        ];
+        let fade = image(&code);
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+        };
+        assert_eq!(super::run(&fade, AT, &mut memory), Some(AT + 37));
+        assert!(!memory.display.shows_bg1());
+        assert_eq!(memory.display.darkening(), None);
+        for step in 1..=2 {
+            assert_eq!(super::run(&fade, AT + 38, &mut memory), Some(AT + 56));
+            assert_eq!(memory.own.get(&0x201C), Some(&step));
+            assert_eq!(memory.display.darkening().unwrap().fixed, [step; 3]);
+        }
+        // `$88:ABF8`'s door: LDA #0; STA $7E:46E6 stops the square.
+        memory.display.spin((184, 352), 3);
+        let stop = image(&[0xA9, 0x00, 0x00, 0x8F, 0xE6, 0x46, 0x7E, 0x02]);
+        assert_eq!(super::run(&stop, AT, &mut memory), Some(AT + 7));
+        memory.display.write(0x2132, 0xE7);
+        assert_eq!(memory.display.darkening().unwrap().spared, None);
+    }
 
     fn image(code: &[u8]) -> Vec<u8> {
         let mut image = vec![0; AT];

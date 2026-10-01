@@ -91,6 +91,8 @@ pub struct Globals {
     pub spawns: Vec<(usize, u16, (u16, u16))>,
     /// Music and sound effect requests ([`crate::audio`]).
     pub audio: crate::audio::Audio,
+    /// The colour math scripts set ([`crate::display`]).
+    pub display: crate::display::Display,
 }
 
 /// An item granted and held up (`COP 60` → `$84:BEA2`).
@@ -134,6 +136,7 @@ impl Globals {
             patches: Vec::new(),
             spawns: Vec::new(),
             audio: crate::audio::Audio::default(),
+            display: crate::display::Display::default(),
         }
     }
 

@@ -156,10 +156,14 @@ const SPAWN: u8 = 0xA2;
 const SPAWN_LINKED: u8 = 0x99;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
-/// Services without a modelled effect: a cosmetic helper (`6A`), PPU
-/// register writes (`76`) and the hit profile (`D9`, `$7F:1022` from
-/// `$8D:BDFA`). Their operands are stepped over.
-const COSMETIC: [(u8, usize); 3] = [(0x6A, 2), (0x76, 2), (0xD9, 1)];
+/// Services for the display alone: the spinning window (`6A`, shape 0
+/// only), PPU register writes (`76`), both into [`crate::display`], and the
+/// hit profile (`D9`, `$7F:1022` from `$8D:BDFA`, stepped over).
+const COSMETIC: [(u8, usize); 3] = [(SPIN, 2), (PPU_WRITE, 2), (0xD9, 1)];
+/// `COP 6A shape speed` (`$80:9DD6`).
+const SPIN: u8 = 0x6A;
+/// `COP 76 register value` (`$80:A127`): `$21rr = value` at the next NMI.
+const PPU_WRITE: u8 = 0x76;
 /// Jumps through a table of words on the spawn parameter (entity `+$26`):
 /// operands the lowest and highest value, then a target per value; above
 /// the highest, on past the table (`$80:8CD8`). Below the lowest the
@@ -456,6 +460,8 @@ pub struct Actor {
     pub palette: u8,
     /// The player's pose a `COP 84` selected: Ark's resource and list.
     pub player_pose: Option<(u8, u8)>,
+    /// Its own bytes in bank `$7F`, as native runs keep them.
+    own: native::Own,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -556,6 +562,7 @@ impl Actor {
             priority: 2,
             palette: 0,
             player_pose: None,
+            own: native::Own::new(),
             walked: false,
             contact: None,
             ease: None,
@@ -843,14 +850,9 @@ impl Actor {
     /// - `LDA $0004,X; ORA/AND #imm; STA $0004,X` on the bits modelled:
     ///   bit 15 hides the actor, bit 9 (`$0200`) arms its contact.
     /// - [`CONTACT`] registers the contact callback.
-    /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`], [`display_code`], and runs on
-    ///   script scratch words ([`native::run`]).
-    fn native_idiom(
-        &mut self,
-        image: &[u8],
-        bank: usize,
-        scratch: &mut native::Scratch,
-    ) -> Option<usize> {
+    /// - [`NO_DAMAGE`], [`PLAYER_POSE_TEST`], and runs on script scratch
+    ///   words and the display ([`native::run`]).
+    fn native_idiom(&mut self, image: &[u8], bank: usize, globals: &mut Globals) -> Option<usize> {
         // Bits 12 and 8 are accepted and not modelled: the guide clears and
         // sets 12 around the freezing's whitening (`$88:B507`, `$88:B53F`)
         // and clears 8, the dispatcher's target bit, before it leaves
@@ -896,9 +898,14 @@ impl Actor {
         if image.get(at..at + NO_DAMAGE.len()) == Some(&NO_DAMAGE) {
             return Some(at + NO_DAMAGE.len());
         }
-        player_pose_mismatch(image, at)
-            .or_else(|| display_code(image, at))
-            .or_else(|| native::run(image, at, scratch))
+        player_pose_mismatch(image, at).or_else(|| {
+            let mut memory = native::Memory {
+                words: &mut globals.scratch,
+                own: &mut self.own,
+                display: &mut globals.display,
+            };
+            native::run(image, at, &mut memory)
+        })
     }
 
     /// The actor with its cell marked, as `COP 3B` would; for tests.
@@ -1086,8 +1093,7 @@ impl Actor {
                     continue;
                 }
                 _ => {
-                    if let Some(next) = self.native_idiom(image, bank, &mut around.globals.scratch)
-                    {
+                    if let Some(next) = self.native_idiom(image, bank, around.globals) {
                         self.pc = next;
                         continue;
                     }
@@ -1638,6 +1644,16 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
+                if let Some(&[first, second]) = around.image.get(operands..operands + 2) {
+                    let display = &mut around.globals.display;
+                    match cosmetic {
+                        PPU_WRITE => {
+                            display.write(0x2100 | u16::from(first), second);
+                        }
+                        SPIN if first == 0 => display.spin(self.position, second),
+                        _ => {}
+                    }
+                }
                 self.pc = operands + length;
             }
         }
@@ -2567,30 +2583,6 @@ fn player_pose_mismatch(image: &[u8], at: usize) -> Option<usize> {
     };
     let target = branch(11);
     (image.get(target) == Some(&0xFA) && branch(20) == target).then_some(target + 1)
-}
-
-fn display_code(image: &[u8], mut at: usize) -> Option<usize> {
-    let start = at;
-    let mut widths = assets::cpu::Widths::native();
-    while *image.get(at)? != 0x02 {
-        let bytes = image.get(at..at + 4)?;
-        let absolute = u16::from_le_bytes([bytes[1], bytes[2]]);
-        let long = u32::from(absolute) | u32::from(bytes[3]) << 16;
-        let display = match bytes[0] {
-            0xE2 | 0xC2 | 0xA9 | 0x09 | 0x29 | 0x1A | 0x3A => true,
-            0x8D | 0x9C => {
-                (0x2100..=0x21FF).contains(&absolute) || (0x0468..=0x046B).contains(&absolute)
-            }
-            0xBF | 0x9F => long == 0x7F_201C,
-            0x8F => long == 0x7E_46E6,
-            _ => false,
-        };
-        if !display {
-            return None;
-        }
-        at = assets::cpu::step(image, at, &mut widths)?;
-    }
-    (at > start).then_some(at)
 }
 
 /// A long operand as a normalized ROM offset.

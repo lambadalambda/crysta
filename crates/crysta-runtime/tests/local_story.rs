@@ -616,6 +616,66 @@ fn read_out(world: &mut World<'_>) -> u32 {
 #[test]
 // `World::pad_locked` as a path is not general over the world's lifetime.
 #[allow(clippy::redundant_closure_for_method_calls)]
+fn the_voice_glows_from_the_broken_door() {
+    // `docs/scene-effects.md`: the door's `COP 6A 00 03` turns a square on
+    // it; the friend's fade child (`$88:9CD8`) hides BG1, then subtracts a
+    // fixed colour outside the square, one step every 18 frames up to 7,
+    // and back down to 0 once the voice has spoken.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(cartridge.image(), 0x000C, 184, 400, events).unwrap();
+    for _ in 0..60 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.strike(DOOR));
+    frames_until(&mut world, 10, |world| world.pad_locked());
+    read_out(&mut world);
+    assert!(world.strike(DOOR));
+    let mut seen = Vec::new();
+    for _ in 0..3000 {
+        let reading = (world.dialogue().is_some() || world.in_scene()) && !world.typing();
+        world
+            .update(None, if reading { A } else { Presses::default() })
+            .unwrap();
+        let darkening = world.display().darkening();
+        seen.push((
+            darkening.map(|darkening| darkening.fixed[0]),
+            darkening.and_then(|darkening| darkening.spared),
+        ));
+        if !reading && !world.pad_locked() && world.dialogue().is_none() && seen.len() > 20 {
+            break;
+        }
+    }
+    let steps: Vec<(usize, Option<u8>)> = seen
+        .iter()
+        .enumerate()
+        .filter(|&(frame, (fixed, _))| frame == 0 || seen[frame - 1].0 != *fixed)
+        .map(|(frame, (fixed, _))| (frame, *fixed))
+        .collect();
+    let fixed: Vec<Option<u8>> = steps.iter().map(|&(_, fixed)| fixed).collect();
+    let up = [1, 2, 3, 4, 5, 6, 7].map(Some);
+    let down = [6, 5, 4, 3, 2, 1].map(Some);
+    assert_eq!(fixed, [&[None][..], &up, &down, &[None]].concat());
+    for ramp in [&steps[1..8], &steps[8..]] {
+        assert!(
+            ramp.windows(2).all(|pair| pair[1].0 - pair[0].0 == 18),
+            "{steps:?}"
+        );
+    }
+    let spin = seen.iter().find_map(|(_, spin)| *spin).expect("the square");
+    assert_eq!((spin.centre, spin.speed), ((184, 352), 3));
+    assert!(!world.display().shows_bg1(), "BG1 stays off until a load");
+    assert_eq!(world.display().darkening(), None, "back to fixed colour 0");
+}
+
+#[test]
+// `World::pad_locked` as a path is not general over the world's lifetime.
+#[allow(clippy::redundant_closure_for_method_calls)]
 fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
     // Selector-14 stairs settle at the raw anchor plus (8,16), as natively:
     // E (152,880), $20 (408,880), $21 (136,128).
@@ -725,6 +785,25 @@ fn ark_plays_the_stair_lists_down_from_e_and_stands_facing_down() {
     );
     assert_eq!(world.stairs_pose(), None);
     assert_eq!(world.facing(), Direction::Down);
+}
+
+#[test]
+fn the_closed_box_glows() {
+    // `$88:ACFA`: COP 76 32 E7, 30 20, 25 21, 27 00, then COP 6A 00 03 on
+    // the box, for as long as it is closed.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut world =
+        World::enter_with_events(cartridge.image(), 0x0021, 136, 128, after_the_door()).unwrap();
+    for _ in 0..30 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    let darkening = world.display().darkening().expect("the box's colour math");
+    assert_eq!(darkening.fixed, [7; 3]);
+    let spin = darkening.spared.expect("the square");
+    assert_eq!((spin.centre, spin.speed), ((136, 384), 3));
+    assert!(world.display().shows_bg1());
 }
 
 #[test]
