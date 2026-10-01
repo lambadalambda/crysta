@@ -15,3 +15,7 @@ Selector `$66` places Ark at (256,1024) and walks him up to 1007 in 20 frames; t
 ## Acceptance Criteria
 
 - Arrival and the way back match the native positions frame by frame on both ROMs.
+
+## Notes
+
+- Exit selectors are read by their kind (`$8D:88DF`): `$66` arrives with the door walk from (256,1024) to (256,1007), `$55` leaves through the bottom and lands on `$03` at (216,816), walking to (216,832) (`local_towers.rs`, both ROMs). The walk-in's frames follow the door arrival's pattern, two still frames shorter at the start than natively; the walk-out is 16 pixels, natively 17.

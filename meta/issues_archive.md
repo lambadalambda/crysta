@@ -153,3 +153,6 @@
 - [x] [Show the glow when a voice speaks from the blue door and the Box](issues/voice-glow-effect.md)
 - [x] [Play the freeze: ice crystals, the brightening, a blue Elle](issues/freeze-effect.md)
 - [x] [Freeze the townsfolk after the freeze](issues/frozen-townsfolk.md)
+- [x] [Load tower 1 from the world map](issues/tower-one-loads.md)
+- [x] [Walk into and out of tower 1](issues/tower-one-arrival-exit.md)
+- [x] [Play tower 1's intro pan and text](issues/tower-one-intro.md)
