@@ -313,3 +313,128 @@ Screenshot: `LEVEL 1`, `LIFE 28/28`, gem `0`.
 - Enemy knockback distance is per enemy (`COP 81 n` in its own script). Only the blob was measured.
 - The gate in `$101` opens when `$0498` reaches 0 (guess: a map script polls it; not measured).
 - The jump attack, the dash attacks and the guard were measured without an enemy (timing only). Their hits are from source.
+
+## 9. Level-up and game over presentation
+
+Measured on both ROMs from `first-tower-neutral-stable` (JP) and
+`tmp/tower/eud/ctl.state` + route lines 579-615 (EU), with `poseprobe` `rec`
+(WRAM each frame, APU port writes) and screenshots. Pokes: spear
+(`$064A=$81`, `$0659=3`), EXP `$0690=$36`, blob 2 at (112,587), life 1,
+layer `E+$16`=0 (the blobs are on layer 1, Ark on 0 at the entrance). For the
+game over: `$065D=1` and the blob on Ark. Probe files:
+`/Users/lainsoykaf/.claude/jobs/ef2e9592/tmp/lv/` (`jp.jsonl`, `eu.jsonl`,
+`go.jsonl`, `goeu.jsonl`, `an.py`). Bank `$84` code and the pose lists have the
+same addresses in both ROMs; bank `$85` follows the +`$98` rule.
+
+### Level up (`$85:EA99` → helper `$85:F35B`, EU `$85:EB31` → `$85:F3F3`)
+
+Check: each frame, if Ark is not busy (`7F:201E` bit 15), not dead (`$0080`),
+`$097C & $8E17` = 0 and `$0986 & $1400` = 0, and EXP ≥ the next row of
+`$8D:BA61` (row L, offset +1/+0 BCD). One level per pass; a second level
+needs a new pass after control returns (ours loops at once: a difference).
+On the trigger frame L: `$097C |= $8000`, Ark `7F:1020 = $C8`, the helper
+starts. `$097C & $8000` also blocks the death check (`$85:E1D4`) and the next
+level check. It does **not** stop the enemies: a blob walked on during the
+pose, and stopped only while the window was open (the usual text halt).
+Damage digits and the dead blob's explosion run on.
+
+Helper script (JP; EU the same with the EU text addresses):
+
+| Step | Code | JP frame | EU frame |
+|---|---|---|---|
+| Ark script `$85:F34C` (`COP AF 00`, clear `E+$04` bits `$0019`), wait 8 | `COP CB`, `COP C1 08` | L+1 | L+1 |
+| Victory: Ark script `$84:A8C8` (`COP B6`, sound `$4E` port 3, `COP 84 1D 00 00`, wait for the list), wait `$45` | skipped if `$097C & $40E0` | L+10 | L+10 |
+| `$0656` += 1, `$0982` = level, text 1 | `COP 1C`, `COP 1F` | L+80 | L+80 |
+| each delta (row L − row L−1) > 0: add to the base stat, `$0982` = delta, text n | `$85:F47A` (words), `F498` (luck byte) | L+160, 239, 319, 399 | L+155, 227, 304, 379 |
+| `$85:F4BD` recompute, text 6 (`$D7`: the window closes) | | L+479 | L+452 |
+| Ark script `$84:A8D7` (`COP 84 20 00 02`), wait `$23` (35) | | L+480 | L+453 |
+| clear `E+$04 & $0020`, `$097C &= ~$8000`, Ark `7F:1020 = $FFC4` (60 frames immune), back to the idle controller (`$84:88AC`, or by `$097C` bits) | | L+516 | L+489 |
+
+Life: the life delta is added to `$069C` **and** to `$065D` at its text; the
+max (`$0657`) only changes at the recompute. The HUD keeps the old level and
+life (cached) until the freeze ends (screenshots at L+478: `1`, `28/28`; at L+494: `2`, `33/33`).
+
+Ark's poses (resource 0 `$A4:A1E4` / EU `$A6:A1E4`; resource 2 `$A6:B8B5` / EU `$A8:B8B5`):
+
+| List | Records (frames, composition), facing byte 0 / 8 |
+|---|---|
+| res0 `$1D` victory | 8 `B361`, 6 `B427`, 2 each `B45B B496 B4DF B51A B563 B59E B603 B63E`, 4 each `B563 B4DF B563 B603 B563`, 6 each `B4DF B563 B603`, 16 `B45B` (held, 84 frames to the hold) |
+| res2 `$20` recover | 6 `D051`, 4 `D08C`, 8 `D0C0`, 16 `D0F4` (34 frames), then standing Down `A54E` |
+
+Sound: `$4E` (port 3) at L+10. No music change. The text blip `$28` every
+second glyph.
+
+Texts (bank `$92`; `$CD 82 09` prints the word `$0982`, in palette 1 after
+`$C6 04`; `$C5 3C` pauses 60; `$D4` returns and keeps the page; `$CF` at the
+start of texts 2-5 is a new line in the open window):
+
+| | JP | EU | JP shown | EU shown |
+|---|---|---|---|---|
+| level | `$92:8000` (`C4 01 C1 C8 01`, opens the window) | `$92:8046` | アークは / レベルが 2 になった！ | Ark level 2! |
+| life | `$92:8020` | `$92:805F` | ＬＩＦＥ（体力）が 5 上がった！ | Life up 5! |
+| attack | `$92:803E` | `$92:8073` | ＳＴＲ（強さ）が 1 上がった！ | Strength up 1! |
+| defense | `$92:805B` | `$92:8084` | ＤＥＦ（守り）が 1 上がった！ | Defense up 1! |
+| luck | `$92:8078` | `$92:809B` | ＬＵＣＫ（運）が 1 上がった！ | Luck up 1! |
+| close | `$92:8095` (`D7`) | `$92:80AF` (`D7`) | | |
+
+The window is the standard bottom window: JP 3 rows (48 px), EU 4 rows (64 px).
+Lines scroll up when it is full (JP shows STR/DEF/LUCK at the end, EU
+Life/Strength/Defense/Luck). Each text runs its decoded page duration
+(JP 76/77, EU 70..74) plus 3-4 frames; A was not pressed (guess: A does not
+shorten the `$C5` pauses).
+
+`HouseDialogue::decode_reading(image, source, |a| match a { 0x0982 => Some(value), 0x0983 => Some(0), _ => None })`
+decodes all ten texts (tested, then deleted): one page each, `Acknowledgement::None`,
+`Placement::Bottom`; the close texts give no pages. `decode_requests` with the
+five gives five pages, each one line (the end cell row 16 after the first);
+the host stacks them and scrolls.
+
+### Game over (`$85:E1BB` → helper `$84:DC59`, EU `$84:DC20`)
+
+`$065D` = 0 and no `$097C & $8E17`: Ark `E+$04 |= $0080`, the helper runs
+(D = the collapse's first frame; the hit frame or the next).
+
+| Step | JP | EU |
+|---|---|---|
+| `E+$04 |= $0010`, `COP AF`, `COP B6`; special cases by `$097C` (`$41E8`) skipped in towers | D | D |
+| collapse res0 `$0F`: 16 `AA79`, 8 `AABB`, 5 `AAE8`, 5 `AB07`, 8 `AB34`, 12 `AB5A`, 8 `ABA3`, 48 `ABDE` (110) | D..D+109 | same |
+| lying res0 `$10` (`ABDE`, held) | D+110 | D+110 |
+| music `$3B` (`COP 30`), `COP 33` unless Y = `$1FC0` | D+111 | D+111 |
+| text `$84:DD52` / EU `$84:DD11` (`COP 1B`), open | D+180 | D+172 |
+| text done (`COP 1F`) | D+688 | D+668 |
+| `COP 07 FF 00`: 16-frame fade out, then life = `$0657`, `$7F:0CA6` = it, `$066C` = 0, transfer to `$0600` (map), `$0602`+1 (entry), `$0604/$0606` (x, y) | D+688..D+704 (map `$0F`) | D+668..D+684 |
+| Ark in the house at (392,160), walks in to (392,143), then control | arrives D+764 | arrives D+734, control D+762 |
+
+The text: `C4 00 C1 C7 FF C8 06` (no window frame: transparent page, the
+blip muted, 6 frames a glyph), name, `C5 78 C5 78 C5 5A` (330 frames), `D4`.
+JP アークは だんだん / 意識が 遠のいていった・・・ (27 glyphs, decoded duration 492);
+EU "Ark's senses / faded away..." (25 glyphs, 480). It shows at the bottom
+over the map; the enemies keep moving. The decoder handles it (`|_| None`).
+
+Resume: it is **not** a reload. Only life (full), the HUD life cache and the
+status word change; EXP, level, gems, items and flags stay. `$0600..$0607` is
+written by the save routine `$8D:A6FB` (current map, `$0956`, `$0952`, `$0954`)
+and by scene command `COP 19` (`$80:8B35`). In chapter 1 the record is Ark's
+house (map `$0F`, entry 6, (384,144)), so a death in a tower goes there, not to
+the tower entrance.
+
+### Recipe for our runtime
+
+1. `progress.rs` `level_up`: raise **one** level, then start a `LevelUp { frame }`
+   held state (like `chest_frame`), dispatched before the walk. While it runs:
+   Ark cannot be hurt or die (skip the scans), enemies run (`run_actors`), the pad
+   is locked; dialogue halts the actors as it does now.
+2. Frames from L: 10 victory list res0 `$1D` + sound `$4E` port 3; 80 the level
+   page; then each nonzero delta's page (apply the stat at its page; life to base
+   and current); after the last page, the recompute (`max_life`), the window
+   closes, list res2 `$20` for 35 frames, then control, Ark facing Down and
+   immune 60 frames. Drive the page changes from `dialogue.busy()` going false
+   (+1 frame), not fixed numbers; the JP/EU frame columns above are the check.
+   Then test the EXP again (a second level repeats it).
+3. Text: one `decode_reading` per text with `0x0982 => value`; request the pages
+   in order, keep the last 3 (JP) / 4 (EU) lines and scroll. HUD: freeze the level and
+   life digits until the end.
+4. `hurt.rs` `down_frame`: replace `DOWN` by the script: 110 frames res0 `$0F`,
+   then `$10` held; music `$3B` at +111; at +180 (EU +172) request the
+   `$84:DD52`/`$84:DD11` page (transparent, no frame) and wait for it; 16-frame fade; then life
+   full, status 0, transfer to the slot's `$0600` record (as now), EXP and the rest kept.
