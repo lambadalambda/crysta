@@ -167,4 +167,9 @@ impl WorldMap {
     pub fn color(&self, index: u8) -> Bgr555 {
         self.palette[usize::from(index)]
     }
+
+    /// Replaces the palette: an animation's colours, or a native snapshot's.
+    pub fn set_palette(&mut self, palette: [Bgr555; 256]) {
+        self.palette = palette;
+    }
 }

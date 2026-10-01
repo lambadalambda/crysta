@@ -1,6 +1,7 @@
 //! Allowlisted ROM-only first backgrounds, not a general scene compositor.
 pub mod camera;
 pub mod crysta_animation;
+pub mod mode7;
 pub mod pandora;
 pub mod scene_animation;
 pub mod world;
