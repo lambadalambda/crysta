@@ -59,6 +59,9 @@ pub struct Globals {
     pub player_action: bool,
     /// Player script pointer queued by `COP DF`, normalized to a ROM offset.
     pub player_script: Option<usize>,
+    /// `COP CB` set Ark's control script back to the pad's (`$84:87C1`):
+    /// the script holding him ends.
+    pub release_player: bool,
     /// Normalized source offset of the `COP DF` that queued [`Self::player_script`].
     pub player_script_source: Option<usize>,
     /// A map transfer `COP 14` queued.
@@ -214,6 +217,7 @@ impl Globals {
             pad: 0,
             player_action: false,
             player_script: None,
+            release_player: false,
             player_script_source: None,
             transfer: None,
             scratch: crate::actors::Scratch::new(),

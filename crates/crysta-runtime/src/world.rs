@@ -698,6 +698,9 @@ impl<'a> World<'a> {
     /// nor takes interaction. Also called after a dialogue/callback resumes,
     /// before the next frame can let Ark walk past the queued handoff.
     fn run_player_actor(&mut self) {
+        if std::mem::take(&mut self.globals.release_player) && self.player_actor.take().is_some() {
+            self.stand();
+        }
         let position = self.position();
         if let Some(script) = self.globals.player_script.take() {
             let source = self.globals.player_script_source.take();
@@ -748,6 +751,15 @@ impl<'a> World<'a> {
         }
     }
 
+    /// Ark stands where he is, facing as he does.
+    fn stand(&mut self) {
+        let (x, y) = self.position();
+        self.walking = WalkingState::new(x, y);
+        self.run = None;
+        self.run_age = 0;
+        self.animation = AnimationState::standing(self.facing);
+    }
+
     /// Projects one player-script turn into Ark's world position. Both ordinary
     /// ticks and same-frame dialogue continuations use this path, so no first
     /// movement sample can escape collision qualification.
@@ -789,11 +801,7 @@ impl<'a> World<'a> {
             }
         }
         if moving_before && !moving_after {
-            let position = self.position();
-            self.walking = WalkingState::new(position.0, position.1);
-            self.run = None;
-            self.run_age = 0;
-            self.animation = AnimationState::standing(self.facing);
+            self.stand();
         }
         if self.player_actor.as_ref().is_some_and(Actor::is_gone) {
             self.player_actor = None;

@@ -355,3 +355,81 @@ fn ark_takes_the_magirock_on_the_second_floor() {
         );
     }
 }
+
+#[test]
+fn ark_walks_the_tower_tops_floor() {
+    // Attribute 1 floors the top (`$105`); the player's tables read it as 0.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0105, 504, 400, after_the_intro()).unwrap();
+        for _ in 0..20 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+        }
+        assert!(world.position().1 < 400, "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn the_four_hiballs_fight_opens_the_door_to_the_light() {
+    // `$105`: the hooded guardian's talk sets flag 1, which wakes the Four
+    // Hiballs (`$90:9390`); the door (`$90:93E0`) waits for `$0498` to fall
+    // to 0, speaks, sets `$114`, then waits for Ark in front of it
+    // (`COP 0C`) and leaves for the light room.
+    let hiballs = |world: &World<'_>| -> Vec<usize> {
+        world
+            .residents()
+            .iter()
+            .filter(|resident| world.foe_life(resident.record).is_some())
+            .map(|resident| resident.record)
+            .collect()
+    };
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0105, 512, 400, after_the_intro()).unwrap();
+        assert_eq!(hiballs(&world).len(), 4, "{:?}", rom.revision());
+        world.place(512, 336);
+        world.face(Direction::Up);
+        world.update(None, Presses::default()).unwrap();
+        world.update(None, a).unwrap();
+        let mut seen = false;
+        for _ in 0..400 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+            seen |= world
+                .residents()
+                .iter()
+                .any(|resident| world.foe_life(resident.record).is_some() && !resident.hidden);
+        }
+        assert!(world.events()[0] & 2 != 0, "{:?}: flag 1", rom.revision());
+        assert!(seen, "{:?}: the Hiballs show", rom.revision());
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+        for record in hiballs(&world) {
+            world.kill_foe(record);
+        }
+        let flag = |world: &World<'_>| world.events()[0x114 / 8] & (1 << (0x114 % 8)) != 0;
+        for _ in 0..400 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+        }
+        assert!(flag(&world), "{:?}: `$114`", rom.revision());
+        let mut leaving = false;
+        for _ in 0..60 {
+            let up = (!world.in_transition()).then_some(Direction::Up);
+            if world.update(up, Presses::default()).is_err() || world.in_transition() {
+                leaving = true;
+                break;
+            }
+        }
+        assert!(leaving, "{:?}: {:?}", rom.revision(), world.position());
+    }
+}

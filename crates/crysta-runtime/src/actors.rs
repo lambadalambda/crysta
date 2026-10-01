@@ -265,9 +265,18 @@ const SOUND_WORD: u8 = 0x38;
 /// Branches on the player inside a rectangle of cells around the actor;
 /// `$80:87C2`. Operands: facing, four signed cell offsets, target.
 const NEAR_BRANCH: u8 = 0x0D;
+/// As [`NEAR_BRANCH`] with the rectangle in map cells (`$80:876C`): the
+/// tower tops' doors wait for Ark in front of them (`$90:9418`).
+const AREA_BRANCH: u8 = 0x0C;
 /// Takes the player's script once no forced action runs (`$097C & $0810`);
 /// `$80:B827`. Operand: the long script.
 const TAKE_PLAYER: u8 = 0xDF;
+/// Sets Ark's control script (`$80:ADBD`, entity `$0DEE`): a byte, the long
+/// script. The pad's own, [`PAD_CONTROL`], ends the script holding him;
+/// another takes him as `COP DF` does.
+const SET_CONTROL: u8 = 0xCB;
+/// Ark's pad control script (`$84:87C1`, the same in both revisions).
+const PAD_CONTROL: usize = 0x04_87C1;
 /// Plays the pose and ends the script's frame as an `RTL` does; `$80:A395`.
 const ANIMATE_AND_END: u8 = 0x91;
 /// Calls a long subroutine, keeping one return (`$7F:0004`); `$80:8592`.
@@ -556,7 +565,8 @@ pub struct Actor {
     pub(crate) died: bool,
     /// The helper art's list drawn instead of the body.
     pub(crate) overlay: Option<(u32, u8)>,
-    /// A sleep `COP 46` leaves for the next yield (`E+$0E`).
+    /// A sleep `COP 46` or a native store leaves for the next yield
+    /// (`E+$0E`).
     sleep: u16,
     /// Whether the actor has ever moved.
     walked: bool,
@@ -1110,6 +1120,10 @@ impl Actor {
 
     /// What a native run may change.
     fn memory<'m>(&'m mut self, globals: &'m mut Globals, probe: (u16, u16)) -> native::Memory<'m> {
+        // `+$14` reads as the facing of the record shown (`$97:B65A`).
+        let facing = self.facing_code();
+        self.own.insert(0x14, facing);
+        self.own.insert(0x15, 0);
         native::Memory {
             words: &mut globals.scratch,
             own: &mut self.own,
@@ -1117,6 +1131,7 @@ impl Actor {
             random: globals.random.word(),
             probe,
             events: &globals.events,
+            sleep: &mut self.sleep,
         }
     }
 
@@ -1464,9 +1479,12 @@ impl Actor {
             WAIT => return self.wait_for_pose(operands),
             WAIT_STEP => return self.wait_step(operands),
             RANDOM_STEP => return self.random_step_service(operands, around),
-            BRANCH_ON_PLAYER_NEAR | NEAR_BRANCH | TAKE_PLAYER | TRANSFER => {
-                return self.player_service(service, operands, bank, around)
-            }
+            BRANCH_ON_PLAYER_NEAR
+            | NEAR_BRANCH
+            | AREA_BRANCH
+            | TAKE_PLAYER
+            | SET_CONTROL
+            | TRANSFER => return self.player_service(service, operands, bank, around),
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
             _ if BODY.contains(&service) => return self.body(service, operands, image),
             PAN | PAN_WAIT => return self.pan(service, operands, around),
@@ -2514,6 +2532,9 @@ impl Actor {
             }
             YIELD => {
                 self.pc = operands;
+                if self.sleep > 0 {
+                    self.state = State::Waiting(std::mem::take(&mut self.sleep));
+                }
                 return false;
             }
             _ => {
@@ -3076,7 +3097,9 @@ impl Actor {
         let image = around.image;
         match service {
             BRANCH_ON_PLAYER_NEAR => return self.branch_near_player(operands, bank, around),
-            NEAR_BRANCH => return self.branch_in_cells(operands, bank, around),
+            NEAR_BRANCH | AREA_BRANCH => {
+                return self.branch_in_cells(operands, bank, around, service == NEAR_BRANCH)
+            }
             TAKE_PLAYER => {
                 if around.globals.player_action {
                     // `$80:B87B` retries the COP next frame.
@@ -3089,6 +3112,28 @@ impl Actor {
                 around.globals.player_script = Some(script);
                 around.globals.player_script_source = Some(self.pc);
                 self.pc = operands + 3;
+            }
+            SET_CONTROL => {
+                let (Some(&kind), Some(script)) = (
+                    image.get(operands),
+                    image.get(operands + 1..operands + 4).and_then(long),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                // The last word in a frame stands: the pad's ends the
+                // script holding Ark, another takes him. A first byte with
+                // bit 0 clear (`$80:ADCD`: `$0980`, `$85:D1F8`) is not
+                // modelled and goes by, as before.
+                if script == PAD_CONTROL {
+                    around.globals.release_player = true;
+                    around.globals.player_script = None;
+                } else if kind & 1 != 0 {
+                    around.globals.release_player = false;
+                    around.globals.player_script = Some(script);
+                    around.globals.player_script_source = Some(self.pc);
+                }
+                self.pc = operands + 4;
             }
             TRANSFER => {
                 let (Some(map), Some(&mode), Some(x), Some(y)) = (
@@ -3122,9 +3167,16 @@ impl Actor {
     /// the actor, as `COP 0F` does on a point: a jump when inside differs from
     /// bit 7 of the facing byte. The corners are the actor's position plus
     /// signed cells (`$80:BC2F`), less eight on Y, against `$0966`/`$0968`,
-    /// inclusive; negative near corners clamp to 0. Returns whether execution
+    /// inclusive; negative near corners clamp to 0. `COP 0C` (`relative`
+    /// false) takes the corners as map cells. Returns whether execution
     /// continues this frame.
-    fn branch_in_cells(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
+    fn branch_in_cells(
+        &mut self,
+        operands: usize,
+        bank: usize,
+        around: &Surroundings<'_>,
+        relative: bool,
+    ) -> bool {
         let Some(bytes) = around.image.get(operands..operands + 7) else {
             self.state = State::Frozen;
             return false;
@@ -3133,10 +3185,17 @@ impl Actor {
         let corner = |base: u16, byte: u8, less: i32| {
             i32::from(base) + i32::from(i8::from_ne_bytes([byte])) * 16 - less
         };
-        let (x, y) = self.position;
-        // Only the near corners clamp (`BPL` at `$80:87DF` / `87F6`).
-        let (left, top) = (corner(x, bytes[1], 0).max(0), corner(y, bytes[2], 8).max(0));
-        let (right, bottom) = (corner(x, bytes[3], 0), corner(y, bytes[4], 8));
+        // `COP 0C` counts from the map's corner, without the 8 above.
+        let (x, y, less) = if relative {
+            (self.position.0, self.position.1, 8)
+        } else {
+            (0, 0, 0)
+        };
+        let (left, top) = (
+            corner(x, bytes[1], 0).max(0),
+            corner(y, bytes[2], less).max(0),
+        );
+        let (right, bottom) = (corner(x, bytes[3], 0), corner(y, bytes[4], less));
         let (px, py) = (i32::from(around.player.0), i32::from(around.player.1) - 8);
         let inside = (id & 0x7F == 0x7F || id & 0x7F == around.facing as u8)
             && (left..=right).contains(&px)
@@ -4186,6 +4245,31 @@ mod script_service_tests {
             player,
             facing: Direction::Down,
         });
+    }
+
+    #[test]
+    fn cop_0c_waits_for_the_player_in_a_rectangle_of_map_cells() {
+        // `$90:9418`: COP 0C 7F (31,19)-(33,20) -> pose 7; else pose 9.
+        let [low, high] = u16::try_from((AT + 14) & 0xFFFF).unwrap().to_le_bytes();
+        let code = [
+            2, 0x0C, 0x7F, 0x1F, 0x13, 0x21, 0x14, low, high, 2, 0x80, 9, 2, 0xBD, 2, 0x80, 7, 2,
+            0xBD,
+        ];
+        for (player, pose) in [((512, 320), 7), ((512, 344), 9)] {
+            let (image, mut actor) = actor_running(&code);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            tick_at(&mut actor, &image, &mut globals, player);
+            assert_eq!(actor.selector, pose, "{player:?}");
+        }
+    }
+
+    #[test]
+    fn cop_cb_hands_ark_back_to_the_pad() {
+        // COP CB 01 $84:87C1; yield.
+        let (image, mut actor) = actor_running(&[2, 0xCB, 1, 0xC1, 0x87, 0x84, 2, 0xBD]);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert!(globals.release_player && globals.player_script.is_none());
     }
 
     #[test]

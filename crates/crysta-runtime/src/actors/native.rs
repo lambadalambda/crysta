@@ -37,14 +37,25 @@ pub struct Memory<'m> {
     pub probe: (u16, u16),
     /// The event flags, which `$80:BBC7` tests.
     pub events: &'m [u8],
+    /// `+$0E`, the frames the scheduler skips after the next yield, as a
+    /// random start delay stores it (`STA $00:000E,X`, `$90:939C`).
+    pub sleep: &'m mut u16,
 }
 
 /// The actor's own bytes runs may use: the wake callbacks and the attack
 /// kind (`$7F:1000..102D,X`, `docs/enemy-scripts.md` §5), `COP CC`'s target
-/// (`$7F:2004..2007,X`), `COP 46`'s row offset and layer (`$7F:201A/201B,X`)
-/// and the voice fade's intensity (`$7F:201C,X`, `$88:9CD8`). Other fields
-/// are the engine's.
-const OWN: [std::ops::RangeInclusive<u16>; 3] = [0x1000..=0x102D, 0x2004..=0x200B, 0x201A..=0x201D];
+/// and counters (`$7F:2004..200B,X`), `COP 46`'s row offset and layer
+/// (`$7F:201A/201B,X`), the voice fade's intensity (`$7F:201C,X`,
+/// `$88:9CD8`) and the callbacks' script bank (`$7F:2020,X`, `$90:93B9`).
+/// Other fields are the engine's.
+const OWN: [std::ops::RangeInclusive<u16>; 4] = [
+    0x1000..=0x102D,
+    0x2004..=0x200B,
+    0x201A..=0x201D,
+    0x2020..=0x2021,
+];
+/// `$00:000E,X`: the entity's sleep (`+$0E`).
+const SLEEP: u32 = 0x00_000E;
 /// `$0966`/`$0968`, Ark's probe, which runs may read.
 const PROBE: [u16; 2] = [0x0966, 0x0968];
 /// `$0408`: the random generator's word, which runs may read.
@@ -303,6 +314,10 @@ impl<'a> Machine<'a> {
                 if self.operand().is_some_and(|field| FIELDS.contains(&field)) =>
             {
                 self.field(opcode, memory.own)?
+            }
+            0x9F if self.long() == Some(SLEEP) && self.x && !self.narrow => {
+                *memory.sleep = self.a?;
+                self.pc + 4
             }
             0xBF | 0x9F => self.own(opcode, memory.own)?,
             0x8F => self.stop_spin(memory.display)?,
@@ -659,6 +674,7 @@ mod tests {
                 random: 0,
                 probe: (0, 0),
                 events: &[],
+                sleep: &mut 0,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -696,6 +712,7 @@ mod tests {
             random: 0,
             probe: (0, 0),
             events: &[],
+            sleep: &mut 0,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -736,6 +753,7 @@ mod tests {
             random: 0,
             probe: (0x0123, 0x0456),
             events: &[],
+            sleep: &mut 0,
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -767,6 +785,7 @@ mod tests {
                 random: 0,
                 probe: (0, 0),
                 events: &events,
+                sleep: &mut 0,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
@@ -874,6 +893,7 @@ mod tests {
             random: 0,
             probe: (0, 0),
             events: &[],
+            sleep: &mut 0,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);
