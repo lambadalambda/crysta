@@ -245,8 +245,11 @@ impl StaticBackground {
             // The rest of the Crysta slice resolves through the loading-script
             // projection. See meta/issues/playable-crysta-slice.md.
             0x000E | 0x0012..=0x0021 => (projected_loads(image, map_id)?, 0x6000),
-            // The first tower's ground floor (`docs/tower-entry.md`).
-            0x0100 => (projected_recipe(image, map_id, &TOWER_LOADS)?, 0x4000),
+            // The towers and the underworld's last maps
+            // (`docs/underworld-inventory.md`).
+            0x0100..=0x0127 | 0x012A | 0x012B => {
+                (projected_recipe(image, map_id, &TOWER_LOADS)?, 0x4000)
+            }
             _ => {
                 return Err(VisualMapError::Unsupported(
                     "unqualified static background map ID",
@@ -696,9 +699,11 @@ pub fn is_known_unconsumed_for_test(kind: ResourceKind, bytes: &[u8]) -> bool {
 }
 
 fn is_known_unconsumed(kind: ResourceKind, bytes: &[u8]) -> bool {
-    const SKIPPED: [(ResourceKind, &[u8]); 5] = [
+    const SKIPPED: [(ResourceKind, &[u8]); 6] = [
         // $000F's OBJ art and its $90 CGRAM palette.
         (ResourceKind::Graphics, &[0x00, 0x10, 0x00]),
+        // The second layer's own tiles in two tower rooms (`$11B`, `$123`).
+        (ResourceKind::Graphics, &[0x00, 0x10, 0x02]),
         (ResourceKind::Palette, &[0x00, 0x20, 0x90]),
         // The second layer and third metatile set, and the shared OBJ graphics.
         (ResourceKind::Layer, &[0x02]),
