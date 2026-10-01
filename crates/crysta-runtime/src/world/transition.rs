@@ -13,8 +13,8 @@
 //! raw or exact source-qualified placement, for route discovery.
 //!
 //! Not modelled: the loads' own frames (3 to 5 natively, more between the
-//! house and the town, which only lengthens the dark), and the player's
-//! walking poses on stairs. Script transfers fade by their mode ([`super::fade`]).
+//! house and the town, which only lengthens the dark). Script transfers
+//! fade by their mode ([`super::fade`]).
 
 use super::{Step, World, WorldError, EXIT_SOUND, STAIRS, STAIRS_UP};
 use crate::{admitted, WORLD_MAPS};
@@ -170,6 +170,22 @@ const STAIRS_UP_ARRIVING: Motion = &[
     (4, 0, 1),
     (2, 0, 0),
 ];
+/// Frames of a stair arrival before its list's second frame is due, less
+/// the first record's 8: the list starts at frame 9 and holds 10 frames.
+const STAIRS_ARRIVING_START: u16 = 12;
+
+/// A stair motion's list in Ark's resource 1 (`$13..$16`).
+fn stair_list(motion: Motion) -> Option<u8> {
+    [
+        (STAIRS_DOWN_LEAVING, 0x16),
+        (STAIRS_UP_LEAVING, 0x14),
+        (STAIRS_DOWN_ARRIVING, 0x13),
+        (STAIRS_UP_ARRIVING, 0x15),
+    ]
+    .into_iter()
+    .find_map(|(stairs, list)| (stairs == motion).then_some(list))
+}
+
 /// Leaving without a walk (world maps, selectors without one): the fade.
 const STILL: Motion = &[(16, 0, 0)];
 /// Frames of a fade.
@@ -401,6 +417,21 @@ impl World<'_> {
         (self.position().1 < threshold).then_some((x, threshold))
     }
 
+    /// Ark's stair list (resource 1) and its age while he walks stairs
+    /// (`docs/ark-poses.md`): leaving from the exit frame; arriving from
+    /// its first frame, the list's start (frame 9) held over the dark set-up.
+    #[must_use]
+    pub fn stairs_pose(&self) -> Option<(u8, u16)> {
+        if let Some(leaving) = &self.leaving {
+            let list = stair_list(leaving.walk.motion)?;
+            // The exit frame shows the first record, one frame short.
+            return Some((list, leaving.walk.frame + 1));
+        }
+        let walk = self.arriving.as_ref()?.walk;
+        let list = stair_list(walk.motion).filter(|_| walk.frame > 0)?;
+        Some((list, walk.frame.saturating_sub(STAIRS_ARRIVING_START)))
+    }
+
     /// The brightness of an exit's fades, 0 dark to 15 full.
     pub(super) fn exit_brightness(&self) -> u8 {
         let level = self
@@ -441,6 +472,10 @@ impl World<'_> {
         if arriving.walk.frame < arriving.walk.len() {
             self.arriving = Some(arriving);
         } else {
+            // Stairs end facing Down (`$84:A303`).
+            if stair_list(arriving.walk.motion).is_some() {
+                self.facing = Direction::Down;
+            }
             self.animation = AnimationState::standing(self.facing);
         }
         self.run_actors()?;

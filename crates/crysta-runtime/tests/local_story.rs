@@ -685,6 +685,49 @@ fn the_opened_stairs_lead_through_e_and_20_to_the_box_room() {
 }
 
 #[test]
+fn ark_plays_the_stair_lists_down_from_e_and_stands_facing_down() {
+    // `docs/ark-poses.md`: leaving down (selector 14) plays resource 1 list
+    // `$16` from the exit frame, its first record one frame short; the
+    // arrival plays `$13` from its frame 9, the first record held ten
+    // frames (shown from the arrival's first frame on). Then Ark stands
+    // facing Down.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = fresh_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(cartridge.image(), 0x000E, 104, 880, events).unwrap();
+    let mut poses = Vec::new();
+    for _ in 0..400 {
+        let up = (!world.in_transition()).then_some(Direction::Up);
+        world.update(up, Presses::default()).unwrap();
+        if world.in_transition() {
+            poses.push((world.map(), world.stairs_pose()));
+        } else if world.map() == 0x0020 {
+            break;
+        }
+    }
+    let leaving: Vec<_> = poses.iter().take_while(|(map, _)| *map == 0x000E).collect();
+    assert_eq!(leaving[0], &(0x000E, Some((0x16, 1))));
+    assert!(leaving
+        .iter()
+        .all(|(_, pose)| pose.is_some_and(|(list, _)| list == 0x16)));
+    let arriving: Vec<_> = poses
+        .iter()
+        .filter_map(|&(map, pose)| (map == 0x0020).then_some(pose).flatten())
+        .collect();
+    assert_eq!(arriving[..12], [(0x13, 0); 12]);
+    assert_eq!(
+        arriving[12..20],
+        (1..9).map(|age| (0x13, age)).collect::<Vec<_>>()[..]
+    );
+    assert_eq!(world.stairs_pose(), None);
+    assert_eq!(world.facing(), Direction::Down);
+}
+
+#[test]
 fn the_box_warns_on_contact_then_opens_for_the_next_approach() {
     // `$83:928F` with the native route's presses from `21-toward-box`
     // (`tools/pandora-qualification/route.jsonl`): Down into the box runs its
