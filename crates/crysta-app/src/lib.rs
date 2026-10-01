@@ -11,6 +11,7 @@
 pub mod background;
 pub mod clock;
 pub mod frame;
+pub mod hud;
 pub mod mode7;
 pub mod music;
 pub mod music_data;

@@ -61,7 +61,7 @@ pub struct Session {
     pub art: Option<RosterArt>,
     /// Rasterized sequences by record, selector, mirror and palette field;
     /// `None` when the packet has no such sequence.
-    pub sprites: HashMap<(usize, u8, bool, u8), Option<Animation>>,
+    pub sprites: HashMap<SpriteKey, Option<Animation>>,
     /// Ark's carry poses and the pots; `None` when the decoder refused them,
     /// and then Ark carries in his ordinary frames and no pot is drawn.
     pub carry_art: Option<CarryArt>,
@@ -428,6 +428,11 @@ impl Session {
             });
             return (ark, None);
         }
+        // The spear's thrust plays its list once (`docs/combat-graphics.md`).
+        if let Some((list, age, hflip)) = self.world.attack_pose() {
+            let thrust = (crysta_runtime::art::THRUST, list, hflip);
+            return (self.carry_frame(thrust, u64::from(age), true), None);
+        }
         // Stairs play their list of Ark's resource 1 once, unmirrored.
         if let Some((list, age)) = self.world.stairs_pose() {
             return (
@@ -528,7 +533,10 @@ impl Session {
         order.sort_unstable();
         for (_, _, index) in order {
             if index == usize::MAX {
-                frame::draw_sprite(frame, background, camera, player, position);
+                // A push after a hit blinks him every second frame.
+                if !world.ark_blinks() {
+                    frame::draw_sprite(frame, background, camera, player, position);
+                }
                 continue;
             }
             let resident = &residents[index];
@@ -627,6 +635,19 @@ impl Session {
                 world.money(),
             );
         }
+        // The towers' HUD (`docs/combat.md` §7), under the damage digits.
+        if crysta_runtime::TOWER_MAPS.contains(&world.map()) {
+            if let Some(art) = self.shop_art.art(self.image) {
+                crate::hud::draw_digits(frame, art, camera, world.digits());
+                let stats = world.stats();
+                let shown = crate::hud::Shown {
+                    level: stats.level,
+                    life: (stats.life, stats.max_life),
+                    gems: world.money(),
+                };
+                crate::hud::draw(frame, art, shown);
+            }
+        }
         // An item held over Ark's head (`COP 60`).
         if let Some((item, (dx, dy))) = world.held_item() {
             let (x, y) = world.position();
@@ -669,25 +690,37 @@ fn draw_dialogue(
     }
 }
 
-/// A resident's sequence as its body and palette field show it, cached. A
-/// sequence the packet lacks falls back to the setup one rather than a block.
+/// A cached resident sequence: a body's by record, selector, mirror and
+/// palette field, or a list of the helper art drawn over it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SpriteKey {
+    /// A body's sequence.
+    Body(usize, u8, bool, u8),
+    /// The helper art's list: an explosion, a dropped gem.
+    Overlay(u32, u8),
+}
+
+/// A resident's sequence as its body and palette field show it, or its
+/// overlay, cached. A sequence the packet lacks falls back to the setup one
+/// rather than a block.
 fn resident_animation<'s>(
-    sprites: &'s mut HashMap<(usize, u8, bool, u8), Option<Animation>>,
+    sprites: &'s mut HashMap<SpriteKey, Option<Animation>>,
     image: &[u8],
     body: &Body,
     resident: &crysta_runtime::residents::Resident,
 ) -> Option<&'s Animation> {
-    let key = (
-        resident.record,
-        resident.selector,
-        resident.hflip,
-        resident.palette,
-    );
+    if let Some((base, selector)) = resident.overlay {
+        return sprites
+            .entry(SpriteKey::Overlay(base, selector))
+            .or_insert_with(|| crysta_runtime::art::overlay_animation(image, base, selector).ok())
+            .as_ref();
+    }
+    let (selector, hflip, palette) = (resident.selector, resident.hflip, resident.palette);
     sprites
-        .entry(key)
+        .entry(SpriteKey::Body(resident.record, selector, hflip, palette))
         .or_insert_with(|| {
-            body.shown(image, (key.1, key.2), key.3)
-                .or_else(|_| body.shown(image, (body.initial(), key.2), key.3))
+            body.shown(image, (selector, hflip), palette)
+                .or_else(|_| body.shown(image, (body.initial(), hflip), palette))
                 .ok()
         })
         .as_ref()

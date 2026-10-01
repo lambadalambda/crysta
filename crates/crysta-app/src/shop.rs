@@ -23,6 +23,14 @@ pub struct ShopArtCache {
 }
 
 impl ShopArtCache {
+    /// The shop display's fixed art, which the HUD shares; `None` when the
+    /// decoder refuses it.
+    pub fn art(&self, image: &[u8]) -> Option<&ShopArt> {
+        self.art
+            .get_or_init(|| ShopArt::from_rom(image).ok())
+            .as_ref()
+    }
+
     /// Draws `display` with the talk target at `target` and Ark at `ark`,
     /// both on screen, and `money`. Art the decoder refuses is left out.
     pub fn draw(
