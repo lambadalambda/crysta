@@ -70,23 +70,18 @@ impl ShopArtCache {
             (tx + 12, ty + 7),
             &art.sprite_palette,
         );
-        if let Some((tiles, colours)) = self
-            .icons
-            .entry(display.item)
-            .or_insert_with(|| item_icon(image, display.item).ok())
-        {
-            let at = if display.holding {
-                (ark.0 - 8, ark.1 - 45)
-            } else {
-                (tx - 24, ty - 3)
-            };
-            let colours = colours.map(|colour| if display.dim { halve(colour) } else { colour });
-            // Its colours are OBJ palette 7's upper eight, 8..15.
-            blit(canvas, at, 16, |px, py| {
-                let colour = tiles[py / 8 * 2 + px / 8].pixels()[py % 8 * 8 + px % 8];
-                (colour >= 8).then(|| rgb(colours[usize::from(colour - 8)]))
-            });
-        }
+        let at = if display.holding {
+            (ark.0 - 8, ark.1 - 45)
+        } else {
+            (tx - 24, ty - 3)
+        };
+        draw_icon(
+            &mut self.icons,
+            canvas,
+            image,
+            (display.item, display.dim),
+            at,
+        );
         number(canvas, art, display.price, (tx + 40, ty - 1));
         for (index, &tile) in (0_i32..).zip(&ShopArt::BAG) {
             panel(
@@ -99,6 +94,40 @@ impl ShopArtCache {
         }
         number(canvas, art, money, (tx + 40, ty + 31));
     }
+}
+
+impl ShopArtCache {
+    /// An item's 16×16 icon with its top-left at `at`, dimmed or not.
+    pub fn draw_icon(
+        &mut self,
+        canvas: &mut Canvas,
+        image: &[u8],
+        item: (u8, bool),
+        at: (i32, i32),
+    ) {
+        draw_icon(&mut self.icons, canvas, image, item, at);
+    }
+}
+
+/// An item's icon from the cache: OBJ palette 7's upper eight colours, 8..15.
+fn draw_icon(
+    icons: &mut HashMap<u8, Option<Icon>>,
+    canvas: &mut Canvas,
+    image: &[u8],
+    (item, dim): (u8, bool),
+    at: (i32, i32),
+) {
+    let Some((tiles, colours)) = icons
+        .entry(item)
+        .or_insert_with(|| item_icon(image, item).ok())
+    else {
+        return;
+    };
+    let colours = colours.map(|colour| if dim { halve(colour) } else { colour });
+    blit(canvas, at, 16, |px, py| {
+        let colour = tiles[py / 8 * 2 + px / 8].pixels()[py % 8 * 8 + px % 8];
+        (colour >= 8).then(|| rgb(colours[usize::from(colour - 8)]))
+    });
 }
 
 /// A number in the panel's 8×16 digits, the ones at `ones`, without

@@ -624,6 +624,16 @@ impl Session {
                 world.money(),
             );
         }
+        // An item held over Ark's head (`COP 60`).
+        if let Some((item, (dx, dy))) = world.held_item() {
+            let (x, y) = world.position();
+            let at = (
+                i32::from(x) - camera.0 + i32::from(dx),
+                i32::from(y) - camera.1 + i32::from(dy),
+            );
+            self.shop_art
+                .draw_icon(frame, self.image, (item, false), at);
+        }
         self.titles.draw(
             frame,
             self.image,
