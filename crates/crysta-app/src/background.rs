@@ -204,18 +204,12 @@ impl CachedBackground {
         }
     }
 
-    /// The door walk's mask (`docs/depth-order.md`): its 14 priority-1
+    /// The player-helper's mask (`docs/depth-order.md`): its priority-1
     /// tiles lose to the background and win over every sprite, so the wall
-    /// above the doorway shows over Ark. Relative to `anchor`: x −8..+8 on
-    /// rows −64..−56, x −16..+16 on rows −56..−32.
-    pub fn cover_door(&self, frame: &mut Canvas, camera: (i32, i32), anchor: Option<(u16, u16)>) {
-        let Some((x, y)) = anchor.map(|(x, y)| (i32::from(x), i32::from(y))) else {
-            return;
-        };
-        for (left, top, right, bottom) in [
-            (x - 8, y - 64, x + 8, y - 56),
-            (x - 16, y - 56, x + 16, y - 32),
-        ] {
+    /// above a doorway or a stairwell's frame shows over Ark. `masks` are
+    /// world rectangles, half-open.
+    pub fn cover(&self, frame: &mut Canvas, camera: (i32, i32), masks: &[(i32, i32, i32, i32)]) {
+        for &(left, top, right, bottom) in masks {
             for world_y in top..bottom {
                 for world_x in left..right {
                     let (Ok(bx), Ok(by)) = (usize::try_from(world_x), usize::try_from(world_y))
