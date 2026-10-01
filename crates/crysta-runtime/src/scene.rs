@@ -42,6 +42,7 @@ impl Presses {
 }
 
 /// What scripts read and write beyond their own actor.
+#[allow(clippy::struct_excessive_bools)] // independent engine words, not a state
 #[derive(Debug, Clone)]
 pub struct Globals {
     /// The `$7E:06C0` event-flag bitmap.
@@ -57,6 +58,9 @@ pub struct Globals {
     /// `$097C & $0810`: the player is in a forced action, such as a recoil,
     /// which `COP DF` waits out.
     pub player_action: bool,
+    /// Ark is out of the scripts' reach (`COP 71`): pushed, down or held
+    /// by the world.
+    pub ark_busy: bool,
     /// Player script pointer queued by `COP DF`, normalized to a ROM offset.
     pub player_script: Option<usize>,
     /// `COP CB` set Ark's control script back to the pad's (`$84:87C1`):
@@ -216,6 +220,7 @@ impl Globals {
             input_mask: 0,
             pad: 0,
             player_action: false,
+            ark_busy: false,
             player_script: None,
             release_player: false,
             player_script_source: None,

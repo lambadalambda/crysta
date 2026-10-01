@@ -40,6 +40,43 @@ pub struct Memory<'m> {
     /// `+$0E`, the frames the scheduler skips after the next yield, as a
     /// random start delay stores it (`STA $00:000E,X`, `$90:939C`).
     pub sleep: &'m mut u16,
+    /// The actor's x and y (`$0000,X`, `$0002,X`).
+    pub position: &'m mut (u16, u16),
+    /// Ark's entity, through `LDY $0DEA`.
+    pub player: View,
+    /// The parent's, through `LDA $7F:001E,X; TAY`, as it was at the
+    /// spawn (`$97:C1E6`).
+    pub parent: Option<View>,
+}
+
+/// What a run reads of another entity through Y.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct View {
+    /// `+$00`, `+$02`.
+    pub x: u16,
+    pub y: u16,
+    /// `+$14`, the facing code.
+    pub facing: u16,
+}
+
+impl View {
+    /// The word at `+field`: x, y, the facing, the layer (always 0 here).
+    fn field(self, field: u16) -> Option<u16> {
+        match field {
+            0x00 => Some(self.x),
+            0x02 => Some(self.y),
+            0x14 => Some(self.facing),
+            0x16 => Some(0),
+            _ => None,
+        }
+    }
+}
+
+/// The entity Y holds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Entity {
+    Player,
+    Parent,
 }
 
 /// The actor's own bytes runs may use: the wake callbacks and the attack
@@ -61,9 +98,9 @@ const PROBE: [u16; 2] = [0x0966, 0x0968];
 /// `$0408`: the random generator's word, which runs may read.
 const RANDOM: u16 = 0x0408;
 /// The entity's own words runs may use through `,X`: `+$14`, a bullet's
-/// direction, and `+$24` and `+$26` (the blob's counters,
-/// `docs/enemy-scripts.md`).
-const FIELDS: [u16; 3] = [0x14, 0x24, 0x26];
+/// direction, `+$16` the layer (0: the runtime keeps one), and `+$24` and
+/// `+$26` (the blob's counters, `docs/enemy-scripts.md`).
+const FIELDS: [u16; 4] = [0x14, 0x16, 0x24, 0x26];
 /// `$7E:46E6`, `COP 6A`'s square: a run stores 0 to stop it.
 const SPIN: u32 = 0x7E_46E6;
 /// The colour math registers' shadows (`$0468..$046B`), which the NMI
@@ -103,7 +140,8 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 7] = [
+const READABLE: [u16; 8] = [
+    WINDOW_BUSY,
     PLAYER_ACTION,
     PRIME_BLUE,
     ENEMIES,
@@ -112,6 +150,8 @@ const READABLE: [u16; 7] = [
     PLAYER_X,
     PLAYER_Y,
 ];
+/// `$0DC2`, nonzero while the text window is busy (`$97:BF59`).
+pub const WINDOW_BUSY: u16 = 0x0DC2;
 /// `$0952`, Ark's x less 8.
 pub const PLAYER_X: u16 = 0x0952;
 /// `$0954`, Ark's y less 16, as the towers' gates read it (`$90:8F8F`).
@@ -262,6 +302,9 @@ struct Machine<'a> {
     x: bool,
     /// Values pushed and not yet pulled.
     stack: Vec<Pushed>,
+    /// The entity Y holds, and the one A holds for a `TAY`.
+    y: Option<Entity>,
+    entity: Option<Entity>,
 }
 
 impl<'a> Machine<'a> {
@@ -286,6 +329,8 @@ impl<'a> Machine<'a> {
             narrow,
             x,
             stack,
+            y: None,
+            entity: None,
         }
     }
 
@@ -305,8 +350,13 @@ impl<'a> Machine<'a> {
     /// Executes one instruction, or stops before it for the script loop or
     /// another recogniser; `None` refuses the run.
     fn step(&mut self, memory: &mut Memory<'_>) -> Option<Flow> {
-        let words = &mut *memory.words;
         let opcode = *self.image.get(self.pc)?;
+        if matches!(opcode, 0xAC | 0xA8 | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF)
+            && self.entity_op(opcode, memory).is_some()
+        {
+            return Some(Flow::On);
+        }
+        let words = &mut *memory.words;
         self.pc = match opcode {
             0xE2 | 0xC2 => self.width(opcode)?,
             0x8D | 0x9C if self.operand().is_some_and(|address| PPU.contains(&address)) => {
@@ -322,7 +372,13 @@ impl<'a> Machine<'a> {
                 }
                 self.pc + 3
             }
-            0x09 | 0x29 => self.logic(opcode)?,
+            0x09 | 0x29 | 0x49 => self.logic(opcode)?,
+            0xBD | 0xDD | 0xFD | 0x7D | 0x9D
+                if self.x && !self.narrow && matches!(self.operand(), Some(0 | 2)) =>
+            {
+                self.position(opcode, memory.position)?
+            }
+            0xC3 => self.compare_stacked()?,
             0xAD if self.operand() == Some(RANDOM) && !self.narrow => {
                 self.set(memory.random);
                 self.pc + 3
@@ -396,8 +452,127 @@ impl<'a> Machine<'a> {
     fn logic(&mut self, opcode: u8) -> Option<usize> {
         let (value, next) = self.immediate()?;
         let a = self.a?;
-        self.set(if opcode == 0x09 { a | value } else { a & value });
+        self.set(match opcode {
+            0x09 => a | value,
+            0x29 => a & value,
+            _ => a ^ value,
+        });
         Some(next)
+    }
+
+    /// `LDA`, `CMP`, `SBC`, `ADC`, `STA` on the actor's own x or y
+    /// (`$0000,X`, `$0002,X`): the Cadet's aim (`$97:BE2B`), its spells'
+    /// place (`$97:C1FC`).
+    fn position(&mut self, opcode: u8, position: &mut (u16, u16)) -> Option<usize> {
+        let first = self.operand()? == 0;
+        let value = if first { position.0 } else { position.1 };
+        match opcode {
+            0x9D => {
+                let a = self.a?;
+                if first {
+                    position.0 = a;
+                } else {
+                    position.1 = a;
+                }
+            }
+            0xBD => self.set(value),
+            0xDD => self.compare(value)?,
+            _ => {
+                let (a, carry) = (u32::from(self.a?), u32::from(self.carry?));
+                let sum = if opcode == 0x7D {
+                    a + u32::from(value) + carry
+                } else {
+                    a + u32::from(value ^ 0xFFFF) + carry
+                };
+                self.set(u16::try_from(sum & 0xFFFF).ok()?);
+                self.carry = Some(sum > 0xFFFF);
+            }
+        }
+        Some(self.pc + 3)
+    }
+
+    /// Y on another entity: `LDY $0DEA` (Ark), `LDA $7F:001E,X; TAY` (the
+    /// parent), `LDA`/`CMP` of its fields through `,Y`; and `LSR A`, `ADC`
+    /// of a readable word. `None` leaves the instruction to the others.
+    fn entity_op(&mut self, opcode: u8, memory: &Memory<'_>) -> Option<()> {
+        if self.narrow {
+            return None;
+        }
+        let view = |entity| match entity {
+            Entity::Player => Some(memory.player),
+            Entity::Parent => memory.parent,
+        };
+        self.pc = match opcode {
+            0xAC if self.operand()? == 0x0DEA => {
+                self.y = Some(Entity::Player);
+                self.pc + 3
+            }
+            0xBF if self.long()? == 0x7F_001E && self.x && memory.parent.is_some() => {
+                (self.a, self.entity) = (None, Some(Entity::Parent));
+                // A pointer, never 0.
+                (self.zero, self.negative) = (Some(false), Some(false));
+                self.pc + 4
+            }
+            0xA8 => {
+                self.y = Some(self.entity?);
+                self.pc + 1
+            }
+            0xB9 | 0xD9 => {
+                let value = view(self.y?)?.field(self.operand()?)?;
+                if opcode == 0xB9 {
+                    self.set(value);
+                } else {
+                    self.compare(value)?;
+                }
+                self.pc + 3
+            }
+            0x4A => {
+                let a = self.a?;
+                self.set(a >> 1);
+                self.carry = Some(a & 1 != 0);
+                self.pc + 1
+            }
+            0x6D => {
+                let at = self.operand()?;
+                let value = if at == PROBE[0] {
+                    memory.probe.0
+                } else if at == PROBE[1] {
+                    memory.probe.1
+                } else if READABLE.contains(&at) {
+                    memory.words.get(&at).copied().unwrap_or(0)
+                } else {
+                    return None;
+                };
+                let sum = u32::from(self.a?) + u32::from(value) + u32::from(self.carry?);
+                self.set(u16::try_from(sum & 0xFFFF).ok()?);
+                self.carry = Some(sum > 0xFFFF);
+                self.pc + 3
+            }
+            _ => return None,
+        };
+        Some(())
+    }
+
+    /// `CMP $01,S` against a wide A pushed last.
+    fn compare_stacked(&mut self) -> Option<usize> {
+        if *self.image.get(self.pc + 1)? != 1 || self.narrow {
+            return None;
+        }
+        let Some(&Pushed::A(Some(value), false)) = self.stack.last() else {
+            return None;
+        };
+        self.compare(value)?;
+        Some(self.pc + 2)
+    }
+
+    /// The flags of `CMP` of A with `value`, wide.
+    fn compare(&mut self, value: u16) -> Option<()> {
+        let a = self.a?;
+        self.carry = Some(a >= value);
+        let difference = a.wrapping_sub(value);
+        self.zero = Some(difference == 0);
+        self.negative = Some(difference & 0x8000 != 0);
+        Some(())
     }
 
     /// `LDA` / `STA $7F:xxxx,X` on [`OWN`], X still the actor.
@@ -446,13 +621,7 @@ impl<'a> Machine<'a> {
             0x9D => write(own, self.a?),
             0x9E => write(own, 0),
             0xBD => self.set(read(own)),
-            0xDD => {
-                let (a, value) = (self.a?, read(own));
-                self.carry = Some(a >= value);
-                let difference = a.wrapping_sub(value);
-                self.zero = Some(difference == 0);
-                self.negative = Some(difference & 0x8000 != 0);
-            }
+            0xDD => self.compare(read(own))?,
             _ => {
                 let value = read(own).wrapping_sub(1);
                 write(own, value);
@@ -497,6 +666,7 @@ impl<'a> Machine<'a> {
     }
 
     fn set(&mut self, value: u16) {
+        self.entity = None;
         self.a = Some(value);
         self.zero = Some(value == 0);
         self.negative = Some(value & if self.narrow { 0x80 } else { 0x8000 } != 0);
@@ -579,11 +749,7 @@ impl<'a> Machine<'a> {
                 } else {
                     words.get(&self.address()?).copied().unwrap_or(0)
                 };
-                let a = self.a?;
-                self.carry = Some(a >= value);
-                let difference = a.wrapping_sub(value);
-                self.zero = Some(difference == 0);
-                self.negative = Some(difference & 0x8000 != 0);
+                self.compare(value)?;
                 Some(self.pc + 3)
             }
             _ => {
@@ -701,6 +867,9 @@ mod tests {
                 probe: (0, 0),
                 events: &[],
                 sleep: &mut 0,
+                position: &mut (0, 0),
+                player: View::default(),
+                parent: None,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -739,6 +908,9 @@ mod tests {
             probe: (0, 0),
             events: &[],
             sleep: &mut 0,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: None,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -780,6 +952,9 @@ mod tests {
             probe: (0x0123, 0x0456),
             events: &[],
             sleep: &mut 0,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: None,
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -812,9 +987,81 @@ mod tests {
                 probe: (0, 0),
                 events: &events,
                 sleep: &mut 0,
+                position: &mut (0, 0),
+                player: View::default(),
+                parent: None,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
+    }
+
+    #[test]
+    fn the_cadet_compares_its_distances_to_the_target_on_the_stack() {
+        // `$97:BE26`: LDA $7F:2004,X; SEC; SBC $0000,X; BPL +4; EOR #$FFFF;
+        // INC; PHA; LDA $7F:2006,X; SEC; SBC $0002,X; BPL +4; EOR #$FFFF;
+        // INC; CMP $01,S; BCC +1; PLA; PLA; COP.
+        let code = [
+            0xBF, 0x04, 0x20, 0x7F, 0x38, 0xFD, 0x00, 0x00, 0x10, 0x04, 0x49, 0xFF, 0xFF, 0x1A,
+            0x48, 0xBF, 0x06, 0x20, 0x7F, 0x38, 0xFD, 0x02, 0x00, 0x10, 0x04, 0x49, 0xFF, 0xFF,
+            0x1A, 0xC3, 0x01, 0x90, 0x01, 0x68, 0x68, 0x02,
+        ];
+        let cadet = image(&code);
+        // Target 64 left and 8 below: |dy| < |dx|, the BCC skips one PLA.
+        let (mut words, mut display) = (Scratch::new(), Display::default());
+        let mut own = Own::from([(0x2004, 0x40), (0x2005, 0), (0x2006, 0x88), (0x2007, 0)]);
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0,
+            probe: (0, 0),
+            events: &[],
+            sleep: &mut 0,
+            position: &mut (0x80, 0x80),
+            player: View::default(),
+            parent: None,
+        };
+        assert_eq!(next(super::run(&cadet, AT, &mut memory)), Some(AT + 35));
+        // Target 8 left and 64 below: no branch, and the second PLA finds
+        // nothing to pull.
+        memory.own.insert(0x2004, 0x78);
+        memory.own.insert(0x2006, 0xC0);
+        assert!(super::run(&cadet, AT, &mut memory).is_none());
+    }
+
+    #[test]
+    fn a_spell_aims_between_its_parent_and_ark() {
+        // `$97:C209`: LDA $7F:001E,X; TAY; LDA $0000,Y; CLC; ADC $0966; LSR;
+        // STA $7F:2004,X; LDY $0DEA; LDA $0014,Y; STA $0000,X; COP.
+        let code = [
+            0xBF, 0x1E, 0x00, 0x7F, 0xA8, 0xB9, 0x00, 0x00, 0x18, 0x6D, 0x66, 0x09, 0x4A, 0x9F,
+            0x04, 0x20, 0x7F, 0xAC, 0xEA, 0x0D, 0xB9, 0x14, 0x00, 0x9D, 0x00, 0x00, 0x02,
+        ];
+        let spell = image(&code);
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut position = (0, 0);
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0,
+            probe: (0x100, 0x80),
+            events: &[],
+            sleep: &mut 0,
+            position: &mut position,
+            player: View {
+                x: 0x100,
+                y: 0x88,
+                facing: 3,
+            },
+            parent: Some(View {
+                x: 0x80,
+                ..View::default()
+            }),
+        };
+        assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
+        assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
+        assert_eq!(position, (3, 0), "Ark's facing, as written");
     }
 
     #[test]
@@ -920,6 +1167,9 @@ mod tests {
             probe: (0, 0),
             events: &[],
             sleep: &mut 0,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: None,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

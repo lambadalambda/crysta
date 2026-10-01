@@ -367,3 +367,43 @@ fn the_knight_guards_and_thrusts_at_ark() {
         assert_eq!(world.foe_life(record), Some(23));
     }
 }
+
+#[test]
+fn the_cadet_casts_spells_that_hurt_ark() {
+    // `$97:BD3E` (`docs/tower-two.md`): an enemy (profile `$03`, 20 life,
+    // its graphics left in VRAM by the floors before) that walks beside
+    // Ark and casts; the spells (`$97:C2DD`) fly on the Cadet's own art.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x100 / 8] |= 3;
+        let world =
+            World::enter_with_events(rom.image(), 0x0109, 128, 400, events.clone()).unwrap();
+        let cadet = world
+            .residents()
+            .iter()
+            .find(|resident| world.foe_life(resident.record) == Some(20))
+            .unwrap_or_else(|| panic!("{:?}: no Cadet", rom.revision()));
+        let at = cadet.position;
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0109, at.0 + 40, at.1 + 40, events).unwrap();
+        for _ in 0..300 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(
+                    None,
+                    Presses {
+                        confirm: reading,
+                        ..Presses::NONE
+                    },
+                )
+                .unwrap();
+        }
+        assert!(
+            world.life().0 < 28,
+            "{:?}: {:?}",
+            rom.revision(),
+            world.life()
+        );
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+    }
+}

@@ -642,6 +642,11 @@ impl<'a> World<'a> {
         self.globals
             .scratch
             .insert(crate::actors::FRAMES, self.globals.frames);
+        self.globals.scratch.insert(
+            crate::actors::WINDOW_BUSY,
+            u16::from(self.globals.dialogue.busy()),
+        );
+        self.globals.ark_busy = self.hurt.is_some() || self.down.is_some();
         self.globals
             .scratch
             .insert(crate::actors::PLAYER_X, x.wrapping_sub(8));
@@ -927,7 +932,7 @@ impl<'a> World<'a> {
                 hflip: actor.hflip,
                 pose_age: 0,
                 walking: false,
-                descriptor: None,
+                descriptor: actor.descriptor(),
                 hidden: actor.hidden,
                 priority: actor.priority,
                 palette: actor.palette,

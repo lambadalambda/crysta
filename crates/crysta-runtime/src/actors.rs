@@ -25,7 +25,7 @@ mod walls;
 pub(crate) use foe::helper;
 pub use native::{
     Scratch, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP,
-    PRIME_BLUE,
+    PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -390,6 +390,9 @@ const PLAYER_AXIS: u8 = 0xD7;
 const PLAYER_SIDE: u8 = 0xD3;
 /// Above, even or below, by Ark's feet (`$80:B38A`).
 const PLAYER_HEIGHT: u8 = 0xD4;
+/// Jumps when Ark is busy, down or out of play, or `$097E & m1`, or
+/// `$097C & m2`; else goes on (`$80:A016`): m1, m2, the target.
+const ARK_BUSY: u8 = 0x71;
 /// Starts a line move toward `$7F:2004/2006,X` (`$80:AE38`): legs, pose,
 /// speed, frame limit, selector (`FF` none).
 const LINE_START: u8 = 0xCC;
@@ -599,6 +602,8 @@ pub struct Actor {
     line: Option<line::Line>,
     /// Spawned by another actor's script.
     spawned: bool,
+    /// The parent as it was at the spawn, for `$7F:001E,X` reads.
+    parent: Option<native::View>,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -706,6 +711,7 @@ impl Actor {
             pending: (0, 0),
             line: None,
             spawned: false,
+            parent: None,
             parameter: 0,
             frozen_return: None,
             base: Base::Common,
@@ -1052,6 +1058,11 @@ impl Actor {
             let (set, cleared) = match op {
                 0x09 if value & !MODELLED == 0 => (value, 0),
                 0x29 if !value & !MODELLED == 0 => (0, !value),
+                // `EOR #$8000`: a blink (the Cadet, `$97:C016`).
+                0x49 if value == 0x8000 => {
+                    self.hidden = !self.hidden;
+                    return Some(at + 9);
+                }
                 _ => return None,
             };
             self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
@@ -1121,13 +1132,23 @@ impl Actor {
         if let Some(next) = player_pose_mismatch(image, at) {
             return Some(next);
         }
-        let probe = probe(around.player);
-        let ran = native::run(image, at, &mut self.memory(around.globals, probe))?;
+        let player = (around.player, around.facing);
+        let ran = native::run(image, at, &mut self.memory(around.globals, player))?;
         Some(self.ran(ran))
     }
 
     /// What a native run may change.
-    fn memory<'m>(&'m mut self, globals: &'m mut Globals, probe: (u16, u16)) -> native::Memory<'m> {
+    fn memory<'m>(
+        &'m mut self,
+        globals: &'m mut Globals,
+        (player, facing): ((u16, u16), Direction),
+    ) -> native::Memory<'m> {
+        let probe = probe(player);
+        let player = native::View {
+            x: player.0,
+            y: player.1,
+            facing: u16::from(sense::code(facing)),
+        };
         // `+$14` reads as the facing of the record shown (`$97:B65A`).
         let facing = self.facing_code();
         self.own.insert(0x14, facing);
@@ -1140,6 +1161,9 @@ impl Actor {
             probe,
             events: &globals.events,
             sleep: &mut self.sleep,
+            position: &mut self.position,
+            player,
+            parent: self.parent,
         }
     }
 
@@ -1186,6 +1210,13 @@ impl Actor {
             && !matches!(self.state, State::Frozen | State::Gone)
             && (self.interaction & INTERACT_ANY_SIDE != 0
                 || (self.interaction & INTERACT_FACING != 0 && facing.opposite() == self.facing))
+    }
+
+    /// The descriptor its art and boxes come from, its parent's for a
+    /// spawned child.
+    #[must_use]
+    pub(crate) const fn descriptor(&self) -> Option<usize> {
+        self.descriptor
     }
 
     /// Where the registered interaction callback runs (normalized), if any.
@@ -1312,7 +1343,7 @@ impl Actor {
             match native::resume(
                 image,
                 paused,
-                &mut self.memory(around.globals, probe(around.player)),
+                &mut self.memory(around.globals, (around.player, around.facing)),
             ) {
                 Some(ran) => self.pc = self.ran(ran),
                 None => self.state = State::Frozen,
@@ -1457,25 +1488,10 @@ impl Actor {
                 return self.door_service(service, operands, bank, around)
             }
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
-            SELECT_POSE => {
-                let Some(selector) = image.get(operands).copied() else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                let hflip = self.hflip;
-                self.set_pose(selector, hflip);
-                // `$80:A18C` restarts the list even for the same pose. Only
-                // where its length is known, or a one-frame fallback wait
-                // would hold the raster on its first frame.
-                if self.pose_list(selector).is_some() {
-                    self.pose_age = 0;
-                }
-                // `$80:A1A8` writes `+$0A`: an RTL comes back here.
-                self.continuation = Some(operands + 1);
-                self.pc = operands + 1;
-            }
+            SELECT_POSE => return self.select_pose(operands, image),
             LINE_START | LINE_STEP => return self.line_service(service, operands, image),
             PROFILE => return self.profile_service(operands, image),
+            ARK_BUSY => return self.ark_busy(operands, bank, around),
             CLEAR_HFLIP | SET_HFLIP | TOGGLE_HFLIP => {
                 let (selector, hflip) = (self.selector, self.hflip);
                 self.set_pose(
@@ -1494,7 +1510,9 @@ impl Actor {
             | SET_CONTROL
             | TRANSFER => return self.player_service(service, operands, bank, around),
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
-            _ if BODY.contains(&service) => return self.body(service, operands, image),
+            _ if BODY.contains(&service) => {
+                return self.body(service, operands, image, around.player)
+            }
             PAN | PAN_WAIT => return self.pan(service, operands, around),
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
@@ -1539,10 +1557,10 @@ impl Actor {
     /// The actor's body: its x and y (`COP B1`, `B2`, `B3`), its art packet (`COP D8`), its
     /// OBJ priority (`COP BA`), palette field (`COP BB`) and orbit (`COP D0`,
     /// `D1`). Returns whether execution continues.
-    fn body(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+    fn body(&mut self, service: u8, operands: usize, image: &[u8], player: (u16, u16)) -> bool {
         match service {
-            ORBIT => return self.start_orbit(operands, image),
-            ORBIT_STEP => return self.step_orbit(operands, image),
+            ORBIT => return self.start_orbit(operands, image, player),
+            ORBIT_STEP => return self.step_orbit(operands, image, player),
             MOVE_Y => {
                 let Some(dy) = cadence::word(image, operands) else {
                     self.state = State::Frozen;
@@ -1791,6 +1809,53 @@ impl Actor {
             });
         }
         self.resources[slot].clone()
+    }
+
+    /// `COP 80 pose`. Returns whether execution continues this frame.
+    fn select_pose(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(selector) = image.get(operands).copied() else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let hflip = self.hflip;
+        self.set_pose(selector, hflip);
+        // `$80:A18C` restarts the list even for the same pose. Only where
+        // its length is known, or a one-frame fallback wait would hold the
+        // raster on its first frame.
+        if self.pose_list(selector).is_some() {
+            self.pose_age = 0;
+        }
+        // `$80:A1A8` writes `+$0A`: an RTL comes back here.
+        self.continuation = Some(operands + 1);
+        self.pc = operands + 1;
+        true
+    }
+
+    /// `COP 71 m1 m2 t`: jumps when Ark is busy or down, or `$097C & m2`
+    /// (`$097E & m1` is not modelled); else goes on. Returns whether
+    /// execution continues this frame.
+    fn ark_busy(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
+        let image = around.image;
+        let (Some(_), Some(m2), Some(target)) = (
+            cadence::word(image, operands),
+            cadence::word(image, operands + 2),
+            cadence::word(image, operands + 4),
+        ) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        // `$097E` is not modelled: no bit of it is ever set here.
+        let action = around
+            .globals
+            .scratch
+            .get(&native::PLAYER_ACTION)
+            .copied()
+            .unwrap_or(0);
+        if around.globals.ark_busy || action & m2 != 0 {
+            return self.jump(bank, target);
+        }
+        self.pc = operands + 6;
+        true
     }
 
     /// `COP D9 n`: the profile, and without bit 7 the life too; a spawned
@@ -2082,18 +2147,24 @@ impl Actor {
 
     /// `COP D0 pose target dx dy angle radius turn reach end`: an orbit
     /// about the actor's own place (where its parent spawned it; target 0)
-    /// plus (dx, dy). Natively `COP D1` reads the parent's place each frame;
+    /// or Ark (`$0DEA`) plus (dx, dy). Natively `COP D1` reads the parent's place each frame;
     /// here it is fixed when the orbit starts, as the crystals' Elle stands
     /// still. Returns whether execution continues.
-    fn start_orbit(&mut self, operands: usize, image: &[u8]) -> bool {
+    fn start_orbit(&mut self, operands: usize, image: &[u8], player: (u16, u16)) -> bool {
         let word = |at: usize| cadence::word(image, operands + at);
         let byte = |at: usize| {
             image
                 .get(operands + at)
                 .map(|&b| i16::from(i8::from_ne_bytes([b])))
         };
-        let (Some(pose), Some(0), Some(dx), Some(dy), Some(angle), Some(radius)) =
-            (word(0), word(2), word(4), word(6), word(8), word(10))
+        let (
+            Some(pose),
+            Some(target @ (0 | 0x0DEA)),
+            Some(dx),
+            Some(dy),
+            Some(angle),
+            Some(radius),
+        ) = (word(0), word(2), word(4), word(6), word(8), word(10))
         else {
             self.state = State::Frozen;
             return false;
@@ -2102,13 +2173,17 @@ impl Actor {
             self.state = State::Frozen;
             return false;
         };
-        let centre = (
-            self.position.0.wrapping_add(dx),
-            self.position.1.wrapping_add(dy),
-        );
+        let about_player = (target == 0x0DEA).then_some((dx, dy));
+        let base = if about_player.is_some() {
+            player
+        } else {
+            self.position
+        };
+        let centre = (base.0.wrapping_add(dx), base.1.wrapping_add(dy));
         self.set_pose(u8::try_from(pose).unwrap_or(0), self.hflip);
         self.orbit = Some(Orbit {
             centre,
+            about_player,
             angle,
             radius,
             turn: turn * 2,
@@ -2121,11 +2196,14 @@ impl Actor {
 
     /// `COP D1`: the orbit's frame. It ends the frame until the orbit ends
     /// (its count, or its radius reached), then goes on.
-    fn step_orbit(&mut self, operands: usize, image: &[u8]) -> bool {
+    fn step_orbit(&mut self, operands: usize, image: &[u8], player: (u16, u16)) -> bool {
         let Some(mut orbit) = self.orbit else {
             self.state = State::Frozen;
             return false;
         };
+        if let Some((dx, dy)) = orbit.about_player {
+            orbit.centre = (player.0.wrapping_add(dx), player.1.wrapping_add(dy));
+        }
         orbit.angle = orbit.angle.wrapping_add_signed(orbit.turn) & 0x3FF;
         orbit.radius = orbit.radius.wrapping_add_signed(orbit.reach) & 0x1FF;
         let Some(position) = orbit.position(image) else {
@@ -2350,7 +2428,7 @@ impl Actor {
     }
 
     /// A child as the spawns make it (`$80:BCA4`): the parent's mirror,
-    /// palette, priority and movement base, `+$04` from `flags` (bit 15
+    /// palette, priority, art, boxes and movement base, `+$04` from `flags` (bit 15
     /// hidden, `$0006` walls).
     fn child(&self, script: usize, flags: u16, at: (u16, u16)) -> Self {
         let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
@@ -2361,11 +2439,17 @@ impl Actor {
         child.base = self.base;
         child.resources.clone_from(&self.resources);
         child.descriptor = self.descriptor;
+        child.boxes.clone_from(&self.boxes);
         child.legs = self.legs;
         child.hidden = flags & 0x8000 != 0;
         child.walls = flags & 0x0006 == 0x0004;
         child.guard.0 = flags & GUARD_04;
         child.spawned = true;
+        child.parent = Some(native::View {
+            x: self.position.0,
+            y: self.position.1,
+            facing: u16::from(self.facing_code()),
+        });
         child
     }
 
@@ -3454,6 +3538,9 @@ fn player_pose_mismatch(image: &[u8], at: usize) -> Option<usize> {
 struct Orbit {
     /// The point it turns about.
     centre: (u16, u16),
+    /// About Ark (target `$0DEA`, the Cadet's ring `$97:C0AC`): the offset
+    /// from him, the centre followed each frame.
+    about_player: Option<(u16, u16)>,
     /// 1024 a turn.
     angle: u16,
     /// In units of 1/128 of the table's 127.

@@ -352,12 +352,12 @@ pub enum Placeholder {
 }
 
 /// A resident's decoded body: every sequence of their packet on demand.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Body {
     art: BodyArt,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum BodyArt {
     House(HouseActor),
     /// One list of a Pandora art (Pandora's Box, an object sheet's list),
@@ -515,7 +515,8 @@ impl Body {
 /// the script) of that art (`docs/mode4-descriptors.md`), as tower 1's
 /// statues and plaque.
 fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placeholder>> {
-    let descriptor = resident.descriptor?;
+    // A spawned child has no header of its own: it draws as its parent.
+    let descriptor = resident.descriptor.filter(|_| resident.record != 0)?;
     // Mode `$04` with the plain palette forms (`$40`, or 0 as the hooded
     // guardians, whose byte 4 names their profile); the table forms are the
     // house decoder's.
@@ -602,7 +603,7 @@ pub fn residents_art(
         .into_iter()
         .map(Some)
         .collect();
-    present
+    let mut bodies: Vec<_> = present
         .iter()
         .map(|resident| {
             let found = list
@@ -649,7 +650,29 @@ pub fn residents_art(
                 }),
             }
         })
-        .collect()
+        .collect();
+    // A child a script spawned draws as its parent (`$80:BCA4` copies the
+    // art with `+$00..$17`): the Cadets' spells. Only in the towers, where
+    // it is checked.
+    for (index, resident) in present.iter().enumerate() {
+        if resident.record != 0
+            || !crate::TOWER_MAPS.contains(&map)
+            || !matches!(bodies[index], Err(Placeholder::Invisible))
+        {
+            continue;
+        }
+        let parent = present.iter().zip(&bodies).find_map(|(other, body)| {
+            (other.record != 0
+                && other.descriptor.is_some()
+                && other.descriptor == resident.descriptor)
+                .then(|| body.as_ref().ok())
+                .flatten()
+        });
+        if let Some(body) = parent.cloned() {
+            bodies[index] = Ok(body);
+        }
+    }
+    bodies
 }
 
 /// The object sheet and list a resident's script points its art at before
