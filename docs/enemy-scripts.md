@@ -140,8 +140,8 @@ derivable or wrong behaviour).
 | `B1`/`B3` | `A9B9`/`A9EA` | word / 2 words | x += w (negated when mirrored) / and y | knight `EFA0`, Guardner, bosses | ok |
 | `B6`/`B7` | `AA33`/`AA42` | – | clear / set mirror (`E+$08 & $4000`) | all | ok |
 | `B8`/`B9` | `AA51`/`AA60` | – | toggle mirror / vertical flip | knight / Shadowkeeper | missing |
-| `CC a p c d s` | `AE38` | 5 bytes | line move to (`7F:2004`, `7F:2006`), set by the script before. Pose p. Steps: N = max(|dx|,|dy|)/c (+1 when not 0) after halving dx, dy until both < 256; the whole vector is run (a+1) times (so a=0 stops at the target, a=4 runs 5 times as far). d: stored in `7F:200B` (meaning not traced). s ≠ `FF`: also start selector s | flyers, `B635`, `B847`, Cadet, Guardner | missing |
-| `CD` | `AF22` | – | one step of the `CC` line per frame through `7F:0018/001A` (so walls stop it), pose stepped by `ED75`; when done `E+$0A` = next, yield | same | missing |
+| `CC a p c d s` | `AE38` | 5 bytes | line move to (`7F:2004`, `7F:2006`), set by the script before. Pose p, streams stopped. Halve the vector until both axes < 256 (k times); N = max/c, +1 when not 0; the halved vector is run 2^k·(a+1) times (a=0 stops at the target, a=4 runs 5 times as far). d = frame limit (1-127; 0 or ≥ `$80`: none). s ≠ `FF`: also start selector s. Goes on (same frame) | flyers, `B635`, `B847`, Cadet, Guardner | missing |
+| `CD` | `AF22` | – | one step of the `CC` line per frame (exact rule in §6 "Line move"), through `7F:0018/001A` (so walls clamp it), own pose countdown `7F:200A` with `ED75`; done or d frames: `E+$0A` = next, yield. Pose negative (knockback): ends at once | same | missing |
 | `D0`/`D1` | `B136`/`B1D1` | | orbit | Cadet children, High Cadet | ok |
 | `D8` | `B4DF` | long | art packet | flyers, death script | ok |
 
@@ -272,18 +272,177 @@ negated on X when mirrored, on Y with the vertical flip) into the pending
 deltas `7F:0018`/`001A`. Then `$80:D0CF` applies them:
 
 - `E+$04 & $0004` clear: position += deltas, no collision.
-- `$0004` set, `$0002` clear (the blob, `$4204`): per axis, the box edge
-  (`x + 7F:0028`, `y + 7F:002C`) is probed in the collision map
-  (`$80:DDA0` right, `DA31` left, `D682` down, `D295` up). A blocked axis
-  is clamped to the wall; the stream keeps running and the pose wait keeps
-  its length. Measured: blob at x 40 (left wall) and at x 56 (y 328) held
-  still for the rest of a 12-frame move. Blobs do not block each other or
-  Ark.
+- `$0004` set, `$0002` clear: the wall probe below (blob, Hiballs, knight,
+  Cadet `$4204`; yellow flyers `$E234`). The Guardner (`$C220`) has none.
 - `$0004` and `$0002` set: a tile-attribute path (`$80:D1A9`, table at
   `$80:D1FB`) that can raise wake bit 5.
 
-The probe classes and the box offsets per descriptor are not traced here
-(see [collision](collision.md) for the player's probes).
+All addresses in this section are the same in EU (bytes compared:
+`$80:C967..CB65` except bank-`$85` operands, `$80:D0CF..E1E0`,
+`$80:E796..E7B2`, `$80:ED75..EE14`, `$86:BAEF..BB49`, `$8D:8C7E..8D60`).
+
+### Box (`7F:0028/002A/002C/002E,X`)
+
+Signed (x offset, width, y offset, height), X = the entity address. The
+pose step `$80:ED75` calls `$86:BAEF` on the first record of each pose
+(`E+$20 = 0`); it sign-extends bytes 4-7 of that record's composition
+(the composition pointer is `7F:000A,X`, bank `E+$12`). The box is not
+mirrored. Shop targets set `(-8,16,-16,16)` directly (`$92:CD16`).
+
+From the decompressed pose packets ([underworld inventory](underworld-inventory.md)):
+
+| Packet | Enemy | Box |
+|---|---|---|
+| `$CB:627D` | blob, Hiballs (poses 0-15) | `(-8,16,-16,16)` (measured on `10C0`, `1100`, `1080`) |
+| `$C9:62DE` | yellow flyers | `(-8,16,-16,16)`; poses 11-12 `(-8,16,-8,16)` |
+| `$C4:7378` | knight | `(-8,16,-16,16)` |
+| `$C9:1DB4` | Cadet | `(-8,16,-16,16)`; pose 24 `(-8,16,-8,16)` |
+
+So the box is x−8..x+8, y−16..y, as the player's.
+
+### Probe (`$80:D101`)
+
+X first, then Y with the new x. Per axis: `pos += delta`, then probe the
+leading edge of the box in the first layer (`$7E:A000`, cell word =
+tile | attribute << 9, **16 px cells**, `$8D:8C7E`; columns step with
+`$8D:8CE1`, rows with `$8D:8D3D`, both wrap). Cells along the edge:
+`(extent >> 4) + (start & 15 ≠ 0)`, where extent is the height (left/right)
+or width (up/down) and start is the box top or left. Left and up probe the
+box's first pixel, right and down its last pixel (`$80:E7A4`, `E796`: −1).
+
+Blocking: `t = $80:E11C[(word >> 9) & $1F]` (word bit 15, the dynamic bit,
+is masked out, so body stamps of `COP 3B` do not block enemies).
+`t = $FFFF` blocks; `t = $8000` (attribute 2, door gaps) blocks only when
+`$048A & $8000` (set in `$101`, measured). Passable: attributes 0, 1, 17,
+22 (2). Everything else blocks, also slopes 6/7, stairs 29, and 12-16.
+
+Blocked axis (any cell blocks): clamp, return carry.
+
+```text
+right: x = ((x+ox+w) & ~15) - ox - w      left: x = ((x+ox) & ~15) + 16 - ox
+down:  y = ((y+oy+h) & ~15) - oy - h      up:   y = ((y+oy) & ~15) + 16 - oy
+```
+
+and that axis's stream stops (`7F:0010` or `0012` = 0, `$80:E1C3`); the
+pose wait (`COP 8E`) keeps its length. Blobs do not block each other or
+Ark (the layer has no body marks).
+
+Wake bits (`$80:E15C..E1D1`): only when the callback field is nonzero and
+the busy bit is clear; then the bit is ORed in and `E+$0E = 0`. Class by
+`a` = attribute (15 for 16 and up) and `E+$16` (layer, below), tables Up
+`$80:D642`, Down `D9E8`, Left `DD60`, Right `E0DC`:
+
+| Cell | Bit, field |
+|---|---|
+| a = 6, 7 (slopes) | 7, `7F:1000` |
+| a = 12, 13 | 6, `7F:100A` |
+| layer 1 and a = 9 (Up), 8 (Down), 10 (Left), 11 (Right) | 8, `7F:100C` |
+| other | Up 2 `1006`, Down 1 `1008`, Left 4 `1002`, Right 3 `1004` |
+
+This answers §5's guess: bits 1-4 are the side that hit a wall, bits 6-8
+are tile classes. The blob has all callback fields 0: no wake bit, its
+script does not react.
+
+Side effects for passable cells (not the player, `$0DEA`): `E+$08 & $3000`
+(priority) is cleared, then set when the last passable probed cell has
+an odd `t` (attributes 17, 22); when all cells pass, `E+$16 = t >> 1`
+(1 on attributes 1 and 17). `E+$16` is the layer of [combat](combat.md).
+
+### As a pure function
+
+```text
+blocks(word) = t == $FFFF || (t == $8000 && $048A & $8000), t = E11C[(word>>9) & $1F]
+step(x, y, dx, dy, (ox,w,oy,h), cell(col,row)):
+  if dx != 0:
+    x += dx; L = x+ox; T = y+oy; n = (h>>4) + (T&15 != 0)
+    col = (dx > 0 ? L+w-1 : L) >> 4
+    if any blocks(cell(col, (T>>4)+i)), i < n: clamp x (right/left), stop X
+  if dy != 0:
+    y += dy; L = x+ox; T = y+oy; n = (w>>4) + (L&15 != 0)
+    row = (dy > 0 ? T+h-1 : T) >> 4
+    if any blocks(cell((L>>4)+i, row)), i < n: clamp y (down/up), stop Y
+```
+
+On our data: `Surroundings::cells` (`world.rs` `surroundings`) is
+`base.room.cells()`, the map's first layer (16 px cells, `width * height`
+words in the native format, tile patches applied, no body marks), so
+`cell(c, r) = cells[r * width + c]` and the attribute is `(word >> 9) & $1F`.
+Do not use `World::room` (bodies written as `14 << 9`).
+
+Measured (JP, `$101`, `tmp/ep` records): the function predicts all 794
+free steps and all 12 blocked frames of blobs `10C0`/`1100` (left at x 40,
+y 352; right at x 56, y 328 and x 216, y 336; up at y 336 and 304; down at
+y 384). On the blocked frame `7F:0010` drops to 0 and x stays for the rest
+of the move; `E+$08` gets `$3000` on attribute 22 (`1100` at (189,340)).
+
+### Line move (`COP CC`/`CD`)
+
+`$80:AE38` and `$80:AF22..B073`, the same bytes in EU. The script stores
+the target (tx, ty) in `7F:2004/2006` before `CC`. `CC` goes on in the same
+frame, so the first `CD` frame is the `CC` frame.
+
+`CC a p c d s` (all words, `E` = entity):
+
+```text
+pose 7F:0008 = p; E+$20 = 0; streams off (7F:0010 = 7F:0012 = 0)
+ax = |tx - x|, ay = |ty - y|; sx = tx < x, sy = ty < y   (2002 bits 14, 15)
+m = max(ax, ay); k = 0
+while m >= 256: m >>= 1; ax >>= 1; ay >>= 1; k += 1   ($40 = 2^k)
+q = m / c (c = 0: $FFFF); n = q == 0 ? 0 : q + 1        (2002 bits 0-13)
+reps = 2^k * (a + 1)                                     (2014)
+i = 0, px = py = 0 (2000, 2008/2009); 200A = 0 (pose timer); 200B = d
+if s != $FF: start selector s ($80:BBDB)
+```
+
+`CD`, once per frame (the delta is written to `7F:0018/001A` and `$80:D0CF`
+applies it in the same frame, so walls clamp it and the count goes on):
+
+```text
+if pose 7F:0008 < 0: E+$0A = next; yield                 ($B04C, no move)
+loop:
+  if i == n:                                             ($AFE5)
+    if ay - py != 0: dy = ±(ay - py)   (sign sy)
+    if ax - px != 0: dx = ±(ax - px)   (sign sx)
+  else:
+    qy = (i*ay) / ((n-1) & $FF); qx = (i*ax) / ((n-1) & $FF)   (floor, $4202/$4204)
+    if qy != py: dy = sext8(±(qy - py)); py = qy
+    if qx != px: dx = sext8(±(qx - px)); px = qx
+    if 0 < 200B < $80 and --200B == 0: 200B = 1 (stays); goto next_rep
+    pose step: if --200A < 0: ED75 (again while carry), 200A = E+$0E
+    E+$0E = 0; i += 1; yield (CD runs again next frame)
+next_rep:
+  if --reps == 0: E+$0A = next; yield                    (this frame's delta moves)
+  i = px = py = 0; goto loop                             (same frame)
+```
+
+So a leg is n frames: i = 0 gives no move, i = 1..n−1 move, the frame
+with i = n is the next leg's i = 0. The whole move takes reps·n + 1
+frames; the end frame does not move. With c = 1 the long axis moves 1 px a
+frame. n = 0 (m < c): one frame, the halved vector once, not reps times.
+The halving drops the low k bits of each axis.
+
+d is a frame limit: on the d-th `CD` frame the move ends after that
+frame's step; because `200B` stays 1, all remaining repeats end in the
+same frame. Quirks: the y test is a 16-bit compare against `2009 | 200A<<8`
+and the x test against `2008 | 2009<<8`, so a restart in the same frame
+can write dy = 0 over that frame's dy when `200A` ≠ 0 (dx is kept).
+
+Knockback (`$85:E03D`) uses `7F:200A` for `COP E4`, then sets the pose to
+`$FFFF` and resumes the script at the `CD`: the line move ends there and
+the script goes on after `CD` the next frame.
+
+s: the selector's stream deltas add to the `CD` delta (`$80:F251` runs
+after the script). At each pose-list end `ED75` stops the streams. All
+chapter 1 scripts use s = `FF`.
+
+Measured (JP, `$101`, blob `1100` at (184,352) running a poked script at
+`7E:1D00`, collision off): `CC 00 08 01 18 FF` to (+40,+30) moved 23 frames
+by (1,0),(1,1),(1,1),(1,1),… to (207,369) and ended on frame 24;
+`CC 04 08 03 00 FF` to (−20,+6): 5 legs of (−3,1),(−3,1),(−4,1),(−3,1),
+(−3,1),(−4,1) plus a still frame, 36 frames, (−100,+30); (+300,−10) with
+c = 4: k = 1, n = 38, 2 legs, 77 frames, exact; the same with d = 10:
+9 steps, end on frame 10, `7F:2014` left at 1. With collision a wall at
+x 200 held x while y went on. The model matches every frame.
 
 ## 7. Blob (`$97:B555`, script `$97:B55A`; EU `$99:8000`/`8005`)
 
@@ -376,9 +535,10 @@ and the Guardner add `04`, `58`, `5A`, `5F`, `63`, `71`, `97`, `A0`, `AF`,
 ## Open questions
 
 - The meaning of `E+$04` bits 4-5 (`$0030`) and `E+$06` bit 14 on bullets.
-- Which tile classes raise wake bits 6-8; the collision box offsets
-  `7F:0028`/`002C` per descriptor.
+- The meaning of attributes 1, 17 and 22 (passable for enemies; 1 and 17
+  set layer 1, 17 and 22 sprite priority) and the other uses of `$048A`
+  bit 15. The column wrap of `$085A` at the map edge is not checked.
 - `COP CC` operand d (`7F:200B`).
-- Who raises wake bits 1-4.
+- Other writers of wake bits 1-4 (the wall probe is one, §6).
 - The boss scripts (show, Shadowkeeper) and the Cadet's text branch.
 - EU timing was not measured; the handlers are the same bytes.
