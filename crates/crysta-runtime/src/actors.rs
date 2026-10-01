@@ -19,6 +19,7 @@ mod foe;
 mod line;
 mod motion;
 mod native;
+mod push;
 mod sense;
 mod walls;
 
@@ -393,6 +394,8 @@ const PLAYER_HEIGHT: u8 = 0xD4;
 /// Jumps when Ark is busy, down or out of play, or `$097E & m1`, or
 /// `$097C & m2`; else goes on (`$80:A016`): m1, m2, the target.
 const ARK_BUSY: u8 = 0x71;
+/// The pad bits a push holds (as `COP 2A $FFF0`).
+const PAD_HELD: u16 = 0xFFF0;
 /// Starts a line move toward `$7F:2004/2006,X` (`$80:AE38`): legs, pose,
 /// speed, frame limit, selector (`FF` none).
 const LINE_START: u8 = 0xCC;
@@ -808,9 +811,13 @@ impl Actor {
             .descriptor
             .filter(|_| resident.body)
             .and_then(|descriptor| cadence::derive(image, descriptor).ok());
+        let mode4 = resident
+            .descriptor
+            .and_then(|descriptor| image.get(descriptor + 3))
+            == Some(&4);
         actor.pose_ticks = resident
             .descriptor
-            .filter(|_| resident.body)
+            .filter(|_| resident.body || mode4)
             .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         // An enemy: hittable (header `+$04` bit `$0200`), its descriptor's
         // byte 4 naming its profile (`$80:FACF`).
@@ -843,6 +850,10 @@ impl Actor {
             // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan.
             actor.hidden |= header & 0x8000 != 0;
             actor.guard.0 = header & GUARD_04;
+        }
+        // Enemies' boxes for the hit scans; the towers' mode-`$04` objects'
+        // for their push tests (`docs/tower-two.md`).
+        if actor.foe.is_some() || mode4 {
             actor.boxes = resident
                 .descriptor
                 .and_then(|descriptor| cadence::pose_boxes(image, descriptor))
@@ -1377,6 +1388,8 @@ impl Actor {
                     self.pc = self.continuation.take().unwrap_or(entry);
                     return Run::Yielded;
                 }
+                // The towers' shared push routines, evaluated here.
+                0x20 if self.push_routine(bank, around).is_some() => continue,
                 // JSR into the bank and its RTS, one level deep (the
                 // freeze's crystals, `$88:B60F`).
                 0x20 if self.subroutine.is_none() => {
@@ -1809,6 +1822,58 @@ impl Actor {
             });
         }
         self.resources[slot].clone()
+    }
+
+    /// A `JSR` at the script position into one of the towers' push
+    /// routines ([`push::routine`]), run here, and the `BCS`/`BCC` after it
+    /// on its carry. `None` when it is not one.
+    fn push_routine(&mut self, bank: usize, around: &mut Surroundings<'_>) -> Option<()> {
+        let image = around.image;
+        let &[0x20, low, high] = image.get(self.pc..self.pc + 3)? else {
+            return None;
+        };
+        let routine = push::routine(image, bank | usize::from(u16::from_le_bytes([low, high])))?;
+        let busy = around.globals.ark_busy
+            || around
+                .globals
+                .scratch
+                .get(&native::PLAYER_ACTION)
+                .is_some_and(|&action| action != 0);
+        let carry = match routine {
+            push::Routine::Test(direction) => {
+                let shape = self
+                    .boxes
+                    .as_ref()
+                    .and_then(|boxes| boxes.get(usize::from(self.selector))?.first())
+                    .map_or([-8, 16, -16, 16], |record| record.sprite);
+                let ark = (
+                    around.player,
+                    sense::code(around.facing),
+                    around.globals.pad,
+                );
+                !busy && push::pushes(direction, ark, self.position, shape)
+            }
+            push::Routine::Take => {
+                around.globals.input_mask |= PAD_HELD;
+                false
+            }
+            push::Routine::Give => {
+                if !busy {
+                    around.globals.input_mask &= !PAD_HELD;
+                }
+                busy
+            }
+        };
+        self.pc += 3;
+        if let Some(&[branch @ (0x90 | 0xB0), offset]) = image.get(self.pc..self.pc + 2) {
+            self.pc += 2;
+            if (branch == 0xB0) == carry {
+                self.pc = self
+                    .pc
+                    .wrapping_add_signed(isize::from(i8::from_ne_bytes([offset])));
+            }
+        }
+        Some(())
     }
 
     /// `COP 80 pose`. Returns whether execution continues this frame.
@@ -2492,13 +2557,15 @@ impl Actor {
                 } else {
                     (0, 0)
                 };
+                // `$80:BF8E`: the cell under (x - 8, y - 16), as the
+                // collision cell of a body there.
                 let cell = (
-                    base.0.wrapping_add_signed(signed(dx)) / 16,
-                    base.1.wrapping_add_signed(signed(dy)) / 16,
+                    base.0.wrapping_add_signed(signed(dx)).wrapping_sub(8) / 16,
+                    base.1.wrapping_add_signed(signed(dy)).wrapping_sub(16) / 16,
                 );
                 let attribute = (u16::from(mode) << 9 >> 9) & 0x1F;
                 self.stamps.retain(|&stamped| stamped != cell);
-                if !matches!(attribute, 0 | 1 | 2 | 22) {
+                if !matches!(attribute, 0 | 1 | 2 | 17 | 22) {
                     self.stamps.push(cell);
                 }
                 self.pc = operands + 3;

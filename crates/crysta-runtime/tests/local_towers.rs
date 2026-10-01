@@ -501,3 +501,35 @@ fn tower_twos_gate_opens_once_tower_one_is_done() {
         }
     }
 }
+
+#[test]
+fn ark_pushes_tower_twos_statue_aside() {
+    // `docs/tower-two.md`: the statue (`$90:958A`) slides one cell when Ark
+    // pushes it from its left for 61 frames, and sets flag `$284`.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0108, 128, 400, events.clone()).unwrap();
+        world.update(None, Presses::default()).unwrap();
+        let statue = world
+            .residents()
+            .iter()
+            .find(|resident| resident.position == (192, 208))
+            .unwrap_or_else(|| panic!("{:?}: no statue", rom.revision()))
+            .record;
+        let mut world = World::enter_with_events(rom.image(), 0x0108, 168, 208, events).unwrap();
+        for _ in 0..120 {
+            world
+                .update(Some(Direction::Right), Presses::default())
+                .unwrap();
+        }
+        let moved = world
+            .residents()
+            .iter()
+            .find(|resident| resident.record == statue)
+            .map(|resident| resident.position);
+        assert_eq!(moved, Some((208, 208)), "{:?}", rom.revision());
+        assert!(world.events()[0x284 / 8] & (1 << (0x284 % 8)) != 0);
+    }
+}
