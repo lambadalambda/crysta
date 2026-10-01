@@ -545,13 +545,12 @@ impl Session {
                     match animation {
                         Some(animation) => {
                             let raster = animation.frame_at(u64::from(resident.pose_age));
-                            frame::draw_sprite(
-                                frame,
-                                background,
-                                camera,
-                                raster,
-                                resident.position,
-                            );
+                            let draw = if resident.priority >= 3 {
+                                frame::draw_sprite_over
+                            } else {
+                                frame::draw_sprite
+                            };
+                            draw(frame, background, camera, raster, resident.position);
                         }
                         None => placeholder(frame),
                     }

@@ -200,6 +200,29 @@ pub fn draw_sprite(
     raster: &crysta_runtime::art::Raster,
     at: (u16, u16),
 ) {
+    blit(canvas, background, camera, raster, at, true);
+}
+
+/// As [`draw_sprite`] for an OBJ of priority 3 (`COP BA $30`): it draws
+/// over the high-priority tiles too.
+pub fn draw_sprite_over(
+    canvas: &mut Canvas,
+    background: &Background,
+    camera: (i32, i32),
+    raster: &crysta_runtime::art::Raster,
+    at: (u16, u16),
+) {
+    blit(canvas, background, camera, raster, at, false);
+}
+
+fn blit(
+    canvas: &mut Canvas,
+    background: &Background,
+    camera: (i32, i32),
+    raster: &crysta_runtime::art::Raster,
+    at: (u16, u16),
+    occluded: bool,
+) {
     for row in 0..raster.height {
         for column in 0..raster.width {
             let Some(pixel) = raster.pixels.get(row * raster.width + column) else {
@@ -213,7 +236,7 @@ pub fn draw_sprite(
             let (Ok(x), Ok(y)) = (usize::try_from(world_x), usize::try_from(world_y)) else {
                 continue;
             };
-            if !background.occludes(x, y) {
+            if !(occluded && background.occludes(x, y)) {
                 canvas.set(
                     (world_x - camera.0, world_y - camera.1),
                     pixel & 0x00FF_FFFF,
