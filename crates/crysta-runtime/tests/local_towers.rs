@@ -422,14 +422,57 @@ fn the_four_hiballs_fight_opens_the_door_to_the_light() {
                 .unwrap();
         }
         assert!(flag(&world), "{:?}: `$114`", rom.revision());
-        let mut leaving = false;
-        for _ in 0..60 {
-            let up = (!world.in_transition()).then_some(Direction::Up);
-            if world.update(up, Presses::default()).is_err() || world.in_transition() {
-                leaving = true;
+        // Through the door, the light room and the parchment's text to the
+        // underworld with flag `$101` (`docs/light-room.md`).
+        let mut texts = 0;
+        for _ in 0..3000 {
+            let up = (!world.in_transition() && world.map() == 0x0105).then_some(Direction::Up);
+            let reading = world.dialogue().is_some() && !world.typing();
+            texts += u32::from(reading && world.resurrecting());
+            world
+                .update(up, if reading { a } else { Presses::default() })
+                .unwrap();
+            if world.map() == 0x0003 && !world.in_transition() {
                 break;
             }
         }
-        assert!(leaving, "{:?}: {:?}", rom.revision(), world.position());
+        assert_eq!(world.map(), 0x0003, "{:?}", rom.revision());
+        assert!(texts > 0, "{:?}: the parchment's text", rom.revision());
+        let flag = 0x101;
+        assert!(world.events()[flag / 8] & (1 << (flag % 8)) != 0);
+        assert_eq!(world.position().0, 216, "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn the_top_floors_door_and_the_light_rooms_orb_draw() {
+    // `docs/mode4-descriptors.md`: the door `$82:F5B2` uploads sheet tiles
+    // `$20..` to the same OBJ tiles (`d15 = d16 = $10`) with one palette;
+    // the orb `$82:F645` starts in pose 0, its header byte not a list.
+    for rom in roms() {
+        let image = rom.image();
+        let events = after_the_intro();
+        for (map, at) in [(0x0105, (512, 400)), (0x0106, (128, 184))] {
+            let world = World::enter_with_events(image, map, at.0, at.1, events.clone()).unwrap();
+            let art = crysta_runtime::art::residents_art(
+                image,
+                map,
+                world.residents(),
+                assets::maps::scripts::EventFlags::Bitmap(&events),
+                assets::maps::scripts::EventFlags::Bitmap(world.events()),
+            );
+            let refused: Vec<_> = world
+                .residents()
+                .iter()
+                .zip(&art)
+                .filter(|(_, art)| matches!(art, Err(crysta_runtime::art::Placeholder::Refused(_))))
+                .map(|(resident, _)| resident.record)
+                .collect();
+            assert!(
+                refused.is_empty(),
+                "{:?} {map:#x}: {refused:x?}",
+                rom.revision()
+            );
+        }
     }
 }

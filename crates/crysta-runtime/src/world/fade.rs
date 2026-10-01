@@ -290,7 +290,8 @@ impl World<'_> {
             };
         }
         let screen = match self.fading {
-            _ if self.dark > 0 => Screen::lit(0),
+            // A load's dark frames; a tower's end under the parchment's text.
+            _ if self.dark > 0 || self.resurrecting() => Screen::lit(0),
             Some(Fading::Out { mode, frame, .. }) => out(mode, frame),
             Some(Fading::In { mode, frame }) => into(mode, frame),
             None => Screen::lit(self.exit_brightness()),

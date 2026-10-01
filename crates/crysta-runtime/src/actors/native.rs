@@ -74,22 +74,36 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 3] = [
+const SCRATCH: [(u16, u16); 6] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
     // An engine word the runtime does not read: the spear's grant sets and
     // clears its bit 8 (`$89:DA96`, `$89:DA31`); bit 15 places windows.
     (0x048A, 0x048B),
+    // The pending map (`$90:8B0F`), which the world takes after the run,
+    // and the tower's index (`$04CC`, `$90:8B31`).
+    (PENDING_MAP, PENDING_MAP + 1),
+    (0x04CC, 0x04CD),
+    // The light room's BG3 scroll (`$90:8AC9`, `$90:8AD5`), not drawn.
+    (0x0886, 0x0889),
 ];
+
+/// `$047C`, the map a script asks for next (`$90:8B0C`).
+pub const PENDING_MAP: u16 = 0x047C;
+/// `$0482`, the map before this one, as the light room reads it.
+pub const PREVIOUS_MAP: u16 = 0x0482;
+/// `$0042`, the frame counter.
+pub const FRAMES: u16 = 0x0042;
 
 /// `$097C`, the player's action word: runs may read it, as a watcher in
 /// `$11` does (`$88:A9EF`); the world keeps it in the scratch words.
 pub const PLAYER_ACTION: u16 = 0x097C;
-/// Engine words runs may read but not write: the player's action word,
+/// Engine words runs may read but not write: the map before and the frame
+/// counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 3] = [PLAYER_ACTION, PRIME_BLUE, ENEMIES];
+const READABLE: [u16; 5] = [PLAYER_ACTION, PRIME_BLUE, ENEMIES, PREVIOUS_MAP, FRAMES];
 /// `$0498`, the enemies a room waits on (`docs/combat.md`), as the tower
 /// floors' controllers poll it.
 pub const ENEMIES: u16 = 0x0498;

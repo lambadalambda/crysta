@@ -36,6 +36,7 @@ mod hurt;
 mod magirock;
 mod pots;
 mod progress;
+mod resurrection;
 mod transition;
 pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
@@ -100,6 +101,8 @@ pub struct World<'a> {
     chest: Option<chest::Opening>,
     /// A Magirock the player is taking.
     pickup: Option<magirock::Pickup>,
+    /// A tower's end under way.
+    resurrection: Option<resurrection::Resurrection>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -344,6 +347,7 @@ impl<'a> World<'a> {
             opening: None,
             chest: None,
             pickup: None,
+            resurrection: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -635,6 +639,9 @@ impl<'a> World<'a> {
             crate::actors::PRIME_BLUE,
             self.globals.inventory.prime_blue(),
         );
+        self.globals
+            .scratch
+            .insert(crate::actors::FRAMES, self.globals.frames);
         for index in 0..self.actors.len() {
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(
@@ -651,6 +658,11 @@ impl<'a> World<'a> {
                 // this actor runs until the window is answered.
                 break;
             }
+        }
+        // The light room asks for `$07` (`$90:8B0C`): the tower's end.
+        if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
+            let before = self.globals.scratch.get(&crate::actors::PREVIOUS_MAP);
+            self.resurrection = before.copied().and_then(resurrection::Resurrection::after);
         }
         let mut gone = Vec::new();
         for (index, (resident, actor)) in self.residents.iter_mut().zip(&self.actors).enumerate() {
@@ -1039,6 +1051,10 @@ impl<'a> World<'a> {
             return Ok((Step::Stayed, None));
         }
         if let Some(step) = self.contact_frame()? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
+        if let Some(step) = self.resurrection_frame(presses) {
             self.apply_patches()?;
             return Ok((step, None));
         }
@@ -1900,6 +1916,10 @@ impl<'a> World<'a> {
             .inventory
             .clone_from(&self.globals.inventory);
         entered.globals.scratch.clone_from(&self.globals.scratch);
+        entered
+            .globals
+            .scratch
+            .insert(crate::actors::PREVIOUS_MAP, self.map);
         entered.globals.slot.clone_from(&self.globals.slot);
         entered.globals.audio = audio;
         // The same first layer is not reloaded: its patches stay, and the
@@ -2227,6 +2247,7 @@ mod tests {
             opening: None,
             chest: None,
             pickup: None,
+            resurrection: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

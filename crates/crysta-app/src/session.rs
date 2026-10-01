@@ -635,8 +635,9 @@ impl Session {
                 world.money(),
             );
         }
-        // The towers' HUD (`docs/combat.md` §7), under the damage digits.
-        if crysta_runtime::TOWER_MAPS.contains(&world.map()) {
+        // The towers' HUD (`docs/combat.md` §7), under the damage digits;
+        // not in the light room (`docs/light-room.md`).
+        if crysta_runtime::TOWER_MAPS.contains(&world.map()) && world.map() != 0x0106 {
             if let Some(art) = self.shop_art.art(self.image) {
                 crate::hud::draw_digits(frame, art, camera, world.digits());
                 let stats = world.stats();
