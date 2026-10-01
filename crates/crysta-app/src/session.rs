@@ -564,6 +564,7 @@ impl Session {
         if let Some((at, raster)) = pot {
             frame::draw_sprite(frame, background, camera, &raster, at);
         }
+        clouds.cover_door(frame, camera, self.world.door_mask());
         clouds.add_second_layer(frame, camera, self.background_clock.tick());
         clouds.extend_edges(frame, camera);
         self.draw_labels(frame, camera);

@@ -192,6 +192,35 @@ impl CachedBackground {
         }
     }
 
+    /// The door walk's mask (`docs/depth-order.md`): its 14 priority-1
+    /// tiles lose to the background and win over every sprite, so the wall
+    /// above the doorway shows over Ark. Relative to `anchor`: x −8..+8 on
+    /// rows −64..−56, x −16..+16 on rows −56..−32.
+    pub fn cover_door(&self, frame: &mut Canvas, camera: (i32, i32), anchor: Option<(u16, u16)>) {
+        let Some((x, y)) = anchor.map(|(x, y)| (i32::from(x), i32::from(y))) else {
+            return;
+        };
+        for (left, top, right, bottom) in [
+            (x - 8, y - 64, x + 8, y - 56),
+            (x - 16, y - 56, x + 16, y - 32),
+        ] {
+            for world_y in top..bottom {
+                for world_x in left..right {
+                    let (Ok(bx), Ok(by)) = (usize::try_from(world_x), usize::try_from(world_y))
+                    else {
+                        continue;
+                    };
+                    if let Some(&pixel) = (bx < self.frame.width)
+                        .then(|| self.frame.pixels.get(by * self.frame.width + bx))
+                        .flatten()
+                    {
+                        frame.set((world_x - camera.0, world_y - camera.1), pixel);
+                    }
+                }
+            }
+        }
+    }
+
     /// Extends the region's edges into a wide view
     /// ([`crate::frame::extend_edges`]); the Mode 7 view wraps and fills the
     /// screen itself.
