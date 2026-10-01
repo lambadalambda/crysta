@@ -410,6 +410,10 @@ impl<P: Page> Dialogue<P> {
         }
         let blip = page.blip(self.typed);
         self.typed += 1;
+            // A page that closes by itself (`$D7`) goes once typed out.
+            if page.acknowledgement() == Acknowledgement::Closes {
+                (self.text, self.retained) = (None, None);
+            }
         blip
     }
 
@@ -492,6 +496,8 @@ impl<P: Page> Dialogue<P> {
             }
         }
         None
+                // It closes by itself.
+                Acknowledgement::Closes => {}
     }
 
     fn close_choice(&mut self) {
@@ -586,6 +592,17 @@ mod tests {
     fn a_flag_write_sets_on_bit_fifteen_and_clears_without_it() {
         let mut globals = Globals::with_events(vec![0; 8]);
         globals.write_flag(0x8026);
+    #[test]
+    fn a_page_that_closes_goes_by_itself_once_typed_out() {
+        let mut dialogue = Dialogue::default();
+        assert!(dialogue.request(pages(&[Acknowledgement::Closes])));
+        // A stub types out at once; a press does not close it.
+        dialogue.press(A);
+        assert!(dialogue.busy());
+        dialogue.tick();
+        assert!(!dialogue.busy() && dialogue.view().is_none());
+    }
+
         assert_eq!(globals.events[4], 0x40);
         globals.write_flag(0x0026);
         assert_eq!(globals.events[4], 0);

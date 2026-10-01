@@ -139,6 +139,7 @@ fn acknowledgement(ack: Acknowledgement) -> &'static str {
         Acknowledgement::Next => "next",
         Acknowledgement::End => "end",
         Acknowledgement::None => "none",
+        Acknowledgement::Closes => "closes",
     }
 }
 

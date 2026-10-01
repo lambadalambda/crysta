@@ -101,6 +101,17 @@ fn palette_changes_flush_only_pending_half_tiles() {
 }
 
 #[test]
+fn a_close_after_glyphs_ends_a_page_that_closes_by_itself() {
+    // "Four Hiballs appeared!" (`$90:9367`): glyphs, a 180-frame pause, `$D7`.
+    let pages = decode(&image(&[0x21, 0xc5, 180, 0xd7]), START).unwrap();
+    assert_eq!(pages.len(), 1);
+    assert_eq!(pages[0].acknowledgement(), Acknowledgement::Closes);
+    assert!(pages[0].duration() > 180);
+    // On an empty page it closes at once, as before.
+    assert!(decode(&image(&[0xd7]), START).unwrap().is_empty());
+}
+
+#[test]
 fn top_level_return_retains_page_without_fabricated_acknowledgement() {
     let pages = decode(&image(&[0x21, 0xd4]), START).unwrap();
     assert_eq!(pages.len(), 1);

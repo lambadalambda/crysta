@@ -56,6 +56,10 @@ pub enum Acknowledgement {
     Next,
     /// Native `$D3`: close the dialogue and return to the event caller.
     End,
+    /// Native `$D7` after a page: once typed out, its pauses included, the
+    /// window closes without a press (`$85:9D7F`), as "Four Hiballs
+    /// appeared!" does (`$90:9367`).
+    Closes,
     /// Native top-level `$D4`: return immediately, retaining the visible page.
     /// Do NOT invent a Continue acknowledgement. The required prompts next enter
     /// an event-level choice on this same page; see `HouseDialogue::choice`.
@@ -879,10 +883,14 @@ impl Decoder<'_> {
                 }
                 0xd5 => self.boundary(at, Acknowledgement::Next)?,
                 // `$85:9D7F` clears the window and closes it without a press (a
-                // two-pass latch on `$0DA4` bit 7). Admitted only on an empty
-                // page, as the spear's presentation uses it.
-                0xd7 if self.page.glyphs.is_empty() && self.stack.is_empty() => {
-                    return Ok(std::mem::take(&mut self.pages))
+                // two-pass latch on `$0DA4` bit 7): at once on an empty page,
+                // as the spear's presentation uses it, else once the page is
+                // typed out.
+                0xd7 if self.stack.is_empty() => {
+                    if !self.page.glyphs.is_empty() {
+                        self.boundary(at, Acknowledgement::Closes)?;
+                    }
+                    return Ok(std::mem::take(&mut self.pages));
                 }
                 0xe3 if self.pandora => {
                     let mask = self.word()?;
