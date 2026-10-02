@@ -858,21 +858,30 @@ impl<'a> World<'a> {
         }
     }
 
-    /// Writes the tile patches scripts queued into the base room, and the
-    /// walkable room over it.
+    /// Writes the tile patches and the collision attributes scripts queued
+    /// into the base room, and the walkable room over it.
     fn apply_patches(&mut self) -> Result<(), WorldError> {
-        if self.globals.patches.is_empty() {
+        if self.globals.patches.is_empty() && self.globals.attributes.is_empty() {
             return Ok(());
         }
         let mut cells = self.base.room.cells().to_vec();
-        for (column, row, tile) in std::mem::take(&mut self.globals.patches) {
-            if column >= self.base.width || row >= self.base.height {
-                continue;
+        // `$80:9393`: the attribute replaces bits 9-14; the tile stays.
+        for (column, row, attribute) in std::mem::take(&mut self.globals.attributes) {
+            if let Some(at) = self.base.index(column, row) {
+                cells[at] = (cells[at] & 0x81FF) | attribute << 9;
             }
-            cells[usize::from(row) * usize::from(self.base.width) + usize::from(column)] =
-                self.base.patch_word(tile);
+        }
+        for (column, row, tile) in std::mem::take(&mut self.globals.patches) {
+            let Some(at) = self.base.index(column, row) else {
+                continue;
+            };
+            cells[at] = self.base.patch_word(tile);
             self.patched.retain(|&(c, r, _)| (c, r) != (column, row));
             self.patched.push((column, row, tile & 0x1FF));
+        }
+        // The moving blocks rewrite their cells each pass: most change nothing.
+        if cells == self.base.room.cells() {
+            return Ok(());
         }
         self.base = self.base.with_cells(cells)?;
         self.room = occupy_cells(self.base.clone(), &self.blocked)?;
@@ -2895,5 +2904,20 @@ mod tests {
         assert_eq!(world.room.room.cells()[2 * 8 + 3], 0x0E << 9 | 0x1A7);
         assert_eq!(world.patched_cells(), [(3, 2, 0x1A7)]);
         assert!(world.globals.patches.is_empty());
+    }
+
+    #[test]
+    fn an_attribute_write_keeps_the_tile_and_its_top_bit() {
+        // `$80:9393`: `(word & $81FF) | attribute << 9`.
+        let mut world = synthetic_world();
+        let at = 2 * 8 + 3;
+        let mut cells = world.base.room.cells().to_vec();
+        cells[at] = 0x8000 | 0x0E << 9 | 0x1A7;
+        world.base = world.base.with_cells(cells).unwrap();
+        world.globals.attributes.push((3, 2, 0x14));
+        world.apply_patches().unwrap();
+        assert_eq!(world.base.room.cells()[at], 0x8000 | 0x14 << 9 | 0x1A7);
+        assert_eq!(world.room.room.cells()[at], 0x8000 | 0x14 << 9 | 0x1A7);
+        assert!(world.patched_cells().is_empty());
     }
 }

@@ -93,6 +93,13 @@ pub struct MapRoom {
 }
 
 impl MapRoom {
+    /// Where cell (`column`, `row`) is in the cells, if it is in the grid.
+    #[must_use]
+    pub fn index(&self, column: u16, row: u16) -> Option<usize> {
+        (column < self.width && row < self.height)
+            .then(|| usize::from(row) * usize::from(self.width) + usize::from(column))
+    }
+
     /// The same room with other cells, keeping its material policy and
     /// collision mode.
     ///

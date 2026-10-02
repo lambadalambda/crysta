@@ -2672,10 +2672,13 @@ impl Actor {
                     base.0.wrapping_add_signed(signed(dx)),
                     base.1.wrapping_add_signed(signed(dy)),
                 );
-                let attribute = (u16::from(mode) << 9 >> 9) & 0x1F;
+                let attribute = u16::from(mode & 0x3F);
                 for cell in self.cells_under(at) {
                     self.stamps.retain(|&stamped| stamped != cell);
-                    if !matches!(attribute, 0 | 1 | 2 | 17 | 22) {
+                    if matches!(attribute & 0x1F, 0 | 1 | 2 | 17 | 20 | 22) {
+                        // Floors and pits the walker knows go in the map.
+                        around.globals.attributes.push((cell.0, cell.1, attribute));
+                    } else {
                         self.stamps.push(cell);
                     }
                 }

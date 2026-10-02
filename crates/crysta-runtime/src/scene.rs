@@ -93,6 +93,9 @@ pub struct Globals {
     /// Tile patches (`COP 44`) not yet written into the map: column, row,
     /// tile.
     pub patches: Vec<(u16, u16, u16)>,
+    /// Collision attributes (`COP 3F`) not yet written into the map:
+    /// column, row, attribute.
+    pub attributes: Vec<(u16, u16, u16)>,
     /// Actors scripts spawned (`COP A2`, `A4`), not yet in the map: script
     /// (normalized) and the child, with what it took from its parent.
     pub spawns: Vec<(usize, crate::actors::Actor)>,
@@ -242,6 +245,7 @@ impl Globals {
             presentation: None,
             counters: vec![0; 0x80],
             patches: Vec::new(),
+            attributes: Vec::new(),
             spawns: Vec::new(),
             next_id: 0x4000,
             views: Vec::new(),
