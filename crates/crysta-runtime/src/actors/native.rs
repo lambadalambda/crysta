@@ -36,7 +36,7 @@ pub struct Memory<'m> {
     /// `$0966`/`$0968`: Ark's probe (x, y - 8), which enemies aim at.
     pub probe: (u16, u16),
     /// The event flags, which `$80:BBC7` tests.
-    pub events: &'m [u8],
+    pub events: &'m mut [u8],
     /// `+$0E`, the frames the scheduler skips after the next yield, as a
     /// random start delay stores it (`STA $00:000E,X`, `$90:939C`).
     pub sleep: &'m mut u16,
@@ -121,7 +121,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 6] = [
+const SCRATCH: [(u16, u16); 7] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -134,6 +134,9 @@ const SCRATCH: [(u16, u16); 6] = [
     (0x04CC, 0x04CD),
     // The light room's BG3 scroll (`$90:8AC9`, `$90:8AD5`), not drawn.
     (0x0886, 0x0889),
+    // An engine word the runtime does not read: the pedestals set its bit 7
+    // (`$90:FBE4`).
+    (0x045A, 0x045B),
 ];
 
 /// `$047C`, the map a script asks for next (`$90:8B0C`).
@@ -185,12 +188,13 @@ const STEPS: usize = 512;
 /// whitening, the figure and the particles; here the run pauses until the
 /// next frame and every actor runs. The calls clobber A and the flags, and
 /// `$8D:AA96` also X.
-const CALLS: [usize; 6] = [
+const CALLS: [usize; 7] = [
     SAVE_PALETTE,
     RAISE_PALETTE,
     RESTORE_PALETTE,
     NESTED_FRAME,
     FLAG_TEST,
+    FLAG_WRITE,
     POSE_STEP,
 ];
 const SAVE_PALETTE: usize = 0x0D_A8EA;
@@ -200,6 +204,9 @@ const NESTED_FRAME: usize = 0x00_80DF;
 /// `$80:BBC7`: carry = event flag `A & $FFF` (the Magirock's taken flag,
 /// `$84:DD8D`).
 const FLAG_TEST: usize = 0x00_BBC7;
+/// `$80:BBCD`: writes event flag `A & $FFF`, set with bit 15, else clear
+/// (tower 3's pedestals, `$90:FBD7`).
+const FLAG_WRITE: usize = 0x00_BBCD;
 /// `$80:ED75`: one step of the pose, which the runtime's pose clock keeps.
 const POSE_STEP: usize = 0x00_ED75;
 /// The call among [`CALLS`] that also clobbers X.
@@ -906,6 +913,9 @@ impl<'a> Machine<'a> {
         if call == FLAG_TEST && flag.is_none() {
             return None;
         }
+        if call == FLAG_WRITE {
+            crate::scene::write_flag(memory.events, self.a?);
+        }
         self.a = None;
         (self.zero, self.negative, self.carry) = (None, None, flag);
         if call == CLOBBERS_X {
@@ -932,7 +942,7 @@ mod tests {
                 display: &mut Display::default(),
                 random: 0,
                 probe: (0, 0),
-                events: &[],
+                events: &mut [],
                 sleep: &mut 0,
                 position: &mut (0, 0),
                 player: View::default(),
@@ -976,7 +986,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut (0, 0),
             player: View::default(),
@@ -1023,7 +1033,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0x0123, 0x0456),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut (0, 0),
             player: View::default(),
@@ -1061,7 +1071,7 @@ mod tests {
                 display: &mut display,
                 random: 0,
                 probe: (0, 0),
-                events: &events,
+                events: &mut events,
                 sleep: &mut 0,
                 position: &mut (0, 0),
                 player: View::default(),
@@ -1071,6 +1081,43 @@ mod tests {
                 carried: &mut None,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
+        }
+    }
+
+    #[test]
+    fn the_pedestal_sets_then_clears_its_flag() {
+        // `$90:FBD7`: LDA $0026,X; ORA #$8000; JSL $80:BBCD; LDA #$0080;
+        // TSB $045A; COP. `$90:FBFB` drops the ORA: the flag clears.
+        let set = [
+            0xBD, 0x26, 0x00, 0x09, 0x00, 0x80, 0x22, 0xCD, 0xBB, 0x80, 0xA9, 0x80, 0x00, 0x0C,
+            0x5A, 0x04, 0x02,
+        ];
+        let clear = [
+            0xBD, 0x26, 0x00, 0x22, 0xCD, 0xBB, 0x80, 0xA9, 0x80, 0x00, 0x0C, 0x5A, 0x04, 0x02,
+        ];
+        let mut events = vec![0; 0x200];
+        for (code, on) in [(&set[..], true), (&clear[..], false)] {
+            let pedestal = image(code);
+            let (mut words, mut display) = (Scratch::new(), Display::default());
+            let mut own = Own::from([(0x26, 3), (0x27, 0)]);
+            let mut memory = Memory {
+                words: &mut words,
+                own: &mut own,
+                display: &mut display,
+                random: 0,
+                probe: (0, 0),
+                events: &mut events,
+                sleep: &mut 0,
+                position: &mut (0, 0),
+                player: View::default(),
+                parent: None,
+                linked: None,
+                views: &[],
+                carried: &mut None,
+            };
+            let end = AT + code.len() - 1;
+            assert_eq!(next(super::run(&pedestal, AT, &mut memory)), Some(end));
+            assert_eq!(events[0] & 1 << 3 != 0, on);
         }
     }
 
@@ -1094,7 +1141,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut (0x80, 0x80),
             player: View::default(),
@@ -1128,7 +1175,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0x100, 0x80),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut position,
             player: View {
@@ -1165,7 +1212,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0x80),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut (0, 0),
             player: View::default(),
@@ -1279,7 +1326,7 @@ mod tests {
             display: &mut display,
             random: 0,
             probe: (0, 0),
-            events: &[],
+            events: &mut [],
             sleep: &mut 0,
             position: &mut (0, 0),
             player: View::default(),

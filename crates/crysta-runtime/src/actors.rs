@@ -1199,7 +1199,7 @@ impl Actor {
             display: &mut globals.display,
             random: globals.random.word(),
             probe,
-            events: &globals.events,
+            events: &mut globals.events,
             sleep: &mut self.sleep,
             position: &mut self.position,
             player,

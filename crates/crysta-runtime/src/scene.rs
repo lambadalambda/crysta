@@ -288,15 +288,7 @@ impl Globals {
 
     /// `COP 07`'s write: bit 15 set sets flag `word & $0FFF`, clear clears it.
     pub fn write_flag(&mut self, word: u16) {
-        let index = usize::from(word & 0x0FFF);
-        if let Some(byte) = self.events.get_mut(index / 8) {
-            let bit = 1 << (index % 8);
-            if word & 0x8000 == 0 {
-                *byte &= !bit;
-            } else {
-                *byte |= bit;
-            }
-        }
+        write_flag(&mut self.events, word);
     }
 }
 
@@ -544,6 +536,20 @@ impl<P: Page> Dialogue<P> {
             cursor,
             glyphs: page.shown(self.typed),
         })
+    }
+}
+
+/// `COP 07`'s and `$80:BBCD`'s write on the `$7E:06C0` bitmap: bit 15 set
+/// sets flag `word & $0FFF`, clear clears it.
+pub(crate) fn write_flag(events: &mut [u8], word: u16) {
+    let index = usize::from(word & 0x0FFF);
+    if let Some(byte) = events.get_mut(index / 8) {
+        let bit = 1 << (index % 8);
+        if word & 0x8000 == 0 {
+            *byte &= !bit;
+        } else {
+            *byte |= bit;
+        }
     }
 }
 

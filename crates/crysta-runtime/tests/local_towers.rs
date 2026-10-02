@@ -652,3 +652,38 @@ fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
         assert!(x < 176 && y == 688, "{:?}: {:?}", rom.revision(), (x, y));
     }
 }
+
+#[test]
+fn a_pedestal_on_tower_threes_second_floor_toggles_its_flag() {
+    // `docs/tower-three.md` §3: A on a pedestal (`$90:FBB3`) sets its flag
+    // (`$001-$004`, `JSL $80:BBCD`); on `$110` the next press clears it.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0110, 296, 608, events).unwrap();
+        let mut flags = vec![];
+        for _ in 0..2 {
+            world.place(296, 608);
+            world.face(Direction::Up);
+            for _ in 0..3 {
+                world.update(None, Presses::default()).unwrap();
+            }
+            world.update(None, a).unwrap();
+            for _ in 0..30 {
+                world.update(None, Presses::default()).unwrap();
+            }
+            flags.push(world.events()[0] & 0x1E);
+        }
+        assert!(
+            flags[0].is_power_of_two(),
+            "{:?}: {flags:?}",
+            rom.revision()
+        );
+        assert_eq!(flags[1], 0, "{:?}", rom.revision());
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+    }
+}
