@@ -1091,3 +1091,84 @@ fn the_way_to_the_hole_opens_with_the_elders_flag() {
         }
     }
 }
+
+#[test]
+fn elles_farewell_on_crysta_sets_its_flag() {
+    // `docs/underworld-end.md` §2: on `$13`, Ark in the zone with Right
+    // held: the farewell, flag `$247`.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x20..=0x2D).chain(0x101..=0x109).chain([0x74]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0013, 476, 168, events).unwrap();
+        let a = Presses {
+            confirm: true,
+            ..Presses::default()
+        };
+        for frame in 0..1500 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            let free = !world.pad_locked() && world.dialogue().is_none() && frame < 300;
+            world
+                .update(
+                    free.then_some(Direction::Right),
+                    if reading { a } else { Presses::default() },
+                )
+                .unwrap();
+        }
+        assert!(
+            world.events()[0x247 / 8] & (1 << (0x247 % 8)) != 0,
+            "{:?}",
+            rom.revision()
+        );
+    }
+}
+
+#[test]
+fn ark_jumps_into_the_hole_and_the_chapter_ends() {
+    // `docs/underworld-end.md` §2: the elder's story in `$127`; "No" with
+    // `$247` opens the rim (attribute 8); Ark jumps in, the exit to the
+    // vortex ends Chapter 1 (flag `$06F`).
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    let down = Presses {
+        down: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x20..=0x2D).chain(0x101..=0x109).chain([0x74, 0x247]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0127, 296, 192, events).unwrap();
+        world.face(Direction::Up);
+        let mut moved = false;
+        for frame in 0..4000 {
+            let view = world.dialogue();
+            let choosing = view.as_ref().is_some_and(|view| view.cursor.is_some());
+            let reading = view.is_some() && !world.typing();
+            let talking = view.is_none() && frame % 60 == 5 && frame < 400;
+            let presses = if choosing && !moved {
+                moved = true;
+                down
+            } else if reading || talking {
+                a
+            } else {
+                Presses::default()
+            };
+            let walk = (frame > 800 && view.is_none()).then_some(Direction::Down);
+            world.update(walk, presses).unwrap();
+            if world.chapter_over() {
+                break;
+            }
+        }
+        assert!(world.chapter_over(), "{:?}", rom.revision());
+        assert!(
+            world.events()[0x6F / 8] & (1 << (0x6F % 8)) != 0,
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

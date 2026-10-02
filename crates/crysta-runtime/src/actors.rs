@@ -2964,8 +2964,9 @@ impl Actor {
                 let attribute = u16::from(mode & 0x3F);
                 for cell in self.cells_under(at) {
                     self.stamps.retain(|&stamped| stamped != cell);
-                    if matches!(attribute & 0x1F, 0 | 1 | 2 | 17 | 20 | 22) {
-                        // Floors and pits the walker knows go in the map.
+                    if matches!(attribute & 0x1F, 0 | 1 | 2 | 8 | 17 | 20 | 22) {
+                        // Floors, pits and lips (the Hole's rim, `$90:808C`)
+                        // the walker knows go in the map.
                         around.globals.attributes.push((cell.0, cell.1, attribute));
                     } else {
                         self.stamps.push(cell);

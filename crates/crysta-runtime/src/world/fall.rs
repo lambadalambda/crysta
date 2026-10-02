@@ -26,6 +26,13 @@ use room_core::Direction;
 const PIT: u16 = 0x14;
 const ROPE: u16 = 0x12;
 const UNSAFE: u16 = 0x13;
+/// The lip (`$80:CF30`): Ark on one jumps down (`$80:CF50`, the Hole's
+/// rim, `docs/underworld-end.md` §2); 2 pixels a frame for 32 frames, into
+/// the Hole's exit (guess), sound `$10`.
+const LIP: u16 = 0x08;
+const HOLE: u16 = 0x0127;
+const JUMP: u16 = 32;
+const JUMP_SOUND: u8 = 0x10;
 /// The rope's band: the box's top this far into its cell.
 const BAND: std::ops::RangeInclusive<u16> = 7..=13;
 /// Frames of the fall, and the second sound's frame.
@@ -43,6 +50,12 @@ const LEAN_END: u16 = LEAN_WINDOW + 4;
 /// Ark falling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Fall {
+    frame: u16,
+}
+
+/// Ark jumping down from a lip: frames into it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Jump {
     frame: u16,
 }
 
@@ -126,6 +139,42 @@ impl World<'_> {
         self.rope = None;
         self.thrust = None;
         self.globals.audio.sound_port3(FALL_SOUNDS[0]);
+    }
+
+    /// A step down refused by a lip (attribute 8, which the walker admits
+    /// only on its directional candidate): Ark jumps from it, as `$80:CF50`
+    /// does once he stands on it.
+    pub(super) fn lip_test(&mut self, step: Step) {
+        // Only the Hole's rim is measured (tower 4's lips are not).
+        let refused = matches!(
+            step,
+            Step::Refused(room_core::Unqualified::UnsupportedType(8))
+        );
+        if !refused || self.facing != Direction::Down || self.map != HOLE {
+            return;
+        }
+        let (x, y) = self.position();
+        let below = samples((x, y + 16)).map(|cell| self.attribute(cell));
+        if below[..2] == [Some(LIP); 2] {
+            self.jump = Some(Jump { frame: 0 });
+            self.globals.audio.sound_port3(JUMP_SOUND);
+        }
+    }
+
+    /// A frame of a jump from a lip: Ark drops, the world runs on; the
+    /// exit under him is taken once he stands again.
+    pub(super) fn jump_frame(&mut self) -> Result<Option<Step>, WorldError> {
+        let Some(mut jump) = self.jump.take() else {
+            return Ok(None);
+        };
+        let (x, y) = self.position();
+        self.walking = room_core::WalkingState::new(x, y + 2);
+        jump.frame += 1;
+        if jump.frame < JUMP {
+            self.jump = Some(jump);
+        }
+        self.run_actors()?;
+        Ok(Some(Step::Walked))
     }
 
     /// The pad on a rope: Left and Right walk; Up or Down leans. Returns

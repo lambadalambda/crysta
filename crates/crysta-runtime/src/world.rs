@@ -28,6 +28,7 @@ use room_core::{
 use std::fmt;
 
 mod attack;
+mod chapter;
 mod chest;
 mod contact;
 mod door;
@@ -110,9 +111,13 @@ pub struct World<'a> {
     level_up: Option<levelup::LevelUp>,
     /// Ark falling into a pit, and where he last stood clear of one.
     fall: Option<fall::Fall>,
+    /// The end of Chapter 1, once Ark jumps into the Hole.
+    chapter: Option<chapter::ChapterEnd>,
     /// Shadowkeeper's fight on `$123`.
     shadowkeeper: Option<shadowkeeper::Fight>,
     rope: Option<fall::Rope>,
+    /// Ark jumping from the Hole's rim.
+    jump: Option<fall::Jump>,
     safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
@@ -364,7 +369,9 @@ impl<'a> World<'a> {
             level_up: None,
             fall: None,
             shadowkeeper: None,
+            chapter: None,
             rope: None,
+            jump: None,
             safe: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -1309,7 +1316,14 @@ impl<'a> World<'a> {
         if let Some(step) = self.fall_frame()? {
             return Ok(Some(step));
         }
+        if let Some(step) = self.jump_frame()? {
+            return Ok(Some(step));
+        }
         if let Some(step) = self.resurrection_frame(presses) {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.chapter_frame() {
+            self.globals.dialogue.press(presses);
             return Ok(Some(step));
         }
         if let Some(step) = self.pickup_frame(presses)? {
@@ -1329,6 +1343,7 @@ impl<'a> World<'a> {
         let direction = self.rope_step(direction);
         let step = self.step_interactive(direction)?;
         self.ground_test();
+        self.lip_test(step);
         // On the plane, not while arriving or mid-step.
         let free = !busy
             && self.scene.is_none()
@@ -2031,6 +2046,14 @@ impl<'a> World<'a> {
         if !self.armed {
             return Ok(None);
         }
+        // The Hole's exit: the end of the chapter.
+        if self
+            .exit_at(origin)
+            .is_some_and(|record| record.direct_destination() == Ok(chapter::VORTEX_MAP))
+        {
+            self.chapter = Some(chapter::ChapterEnd::default());
+            return Ok(None);
+        }
         if self.animate {
             // Leaving starts; this frame walks on as any other.
             if let Some(record) = self.exit_at(origin) {
@@ -2501,7 +2524,9 @@ mod tests {
             level_up: None,
             fall: None,
             shadowkeeper: None,
+            chapter: None,
             rope: None,
+            jump: None,
             safe: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
