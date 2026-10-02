@@ -124,7 +124,9 @@ impl ExitRecord {
     }
     /// The destination a conditional table picks (`$8D:8911`): bit 15 names
     /// a list in bank `$81` of 10-byte entries (flag, map, mode, selector,
-    /// raw x, raw y) ended by `$FFFF`; the first whose flag `set` holds.
+    /// raw x, raw y) ended by `$FFFF`; the first whose flag `set` holds, or
+    /// is clear when the record's mode has bit 7 (`$8D:8915`); a flag word
+    /// of 0 always holds (`$8D:891D`).
     #[must_use]
     pub fn conditional(&self, image: &[u8], set: impl Fn(u16) -> bool) -> Option<Conditional> {
         let raw = self.raw_destination();
@@ -139,7 +141,7 @@ impl ExitRecord {
                 return None;
             }
             let entry = slice(image, at, 10).ok()?;
-            if set(flag) {
+            if flag == 0 || set(flag) != (self.bytes[6] & 0x80 != 0) {
                 let word = |index: usize| u16::from_le_bytes([entry[index], entry[index + 1]]);
                 return Some(Conditional {
                     map: word(2),
