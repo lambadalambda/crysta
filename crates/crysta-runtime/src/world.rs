@@ -706,6 +706,45 @@ impl<'a> World<'a> {
         }
     }
 
+    /// The push scripts put on Ark (`7F:0018/001A`) while he sleeps
+    /// (`$097E & $0400`): the Guardner's vacuum draws him in a pixel a
+    /// frame, against the walls.
+    fn push_ark(&mut self) {
+        let gates = self.globals.scratch.get(&crate::actors::ARK_GATES);
+        if gates.is_none_or(|gates| gates & 0x0400 == 0) {
+            self.globals.ark_push = (0, 0);
+            return;
+        }
+        let (dx, dy) = self.globals.ark_push;
+        let mut at = self.position();
+        let axes = [
+            (dx, Direction::Left, Direction::Right),
+            (dy, Direction::Up, Direction::Down),
+        ];
+        for (delta, back, forth) in axes {
+            let way = if delta < 0 { back } else { forth };
+            let pixels = delta.unsigned_abs();
+            if pixels == 0 {
+                continue;
+            }
+            if let Ok(moved) = self
+                .room
+                .room
+                .resolve_scripted_cardinal(at.0, at.1, way, pixels)
+            {
+                at = (moved.x, moved.y);
+            }
+        }
+        // A push lasts the frame (`$80:D0F0`).
+        self.globals.ark_push = (0, 0);
+        if at != self.position() {
+            self.walking = WalkingState::new(at.0, at.1);
+            if let Some(actor) = &mut self.player_actor {
+                actor.position = at;
+            }
+        }
+    }
+
     /// Makes the writes a run made into other actors, spawned this frame
     /// or not.
     fn apply_pokes(&mut self) {
@@ -714,8 +753,14 @@ impl<'a> World<'a> {
             let (Poke::Word { id, .. } | Poke::Flags { id, .. }) = poke else {
                 // Ark's: only the blink is his own here; the rest is
                 // published (`ARK_FLAGS`).
-                if let Poke::Ark { flags } = poke {
-                    self.globals.ark_flags = flags & 0x8000;
+                match poke {
+                    Poke::Ark { flags } => self.globals.ark_flags = flags & 0x8000,
+                    Poke::ArkPush { at, value } => {
+                        let push = &mut self.globals.ark_push;
+                        let axis = if at == 0x18 { &mut push.0 } else { &mut push.1 };
+                        *axis = value.cast_signed();
+                    }
+                    _ => {}
                 }
                 continue;
             };
@@ -768,6 +813,7 @@ impl<'a> World<'a> {
             }
         }
         self.make_deletions();
+        self.push_ark();
         // The light room asks for `$07` (`$90:8B0C`): the tower's end.
         if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
             let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);

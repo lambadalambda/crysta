@@ -56,6 +56,8 @@ pub struct Memory<'m> {
     pub carried: &'m mut Option<(usize, u16)>,
     /// Writes into other entities, which the world makes after the run.
     pub pokes: &'m mut Vec<Poke>,
+    /// The bank of the actor's script as the CPU sees it (`+$0C`).
+    pub bank: u8,
 }
 
 /// A write into another entity by its id.
@@ -85,6 +87,14 @@ pub enum Poke {
         /// The word.
         flags: u16,
     },
+    /// A push on Ark (`PHX; LDX $0DEA; STA $7F:0018/001A,X; PLX`): the
+    /// Guardner's vacuum (`$97:C447`).
+    ArkPush {
+        /// `$18` across, `$1A` down.
+        at: u16,
+        /// Pixels for the next frame, signed.
+        value: u16,
+    },
 }
 
 /// `LDA $0004,X; ORA #v / AND #v; STA $0004,X` at the start of `code`:
@@ -110,6 +120,8 @@ pub struct View {
     pub flags: u16,
     /// `+$26`, a script's word (the show's balls left, `$97:CF3F`).
     pub word26: u16,
+    /// `7F:101E`, the Guardners' transfer index (`$97:C415`).
+    pub index: u16,
     /// `+$00`.
     pub x: u16,
     /// `+$02`.
@@ -464,7 +476,10 @@ impl<'a> Machine<'a> {
             return Some(Flow::On);
         }
         let next = self.poke(opcode, memory);
-        if let Some(next) = next.or_else(|| self.resume_at(opcode)) {
+        let next = next
+            .or_else(|| self.resume_at(opcode))
+            .or_else(|| self.script_bank(opcode, memory.bank));
+        if let Some(next) = next {
             self.pc = next;
             return Some(Flow::On);
         }
@@ -522,7 +537,7 @@ impl<'a> Machine<'a> {
             }
             0x8F => self.stop_spin(memory.display)?,
             // Scratch words are words: a narrow accumulator refuses them.
-            0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xC9 | 0xCD | 0x0C | 0x1C if self.narrow => {
+            0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xCD | 0x0C | 0x1C if self.narrow => {
                 return None;
             }
             0xAD if self
@@ -552,6 +567,16 @@ impl<'a> Machine<'a> {
             _ => return Some(Flow::Stop),
         };
         Some(Flow::On)
+    }
+
+    /// `SEP #$20; LDA $000C,X`: the bank of the actor's script (the
+    /// Guardner's watcher, `$97:C5EA`).
+    fn script_bank(&mut self, opcode: u8, bank: u8) -> Option<usize> {
+        let ok = opcode == 0xBD && self.narrow && self.x && self.operand() == Some(0x0C);
+        ok.then(|| {
+            self.set(u16::from(bank));
+            self.pc + 3
+        })
     }
 
     /// `STA $000A,X; RTL`: the script goes on at A in its bank (the show's
@@ -584,10 +609,38 @@ impl<'a> Machine<'a> {
                 self.x = false;
                 Some(self.pc + 1)
             }
+            // TAX of an entity loaded (`LDA $7F:001E,X`) or of an id.
             0xAA if self.x => {
-                self.x_entity = Some(Entity::Id(self.a?));
+                self.x_entity = Some(self.entity.or(self.a.map(Entity::Id))?);
                 self.x = false;
                 Some(self.pc + 1)
+            }
+            // LDX $0DEA: Ark.
+            0xAE if self.x && self.operand()? == 0x0DEA => {
+                self.x_entity = Some(Entity::Player);
+                self.x = false;
+                Some(self.pc + 3)
+            }
+            0x9F if !self.x && self.x_entity == Some(Entity::Player) => {
+                let at = u16::try_from(self.long()? ^ 0x7F_0000).ok()?;
+                matches!(at, 0x18 | 0x1A).then_some(())?;
+                let value = self.a?;
+                memory.pokes.push(Poke::ArkPush { at, value });
+                Some(self.pc + 4)
+            }
+            // The parent's transfer index through X (`$97:C415`).
+            0xBF if !self.x && self.long()? == 0x7F_101E => {
+                let entity = self.x_entity?;
+                let index = match entity {
+                    Entity::Parent => memory.parent.map(|parent| {
+                        let fresh = memory.views.iter().find(|(id, _)| *id == parent.id);
+                        fresh.map_or(parent, |&(_, view)| view).index
+                    })?,
+                    Entity::Id(id) => memory.views.iter().find(|(other, _)| *other == id)?.1.index,
+                    Entity::Player => return None,
+                };
+                self.set(index);
+                Some(self.pc + 4)
             }
             0x9F => {
                 let (id, long) = (other?, self.long()?);
@@ -692,7 +745,9 @@ impl<'a> Machine<'a> {
     /// parent), `LDA`/`CMP` of its fields through `,Y`; and `LSR A`, `ADC`
     /// of a readable word. `None` leaves the instruction to the others.
     fn entity_op(&mut self, opcode: u8, memory: &Memory<'_>) -> Option<()> {
-        if self.narrow {
+        // Y is 16 bits wide whatever A is: `LDY $0DEA` after `SEP #$20`
+        // (`$97:C5E7`).
+        if self.narrow && opcode != 0xAC {
             return None;
         }
         let by_id = |id| {
@@ -800,13 +855,14 @@ impl<'a> Machine<'a> {
         Some(self.pc + 2)
     }
 
-    /// The flags of `CMP` of A with `value`, wide.
+    /// The flags of `CMP` of A with `value`, at the accumulator's width.
     fn compare(&mut self, value: u16) -> Option<()> {
         let a = self.a?;
         self.carry = Some(a >= value);
         let difference = a.wrapping_sub(value);
-        self.zero = Some(difference == 0);
-        self.negative = Some(difference & 0x8000 != 0);
+        let top = if self.narrow { 0x80 } else { 0x8000 };
+        self.zero = Some(difference & (top | (top - 1)) == 0);
+        self.negative = Some(difference & top != 0);
         Some(())
     }
 
@@ -990,12 +1046,14 @@ impl<'a> Machine<'a> {
                 self.set(value);
                 Some(next)
             }
-            0xC9 | 0xCD => {
-                let value = if opcode == 0xC9 {
-                    self.operand()?
-                } else {
-                    words.get(&self.address()?).copied().unwrap_or(0)
-                };
+            // CMP # takes the accumulator's width (`$97:C5ED`, narrow).
+            0xC9 => {
+                let (value, next) = self.immediate()?;
+                self.compare(value)?;
+                Some(next)
+            }
+            0xCD => {
+                let value = words.get(&self.address()?).copied().unwrap_or(0);
                 self.compare(value)?;
                 Some(self.pc + 3)
             }
@@ -1145,6 +1203,7 @@ mod tests {
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
+                bank: 0x97,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -1190,6 +1249,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -1238,6 +1298,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -1277,6 +1338,7 @@ mod tests {
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
+                bank: 0x97,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
@@ -1313,6 +1375,7 @@ mod tests {
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
+                bank: 0x97,
             };
             let end = AT + code.len() - 1;
             assert_eq!(next(super::run(&pedestal, AT, &mut memory)), Some(end));
@@ -1345,6 +1408,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&ball, AT, &mut memory)), Some(AT + 13));
         assert_eq!(sleep, 5 << 3);
@@ -1384,6 +1448,7 @@ mod tests {
             views,
             carried: &mut None,
             pokes: &mut pokes,
+            bank: 0x97,
         };
         (next(super::run(&run, AT, &mut memory)), pokes)
     }
@@ -1435,6 +1500,38 @@ mod tests {
         assert_eq!(next, Some(AT + 12));
         let (id, at, value) = (0x4001, 0x26, 7);
         assert_eq!(pokes, [Poke::Word { id, at, value }]);
+    }
+
+    #[test]
+    fn the_vacuum_takes_its_index_and_pulls_ark() {
+        // `$97:C40F`: LDA $7F:001E,X; PHX; TAX; LDA $7F:101E,X; PLX;
+        // STA $7F:101E,X; then `$97:C443`: LDA #1; PHX; LDX $0DEA;
+        // STA $7F:0018,X; PLX; COP.
+        let code = [
+            0xBF, 0x1E, 0x00, 0x7F, 0xDA, 0xAA, 0xBF, 0x1E, 0x10, 0x7F, 0xFA, 0x9F, 0x1E, 0x10,
+            0x7F, 0xA9, 0x01, 0x00, 0xDA, 0xAE, 0xEA, 0x0D, 0x9F, 0x18, 0x00, 0x7F, 0xFA, 0x02,
+        ];
+        let parent = View {
+            id: 0x4001,
+            index: 2,
+            ..View::default()
+        };
+        let mut own = Own::new();
+        let (next, pokes) = poking_among(&code, &mut own, None, &[(0x4001, parent)]);
+        assert_eq!(next, Some(AT + 27));
+        assert_eq!(own[&0x101E], 2);
+        assert_eq!(pokes, [Poke::ArkPush { at: 0x18, value: 1 }]);
+    }
+
+    #[test]
+    fn the_watcher_reads_its_script_bank() {
+        // `$97:C5E5`: SEP #$20; LDY $0DEA; LDA $000C,X; CMP #$97; REP #$20;
+        // BNE +14; COP.
+        let code = [
+            0xE2, 0x20, 0xAC, 0xEA, 0x0D, 0xBD, 0x0C, 0x00, 0xC9, 0x97, 0xC2, 0x20, 0xD0, 0x0E,
+            0x02,
+        ];
+        assert_eq!(poking(&code, &mut Own::new(), None).0, Some(AT + 14));
     }
 
     #[test]
@@ -1527,6 +1624,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&cadet, AT, &mut memory)), Some(AT + 35));
         // Target 8 left and 64 below: no branch, and the second PLA finds
@@ -1560,6 +1658,7 @@ mod tests {
                 id: 0,
                 flags: 0,
                 word26: 0,
+                index: 0,
                 x: 0x100,
                 y: 0x88,
                 facing: 3,
@@ -1572,6 +1671,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
         assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
@@ -1603,6 +1703,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
         assert_eq!(own[&0x2006], 0x70);
@@ -1718,6 +1819,7 @@ mod tests {
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
+            bank: 0x97,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

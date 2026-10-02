@@ -63,6 +63,35 @@ const CHOICE: u8 = 0x1A;
 const SET_SCRIPT: u8 = 0xC0;
 /// Redirects the actor's script to a long address and yields; `$80:AAE1`.
 const REDIRECT_SCRIPT: u8 = 0xBF;
+/// The services [`Actor::player_service`] runs.
+const PLAYER_SERVICES: &[u8] = &[
+    BRANCH_ON_PLAYER_NEAR,
+    NEAR_BRANCH,
+    AREA_BRANCH,
+    TAKE_PLAYER,
+    SET_CONTROL,
+    TRANSFER,
+    TRANSFER_BY_INDEX,
+];
+/// The services [`Actor::script_service`] runs.
+const SCRIPT_SERVICES: &[u8] = &[
+    WRITE_FLAG,
+    REGISTER_CALLBACK,
+    LOCK_INPUT,
+    UNLOCK_INPUT,
+    SET_SCRIPT,
+    REDIRECT_SCRIPT,
+    REDIRECT_AFTER,
+    LONG_JUMP,
+    CONTINUATION,
+    DELETE_ON_FLAG,
+    DELETE,
+    WAIT_FOR_FLAG,
+    OCCUPY,
+];
+/// As [`REDIRECT_SCRIPT`], the script resting a word of frames first
+/// (`$80:AAC1`, `E+$0E`): the Guardner's vacuum, `$97:C492`.
+const REDIRECT_AFTER: u8 = 0xBE;
 /// Unlocks pad buttons, `$045E &= !mask`; `$80:8FE6`.
 const UNLOCK_INPUT: u8 = 0x29;
 /// Locks pad buttons, `$045E |= mask`; `$80:8FF5`.
@@ -205,7 +234,7 @@ const GROUP_SPAWNS: [(u8, u8); 3] = [(0xE6, SPAWN_AFTER), (0xE7, SPAWN), (0xE8, 
 /// A group's root deletes every other entity of the group (`$80:B9D1`).
 const DELETE_GROUP: u8 = 0xEB;
 /// The spawns, and the group's deletion, which [`Actor::spawn`] runs.
-const SPAWNS: [u8; 9] = [
+const SPAWNS: &[u8] = &[
     SPAWN,
     SPAWN_LINKED,
     SPAWN_AT,
@@ -255,6 +284,8 @@ const SPEED: u8 = 0xB0;
 /// selector through the following pose wait (`$80:A200..A2D8`). Operands:
 /// pose, movement selector and resource-table index.
 const PLAYER_POSE_MOVING: u8 = 0x84;
+/// Ark's pose list of a resource, a count of times (`$80:A28B`).
+const ARK_POSE_REPEAT: u8 = 0x89;
 /// Selects a pose and starts the movement streams of the same selector
 /// (`$80:A1B9`).
 const POSE_MOVING: u8 = 0x81;
@@ -337,6 +368,9 @@ const EASE_START: u8 = 0xED;
 const EASE_STEP: u8 = 0xEE;
 /// Queues a map transfer: map, mode, selector, x, y; `$80:8A23`.
 const TRANSFER: u8 = 0x14;
+/// As [`TRANSFER`], the record from a table by the actor's `7F:101E`
+/// (`$80:8A58`): the Guardners send Ark back down their tower.
+const TRANSFER_BY_INDEX: u8 = 0x15;
 /// Inline native code that registers the contact callback: `LDA #target;
 /// STA $7F:1010,X`, with the target's two bytes as wildcards.
 const CONTACT: [Option<u8>; 7] = [
@@ -674,6 +708,10 @@ pub struct Actor {
     root_died: bool,
     /// `COP C2`-`C5` that found a wall this frame.
     blocked_tests: u8,
+    /// Ark's own script (`COP DF`), and the frames of the list his pose
+    /// service named (`COP 84`, `89`), which `COP 8E`/`8F` wait out.
+    ark: bool,
+    ark_list: Option<u16>,
     /// The child the last `COP 99` spawned, for the run after it.
     linked: Option<u16>,
     /// A a run left at a jump, and the jump's target, for a run there.
@@ -791,6 +829,8 @@ impl Actor {
             struck: false,
             root_died: false,
             blocked_tests: 0,
+            ark: false,
+            ark_list: None,
             linked: None,
             carried: None,
             parameter: 0,
@@ -836,6 +876,7 @@ impl Actor {
     ) -> Self {
         let mut actor = Self::new(position, script, 0, 1);
         actor.map = map;
+        actor.ark = true;
         let candidate = map == 0x21 && source == cadence::frozen_return_guide(image);
         if candidate {
             let entry = cadence::frozen_return_start(image);
@@ -923,6 +964,15 @@ impl Actor {
         // (`$80:F974`).
         if actor.foe.is_none() && actor.parameter != 0 {
             actor.own.insert(0x26, actor.parameter);
+        }
+        // A 16-byte record's fields (`$80:F56F`): `7F:1018` (word), `101A`,
+        // `101C` (word) and `101E`, the Guardners' transfer index.
+        let record = image.get(resident.record..resident.record + 16);
+        if let Some(&[0 | 1, _, _, flags, .., a, b, c, d, e, f]) = record {
+            if flags & 0xC0 == 0xC0 {
+                let fields = [0x1018, 0x1019, 0x101A, 0x101C, 0x101D, 0x101E];
+                actor.own.extend(fields.into_iter().zip([a, b, c, d, e, f]));
+            }
         }
         if actor.foe.is_some() {
             // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan.
@@ -1235,6 +1285,7 @@ impl Actor {
             id: 0,
             flags: globals.ark_flags | published,
             word26: 0,
+            index: 0,
             x: player.0,
             y: player.1,
             facing: u16::from(sense::code(facing)),
@@ -1258,6 +1309,7 @@ impl Actor {
             views: &globals.views,
             carried: &mut self.carried,
             pokes: &mut globals.pokes,
+            bank: u8::try_from(self.pc >> 16 & 0x3F).unwrap_or(0) | 0x80,
         }
     }
 
@@ -1422,6 +1474,7 @@ impl Actor {
     }
 
     fn set_pose(&mut self, selector: u8, hflip: bool) {
+        self.ark_list = None;
         if self.selector != selector || self.hflip != hflip {
             self.selector = selector;
             self.hflip = hflip;
@@ -1557,13 +1610,13 @@ impl Actor {
             SHOW_TEXT | SHOW_TEXT_BANKED | TEXT_WAIT | TEXT_STEP | CHOICE => {
                 return self.text_service(service, operands, bank, around)
             }
-            WRITE_FLAG | REGISTER_CALLBACK | LOCK_INPUT | UNLOCK_INPUT | SET_SCRIPT
-            | REDIRECT_SCRIPT | LONG_JUMP | CONTINUATION | DELETE_ON_FLAG | DELETE
-            | WAIT_FOR_FLAG | OCCUPY => return self.script_service(service, operands, around),
+            _ if SCRIPT_SERVICES.contains(&service) => {
+                return self.script_service(service, operands, around)
+            }
             EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
             SWITCH | SPEED => return self.parameter_service(service, operands, bank, image),
-            PLAYER_POSE_MOVING if self.frozen_return.is_some() => {
-                return self.frozen_return_pose(operands, image)
+            PLAYER_POSE_MOVING | ARK_POSE_REPEAT if self.ark => {
+                return self.ark_pose(service, operands, image)
             }
             POSE_MOVING | POSE_SELECTOR | REPEAT_POSE_MOVING | REPEAT_MOVING => {
                 return self.moving_pose(service, operands, image)
@@ -1611,12 +1664,9 @@ impl Actor {
             WAIT => return self.wait_for_pose(operands),
             WAIT_STEP => return self.wait_step(operands),
             RANDOM_STEP => return self.random_step_service(operands, around),
-            BRANCH_ON_PLAYER_NEAR
-            | NEAR_BRANCH
-            | AREA_BRANCH
-            | TAKE_PLAYER
-            | SET_CONTROL
-            | TRANSFER => return self.player_service(service, operands, bank, around),
+            _ if PLAYER_SERVICES.contains(&service) => {
+                return self.player_service(service, operands, bank, around)
+            }
             BRANCH_ON_GLOBAL => self.pc = operands + 4,
             _ if BODY.contains(&service) => {
                 return self.body(service, operands, image, around.player)
@@ -1659,7 +1709,45 @@ impl Actor {
 
     /// Ticks of the display list a selector names, when the packet is known.
     fn pose_list(&self, selector: u8) -> Option<u16> {
+        if self.ark_list.is_some() {
+            return self.ark_list;
+        }
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
+    }
+
+    /// `COP 84 sel list resource` and `COP 89 count list sel resource` on
+    /// Ark's own script outside the frozen return (`$80:A200`, `A28B`): the
+    /// list of his resource, which `COP 8E` waits out, and `COP 8F` that
+    /// many times (the Guardner's sleep, `$97:C5BB`). His art is not
+    /// changed here.
+    fn ark_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        if self.frozen_return.is_some() {
+            return if service == PLAYER_POSE_MOVING {
+                self.frozen_return_pose(operands, image)
+            } else {
+                self.state = State::Frozen;
+                false
+            };
+        }
+        // Byte 0 the count (`+$22`), byte 1 the list, the last the resource.
+        let length = if service == ARK_POSE_REPEAT { 4 } else { 3 };
+        let bytes = image.get(operands..operands + length);
+        let records = bytes.and_then(|bytes| {
+            assets::sprites::boxes::ark_list(image, bytes[length - 1], bytes[1]).ok()
+        });
+        let (Some(bytes), Some(records)) = (bytes, records) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let count = bytes[0];
+        let ticks: u16 = records
+            .iter()
+            .map(|record| u16::from(record.duration) + 1)
+            .sum();
+        self.ark_list = Some(ticks.max(1));
+        self.repeats = Some(u16::from(count));
+        self.pc = operands + length;
+        true
     }
 
     /// The actor's body: its x and y (`COP B1`, `B2`, `B3`), its art packet (`COP D8`), its
@@ -2715,7 +2803,7 @@ impl Actor {
             }
             Poke::Flags { set, cleared, .. } => self.write_04(set, cleared),
             // The world keeps Ark's.
-            Poke::Ark { .. } => {}
+            Poke::Ark { .. } | Poke::ArkPush { .. } => {}
         }
     }
 
@@ -2729,6 +2817,7 @@ impl Actor {
             id: self.id,
             flags: u16::from(self.hidden) << 15 | u16::from(out) << 7,
             word26: self.own_word(0x26),
+            index: self.own_word(0x101E) & 0xFF,
             x: self.position.0,
             y: self.position.1,
             facing: u16::from(self.facing_code()),
@@ -3159,7 +3248,9 @@ impl Actor {
                 }
                 self.pc = operands + 2;
             }
-            REDIRECT_SCRIPT => return self.redirect_script(operands, image),
+            REDIRECT_SCRIPT | REDIRECT_AFTER => {
+                return self.redirect_script(service, operands, image)
+            }
             SET_SCRIPT | LONG_JUMP => {
                 let Some(target) = image.get(operands..operands + 3).and_then(long) else {
                     self.state = State::Frozen;
@@ -3228,7 +3319,16 @@ impl Actor {
 
     /// `COP BF` writes the actor's script pointer, clears its countdown and
     /// exits the scheduler (`$80:AAE1`). The target runs on the next tick.
-    fn redirect_script(&mut self, operands: usize, image: &[u8]) -> bool {
+    fn redirect_script(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        let delay = if service == REDIRECT_AFTER {
+            let Some(delay) = cadence::word(image, operands + 3) else {
+                self.state = State::Frozen;
+                return false;
+            };
+            delay
+        } else {
+            0
+        };
         let Some(target) = image
             .get(operands..operands + 3)
             .and_then(long)
@@ -3241,6 +3341,10 @@ impl Actor {
             self.die(image);
         } else {
             self.pc = target;
+            // `E+$0E`: the rest before the target runs, as a yield's.
+            if delay > 0 {
+                self.state = State::Waiting(delay);
+            }
         }
         false
     }
@@ -3718,12 +3822,23 @@ impl Actor {
                 }
                 self.pc = operands + 4;
             }
-            TRANSFER => {
+            TRANSFER | TRANSFER_BY_INDEX => {
+                // The table of `$80:8A58` (`$8D:BA41`, European `$8D:B90A`).
+                let index = self.own.get(&0x101E).copied().unwrap_or(0);
+                let record = if service == TRANSFER {
+                    operands
+                } else if index == 0 {
+                    self.pc = operands;
+                    return true;
+                } else {
+                    assets::layout::per_revision(image, 0x0D_BA41, 0x0D_B90A)
+                        + usize::from(index) * 8
+                };
                 let (Some(map), Some(&mode), Some(x), Some(y)) = (
-                    cadence::word(image, operands),
-                    image.get(operands + 2),
-                    cadence::word(image, operands + 4),
-                    cadence::word(image, operands + 6),
+                    cadence::word(image, record),
+                    image.get(record + 2),
+                    cadence::word(image, record + 4),
+                    cadence::word(image, record + 6),
                 ) else {
                     self.state = State::Frozen;
                     return false;
@@ -3736,7 +3851,7 @@ impl Actor {
                     position: (x + 8, y + 16),
                     mode,
                 });
-                self.pc = operands + 8;
+                self.pc = operands + if service == TRANSFER { 8 } else { 0 };
             }
             _ => {
                 self.state = State::Frozen;
@@ -5219,6 +5334,38 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&code);
         tick(&mut actor, &image);
         assert_eq!(actor.frozen_at(), None);
+    }
+
+    #[test]
+    fn cop_15_transfers_by_the_actors_index() {
+        // `7F:101E = 1`: the table's first record, tower 3's `$10F` at raw
+        // (376,912); the loader adds (8,16).
+        let mut code = vec![2, 0x15, 2, 0xBD];
+        code.resize(0x8_0000, 0);
+        let (mut image, mut actor) = actor_running(&code);
+        image[0x0D_BA49..0x0D_BA51].copy_from_slice(&[0x0F, 0x01, 0, 6, 0x78, 0x01, 0x90, 0x03]);
+        actor.own.insert(0x101E, 1);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        let transfer = globals.transfer.expect("a transfer");
+        assert_eq!((transfer.map, transfer.position), (0x010F, (384, 928)));
+    }
+
+    #[test]
+    fn cop_be_goes_on_elsewhere_after_a_rest() {
+        // COP BE $88:8010 3; at +$10: pose 9, yield.
+        let mut code = vec![2, 0xBE, 0x10, 0x80, 0x88, 3, 0];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        for _ in 0..3 {
+            tick(&mut actor, &image);
+            assert_ne!(actor.selector, 9, "resting");
+        }
+        for _ in 0..3 {
+            tick(&mut actor, &image);
+        }
+        assert_eq!(actor.selector, 9);
     }
 
     #[test]
