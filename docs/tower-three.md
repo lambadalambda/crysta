@@ -185,6 +185,19 @@ scripts. Missing native: `ASL`; `JSL $80:BBCD` (flag write by A) and
 `7F:102E`/`7F:001E` as the group root/parent; `+$04` masks `$8030`,
 `$7FEF`, `$FFDF`, `$FF7F`, `|4`; `$0DC2` (text open).
 
+### After the runtime work
+
+Tower 3 plays from `$10E` to the light room `$106` and the resurrection
+(`world/fall.rs`, `COP 3F` attributes, the pedestals' `JSL $80:BBCD`,
+`ASL`, writes into other actors, group spawns, struck callbacks). Tests:
+`local_towers.rs` (crumbling row to `$114`, a fall elsewhere, a pedestal,
+the ball wave, the High Cadet). Open:
+
+- the Guardner's grab (`$97:C5A9`: `COP DF` on Ark, `TSB $097E`, Ark's
+  `+$04` through `LDY $0DEA`) freezes at `$97:C5E5` / `$99:909B`;
+- the landing's drop on `$114` (`$90:FA4E`) and the falling pose;
+- the darts' damage; the teeter at a pit's edge.
+
 ## 5. Proposed runtime model
 
 1. **Pits.** A collision class "pit" for attributes `$12`/`$14`: Ark may
