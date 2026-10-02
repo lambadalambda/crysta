@@ -375,10 +375,11 @@ impl Room {
             return Ok(rule.alias.material());
         }
         match kind {
-            // `1` and `17` take the same handlers as `0` in all sixteen
-            // directional tables (`$80:D542`, `D8E8`, `DC60`, `DFDC`, `$40`
-            // apart): the tower tops' floor, tower 2's statue rows.
-            0 | 1 | 2 | 17 | 22 => Ok(Material::Open),
+            // `1`, `17` and `20` take the same handlers as `0` in all
+            // sixteen directional tables (`$80:D542`, `D8E8`, `DC60`,
+            // `DFDC`, `$40` apart): the tower tops' floor, tower 2's statue
+            // rows, the pits Ark walks onto and falls into (`$80:CC00`).
+            0 | 1 | 2 | 17 | 20 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
