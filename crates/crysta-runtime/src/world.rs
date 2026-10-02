@@ -669,10 +669,23 @@ impl<'a> World<'a> {
     /// Makes the writes a run made into other actors, spawned this frame
     /// or not.
     fn apply_pokes(&mut self) {
+        use crate::actors::Poke;
         for poke in std::mem::take(&mut self.globals.pokes) {
+            let (Poke::Word { id, .. } | Poke::Flags { id, .. }) = poke else {
+                // Ark's: only the blink is his own here; the rest is
+                // published (`ARK_FLAGS`).
+                if let Poke::Ark { flags } = poke {
+                    self.globals.ark_flags = flags & 0x8000;
+                }
+                continue;
+            };
             let spawned = self.globals.spawns.iter_mut().map(|(_, actor)| actor);
-            let mut all = self.actors.iter_mut().chain(spawned);
-            if let Some(actor) = all.find(|actor| actor.id == poke.id()) {
+            if let Some(actor) = self
+                .actors
+                .iter_mut()
+                .chain(spawned)
+                .find(|actor| actor.id == id)
+            {
                 actor.take_poke(poke);
             }
         }
@@ -2021,6 +2034,8 @@ impl<'a> World<'a> {
             .inventory
             .clone_from(&self.globals.inventory);
         entered.globals.scratch.clone_from(&self.globals.scratch);
+        // Ark's state gates do not outlive the map.
+        entered.globals.scratch.remove(&crate::actors::ARK_GATES);
         entered
             .globals
             .scratch

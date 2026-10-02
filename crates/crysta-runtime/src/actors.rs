@@ -25,8 +25,8 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_FLAGS, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
-    PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
+    Poke, Scratch, View, ARK_FLAGS, ARK_GATES, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION,
+    PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -1222,9 +1222,10 @@ impl Actor {
         (player, facing): ((u16, u16), Direction),
     ) -> native::Memory<'m> {
         let probe = probe(player);
+        let published = globals.scratch.get(&ARK_FLAGS).copied().unwrap_or(0);
         let player = native::View {
             id: 0,
-            flags: 0,
+            flags: globals.ark_flags | published,
             x: player.0,
             y: player.1,
             facing: u16::from(sense::code(facing)),
@@ -1980,12 +1981,12 @@ impl Actor {
         true
     }
 
-    /// `COP 71 m1 m2 t`: jumps when Ark is busy or down, or `$097C & m2`
-    /// (`$097E & m1` is not modelled); else goes on. Returns whether
-    /// execution continues this frame.
+    /// `COP 71 m1 m2 t`: jumps when Ark is busy or down, or `$097E & m1`,
+    /// or `$097C & m2`; else goes on. Returns whether execution continues
+    /// this frame.
     fn ark_busy(&mut self, operands: usize, bank: usize, around: &Surroundings<'_>) -> bool {
         let image = around.image;
-        let (Some(_), Some(m2), Some(target)) = (
+        let (Some(m1), Some(m2), Some(target)) = (
             cadence::word(image, operands),
             cadence::word(image, operands + 2),
             cadence::word(image, operands + 4),
@@ -1993,14 +1994,9 @@ impl Actor {
             self.state = State::Frozen;
             return false;
         };
-        // `$097E` is not modelled: no bit of it is ever set here.
-        let action = around
-            .globals
-            .scratch
-            .get(&native::PLAYER_ACTION)
-            .copied()
-            .unwrap_or(0);
-        if around.globals.ark_busy || action & m2 != 0 {
+        let word = |at| around.globals.scratch.get(&at).copied().unwrap_or(0);
+        let (gates, action) = (word(native::ARK_GATES), word(native::PLAYER_ACTION));
+        if around.globals.ark_busy || gates & m1 != 0 || action & m2 != 0 {
             return self.jump(bank, target);
         }
         self.pc = operands + 6;
@@ -2708,6 +2704,8 @@ impl Actor {
                 self.sync_life();
             }
             Poke::Flags { set, cleared, .. } => self.write_04(set, cleared),
+            // The world keeps Ark's.
+            Poke::Ark { .. } => {}
         }
     }
 

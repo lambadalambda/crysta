@@ -107,6 +107,8 @@ pub struct Globals {
     pub deletions: Vec<u16>,
     /// Writes runs made into other actors, not yet made.
     pub pokes: Vec<crate::actors::Poke>,
+    /// Ark's `+$04` as scripts set it: bit 15 hides him (a blink).
+    pub ark_flags: u16,
     /// Group roots whose groups go (`COP EB`), not yet gone, each with the
     /// spawns of this frame made before it: later ones stay.
     pub group_deletions: Vec<(u16, usize)>,
@@ -256,6 +258,7 @@ impl Globals {
             views: Vec::new(),
             deletions: Vec::new(),
             pokes: Vec::new(),
+            ark_flags: 0,
             group_deletions: Vec::new(),
             marks: Vec::new(),
             audio: crate::audio::Audio::default(),

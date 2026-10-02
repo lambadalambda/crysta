@@ -105,10 +105,11 @@ impl World<'_> {
     }
 
     /// Whether Ark blinks out this frame: the hit's second frame, fourth,
-    /// ... while the push lasts.
+    /// ... while the push lasts; or a script blinks him (the Cadet's
+    /// paralysis, `$97:C2C8`).
     #[must_use]
     pub fn ark_blinks(&self) -> bool {
-        self.hurt.is_some_and(|hurt| hurt.frame % 2 == 0)
+        self.hurt.is_some_and(|hurt| hurt.frame % 2 == 0) || self.globals.ark_flags & 0x8000 != 0
     }
 
     /// The enemies' hit scan on Ark (`$85:D30C`): an attack box touching

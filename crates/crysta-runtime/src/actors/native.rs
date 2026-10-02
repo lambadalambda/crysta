@@ -79,16 +79,12 @@ pub enum Poke {
         /// The bits cleared.
         cleared: u16,
     },
-}
-
-impl Poke {
-    /// The entity it writes into.
-    #[must_use]
-    pub const fn id(self) -> u16 {
-        match self {
-            Self::Word { id, .. } | Self::Flags { id, .. } => id,
-        }
-    }
+    /// Ark's `+$04` (`LDY $0DEA; STA $0004,Y`): the paralysis's blink
+    /// (`$97:C2C8`).
+    Ark {
+        /// The word.
+        flags: u16,
+    },
 }
 
 /// `LDA $0004,X; ORA #v / AND #v; STA $0004,X` at the start of `code`:
@@ -182,7 +178,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 7] = [
+const SCRATCH: [(u16, u16); 8] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -195,11 +191,16 @@ const SCRATCH: [(u16, u16); 7] = [
     (0x04CC, 0x04CD),
     // The light room's BG3 scroll (`$90:8AC9`, `$90:8AD5`), not drawn.
     (0x0886, 0x0889),
+    // Ark's state gates: `$8000` paralysed (`$97:C2B2`), `$0400` asleep
+    // (`$97:C5AC`); `COP 71` tests them.
+    (ARK_GATES, ARK_GATES + 1),
     // An engine word the runtime does not read: the pedestals set its bit 7
     // (`$90:FBE4`).
     (0x045A, 0x045B),
 ];
 
+/// `$097E`, Ark's state gates.
+pub const ARK_GATES: u16 = 0x097E;
 /// `$047C`, the map a script asks for next (`$90:8B0C`).
 pub const PENDING_MAP: u16 = 0x047C;
 /// `$0482`, the map before this one, as the light room reads it.
@@ -584,6 +585,10 @@ impl<'a> Machine<'a> {
                 memory.pokes.push(Poke::Flags { id, set, cleared });
                 self.a = None;
                 Some(self.pc + 9)
+            }
+            0x99 if self.operand()? == 0x04 && self.y? == Entity::Player => {
+                memory.pokes.push(Poke::Ark { flags: self.a? });
+                Some(self.pc + 3)
             }
             0x99 if FIELDS.contains(&self.operand()?) => {
                 let (id, at, value) = (id(self.y?)?, self.operand()?, self.a?);
@@ -1344,6 +1349,20 @@ mod tests {
             pokes: &mut pokes,
         };
         (next(super::run(&run, AT, &mut memory)), pokes)
+    }
+
+    #[test]
+    fn the_cadets_paralysis_sets_its_gate_and_blinks_ark() {
+        // `$97:C2AF`: LDA #$8000; TSB $097E; then a step of the blink:
+        // LDY $0DEA; LDA $0004,Y; BIT #$0080; BNE +8; EOR #$8000;
+        // STA $0004,Y; COP.
+        let code = [
+            0xA9, 0x00, 0x80, 0x0C, 0x7E, 0x09, 0xAC, 0xEA, 0x0D, 0xB9, 0x04, 0x00, 0x89, 0x80,
+            0x00, 0xD0, 0x05, 0x49, 0x00, 0x80, 0x99, 0x04, 0x00, 0x02,
+        ];
+        let (next, pokes) = poking(&code, &mut Own::new(), None);
+        assert_eq!(next, Some(AT + 23));
+        assert_eq!(pokes, [Poke::Ark { flags: 0x8000 }]);
     }
 
     #[test]
