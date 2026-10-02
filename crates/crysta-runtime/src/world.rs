@@ -666,6 +666,18 @@ impl<'a> World<'a> {
             .insert(crate::actors::PLAYER_Y, y.wrapping_sub(16));
     }
 
+    /// Makes the writes a run made into other actors, spawned this frame
+    /// or not.
+    fn apply_pokes(&mut self) {
+        for poke in std::mem::take(&mut self.globals.pokes) {
+            let spawned = self.globals.spawns.iter_mut().map(|(_, actor)| actor);
+            let mut all = self.actors.iter_mut().chain(spawned);
+            if let Some(actor) = all.find(|actor| actor.id == poke.id()) {
+                actor.take_poke(poke);
+            }
+        }
+    }
+
     /// Runs every resident's script for one frame and moves bodies.
     ///
     /// Each actor sees the player's cell and every other body's cell and
@@ -692,6 +704,7 @@ impl<'a> World<'a> {
                 self.facing,
             );
             self.actors[index].tick(&mut around);
+            self.apply_pokes();
             if self.actors[index].blocked().is_some() {
                 // `$80:8C4A`/`8B85` wait inside the handler: nobody after
                 // this actor runs until the window is answered.
@@ -700,6 +713,34 @@ impl<'a> World<'a> {
         }
         for id in std::mem::take(&mut self.globals.deletions) {
             if let Some(actor) = self.actors.iter_mut().find(|actor| actor.id == id) {
+                actor.remove();
+            }
+        }
+        let deaths: Vec<_> = self
+            .actors
+            .iter_mut()
+            .filter_map(|actor| actor.take_root_death().then_some(actor.id))
+            .collect();
+        for root in deaths {
+            for actor in self
+                .actors
+                .iter_mut()
+                .filter(|actor| actor.group() == Some(root))
+            {
+                actor.go_with_root(self.image);
+            }
+        }
+        for (root, before) in std::mem::take(&mut self.globals.group_deletions) {
+            let mut index = 0;
+            self.globals.spawns.retain(|(_, actor)| {
+                index += 1;
+                index > before || actor.group() != Some(root)
+            });
+            for actor in self
+                .actors
+                .iter_mut()
+                .filter(|actor| actor.group() == Some(root))
+            {
                 actor.remove();
             }
         }

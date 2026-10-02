@@ -141,6 +141,7 @@ jp_address	eu_address	kind	method	confidence	note
 85:BEF7	85:BF8F	text	exact	high	run 0x255 bytes +shape; code; crates/assets/src/text/pandora.rs:178 (+2)
 85:C800	85:C898	text	exact	high	run 0x2e bytes; test; crates/assets/src/text/pandora/tests.rs:200 (+1)
 85:C802	85:C89A	text	aligned	medium	gap 0x2 bytes, same length (one side); text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/pandora/tests.rs:200
+85:E27B	85:E313	script	exact	high	verbatim 0x15 bytes; code; crates/crysta-runtime/src/actors/foe.rs
 C6:2191	C8:2191	music	exact	high	run 0x777f bytes +shape; code; crates/crysta-app/src/music_data.rs:108
 86:959C	86:959C	sprite	exact	high	run 0x1ea bytes +code; code; crates/assets/src/maps/scripts.rs:14 (+8)
 86:959F	86:959F	map	aligned	medium	gap 0x16 bytes, same length; test; crates/assets/src/maps/visual.rs:1109

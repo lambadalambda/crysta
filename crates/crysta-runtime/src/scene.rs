@@ -105,6 +105,11 @@ pub struct Globals {
     pub views: Vec<(u16, crate::actors::View)>,
     /// Actors another's script deleted (`PHX; TYX; COP A7; PLX`).
     pub deletions: Vec<u16>,
+    /// Writes runs made into other actors, not yet made.
+    pub pokes: Vec<crate::actors::Poke>,
+    /// Group roots whose groups go (`COP EB`), not yet gone, each with the
+    /// spawns of this frame made before it: later ones stay.
+    pub group_deletions: Vec<(u16, usize)>,
     /// The cells bodies mark and seal this frame, as the map has them.
     pub marks: Vec<(u16, u16)>,
     /// Music and sound effect requests ([`crate::audio`]).
@@ -250,6 +255,8 @@ impl Globals {
             next_id: 0x4000,
             views: Vec::new(),
             deletions: Vec::new(),
+            pokes: Vec::new(),
+            group_deletions: Vec::new(),
             marks: Vec::new(),
             audio: crate::audio::Audio::default(),
             display: crate::display::Display::default(),

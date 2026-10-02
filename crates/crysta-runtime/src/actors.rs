@@ -25,8 +25,8 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Scratch, View, ARK_FLAGS, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y,
-    PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
+    Poke, Scratch, View, ARK_FLAGS, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
+    PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -195,6 +195,35 @@ const SINE: usize = 0x01_F563;
 const SPAWN_AT: u8 = 0x9C;
 /// As [`SPAWN_AT`] with a flags word (`$80:A79D`): the flyers' bullets.
 const SPAWN_OFFSET: u8 = 0xA4;
+/// A script at the actor, without a flags word, after its parent in the
+/// list (`$80:A6F1`).
+const SPAWN_AFTER: u8 = 0xA1;
+/// [`SPAWN_AFTER`], [`SPAWN`] and [`SPAWN_OFFSET`] whose child joins the
+/// spawner's group (`$80:B99A`, `B9A5`, `B9B0`; `7F:102E` = the root,
+/// `$80:BB5A`).
+const GROUP_SPAWNS: [(u8, u8); 3] = [(0xE6, SPAWN_AFTER), (0xE7, SPAWN), (0xE8, SPAWN_OFFSET)];
+/// A group's root deletes every other entity of the group (`$80:B9D1`).
+const DELETE_GROUP: u8 = 0xEB;
+/// The spawns, and the group's deletion, which [`Actor::spawn`] runs.
+const SPAWNS: [u8; 9] = [
+    SPAWN,
+    SPAWN_LINKED,
+    SPAWN_AT,
+    SPAWN_OFFSET,
+    SPAWN_AFTER,
+    0xE6,
+    0xE7,
+    0xE8,
+    DELETE_GROUP,
+];
+/// The enemies' death script (`$85:E27B`), which a script may jump to.
+const DEATH: usize = 0x05_E27B;
+/// The own word that holds the group's root (`7F:102E`).
+const GROUP: u16 = 0x102E;
+/// The own words of an enemy's life (`7F:102A`) and its struck callback
+/// (`7F:1016`).
+const LIFE: u16 = 0x102A;
+const STRUCK: u16 = 0x1016;
 /// Frames a hit leaves the target unhittable (`$7F:1020 = $10`).
 const HIT_COOLDOWN: u16 = 16;
 /// Services for the display alone: the spinning window (`6A`, shape 0
@@ -318,6 +347,14 @@ const CONTACT: [Option<u8>; 7] = [
 /// it), `$0002` and `$0020` not a target of hits, `$0010` not attacking
 /// (the hit scan `$85:D281`).
 const GUARD_04: u16 = 0x0033;
+/// The `+$04` bits scripts may set and clear: those modelled, and some
+/// accepted and not modelled. The guide clears and sets 12 around the
+/// freezing's whitening (`$88:B507`, `$88:B53F`) and clears 8, the
+/// dispatcher's target bit, before it leaves (`$88:AF1A`). Bit 13 lets a
+/// hidden body move (`$80:C967`), as every body does here (the Guardner's
+/// dive, `$97:C573`). Bit 7, out of play, is the runtime's own: a copy
+/// clears it when struck (`$97:C9C5`).
+const MODELLED_04: u16 = 0x8000 | 0x2000 | 0x1000 | 0x0200 | 0x0100 | 0x0080 | WALLS_04 | GUARD_04;
 /// `+$04` bit `$0004`: the walls stop the enemy (with `$0002` clear, which
 /// the scripts that set it leave clear: `$90:9C27`, a dropped Hiball).
 const WALLS_04: u16 = 0x0004;
@@ -624,6 +661,12 @@ pub struct Actor {
     parent: Option<native::View>,
     /// The id other actors' runs know it by (`views`, `LDY $0026,X`).
     pub(crate) id: u16,
+    /// It heads a group (`7F:001E = $FFFF`, `$80:BB60`).
+    root: bool,
+    /// A hit that did not kill wakes its struck callback next frame.
+    pub(crate) struck: bool,
+    /// It headed a group and died: the group goes with it.
+    root_died: bool,
     /// The child the last `COP 99` spawned, for the run after it.
     linked: Option<u16>,
     /// A a run left at a jump, and the jump's target, for a run there.
@@ -737,6 +780,9 @@ impl Actor {
             spawned: false,
             parent: None,
             id: 0,
+            root: false,
+            struck: false,
+            root_died: false,
             linked: None,
             carried: None,
             parameter: 0,
@@ -977,6 +1023,7 @@ impl Actor {
     fn frame(&mut self, around: &mut Surroundings<'_>) {
         self.cooldown = self.cooldown.saturating_sub(1);
         self.pose_age = self.pose_age.saturating_add(1);
+        self.wake_struck();
         if matches!(self.state, State::Ordinary { ticks_left: 0, .. }) {
             self.walking = false;
             self.state = State::Running;
@@ -1021,6 +1068,7 @@ impl Actor {
         if self.state == State::Frozen && self.frozen_at.is_none() {
             self.frozen_at = Some(self.pc);
         }
+        self.sync_life();
     }
 
     /// Where the script stopped at something the interpreter does not model,
@@ -1082,28 +1130,14 @@ impl Actor {
         bank: usize,
         around: &mut Surroundings<'_>,
     ) -> Option<usize> {
-        // Bits 12 and 8 are accepted and not modelled: the guide clears and
-        // sets 12 around the freezing's whitening (`$88:B507`, `$88:B53F`)
-        // and clears 8, the dispatcher's target bit, before it leaves
-        // (`$88:AF1A`).
-        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100 | WALLS_04 | GUARD_04;
         let at = self.pc;
-        if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
-            let value = u16::from_le_bytes([low, high]);
-            let (set, cleared) = match op {
-                0x09 if value & !MODELLED == 0 => (value, 0),
-                0x29 if !value & !MODELLED == 0 => (0, !value),
-                // `EOR #$8000`: a blink (the Cadet, `$97:C016`).
-                0x49 if value == 0x8000 => {
-                    self.hidden = !self.hidden;
-                    return Some(at + 9);
-                }
-                _ => return None,
-            };
-            self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
-            self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
-            self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
-            self.walls = (self.walls || set & WALLS_04 != 0) && cleared & WALLS_04 == 0;
+        if let Some((set, cleared)) = image.get(at..).and_then(native::flags_04) {
+            self.write_04(set, cleared);
+            return Some(at + 9);
+        }
+        // `EOR #$8000` on `+$04`: a blink (the Cadet, `$97:C016`).
+        if image.get(at..at + 9) == Some(&[0xBD, 0x04, 0x00, 0x49, 0x00, 0x80, 0x9D, 0x04, 0x00]) {
+            self.hidden = !self.hidden;
             return Some(at + 9);
         }
         let layer_test = if image.get(at..at + 3) == Some(&LOAD_PLAYER_Y) {
@@ -1189,6 +1223,8 @@ impl Actor {
     ) -> native::Memory<'m> {
         let probe = probe(player);
         let player = native::View {
+            id: 0,
+            flags: 0,
             x: player.0,
             y: player.1,
             facing: u16::from(sense::code(facing)),
@@ -1211,6 +1247,7 @@ impl Actor {
             linked: self.linked.take(),
             views: &globals.views,
             carried: &mut self.carried,
+            pokes: &mut globals.pokes,
         }
     }
 
@@ -1481,6 +1518,8 @@ impl Actor {
                     return Run::Yielded;
                 }
             }
+            // Y holds a spawned child only up to the next service.
+            self.linked = None;
             if !self.service(window[1], self.pc + 2, bank, around) {
                 return match self.state {
                     State::Blocked(wait) => Run::Blocked(wait),
@@ -1541,10 +1580,10 @@ impl Actor {
             | BLOCKED_UP..=BLOCKED_RIGHT => {
                 return self.cell_service(service, operands, bank, around)
             }
-            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | SPAWN | SPAWN_LINKED
-            | SPAWN_AT | SPAWN_OFFSET | MUSIC_WAIT | 0x6A | 0x76 => {
+            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | MUSIC_WAIT | 0x6A | 0x76 => {
                 return self.door_service(service, operands, bank, around)
             }
+            _ if SPAWNS.contains(&service) => return self.spawn(service, operands, around),
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => return self.select_pose(operands, image),
             LINE_START | LINE_STEP => return self.line_service(service, operands, image),
@@ -2229,9 +2268,6 @@ impl Actor {
                 }
                 self.pc = operands + 5;
             }
-            SPAWN | SPAWN_LINKED | SPAWN_AT | SPAWN_OFFSET => {
-                return self.spawn(service, operands, around)
-            }
             MUSIC_WAIT => return self.hold(operands, 3),
             cosmetic => {
                 let Some(&(_, length)) = COSMETIC.iter().find(|&&(service, _)| service == cosmetic)
@@ -2509,14 +2545,27 @@ impl Actor {
         }
     }
 
-    /// `COP A2` and `COP 99` (a script and a flags word, at the actor) and
-    /// `COP 9C` (a script at an offset). Returns whether execution continues.
+    /// `COP A2` and `COP 99` (a script and a flags word, at the actor),
+    /// `COP A1` (a script at the actor), `COP 9C` and `A4` (a script at an
+    /// offset), the group spawns (`E6`-`E8`) and the group's deletion
+    /// (`EB`). Returns whether execution continues.
     fn spawn(&mut self, service: u8, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        if service == DELETE_GROUP {
+            if self.root {
+                let spawned = around.globals.spawns.len();
+                around.globals.group_deletions.push((self.id, spawned));
+            }
+            self.pc = operands;
+            return true;
+        }
         let image = around.image;
         let script = image.get(operands..operands + 3).and_then(long);
         let word = |at: usize| cadence::word(image, operands + at);
-        let (script, flags, offset, length) = match service {
+        let grouped = GROUP_SPAWNS.iter().find(|&&(group, _)| group == service);
+        let (script, flags, offset, length) = match grouped.map_or(service, |&(_, as_)| as_) {
             SPAWN | SPAWN_LINKED => (script, word(3), Some((0, 0)), 5),
+            // No flags word: the child keeps the parent's `+$04` (`$80:BCA4`).
+            SPAWN_AFTER => (script, Some(self.flags_04()), Some((0, 0)), 3),
             SPAWN_AT => (script, Some(0), word(3).zip(word(5)), 7),
             _ => (script, word(7), word(3).zip(word(5)), 9),
         };
@@ -2532,9 +2581,18 @@ impl Actor {
         let mut child = self.child(script, flags, at);
         child.id = around.globals.next_id;
         around.globals.next_id = around.globals.next_id.wrapping_add(1).max(0x4000);
-        if service == SPAWN_LINKED {
-            self.linked = Some(child.id);
+        if grouped.is_some() {
+            let root = self.group_of_spawns();
+            self.root |= root == self.id;
+            child.set_own_word(GROUP, root);
+            // A hittable group child (`+$04` bit `$0200`) is an enemy of its
+            // descriptor's profile, as a record is: the High Cadet's copies.
+            if flags & 0x0200 != 0 {
+                child.arm(image);
+            }
         }
+        // Y holds the child after the service (`$97:C6AD`).
+        self.linked = Some(child.id);
         // The child is an entity at once: runs this frame see it.
         around.globals.views.push((child.id, child.view()));
         around.globals.spawns.push((script, child));
@@ -2542,9 +2600,126 @@ impl Actor {
         true
     }
 
+    /// Makes a spawned child an enemy of its descriptor's profile (byte 4),
+    /// counted in no room, with the descriptor's boxes.
+    fn arm(&mut self, image: &[u8]) {
+        let Some(descriptor) = self.descriptor else {
+            return;
+        };
+        let Some(profile) = image
+            .get(descriptor + 4)
+            .and_then(|&index| crate::combat::profile(image, index))
+        else {
+            return;
+        };
+        self.foe = Some(foe::Foe::new(profile, false));
+        if self.boxes.is_none() {
+            self.boxes = cadence::pose_boxes(image, descriptor).map(std::rc::Rc::new);
+        }
+    }
+
+    /// An enemy's life, which its script keeps in `7F:102A` (the High
+    /// Cadet's copies, `$97:C9D1`): a write there sets it; a hit writes it
+    /// back ([`Self::mirror_life`]).
+    fn sync_life(&mut self) {
+        if !self.own.contains_key(&LIFE) {
+            return;
+        }
+        let life = self.own_word(LIFE);
+        if let Some(foe) = &mut self.foe {
+            foe.life = life;
+        }
+    }
+
+    /// The life after a hit, where the script reads it.
+    pub(crate) fn mirror_life(&mut self) {
+        let life = self.foe.as_ref().map(|foe| foe.life);
+        if let Some(life) = life.filter(|_| self.own.contains_key(&LIFE)) {
+            self.set_own_word(LIFE, life);
+        }
+    }
+
+    /// The struck wake (`7F:201E` bit `$0800`, `$80:C967`): the script goes
+    /// on from `7F:1016`, in the bank of `7F:2020`, or its own.
+    fn wake_struck(&mut self) {
+        let target = self.own_word(STRUCK);
+        let idle = matches!(self.state, State::Frozen | State::Gone | State::Blocked(_));
+        if !std::mem::take(&mut self.struck) || target < 0x8000 || idle {
+            return;
+        }
+        let bank = self
+            .own
+            .get(&0x2020)
+            .map_or(self.pc & 0x3F_0000, |&bank| usize::from(bank & 0x3F) << 16);
+        self.pc = bank | usize::from(target);
+        self.state = State::Running;
+        self.call = None;
+        self.paused = None;
+    }
+
+    /// The group it is in: its root's id (`7F:102E`), if any.
+    pub(crate) fn group(&self) -> Option<u16> {
+        Some(self.own_word(GROUP)).filter(|&root| root != 0)
+    }
+
+    /// A word of its own bytes (0 where unwritten).
+    fn own_word(&self, at: u16) -> u16 {
+        let byte = |at| self.own.get(&at).copied().unwrap_or(0);
+        u16::from_le_bytes([byte(at), byte(at + 1)])
+    }
+
+    fn set_own_word(&mut self, at: u16, value: u16) {
+        let [low, high] = value.to_le_bytes();
+        self.own.insert(at, low);
+        self.own.insert(at + 1, high);
+    }
+
+    /// `+$04` as the runtime keeps it, for a spawn that copies it.
+    fn flags_04(&self) -> u16 {
+        u16::from(self.hidden) << 15
+            | u16::from(self.touchable) << 9
+            | if self.walls { WALLS_04 } else { 0 }
+            | self.guard.0
+    }
+
+    /// The root its group spawns join (`$80:BB5A`): itself when it has no
+    /// parent or already heads a group, else its own group's root.
+    fn group_of_spawns(&self) -> u16 {
+        if self.parent.is_none() || self.root {
+            self.id
+        } else {
+            self.group().unwrap_or(self.id)
+        }
+    }
+
+    /// `+$04` bits set and cleared, as far as they are modelled.
+    fn write_04(&mut self, set: u16, cleared: u16) {
+        self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
+        self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
+        self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
+        self.walls = (self.walls || set & WALLS_04 != 0) && cleared & WALLS_04 == 0;
+    }
+
+    /// Takes a write another actor's run made into it.
+    pub(crate) fn take_poke(&mut self, poke: Poke) {
+        match poke {
+            Poke::Word { at, value, .. } => {
+                self.set_own_word(at, value);
+                self.sync_life();
+            }
+            Poke::Flags { set, cleared, .. } => self.write_04(set, cleared),
+        }
+    }
+
     /// What other actors' runs read of it through `,Y`.
     pub(crate) fn view(&self) -> native::View {
+        let out = self
+            .foe
+            .as_ref()
+            .is_some_and(|foe| foe.exploding.is_some() || foe.dead);
         native::View {
+            id: self.id,
+            flags: u16::from(self.hidden) << 15 | u16::from(out) << 7,
             x: self.position.0,
             y: self.position.1,
             facing: u16::from(self.facing_code()),
@@ -2570,11 +2745,7 @@ impl Actor {
         child.walls = flags & 0x0006 == 0x0004;
         child.guard.0 = flags & GUARD_04;
         child.spawned = true;
-        child.parent = Some(native::View {
-            x: self.position.0,
-            y: self.position.1,
-            facing: u16::from(self.facing_code()),
-        });
+        child.parent = Some(self.view());
         child
     }
 
@@ -2968,7 +3139,10 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                if service == LONG_JUMP {
+                if service == LONG_JUMP && Some(target) == assets::layout::offset(image, DEATH) {
+                    self.die(image);
+                    return false;
+                } else if service == LONG_JUMP {
                     self.pc = target;
                 } else if let Some(outer) = &mut self.outer {
                     // From a callback: the actor's own script, which runs
@@ -4949,6 +5123,100 @@ mod script_service_tests {
             panic!("one spawn");
         };
         assert_eq!((*script, child.position), (0x08_8029, actor.position));
+    }
+
+    #[test]
+    fn cop_a1_spawns_at_the_actor() {
+        // COP A1 $88:8029; yield.
+        let code = [2, 0xA1, 0x29, 0x80, 0x88, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        let [(script, child)] = &globals.spawns[..] else {
+            panic!("one spawn");
+        };
+        assert_eq!((*script, child.position), (0x08_8029, actor.position));
+    }
+
+    #[test]
+    fn cop_e8_spawns_into_the_group_and_eb_deletes_it() {
+        // COP E8 $88:8029 (+8,-4) $2230; COP E8 again; yield; COP EB; yield.
+        let spawn = [2, 0xE8, 0x29, 0x80, 0x88, 8, 0, 0xFC, 0xFF, 0x30, 0x22];
+        let mut code = [spawn, spawn].concat();
+        code.extend_from_slice(&[2, 0xBD, 2, 0xEB, 2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        actor.id = 0x0105;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        let roots: Vec<_> = globals
+            .spawns
+            .iter()
+            .map(|(_, child)| (child.position, child.group()))
+            .collect();
+        assert_eq!(roots, [((64, 60), Some(0x0105)); 2]);
+        // A child spawning into the group passes the root on.
+        let (_, child) = &globals.spawns[0];
+        assert_eq!(child.group_of_spawns(), 0x0105);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.group_deletions, [(0x0105, 2)]);
+    }
+
+    fn profile(life: u16) -> crate::combat::Profile {
+        crate::combat::Profile {
+            resist: 0,
+            weak: 0,
+            level: 1,
+            life,
+            exp: 0,
+            gems: 0,
+            drop_mask: 0,
+            attacks: [0; 2],
+            defense: 0,
+            luck: 0,
+        }
+    }
+
+    #[test]
+    fn a_struck_callback_takes_the_script_after_a_hit_that_did_not_kill() {
+        // Pose 7, yield; at +$10 the callback: pose 9, yield. The script
+        // keeps its life in `7F:102A` ($6000) and handles knockback itself.
+        let mut code = vec![2, 0x80, 7, 2, 0xBD];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        actor.foe = Some(foe::Foe::new(profile(20), false));
+        actor.guard.1 = 0x0010;
+        let [low, high] = u16::try_from((AT + 0x10) & 0xFFFF).unwrap().to_le_bytes();
+        actor
+            .own
+            .extend([(0x1016, low), (0x1017, high), (0x102A, 0), (0x102B, 0x60)]);
+        tick(&mut actor, &image);
+        assert_eq!(actor.selector, 7);
+        assert_eq!(actor.foe.as_ref().map(|foe| foe.life), Some(0x6000));
+        actor.take_hit(5, Direction::Down, &image);
+        tick(&mut actor, &image);
+        assert_eq!(actor.selector, 9);
+    }
+
+    #[test]
+    fn a_jump_to_the_death_script_ends_the_actor() {
+        // COP 06 $85:E27B: an enemy explodes; anything else goes.
+        let code = [2, 0x06, 0x7B, 0xE2, 0x85];
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert!(actor.is_gone());
+        let (image, mut actor) = actor_running(&code);
+        actor.foe = Some(foe::Foe::new(profile(20), false));
+        tick(&mut actor, &image);
+        assert!(actor
+            .foe
+            .as_ref()
+            .is_some_and(|foe| foe.exploding.is_some()));
+        // A group's root takes its group along.
+        let (image, mut actor) = actor_running(&code);
+        actor.root = true;
+        tick(&mut actor, &image);
+        assert!(actor.take_root_death());
     }
 
     #[test]

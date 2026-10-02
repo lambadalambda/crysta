@@ -718,3 +718,41 @@ fn tower_threes_ball_wave_drops_eight_hiballs() {
         assert_eq!(dropped.len(), 8, "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn the_high_cadet_falls_after_three_real_hits() {
+    // `docs/tower-three.md` §3: Ark walks up to the guardian; the room
+    // closes and the High Cadet comes as three copies. A hit on the real
+    // one costs it a life; a fake leaves a Cadet. After three, flag `$002`,
+    // then `$11A` and the door opens.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0113, 392, 440, events).unwrap();
+        world.set_life(999);
+        let flag = |world: &World, n: usize| world.events()[n / 8] & (1 << (n % 8)) != 0;
+        for frame in 0..6000 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            let up = (frame < 20).then_some(Direction::Up);
+            world
+                .update(up, if reading { a } else { Presses::default() })
+                .unwrap();
+            if frame % 40 == 0 {
+                world.hit_spawned(1);
+            }
+            if flag(&world, 0x11A) {
+                break;
+            }
+        }
+        assert!(
+            flag(&world, 0x002) && flag(&world, 0x11A),
+            "{:?}",
+            rom.revision()
+        );
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+    }
+}

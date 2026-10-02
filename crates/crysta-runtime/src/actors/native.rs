@@ -54,11 +54,64 @@ pub struct Memory<'m> {
     /// A left at a `BRA`/`JMP` the script loop follows, and its target,
     /// for a run that starts there (`$90:FCC6`: `INC; BRA` to `STA $0026,X`).
     pub carried: &'m mut Option<(usize, u16)>,
+    /// Writes into other entities, which the world makes after the run.
+    pub pokes: &'m mut Vec<Poke>,
+}
+
+/// A write into another entity by its id.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Poke {
+    /// A word of its own bytes at a key (`+$26`, `7F:102A`).
+    Word {
+        /// The entity.
+        id: u16,
+        /// The key of the word's low byte.
+        at: u16,
+        /// The word.
+        value: u16,
+    },
+    /// `+$04` bits set and cleared (`LDA $0004,X; ORA/AND; STA`).
+    Flags {
+        /// The entity.
+        id: u16,
+        /// The bits set.
+        set: u16,
+        /// The bits cleared.
+        cleared: u16,
+    },
+}
+
+impl Poke {
+    /// The entity it writes into.
+    #[must_use]
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Word { id, .. } | Self::Flags { id, .. } => id,
+        }
+    }
+}
+
+/// `LDA $0004,X; ORA #v / AND #v; STA $0004,X` at the start of `code`:
+/// the `+$04` bits it sets and clears, if they are all modelled.
+pub(super) fn flags_04(code: &[u8]) -> Option<(u16, u16)> {
+    let &[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00, ..] = code else {
+        return None;
+    };
+    let value = u16::from_le_bytes([low, high]);
+    match op {
+        0x09 if value & !super::MODELLED_04 == 0 => Some((value, 0)),
+        0x29 if !value & !super::MODELLED_04 == 0 => Some((0, !value)),
+        _ => None,
+    }
 }
 
 /// What a run reads of another entity through Y.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct View {
+    /// Its id, for writes into it (0: none).
+    pub id: u16,
+    /// `+$04` as far as it is kept: hidden (`$8000`), out of play (`$0080`).
+    pub flags: u16,
     /// `+$00`.
     pub x: u16,
     /// `+$02`.
@@ -68,11 +121,13 @@ pub struct View {
 }
 
 impl View {
-    /// The word at `+field`: x, y, the facing, the layer (always 0 here).
+    /// The word at `+field`: x, y, `+$04`, the facing, the layer (always 0
+    /// here).
     fn field(self, field: u16) -> Option<u16> {
         match field {
             0x00 => Some(self.x),
             0x02 => Some(self.y),
+            0x04 => Some(self.flags),
             0x14 => Some(self.facing),
             0x16 => Some(0),
             _ => None,
@@ -89,18 +144,24 @@ enum Entity {
     Id(u16),
 }
 
-/// The actor's own bytes runs may use: the wake callbacks and the attack
-/// kind (`$7F:1000..102D,X`, `docs/enemy-scripts.md` §5), `COP CC`'s target
+/// The actor's own bytes runs may use: the parent, which a copy clears as it
+/// leaves its group (`$7F:001E,X`, `$97:CA09`), the wake callbacks, the
+/// attack kind and the group root (`$7F:1000..102F,X`,
+/// `docs/enemy-scripts.md` §5), `COP CC`'s target
 /// and counters (`$7F:2004..200B,X`), `COP 46`'s row offset and layer
 /// (`$7F:201A/201B,X`), the voice fade's intensity (`$7F:201C,X`,
 /// `$88:9CD8`) and the callbacks' script bank (`$7F:2020,X`, `$90:93B9`).
 /// Other fields are the engine's.
-const OWN: [std::ops::RangeInclusive<u16>; 4] = [
-    0x1000..=0x102D,
+const OWN: [std::ops::RangeInclusive<u16>; 5] = [
+    0x001E..=0x001F,
+    0x1000..=0x102F,
     0x2004..=0x200B,
     0x201A..=0x201D,
     0x2020..=0x2021,
 ];
+/// Own words that hold an entity's id: the group root (`7F:102E`) and the
+/// root a copy keeps after it leaves the group (`7F:201C`, `$97:CA02`).
+const ID_FIELDS: [u16; 2] = [0x102E, 0x201C];
 /// `$00:000E,X`: the entity's sleep (`+$0E`).
 const SLEEP: u32 = 0x00_000E;
 /// `$0966`/`$0968`, Ark's probe, which runs may read.
@@ -329,6 +390,8 @@ struct Machine<'a> {
     /// The entity Y holds, and the one A holds for a `TAY`.
     y: Option<Entity>,
     entity: Option<Entity>,
+    /// The other entity X holds after a `TYX` or `TAX` (then `x` is false).
+    x_entity: Option<Entity>,
     /// Before the run's first instruction, where Y is a linked child's.
     pc_is_start: bool,
 }
@@ -357,6 +420,7 @@ impl<'a> Machine<'a> {
             stack,
             y: None,
             entity: None,
+            x_entity: None,
             pc_is_start: true,
         }
     }
@@ -384,9 +448,13 @@ impl<'a> Machine<'a> {
         self.pc_is_start = false;
         if matches!(
             opcode,
-            0xAC | 0xA8 | 0x98 | 0xBC | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF
+            0xAC | 0xA8 | 0x98 | 0xBC | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF | 0xC0
         ) && self.entity_op(opcode, memory).is_some()
         {
+            return Some(Flow::On);
+        }
+        if let Some(next) = self.poke(opcode, memory) {
+            self.pc = next;
             return Some(Flow::On);
         }
         let words = &mut *memory.words;
@@ -473,6 +541,57 @@ impl<'a> Machine<'a> {
             _ => return Some(Flow::Stop),
         };
         Some(Flow::On)
+    }
+
+    /// Writes into another entity: `TYX`/`TAX` onto it, `STA $7F:k,X` and
+    /// `LDA $0004,X; ORA/AND #; STA $0004,X` there, `STA $0026,Y`. `None`
+    /// leaves the instruction to the others.
+    fn poke(&mut self, opcode: u8, memory: &mut Memory<'_>) -> Option<usize> {
+        if self.narrow {
+            return None;
+        }
+        let id = |entity| match entity {
+            Entity::Id(id) => Some(id),
+            Entity::Parent => memory.parent.map(|parent| parent.id).filter(|&id| id != 0),
+            Entity::Player => None,
+        };
+        let other = self.x_entity.filter(|_| !self.x).and_then(id);
+        match opcode {
+            0xBB if self.x => {
+                self.x_entity = Some(self.y?);
+                self.x = false;
+                Some(self.pc + 1)
+            }
+            0xAA if self.x => {
+                self.x_entity = Some(Entity::Id(self.a?));
+                self.x = false;
+                Some(self.pc + 1)
+            }
+            0x9F => {
+                let (id, long) = (other?, self.long()?);
+                let at = u16::try_from(long & 0xFFFF).ok()?;
+                let owned = OWN
+                    .iter()
+                    .any(|own| own.contains(&at) && own.contains(&(at + 1)));
+                (long >> 16 == 0x7F && owned).then_some(())?;
+                let value = self.a?;
+                memory.pokes.push(Poke::Word { id, at, value });
+                Some(self.pc + 4)
+            }
+            0xBD => {
+                let id = other?;
+                let (set, cleared) = flags_04(self.image.get(self.pc..)?)?;
+                memory.pokes.push(Poke::Flags { id, set, cleared });
+                self.a = None;
+                Some(self.pc + 9)
+            }
+            0x99 if FIELDS.contains(&self.operand()?) => {
+                let (id, at, value) = (id(self.y?)?, self.operand()?, self.a?);
+                memory.pokes.push(Poke::Word { id, at, value });
+                Some(self.pc + 3)
+            }
+            _ => None,
+        }
     }
 
     /// Where the `BRA` or `JMP` at the pc goes, if it is one.
@@ -573,6 +692,12 @@ impl<'a> Machine<'a> {
                 self.y = Some(self.entity?);
                 self.pc + 1
             }
+            // CPY # with a spawned child in Y: a slot, never the empty one
+            // (`$1FC0`, `$97:C589`).
+            0xC0 if matches!(self.y, Some(Entity::Id(_))) => {
+                (self.zero, self.carry) = (Some(false), None);
+                self.pc + 3
+            }
             // TYA of a linked child: its id.
             0x98 => {
                 let Entity::Id(id) = self.y? else {
@@ -588,7 +713,15 @@ impl<'a> Machine<'a> {
                 self.pc + 3
             }
             0xB9 | 0xD9 => {
-                let value = view(self.y?)?.field(self.operand()?)?;
+                let (entity, field) = (self.y?, self.operand()?);
+                let value = match view(entity) {
+                    Some(view) => view.field(field)?,
+                    // An id no entity has any more: out of play (`+$04`
+                    // bit 7, `$85:E27E`), as the fake copy waits for its
+                    // Cadet to be (`$97:CA4C`).
+                    None if field == 0x04 && matches!(entity, Entity::Id(_)) => 0x0080,
+                    None => return None,
+                };
                 if opcode == 0xB9 {
                     self.set(value);
                 } else {
@@ -659,7 +792,12 @@ impl<'a> Machine<'a> {
         if opcode == 0xBF {
             let byte = |at: u16| u16::from(own.get(&at).copied().unwrap_or(0));
             let high = if self.narrow { 0 } else { byte(address + 1) };
-            self.set(byte(address) | high << 8);
+            let value = byte(address) | high << 8;
+            self.set(value);
+            // The group root, or the one a copy kept (`$97:CA55`), for a TAY.
+            if ID_FIELDS.contains(&address) && !self.narrow {
+                self.entity = Some(Entity::Id(value));
+            }
         } else {
             let value = self.a?.to_le_bytes();
             for (at, byte) in (address..address + width).zip(value) {
@@ -690,7 +828,13 @@ impl<'a> Machine<'a> {
         match opcode {
             0x9D => write(own, self.a?),
             0x9E => write(own, 0),
-            0xBD => self.set(read(own)),
+            0xBD => {
+                self.set(read(own));
+                // `+$26` keeps a child's id (`$97:CA48`), for a TAY.
+                if at == 0x26 {
+                    self.entity = self.a.map(Entity::Id);
+                }
+            }
             0xDD => self.compare(read(own))?,
             _ => {
                 let value = read(own).wrapping_sub(1);
@@ -859,7 +1003,12 @@ impl<'a> Machine<'a> {
             },
             0xDA => self.stack.push(Pushed::X(self.x)),
             _ => match self.stack.pop()? {
-                Pushed::X(valid) => self.x = valid,
+                Pushed::X(valid) => {
+                    self.x = valid;
+                    if valid {
+                        self.x_entity = None;
+                    }
+                }
                 Pushed::A(..) => return None,
             },
         }
@@ -963,6 +1112,7 @@ mod tests {
                 linked: None,
                 views: &[],
                 carried: &mut None,
+                pokes: &mut Vec::new(),
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -1007,6 +1157,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -1054,6 +1205,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -1092,6 +1244,7 @@ mod tests {
                 linked: None,
                 views: &[],
                 carried: &mut None,
+                pokes: &mut Vec::new(),
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
@@ -1127,6 +1280,7 @@ mod tests {
                 linked: None,
                 views: &[],
                 carried: &mut None,
+                pokes: &mut Vec::new(),
             };
             let end = AT + code.len() - 1;
             assert_eq!(next(super::run(&pedestal, AT, &mut memory)), Some(end));
@@ -1158,9 +1312,99 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&ball, AT, &mut memory)), Some(AT + 13));
         assert_eq!(sleep, 5 << 3);
+    }
+
+    /// A run of `code` with Y on child `linked` and a parent `0x4001`,
+    /// and the writes it leaves for other entities.
+    fn poking(code: &[u8], own: &mut Own, linked: Option<u16>) -> (Option<usize>, Vec<Poke>) {
+        let run = image(code);
+        let (mut words, mut display) = (Scratch::new(), Display::default());
+        let mut pokes = Vec::new();
+        let mut memory = Memory {
+            words: &mut words,
+            own,
+            display: &mut display,
+            random: 0,
+            probe: (0, 0),
+            events: &mut [],
+            sleep: &mut 0,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: Some(View {
+                id: 0x4001,
+                ..View::default()
+            }),
+            linked,
+            views: &[],
+            carried: &mut None,
+            pokes: &mut pokes,
+        };
+        (next(super::run(&run, AT, &mut memory)), pokes)
+    }
+
+    #[test]
+    fn the_guardners_bolt_writes_its_parents_counter() {
+        // `$97:C551`: LDA $7F:001E,X; TAY; LDA #2; STA $0026,Y; COP.
+        let code = [
+            0xBF, 0x1E, 0x00, 0x7F, 0xA8, 0xA9, 0x02, 0x00, 0x99, 0x26, 0x00, 0x02,
+        ];
+        let (next, pokes) = poking(&code, &mut Own::new(), None);
+        assert_eq!(next, Some(AT + 11));
+        let (id, at, value) = (0x4001, 0x26, 2);
+        assert_eq!(pokes, [Poke::Word { id, at, value }]);
+    }
+
+    #[test]
+    fn the_high_cadet_writes_into_its_copy_and_its_group_root() {
+        // `$97:C6AD`: PHX; TYX; LDA #$6000; STA $7F:102A,X; PLX; then
+        // `$97:C9F3`: LDA $7F:102E,X; TAY; LDA #4; STA $0026,Y; COP.
+        let code = [
+            0xDA, 0xBB, 0xA9, 0x00, 0x60, 0x9F, 0x2A, 0x10, 0x7F, 0xFA, 0xBF, 0x2E, 0x10, 0x7F,
+            0xA8, 0xA9, 0x04, 0x00, 0x99, 0x26, 0x00, 0x02,
+        ];
+        let mut own = Own::from([(0x102E, 0x90), (0x102F, 0x01)]);
+        let (next, pokes) = poking(&code, &mut own, Some(0x4002));
+        assert_eq!(next, Some(AT + 21));
+        let word = |id, at, value| Poke::Word { id, at, value };
+        assert_eq!(pokes, [word(0x4002, 0x102A, 0x6000), word(0x0190, 0x26, 4)]);
+    }
+
+    #[test]
+    fn a_spawned_child_is_never_the_empty_slot() {
+        // `$97:C589`: CPY #$1FC0; BNE +3; JMP $C551; COP.
+        let code = [0xC0, 0xC0, 0x1F, 0xD0, 0x03, 0x4C, 0x51, 0xC5, 0x02];
+        let (next, _) = poking(&code, &mut Own::new(), Some(0x4002));
+        assert_eq!(next, Some(AT + 8));
+    }
+
+    #[test]
+    fn a_fake_copy_sees_its_cadet_gone() {
+        // `$97:CA48`: LDA $0026,X; TAY; LDA $0004,Y; AND #$0080; BNE +1;
+        // RTL; COP.
+        let code = [
+            0xBD, 0x26, 0x00, 0xA8, 0xB9, 0x04, 0x00, 0x29, 0x80, 0x00, 0xD0, 0x01, 0x6B, 0x02,
+        ];
+        let mut own = Own::from([(0x26, 0x05), (0x27, 0x40)]);
+        assert_eq!(poking(&code, &mut own, None).0, Some(AT + 13));
+    }
+
+    #[test]
+    fn a_fake_copy_wakes_its_cadet_through_x() {
+        // `$97:CA37`: PHX; LDA $0026,X; TAX; LDA $0004,X; AND #$FFCF;
+        // STA $0004,X; PLX; COP.
+        let code = [
+            0xDA, 0xBD, 0x26, 0x00, 0xAA, 0xBD, 0x04, 0x00, 0x29, 0xCF, 0xFF, 0x9D, 0x04, 0x00,
+            0xFA, 0x02,
+        ];
+        let mut own = Own::from([(0x26, 0x05), (0x27, 0x40)]);
+        let (next, pokes) = poking(&code, &mut own, None);
+        assert_eq!(next, Some(AT + 15));
+        let (id, set, cleared) = (0x4005, 0, 0x0030);
+        assert_eq!(pokes, [Poke::Flags { id, set, cleared }]);
     }
 
     #[test]
@@ -1191,6 +1435,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&cadet, AT, &mut memory)), Some(AT + 35));
         // Target 8 left and 64 below: no branch, and the second PLA finds
@@ -1221,6 +1466,8 @@ mod tests {
             sleep: &mut 0,
             position: &mut position,
             player: View {
+                id: 0,
+                flags: 0,
                 x: 0x100,
                 y: 0x88,
                 facing: 3,
@@ -1232,6 +1479,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
         assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
@@ -1262,6 +1510,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
         assert_eq!(own[&0x2006], 0x70);
@@ -1376,6 +1625,7 @@ mod tests {
             linked: None,
             views: &[],
             carried: &mut None,
+            pokes: &mut Vec::new(),
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

@@ -166,12 +166,16 @@ impl Actor {
         if steady {
             if foe.life == 0 {
                 self.explode(&mut foe, image);
+            } else {
+                self.struck = true;
             }
             self.foe = Some(foe);
+            self.mirror_life();
             return;
         }
         foe.knocked = true;
         self.foe = Some(foe);
+        self.mirror_life();
         self.line = None;
         let (selector, mirrored) = match away {
             Direction::Down => (0, false),
@@ -243,12 +247,56 @@ impl Actor {
         } else if matches!(self.state, State::Waiting(_)) {
             self.state = State::Waiting(0);
         }
+        // `$85:E233`: alive after the push, the struck callback.
+        self.struck |= foe.life > 0;
+    }
+
+    /// A jump to the death script (`$85:E27B`): an enemy explodes, as its
+    /// death check would have it; anything else goes at once (the High
+    /// Cadet's hidden controller, `$97:C712`).
+    pub(crate) fn die(&mut self, image: &[u8]) {
+        self.go_up(image, false);
+    }
+
+    /// The explosion, unless one is under way; gone at once without a foe.
+    fn go_up(&mut self, image: &[u8], no_gem: bool) {
+        let Some(mut foe) = self.foe.take() else {
+            self.state = State::Gone;
+            self.root_died |= self.root;
+            return;
+        };
+        if foe.exploding.is_none() && !foe.dead {
+            foe.life = 0;
+            if no_gem {
+                foe.profile.gems = 0;
+            }
+            self.explode(&mut foe, image);
+        }
+        self.foe = Some(foe);
+    }
+
+    /// Whether it headed a group and died since last asked: the group goes
+    /// with it (`$85:E383`).
+    pub(crate) fn take_root_death(&mut self) -> bool {
+        std::mem::take(&mut self.root_died)
+    }
+
+    /// Its root died (`$85:E383`): a hidden member, or one out of the hit
+    /// scan (`+$04` bit 1), goes at once; any other explodes and goes,
+    /// leaving no gem (`$85:E353`).
+    pub(crate) fn go_with_root(&mut self, image: &[u8]) {
+        if self.hidden || self.guard.0 & 2 != 0 {
+            self.state = State::Gone;
+        } else {
+            self.go_up(image, true);
+        }
     }
 
     /// The death script's start (`$85:E27B`): the explosion.
     fn explode(&mut self, foe: &mut Foe, image: &[u8]) {
         foe.exploding = Some(EXPLOSION);
         self.died = true;
+        self.root_died |= self.root;
         self.motion = None;
         self.stream = None;
         self.overlay = Some((helper(image), EXPLODING));

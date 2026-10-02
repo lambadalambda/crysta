@@ -124,6 +124,21 @@ impl World<'_> {
         true
     }
 
+    /// Hits the first spawned enemy a hit may land on now, as Ark's thrust
+    /// would with `damage`, for tests. Returns its script, if one was hit.
+    #[doc(hidden)]
+    pub fn hit_spawned(&mut self, damage: u16) -> Option<u32> {
+        let (resident, actor) =
+            self.residents
+                .iter()
+                .zip(&mut self.actors)
+                .find(|(resident, actor)| {
+                    resident.record == 0 && actor.body_box().is_some() && !actor.unharmed()
+                })?;
+        actor.take_hit(damage, room_core::Direction::Down, self.image);
+        resident.script
+    }
+
     /// Places an enemy and sets its life, for tests. Returns whether the
     /// record is an enemy here.
     #[doc(hidden)]
