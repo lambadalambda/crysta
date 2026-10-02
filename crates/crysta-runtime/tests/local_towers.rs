@@ -872,3 +872,22 @@ fn the_dancing_huball_troupe_ends_when_its_balls_are_hit() {
         assert!(world.events()[0x11D / 8] & (1 << (0x11D % 8)) != 0);
     }
 }
+
+#[test]
+fn tower_fours_top_floor_runs_without_freezing() {
+    // `$11A`'s ring follows walls; blocked every way it waits (`$97:B445`).
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x105 / 8] |= 1 << (0x105 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x011A, 376, 552, events).unwrap();
+        for _ in 0..300 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert!(
+            world.frozen_scripts().is_empty(),
+            "{:?}: {:x?}",
+            rom.revision(),
+            world.frozen_scripts()
+        );
+    }
+}

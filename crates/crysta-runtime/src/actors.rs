@@ -672,6 +672,8 @@ pub struct Actor {
     pub(crate) struck: bool,
     /// It headed a group and died: the group goes with it.
     root_died: bool,
+    /// `COP C2`-`C5` that found a wall this frame.
+    blocked_tests: u8,
     /// The child the last `COP 99` spawned, for the run after it.
     linked: Option<u16>,
     /// A a run left at a jump, and the jump's target, for a run there.
@@ -788,6 +790,7 @@ impl Actor {
             root: false,
             struck: false,
             root_died: false,
+            blocked_tests: 0,
             linked: None,
             carried: None,
             parameter: 0,
@@ -1447,6 +1450,7 @@ impl Actor {
         // `COP BC`/`C0` point it elsewhere first.
         let entry = self.pc;
         self.continuation = None;
+        self.blocked_tests = 0;
         for _ in 0..BUDGET {
             // Per step: a long jump or call may have changed it.
             let bank = self.pc & 0xFF_0000;
@@ -2812,14 +2816,7 @@ impl Actor {
                 self.pc = operands + 4;
             }
             BLOCKED_UP..=BLOCKED_RIGHT => {
-                let Some(target) = cadence::word(image, operands) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                if self.blocked_beyond(service - BLOCKED_UP, around) {
-                    return self.jump(bank, target);
-                }
-                self.pc = operands + 2;
+                return self.blocked_test(service, operands, bank, around)
             }
             STAMP | UNSTAMP => {
                 let Some(&[0, dx, dy]) = image.get(operands..operands + 3) else {
@@ -2866,6 +2863,30 @@ impl Actor {
             }
         }
         true
+    }
+
+    /// `COP C2`-`C5`: jumps when the cells beyond the box that way stop the
+    /// actor. Returns whether execution continues this frame.
+    fn blocked_test(
+        &mut self,
+        service: u8,
+        operands: usize,
+        bank: usize,
+        around: &Surroundings<'_>,
+    ) -> bool {
+        let Some(target) = cadence::word(around.image, operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        if !self.blocked_beyond(service - BLOCKED_UP, around) {
+            self.pc = operands + 2;
+            return true;
+        }
+        // Blocked every way, a wall-follower would test round and round
+        // without a yield (`$11A`'s ring, `$97:B445`; natively `$0868` bit 7
+        // tests another map, not modelled): it waits a frame instead.
+        self.blocked_tests += 1;
+        self.blocked_tests <= 4 && self.jump(bank, target)
     }
 
     /// The box (x offset, width, y offset, height) of the pose shown, from
@@ -5183,6 +5204,21 @@ mod script_service_tests {
             defense: 0,
             luck: 0,
         }
+    }
+
+    #[test]
+    fn a_wall_follower_blocked_every_way_waits_a_frame() {
+        // `$97:B445`-like: C5 -> C3 -> C4 -> C2 -> C5 ..., all blocked (no
+        // cells: off the map).
+        let at = |offset: usize| u16::try_from((AT + offset) & 0xFFFF).unwrap().to_le_bytes();
+        let mut code = vec![];
+        for (service, next) in [(0xC5, 4), (0xC3, 8), (0xC4, 12), (0xC2, 0)] {
+            let [low, high] = at(next);
+            code.extend_from_slice(&[2, service, low, high]);
+        }
+        let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert_eq!(actor.frozen_at(), None);
     }
 
     #[test]
