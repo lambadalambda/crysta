@@ -687,3 +687,34 @@ fn a_pedestal_on_tower_threes_second_floor_toggles_its_flag() {
         assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn tower_threes_ball_wave_drops_eight_hiballs() {
+    // `docs/tower-three.md` §3: with both pedestals (`$001`, `$002`) the
+    // `$112` controller sets `$003` and opens the door (`$112`); the eight
+    // balls wait a random multiple of 8 frames (`ASL`), drop and fight.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in [0x103, 0x001, 0x002] {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0112, 384, 700, events).unwrap();
+        let wave = |resident: &&crysta_runtime::residents::Resident| {
+            matches!(resident.script, Some(0x90_9BFC | 0x90_9EB7))
+        };
+        // Each ball's record, once it has left its start row as a foe.
+        let mut dropped = std::collections::BTreeSet::new();
+        for _ in 0..600 {
+            world.update(None, Presses::default()).unwrap();
+            for resident in world.residents().iter().filter(wave) {
+                if resident.position.1 != 224 && world.foe_life(resident.record).is_some() {
+                    dropped.insert(resident.record);
+                }
+            }
+        }
+        let flag = |n: usize| world.events()[n / 8] & (1 << (n % 8)) != 0;
+        assert!(flag(0x003) && flag(0x112), "{:?}", rom.revision());
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+        assert_eq!(dropped.len(), 8, "{:?}", rom.revision());
+    }
+}

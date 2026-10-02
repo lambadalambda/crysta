@@ -318,6 +318,9 @@ const CONTACT: [Option<u8>; 7] = [
 /// it), `$0002` and `$0020` not a target of hits, `$0010` not attacking
 /// (the hit scan `$85:D281`).
 const GUARD_04: u16 = 0x0033;
+/// `+$04` bit `$0004`: the walls stop the enemy (with `$0002` clear, which
+/// the scripts that set it leave clear: `$90:9C27`, a dropped Hiball).
+const WALLS_04: u16 = 0x0004;
 /// `+$06` bits: `$0010` the script handles knockback (none), `$0020` takes
 /// no damage.
 const GUARD_06: u16 = 0x0030;
@@ -1083,7 +1086,7 @@ impl Actor {
         // sets 12 around the freezing's whitening (`$88:B507`, `$88:B53F`)
         // and clears 8, the dispatcher's target bit, before it leaves
         // (`$88:AF1A`).
-        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100 | GUARD_04;
+        const MODELLED: u16 = 0x8000 | 0x1000 | 0x0200 | 0x0100 | WALLS_04 | GUARD_04;
         let at = self.pc;
         if let Some(&[0xBD, 0x04, 0x00, op, low, high, 0x9D, 0x04, 0x00]) = image.get(at..at + 9) {
             let value = u16::from_le_bytes([low, high]);
@@ -1100,6 +1103,7 @@ impl Actor {
             self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
             self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
             self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
+            self.walls = (self.walls || set & WALLS_04 != 0) && cleared & WALLS_04 == 0;
             return Some(at + 9);
         }
         let layer_test = if image.get(at..at + 3) == Some(&LOAD_PLAYER_Y) {
@@ -4648,6 +4652,25 @@ mod script_service_tests {
         let mut globals = Globals::with_events(vec![0; 512]);
         tick_at(&mut actor, &image, &mut globals, (0, 0));
         assert!(globals.release_player && globals.player_script.is_none());
+    }
+
+    #[test]
+    fn a_dropped_ball_takes_the_walls_by_its_04_bit() {
+        // `$90:9C27`: LDA $0004,X; ORA #$0004; STA $0004,X; yield; then the
+        // bit cleared again.
+        let set = [
+            0xBD, 0x04, 0x00, 0x09, 0x04, 0x00, 0x9D, 0x04, 0x00, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&set);
+        tick(&mut actor, &image);
+        assert!(actor.walls && actor.frozen_at().is_none());
+        let clear = [
+            0xBD, 0x04, 0x00, 0x29, 0xFB, 0xFF, 0x9D, 0x04, 0x00, 2, 0xBD,
+        ];
+        let (image, _) = actor_running(&clear);
+        actor.pc = AT;
+        tick(&mut actor, &image);
+        assert!(!actor.walls);
     }
 
     #[test]

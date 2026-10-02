@@ -455,7 +455,7 @@ impl<'a> Machine<'a> {
                 self.pc + 3
             }
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0x0C | 0x1C => self.memory(opcode, words)?,
-            0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A | 0x89 => self.accumulator(opcode, words)?,
+            0xA9 | 0xC9 | 0xCD | 0x1A | 0x3A | 0x89 | 0x0A => self.accumulator(opcode, words)?,
             0x48 | 0x68 | 0xDA | 0xFA => self.stack_op(opcode)?,
             0xF0 | 0xD0 | 0x90 | 0xB0 | 0x10 | 0x30 => self.branch(opcode)?,
             0x18 | 0x38 => {
@@ -799,7 +799,8 @@ impl<'a> Machine<'a> {
         Some(self.pc + 3)
     }
 
-    /// `LDA #`, `CMP #`, `CMP` a scratch word, `BIT #`, `INC A`, `DEC A`.
+    /// `LDA #`, `CMP #`, `CMP` a scratch word, `BIT #`, `INC A`, `DEC A`,
+    /// `ASL A`.
     fn accumulator(&mut self, opcode: u8, words: &Scratch) -> Option<usize> {
         match opcode {
             // Immediate BIT sets only Z.
@@ -821,6 +822,18 @@ impl<'a> Machine<'a> {
                 };
                 self.compare(value)?;
                 Some(self.pc + 3)
+            }
+            // ASL A: the top bit goes to the carry.
+            0x0A => {
+                let (mask, top) = if self.narrow {
+                    (0xFF, 0x80)
+                } else {
+                    (0xFFFF, 0x8000)
+                };
+                let a = self.a?;
+                self.set(a << 1 & mask);
+                self.carry = Some(a & top != 0);
+                Some(self.pc + 1)
             }
             _ => {
                 let mask = if self.narrow { 0xFF } else { 0xFFFF };
@@ -1119,6 +1132,35 @@ mod tests {
             assert_eq!(next(super::run(&pedestal, AT, &mut memory)), Some(end));
             assert_eq!(events[0] & 1 << 3 != 0, on);
         }
+    }
+
+    #[test]
+    fn the_ball_wave_sleeps_a_random_multiple_of_eight() {
+        // `$90:9C05`: LDA $0408; AND #$1F; ASL; ASL; ASL; STA $00:000E,X;
+        // COP.
+        let code = [
+            0xAD, 0x08, 0x04, 0x29, 0x1F, 0x00, 0x0A, 0x0A, 0x0A, 0x9F, 0x0E, 0x00, 0x00, 0x02,
+        ];
+        let ball = image(&code);
+        let (mut words, mut display, mut own) = (Scratch::new(), Display::default(), Own::new());
+        let mut sleep = 0;
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0x0125,
+            probe: (0, 0),
+            events: &mut [],
+            sleep: &mut sleep,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
+        };
+        assert_eq!(next(super::run(&ball, AT, &mut memory)), Some(AT + 13));
+        assert_eq!(sleep, 5 << 3);
     }
 
     #[test]
