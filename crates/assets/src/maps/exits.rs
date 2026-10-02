@@ -54,6 +54,19 @@ impl fmt::Display for ExitError {
 }
 impl std::error::Error for ExitError {}
 
+/// A destination a conditional exit list picked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Conditional {
+    /// The map.
+    pub map: u16,
+    /// The transition mode.
+    pub mode: u8,
+    /// The arrival selector.
+    pub selector: u8,
+    /// The raw destination x and y.
+    pub position: (u16, u16),
+}
+
 /// One 12-byte exit record, preserving unknown operand bits without interpretation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExitRecord {
@@ -106,6 +119,35 @@ impl ExitRecord {
             Err(ExitError::ConditionalDestination { raw })
         } else {
             Ok(raw)
+        }
+    }
+    /// The destination a conditional table picks (`$8D:8911`): bit 15 names
+    /// a list in bank `$81` of 10-byte entries (flag, map, mode, selector,
+    /// raw x, raw y) ended by `$FFFF`; the first whose flag `set` holds.
+    #[must_use]
+    pub fn conditional(&self, image: &[u8], set: impl Fn(u16) -> bool) -> Option<Conditional> {
+        let raw = self.raw_destination();
+        if raw & 0x8000 == 0 {
+            return None;
+        }
+        let mut at = 0x01_0000 | usize::from(raw);
+        loop {
+            let entry = slice(image, at, 2).ok()?;
+            let flag = u16::from_le_bytes([entry[0], entry[1]]);
+            if flag == 0xFFFF {
+                return None;
+            }
+            let entry = slice(image, at, 10).ok()?;
+            if set(flag) {
+                let word = |index: usize| u16::from_le_bytes([entry[index], entry[index + 1]]);
+                return Some(Conditional {
+                    map: word(2),
+                    mode: entry[4],
+                    selector: entry[5],
+                    position: (word(6), word(8)),
+                });
+            }
+            at += 10;
         }
     }
     /// Raw transition mode (byte 6); unknown values are preserved.

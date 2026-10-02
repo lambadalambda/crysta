@@ -93,3 +93,30 @@ fn probe_origin_reproduces_the_measured_runtime_pair() {
     // The masks wrap to the loaded map rather than clamping.
     assert_eq!(ExitList::probe_origin(4, 8, 511, 1023).0, 508);
 }
+
+#[test]
+fn tower_threes_fall_resolves_to_the_basement_with_its_flag() {
+    // `docs/tower-three.md` §2: `$10F`'s exit over rows 0-38 names the list
+    // `$81:F144`: flag `$1F` -> `$114` mode 4 at raw (240,128).
+    for name in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local")
+            .join(name);
+        let Ok(bytes) = std::fs::read(path) else {
+            continue;
+        };
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let exits = assets::maps::exits::ExitList::from_rom(rom.image(), 0x10F).unwrap();
+        let fall = exits
+            .records()
+            .iter()
+            .find(|record| record.raw_destination() & 0x8000 != 0)
+            .expect("the conditional exit");
+        assert_eq!(fall.conditional(rom.image(), |_| false), None);
+        let picked = fall.conditional(rom.image(), |flag| flag == 0x1F).unwrap();
+        assert_eq!(
+            (picked.map, picked.mode, picked.selector, picked.position),
+            (0x114, 4, 0, (240, 128))
+        );
+    }
+}
