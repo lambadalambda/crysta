@@ -344,7 +344,7 @@ impl Room {
             return self.pair_response(edge, 16, second);
         }
         if edge.q() == 0 {
-            return Ok(if matches!(first, 0 | 1 | 2 | 17 | 20 | 22 | 29) {
+            return Ok(if matches!(first, 0 | 1 | 2 | 17 | 18 | 20 | 22 | 29) {
                 Response::Pass
             } else {
                 Response::Block(0)
@@ -374,7 +374,7 @@ impl Room {
     }
 
     fn pair_response(&self, edge: Edge, first: u8, second: u8) -> Result<Response, Unqualified> {
-        let open = |k| matches!(k, 0 | 1 | 2 | 17 | 20 | 22 | 29);
+        let open = |k| matches!(k, 0 | 1 | 2 | 17 | 18 | 20 | 22 | 29);
         let partial = |k| matches!(k, 5 | 16);
         let plus = Response::Block(i32::from(edge.q() >= 8));
         let minus = Response::Block(-i32::from(edge.q() < 8));

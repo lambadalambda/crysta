@@ -379,7 +379,10 @@ impl Room {
             // sixteen directional tables (`$80:D542`, `D8E8`, `DC60`,
             // `DFDC`, `$40` apart): the tower tops' floor, tower 2's statue
             // rows, the pits Ark walks onto and falls into (`$80:CC00`).
-            0 | 1 | 2 | 17 | 20 | 22 => Ok(Material::Open),
+            // `18`, tower 4's rope, is Open in most of them and Solid in the
+            // rest (`docs/tower-four.md` §2); Open here, a first cut: the
+            // runtime keeps Ark on the rope's row.
+            0 | 1 | 2 | 17 | 18 | 20 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
