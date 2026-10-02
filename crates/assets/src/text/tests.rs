@@ -27,6 +27,33 @@ fn glyphs_newlines_and_acknowledgements_are_not_flattened() {
 }
 
 #[test]
+fn a_jump_goes_on_elsewhere_in_the_bank() {
+    // `$CB w` (`$85:9A09`): the text goes on at `w` in its bank.
+    let mut rom = image(&[0x21, 0xcb, 0x10, 0x80]);
+    rom[0x8_8010..0x8_8012].copy_from_slice(&[0x22, 0xd3]);
+    let pages = decode(&rom, START).unwrap();
+    assert_eq!(pages[0].glyphs().len(), 2);
+}
+
+#[test]
+fn the_top_window_opens_at_the_top() {
+    // `$DF` (`$85:965F`): the standard window at tilemap `$0104`.
+    let pages = decode(&image(&[0xdf, 0x21, 0xd3]), START).unwrap();
+    assert_eq!(pages[0].placement(), Placement::Top);
+    assert_eq!(pages[0].width(), 224);
+}
+
+#[test]
+fn any_label_in_the_table_is_called() {
+    // `$E4 n` (`$85:9725`, Japanese): entry `n` of `$92:C5E7`.
+    let mut rom = image(&[0xe4, 0x13, 0x21, 0xd3]);
+    rom[0x12_c5e7 + 0x26..0x12_c5e7 + 0x28].copy_from_slice(&0xc900_u16.to_le_bytes());
+    rom[0x12_c900..0x12_c902].copy_from_slice(&[0x22, 0xd4]);
+    let pages = decode_profile(&rom, START, true).unwrap();
+    assert_eq!(pages[0].glyphs().len(), 2);
+}
+
+#[test]
 fn subroutine_return_is_not_a_page_end() {
     let mut rom = image(&[0xd2, 1, 0x24, 0xd3]);
     rom[0x12_c449..0x12_c44b].copy_from_slice(&0xc800_u16.to_le_bytes());

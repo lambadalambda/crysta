@@ -26,6 +26,7 @@ pub fn content_origin(
     view_width: usize,
 ) -> (i32, i32) {
     let (column, row) = match placement {
+        Placement::Top => TOP,
         Placement::AwayFromPlayer if player_screen_y >= VIEW_HEIGHT / 2 => TOP,
         Placement::Bottom | Placement::AwayFromPlayer => {
             assets::layout::per_revision(image, BOTTOM, EUROPEAN_BOTTOM)

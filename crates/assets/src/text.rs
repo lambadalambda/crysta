@@ -77,6 +77,9 @@ pub enum Placement {
     /// `$C0`/`$C1`: the standard window at tilemap base `$0504`, the bottom
     /// of the screen.
     Bottom,
+    /// `$DF` (`$85:965F`): the standard window at tilemap base `$0104`, the
+    /// top of the screen (Elle's farewell, `docs/underworld-end.md`).
+    Top,
     /// `$DA` (`$85964D`): the standard window at the bottom, or at the top
     /// when the player stands in the lower half of the screen.
     AwayFromPlayer,
@@ -537,7 +540,8 @@ impl Decoder<'_> {
         Ok(())
     }
     /// `$C0`/`$C1` open the standard window; `$DA` (`$85964D`) opens it at
-    /// whichever of top and bottom the player is not standing in.
+    /// whichever of top and bottom the player is not standing in, `$DF` at
+    /// the top.
     fn standard_window(&mut self, at: u32, command: u8) -> Result<(), TextError> {
         self.advance(at)?;
         if command != 0xc0 {
@@ -545,10 +549,10 @@ impl Decoder<'_> {
         }
         // `$C0`, `$C1` and `$DA` reset the speaker's colour.
         self.speaker = SPEAKER;
-        self.placement = if command == 0xda {
-            Placement::AwayFromPlayer
-        } else {
-            Placement::Bottom
+        self.placement = match command {
+            0xda => Placement::AwayFromPlayer,
+            0xdf => Placement::Top,
+            _ => Placement::Bottom,
         };
         self.clear();
         Ok(())
@@ -656,11 +660,8 @@ impl Decoder<'_> {
         let pointer = bytes(self.image, table + u32::from(index) * 2, 2)?;
         self.enter(0x92_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
     }
-    fn label_call(&mut self, at: u32) -> Result<(), TextError> {
+    fn label_call(&mut self) -> Result<(), TextError> {
         let index = self.next()?;
-        if ![0x06, 0x08, 0x25].contains(&index) {
-            return Err(invalid(at, "unsupported Pandora label call"));
-        }
         let pointer = bytes(self.image, 0x92_c5e7 + u32::from(index) * 2, 2)?;
         self.enter(0x92_0000 | u32::from(u16::from_le_bytes([pointer[0], pointer[1]])))
     }
@@ -828,7 +829,12 @@ impl Decoder<'_> {
                         ((0xb5 + (code >> 9)) << 16) | (0x8000 + (code & 511) * 64),
                     )?;
                 }
-                c @ (0xc0 | 0xc1 | 0xda) => self.standard_window(at, c)?,
+                c @ (0xc0 | 0xc1 | 0xda | 0xdf) => self.standard_window(at, c)?,
+                // `$85:9A09`: the text goes on at a word in its bank.
+                0xcb => {
+                    let target = self.word()?;
+                    self.pc = (at & 0xff_0000) | u32::from(target);
+                }
                 0xc2 => self.custom_window(at)?,
                 // `$C4 0` draws the page without its window: the friends' line as
                 // the door breaks, and the Pandora guide's.
@@ -907,7 +913,7 @@ impl Decoder<'_> {
                 }
                 command @ 0xe4..=0xe6 if self.europe() => self.dictionary(command)?,
                 // $859725 calls the bank-$92 item-label pointer table, returning via D4.
-                0xe4 if self.pandora => self.label_call(at)?,
+                0xe4 if self.pandora => self.label_call()?,
                 _ => return Err(invalid(at, "unsupported text command (including choices)")),
             }
         }
