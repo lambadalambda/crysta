@@ -140,6 +140,7 @@ fn acknowledgement(ack: Acknowledgement) -> &'static str {
         Acknowledgement::End => "end",
         Acknowledgement::None => "none",
         Acknowledgement::Closes => "closes",
+        Acknowledgement::Advances => "advances",
     }
 }
 

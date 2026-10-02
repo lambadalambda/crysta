@@ -60,6 +60,10 @@ pub enum Acknowledgement {
     /// window closes without a press (`$85:9D7F`), as "Four Hiballs
     /// appeared!" does (`$90:9367`).
     Closes,
+    /// A window opened again after a page (`$C0`, `$C1`, `$C2`, `$DA`):
+    /// once typed out, its pauses included, the next page follows without
+    /// a press, as the guardian of tower 3's top does (`$90:9DAF`).
+    Advances,
     /// Native top-level `$D4`: return immediately, retaining the visible page.
     /// Do NOT invent a Continue acknowledgement. The required prompts next enter
     /// an event-level choice on this same page; see `HouseDialogue::choice`.
@@ -483,9 +487,10 @@ impl Decoder<'_> {
         let [x, y] = self.position.map(usize::from);
         let [width, height] = self.dimensions.map(usize::from);
         // Glyphs advance by 12 pixels although their cells are 16 wide.
-        // The final glyph of a narrow English window can extend four pixels
-        // beyond its content; clip that overlap, not the entire text page.
-        if x + 12 > width || y + 16 > height {
+        // The final glyph of a narrow English window, or of a full line
+        // ("A SWARM OF HIBALLS!", European `$90:9E97`), can extend four
+        // pixels beyond its content; clip that overlap, not the page.
+        if x + 8 > width || y + 16 > height {
             return Err(invalid(text_source, "text exceeds qualified page geometry"));
         }
         let glyph = DialogueGlyph {
@@ -534,9 +539,7 @@ impl Decoder<'_> {
     /// `$C0`/`$C1` open the standard window; `$DA` (`$85964D`) opens it at
     /// whichever of top and bottom the player is not standing in.
     fn standard_window(&mut self, at: u32, command: u8) -> Result<(), TextError> {
-        if !self.page.glyphs.is_empty() {
-            return Err(invalid(at, "unacknowledged page clear"));
-        }
+        self.advance(at)?;
         if command != 0xc0 {
             self.dimensions = standard(self.image);
         }
@@ -550,6 +553,13 @@ impl Decoder<'_> {
         self.clear();
         Ok(())
     }
+    /// A window opened over a page ends it: the next follows by itself.
+    fn advance(&mut self, at: u32) -> Result<(), TextError> {
+        if self.page.glyphs.is_empty() {
+            return Ok(());
+        }
+        self.boundary(at, Acknowledgement::Advances)
+    }
     fn custom_window(&mut self, at: u32) -> Result<(), TextError> {
         let [column, row, width, height] = [self.next()?, self.next()?, self.next()?, self.next()?];
         // $85982D: tile column, row, width and height of a window on the
@@ -560,9 +570,7 @@ impl Decoder<'_> {
         if width == 0 || height < 2 || right > 32 || bottom > 28 {
             return Err(invalid(at, "unsupported window layout"));
         }
-        if !self.page.glyphs.is_empty() {
-            return Err(invalid(at, "unacknowledged page clear"));
-        }
+        self.advance(at)?;
         self.dimensions = [u16::from(width) * 8, u16::from(height / 2) * 16];
         self.placement = Placement::Tile { column, row };
         self.clear();

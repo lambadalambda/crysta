@@ -61,7 +61,7 @@ fn truncation_missing_terminators_and_overflow_fail() {
     assert_eq!(decode(&rom, START).unwrap_err().reason, "truncated source");
     assert!(decode(&image(&[0xcf; 4096]), START).is_err());
     assert!(decode(&image(&[0xcf, 0xcf, 0xcf, 0x21, 0xd3]), START).is_err());
-    let mut wide = vec![0x21; 19];
+    let mut wide = vec![0x21; 20];
     wide.push(0xd3);
     assert!(decode(&image(&wide), START).is_err());
     assert!(decode(&image(&[0x21, 0xc0, 0xd3]), START).is_err());
@@ -109,6 +109,28 @@ fn a_close_after_glyphs_ends_a_page_that_closes_by_itself() {
     assert!(pages[0].duration() > 180);
     // On an empty page it closes at once, as before.
     assert!(decode(&image(&[0xd7]), START).unwrap().is_empty());
+}
+
+#[test]
+fn a_window_opened_after_glyphs_goes_on_without_a_press() {
+    // "Guardian: ..." (`$90:9DAF`): glyphs, a 120-frame pause, `$C0`, more.
+    let pages = decode(&image(&[0x21, 0xc5, 120, 0xc0, 0x22, 0xd3]), START).unwrap();
+    assert_eq!(pages.len(), 2);
+    assert_eq!(pages[0].acknowledgement(), Acknowledgement::Advances);
+    assert!(pages[0].duration() > 120);
+    assert_eq!(pages[1].acknowledgement(), Acknowledgement::End);
+}
+
+#[test]
+fn a_full_line_may_run_four_pixels_into_the_frame() {
+    // "A SWARM OF HIBALLS!" (European `$90:9E97`): 19 glyphs, 228 pixels on
+    // a 224-pixel line; a 20th is refused.
+    let mut line = vec![0xc1];
+    line.extend([0x21; 19]);
+    line.push(0xd3);
+    assert!(decode(&image(&line), START).is_ok());
+    line.insert(1, 0x21);
+    assert!(decode(&image(&line), START).is_err());
 }
 
 #[test]
@@ -170,7 +192,9 @@ fn window_anchor_clears_the_page_and_records_its_placement() {
     assert_eq!(pages[0].width(), 224);
     let pages = decode(&image(&[0xc0, 0x21, 0xd3]), START).unwrap();
     assert_eq!(pages[0].placement(), Placement::Bottom);
-    assert!(decode(&image(&[0x21, 0xda, 0x21, 0xd3]), START).is_err());
+    // Over a page, the page goes on by itself.
+    let pages = decode(&image(&[0x21, 0xda, 0x21, 0xd3]), START).unwrap();
+    assert_eq!(pages[0].acknowledgement(), Acknowledgement::Advances);
 }
 
 #[test]
@@ -218,5 +242,6 @@ fn window_layouts_set_the_geometry_and_placement() {
         let stream = [0xc2, layout[0], layout[1], layout[2], layout[3], 0x21, 0xd3];
         assert!(decode(&image(&stream), START).is_err(), "{layout:?}");
     }
-    assert!(decode(&image(&[0x21, 0xc2, 3, 3, 25, 6, 0x21, 0xd3]), START).is_err());
+    let pages = decode(&image(&[0x21, 0xc2, 3, 3, 25, 6, 0x21, 0xd3]), START).unwrap();
+    assert_eq!(pages[0].acknowledgement(), Acknowledgement::Advances);
 }

@@ -423,9 +423,12 @@ impl<P: Page> Dialogue<P> {
     pub fn tick(&mut self) -> Option<u8> {
         let page = self.page()?;
         if self.typed >= page.duration() {
-            // A page that closes by itself (`$D7`) goes once typed out.
-            if page.acknowledgement() == Acknowledgement::Closes {
-                (self.text, self.retained) = (None, None);
+            match page.acknowledgement() {
+                // A page that closes by itself (`$D7`) goes once typed out.
+                Acknowledgement::Closes => (self.text, self.retained) = (None, None),
+                // One a window opened over gives way to the next.
+                Acknowledgement::Advances => self.next_page(),
+                _ => {}
             }
             return None;
         }
@@ -502,19 +505,28 @@ impl<P: Page> Dialogue<P> {
         if !presses.confirm {
             return None;
         }
-        if let Some((pages, index)) = &mut self.text {
-            match pages[*index].acknowledgement() {
-                Acknowledgement::Next if *index + 1 < pages.len() => {
-                    *index += 1;
-                    self.typed = 0;
-                    self.settle();
-                }
-                // It closes by itself.
-                Acknowledgement::Closes => {}
-                _ => self.text = None,
-            }
+        let shown = self.text.as_ref();
+        match shown.map(|(pages, index)| pages[*index].acknowledgement()) {
+            // It closes, or goes on, by itself.
+            None | Some(Acknowledgement::Closes | Acknowledgement::Advances) => {}
+            Some(Acknowledgement::Next) => self.next_page(),
+            Some(_) => self.text = None,
         }
         None
+    }
+
+    /// The next page of the text, or the end of it.
+    fn next_page(&mut self) {
+        let Some((pages, index)) = &mut self.text else {
+            return;
+        };
+        if *index + 1 < pages.len() {
+            *index += 1;
+            self.typed = 0;
+            self.settle();
+        } else {
+            self.text = None;
+        }
     }
 
     fn close_choice(&mut self) {
@@ -628,6 +640,19 @@ mod tests {
         assert!(dialogue.busy());
         dialogue.tick();
         assert!(!dialogue.busy() && dialogue.view().is_none());
+    }
+
+    #[test]
+    fn a_page_that_advances_gives_way_to_the_next_once_typed_out() {
+        use Acknowledgement::{Advances, End};
+        let mut dialogue = Dialogue::default();
+        assert!(dialogue.request(pages(&[Advances, End])));
+        dialogue.press(A);
+        assert_eq!(dialogue.view().unwrap().page.1, 0);
+        dialogue.tick();
+        assert_eq!(dialogue.view().unwrap().page.1, 1);
+        dialogue.press(A);
+        assert!(!dialogue.busy());
     }
 
     #[test]

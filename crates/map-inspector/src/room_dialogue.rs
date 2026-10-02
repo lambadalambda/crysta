@@ -119,7 +119,7 @@ fn append_request(art: &mut DialogueArt, source: u32, pages: &[DialoguePage]) ->
         );
         request.push(json!({"key":key,"page_id":page_id,"boundary_source":page.boundary_source(),
             "glyph_count":page.glyphs().len(),"acknowledgement":match page.acknowledgement() {
-                Acknowledgement::Next=>"next",Acknowledgement::End=>"end",Acknowledgement::None=>"none",Acknowledgement::Closes=>"closes",
+                Acknowledgement::Next=>"next",Acknowledgement::End=>"end",Acknowledgement::None=>"none",Acknowledgement::Closes=>"closes",Acknowledgement::Advances=>"advances",
             }}));
     }
     art.requests.insert(format!("{source:06x}"), json!(request));
