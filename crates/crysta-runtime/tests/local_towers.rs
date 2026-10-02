@@ -891,3 +891,21 @@ fn tower_fours_top_floor_runs_without_freezing() {
         );
     }
 }
+
+#[test]
+fn guardners_have_bodies_and_can_be_hit() {
+    // Their records are the 16-byte form (parameter `$C0`, `$80:F564`):
+    // the descriptor as in the 10-byte one, then `7F:1018..101E`.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let world = World::enter_with_events(rom.image(), 0x0111, 176, 464, events).unwrap();
+        let guardners: Vec<_> = world
+            .residents()
+            .iter()
+            .filter(|resident| matches!(resident.script, Some(0x97_C34A | 0x99_8E00)))
+            .map(|resident| (resident.body, world.foe_life(resident.record).is_some()))
+            .collect();
+        assert_eq!(guardners, [(true, true); 2], "{:?}", rom.revision());
+    }
+}

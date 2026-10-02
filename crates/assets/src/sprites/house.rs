@@ -6,7 +6,7 @@ use crate::{
     graphics::{decode_tiles_4bpp, Bgr555, Tile4bpp},
     maps::{
         actor_script::{self, ScriptError},
-        actors::{parsed_before, SpawnRecord},
+        actors::{ordinary_length, parsed_before, SpawnRecord},
         scripts::EventFlags,
     },
 };
@@ -249,7 +249,7 @@ impl HouseActor {
     ) -> Vec<Result<Self, RecordRefusal>> {
         let mut out: Vec<Result<Self, RecordRefusal>> = Vec::with_capacity(records.len());
         for (index, record) in records.iter().enumerate() {
-            if record.opcode() > 1 || record.bytes().len() != 10 {
+            if record.opcode() > 1 || !ordinary_length(record.bytes().len()) {
                 out.push(Err(RecordRefusal::NoDescriptor));
                 continue;
             }
@@ -282,7 +282,7 @@ impl HouseActor {
         previous: Option<&Self>,
     ) -> Result<Self, SpriteError> {
         let spawn = record.bytes();
-        if record.opcode() > 1 || spawn.len() != 10 {
+        if record.opcode() > 1 || !ordinary_length(spawn.len()) {
             return Err(SpriteError::Invalid(
                 "spawn record carries no resource descriptor",
             ));
@@ -850,8 +850,9 @@ impl<'a> Loader<'a> {
         if d[pal] & 0xC0 != 0x80
             || d[pal + 1] % 2 != 0
             || d[pal + 2] != 2
-            // The OBJ palette slot: 8, 10, or the Cadets' 12 (`$82:EAED`).
-            || ![8, 10, 12].contains(&d[pal + 3])
+            // The OBJ palette slot, in 8-colour units: the Guardners' 6
+            // (`$82:EB2B`), 8, 10, or the Cadets' 12 (`$82:EAED`).
+            || ![6, 8, 10, 12].contains(&d[pal + 3])
         {
             return Err(SpriteError::Invalid("unsupported house palette descriptor"));
         }

@@ -512,7 +512,8 @@ enum Parse {
     /// Leaves it alone: `$FD`/`$FE`.
     None,
     /// Not followed here: a bank at or above `$90`, which skips the parse,
-    /// or a record whose length is not the ten bytes the layout is known for.
+    /// or a record whose length is neither of the two the layout is known
+    /// for.
     Unknown,
 }
 
@@ -521,10 +522,19 @@ fn parse(record: &SpawnRecord) -> Parse {
         return Parse::None;
     }
     match record.bytes() {
-        bytes if bytes.len() != 10 || bytes[9] >= 0x90 => Parse::Unknown,
-        [.., 0, 0, _] => Parse::Reuse,
+        bytes if !ordinary_length(bytes.len()) || bytes[9] >= 0x90 => Parse::Unknown,
+        // The descriptor's address word, bytes 7-8, whatever follows.
+        [_, _, _, _, _, _, _, 0, 0, ..] => Parse::Reuse,
         _ => Parse::Own,
     }
+}
+
+/// Whether a record has an ordinary record's length: ten bytes, or sixteen
+/// with the fields `7F:1018..101E` after them (`$80:F564`, the Guardners'
+/// transfer index in the last).
+#[must_use]
+pub const fn ordinary_length(length: usize) -> bool {
+    matches!(length, 10 | 16)
 }
 
 /// Normalized offset of a long ROM pointer: `$80..$BF:8000..FFFF` or
@@ -608,12 +618,15 @@ mod tests {
         );
         assert_eq!(rom_offset(&[0, 0x80, 0x7E]), None);
         assert_eq!(rom_offset(&[0, 0x80]), None);
-        // A record longer than ten bytes stops the chain like a far bank.
-        let long = SpawnRecord {
-            bytes: [record(1, 0, own).bytes, vec![0; 6]].concat(),
+        // A sixteen-byte record (`$80:F564`) parses its own as a ten-byte
+        // one; any other length stops the chain like a far bank.
+        let wide = |extra: usize| SpawnRecord {
+            bytes: [record(1, 0, own).bytes, vec![0; extra]].concat(),
             ..record(1, 1, own)
         };
-        let chain = [record(1, 0, own), long, record(1, 2, none)];
+        let chain = [record(1, 0, own), wide(6), record(1, 2, none)];
+        assert_eq!(descriptor_owner(&chain, 2), Some(1));
+        let chain = [record(1, 0, own), wide(2), record(1, 2, none)];
         assert_eq!(descriptor_owner(&chain, 2), None);
         assert_eq!(descriptor_owner(&chain, 1), None);
     }
