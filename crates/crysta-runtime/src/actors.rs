@@ -1126,9 +1126,10 @@ impl Actor {
         // (`$88:D33D`).
         if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
             const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
-            // Bit 14, which the crystals and bullets set (`$88:B60F`,
-            // `$97:BAAC`), is not modelled.
-            const ACCEPTED: u16 = INTERACTION | GUARD_06 | 0x4000;
+            // Bits 14 and 13, which the crystals, bullets and tower 4's
+            // traps set (`$88:B60F`, `$97:BAAC`, `$97:B43C`), are not
+            // modelled.
+            const ACCEPTED: u16 = INTERACTION | GUARD_06 | 0x6000;
             let value = u16::from_le_bytes([low, high]);
             match op {
                 0x09 if value & !ACCEPTED == 0 => {

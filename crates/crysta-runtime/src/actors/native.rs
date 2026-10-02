@@ -428,6 +428,12 @@ impl<'a> Machine<'a> {
                 self.pc + 4
             }
             0xBF | 0x9F => self.own(opcode, memory.own)?,
+            // The palette buffer (`$7F:0600..07FF`): a room's colour effect,
+            // not drawn here (`$90:A45C`).
+            0x8F if (0x7F_0600..0x7F_0800).contains(&self.long()?) => {
+                self.a?;
+                self.pc + 4
+            }
             0x8F => self.stop_spin(memory.display)?,
             // Scratch words are words: a narrow accumulator refuses them.
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xC9 | 0xCD | 0x0C | 0x1C if self.narrow => {
@@ -863,7 +869,11 @@ impl<'a> Machine<'a> {
         if self.narrow {
             return None;
         }
-        let (a, value, carry) = (u32::from(self.a?), u32::from(self.operand()?), self.carry?);
+        // A `SBC` without `SEC` after a `COP` (the Guardner's aim,
+        // `$97:C541`): the carry the handler leaves is not tracked; taken as
+        // set, the usual state there (guess).
+        let carry = self.carry.unwrap_or(opcode == 0xE9);
+        let (a, value) = (u32::from(self.a?), u32::from(self.operand()?));
         let sum = if opcode == 0x69 {
             a + value + u32::from(carry)
         } else {
@@ -1137,6 +1147,35 @@ mod tests {
         assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
         assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
         assert_eq!(position, (3, 0), "Ark's facing, as written");
+    }
+
+    #[test]
+    fn palette_buffer_writes_and_a_subtraction_after_a_cop_go_by() {
+        // `$90:A459`: LDA #0; STA $7F:0640; `$97:C53E`: LDA $0968; SBC #$10;
+        // STA $7F:2006,X; COP.
+        let code = [
+            0xA9, 0x00, 0x00, 0x8F, 0x40, 0x06, 0x7F, 0xAD, 0x68, 0x09, 0xE9, 0x10, 0x00, 0x9F,
+            0x06, 0x20, 0x7F, 0x02,
+        ];
+        let run = image(&code);
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0,
+            probe: (0, 0x80),
+            events: &[],
+            sleep: &mut 0,
+            position: &mut (0, 0),
+            player: View::default(),
+            parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
+        };
+        assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
+        assert_eq!(own[&0x2006], 0x70);
     }
 
     #[test]
