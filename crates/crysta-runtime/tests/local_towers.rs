@@ -1050,3 +1050,44 @@ fn shadowkeeper_falls_after_two_lives_and_the_tower_ends() {
         assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn the_continents_door_raises_mu() {
+    // `docs/underworld-end.md` §2: after tower 5 (`$109`) the door on `$12A`
+    // sets `$11E` and reloads the map; then the text, flags `$11F`, `$40E`,
+    // and back to the underworld.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in 0x101..=0x109 {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x012A, 1120, 124, events).unwrap();
+        world.face(Direction::Up);
+        play(&mut world, 900, false);
+        let flag = |n: usize| world.events()[n / 8] & (1 << (n % 8)) != 0;
+        assert_eq!(world.map(), 0x0003, "{:?}", rom.revision());
+        assert!(flag(0x11F) && flag(0x40E), "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn the_way_to_the_hole_opens_with_the_elders_flag() {
+    // `$03`'s exit at (41,36) names a list (`$81:F046`): with `$74` it
+    // leads to the Hole `$127`.
+    for rom in roms() {
+        for told in [false, true] {
+            let mut events = after_the_intro();
+            for flag in (0x101..=0x109).chain(told.then_some(0x74)) {
+                events[flag / 8] |= 1 << (flag % 8);
+            }
+            let mut world =
+                World::enter_with_events(rom.image(), 0x0003, 664, 560, events).unwrap();
+            for _ in 0..60 {
+                world
+                    .update(Some(Direction::Down), Presses::default())
+                    .unwrap();
+            }
+            assert_eq!(world.map() == 0x0127, told, "{:?}", rom.revision());
+        }
+    }
+}

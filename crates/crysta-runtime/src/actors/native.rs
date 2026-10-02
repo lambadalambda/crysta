@@ -242,6 +242,9 @@ const SCRATCH: [(u16, u16); 13] = [
 pub const ARK_GATES: u16 = 0x097E;
 /// `$047C`, the map a script asks for next (`$90:8B0C`).
 pub const PENDING_MAP: u16 = 0x047C;
+/// `$047E`, the map shown, which the continents' door asks for again
+/// (`$90:A4B4`).
+pub const CURRENT_MAP: u16 = 0x047E;
 /// `$0482`, the map before this one, as the light room reads it.
 pub const PREVIOUS_MAP: u16 = 0x0482;
 /// `$0042`, the frame counter.
@@ -254,7 +257,8 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 11] = [
+const READABLE: [u16; 12] = [
+    CURRENT_MAP,
     ARK_ARMOR,
     ARK_MAX_LIFE,
     ARK_FLAGS,

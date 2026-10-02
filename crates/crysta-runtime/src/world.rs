@@ -639,6 +639,9 @@ impl<'a> World<'a> {
         self.globals.scratch.insert(crate::actors::ARK_ARMOR, armor);
         self.globals
             .scratch
+            .insert(crate::actors::CURRENT_MAP, self.map);
+        self.globals
+            .scratch
             .insert(crate::actors::ARK_MAX_LIFE, stats.max_life);
         self.globals
             .scratch
@@ -844,10 +847,21 @@ impl<'a> World<'a> {
                 self.globals.slot.set_life(life.min(stats.max_life));
             }
         }
-        // The light room asks for `$07` (`$90:8B0C`): the tower's end.
-        if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
-            let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);
-            self.resurrection = Some(resurrection::Resurrection::of(tower));
+        // The light room asks for `$07` (`$90:8B0C`): the tower's end; the
+        // continents' door, the map shown (`$90:A4B4`): a reload.
+        match self.globals.scratch.remove(&crate::actors::PENDING_MAP) {
+            Some(0x0007) => {
+                let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);
+                self.resurrection = Some(resurrection::Resurrection::of(tower));
+            }
+            Some(map) if map == self.map => {
+                self.globals.transfer = Some(crate::scene::Transfer {
+                    map,
+                    position: self.position(),
+                    mode: 0,
+                });
+            }
+            _ => {}
         }
         let mut gone = Vec::new();
         for (index, (resident, actor)) in self.residents.iter_mut().zip(&self.actors).enumerate() {
@@ -2019,7 +2033,7 @@ impl<'a> World<'a> {
         }
         if self.animate {
             // Leaving starts; this frame walks on as any other.
-            if let Some(record) = self.exits.select(origin.0, origin.1).cloned() {
+            if let Some(record) = self.exit_at(origin) {
                 self.leave(&record);
             }
             return Ok(None);
@@ -2027,13 +2041,28 @@ impl<'a> World<'a> {
         self.transition_at(origin)
     }
 
+    /// The exit whose rectangle contains `origin`, a conditional one's
+    /// destination picked by the flags (`$8D:8911`: the Hole on `$03`
+    /// after flag `$74`).
+    fn exit_at(&self, origin: (u16, u16)) -> Option<ExitRecord> {
+        let events = &self.globals.events;
+        let set = |flag| EventFlags::Bitmap(events).get(flag) == Some(true);
+        self.exits
+            .select(origin.0, origin.1)?
+            .resolved(self.image, set)
+    }
+
     /// Follows the exit whose rectangle contains `origin`, if it stays in the
     /// slice.
     fn transition_at(&mut self, origin: (u16, u16)) -> Result<Option<Step>, WorldError> {
-        let Some(record) = self.exits.select(origin.0, origin.1) else {
+        // Pinned sources are validated before their operands are read.
+        if let Some(raw) = self.exits.select(origin.0, origin.1) {
+            qualified_arrival(self.map, raw)?;
+        }
+        let Some(record) = self.exit_at(origin) else {
             return Ok(None);
         };
-        let Some(mut entered) = self.enter_exit(record, false)? else {
+        let Some(mut entered) = self.enter_exit(&record, false)? else {
             return Ok(None);
         };
         let destination = entered.map;

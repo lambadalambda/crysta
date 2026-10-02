@@ -25,8 +25,9 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, ENEMIES, FRAMES,
-    PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
+    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, CURRENT_MAP,
+    ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE,
+    WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -251,6 +252,9 @@ const SPAWNS: &[u8] = &[
     0xE8,
     DELETE_GROUP,
 ];
+/// The continents' door's parchment set-up and where it goes on, Japanese
+/// (`$90:A4CE`, `$90:A565`) and European (`$97:BDCF`, `$97:BE66`).
+const PARCHMENT: [(usize, usize); 2] = [(0x10_A4CE, 0x10_A565), (0x17_BDCF, 0x17_BE66)];
 /// The enemies' death script (`$85:E27B`), which a script may jump to
 /// (`COP 06`) or go on in (`COP BF`, the show's controller, `$97:CD07`).
 const DEATH: usize = 0x05_E27B;
@@ -1276,6 +1280,14 @@ impl Actor {
         }
         if let Some(next) = player_pose_mismatch(image, at) {
             return Some(next);
+        }
+        // The continents' door after its reload (`docs/underworld-end.md`
+        // §2): the parchment's set-up (the picture's DMA, the palette, the
+        // colour math) is not drawn here; the door, hidden, goes on at its
+        // text.
+        let parchment = assets::layout::per_revision(image, PARCHMENT[0], PARCHMENT[1]);
+        if at == parchment.0 {
+            return Some(parchment.1);
         }
         let player = (around.player, around.facing);
         let ran = native::run(image, at, &mut self.memory(around.globals, player))?;
