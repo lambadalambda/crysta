@@ -7,7 +7,7 @@
 //!
 //! Not modelled: Ark's victory and recovery poses (resource 0 list `$1D`,
 //! resource 2 list `$20`) and the window's scrolling lines (each text shows
-//! on its own).
+//! on its own). Poses tracked: `meta/issues/ark-underworld-poses.md`.
 
 use super::{Step, World, WorldError};
 use crate::combat::Level;

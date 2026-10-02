@@ -14,6 +14,7 @@
 //! Not modelled: the darkness and the torches, the camera's pan, the
 //! claws, the tail and the shots (the body hurts by its own attack box
 //! only), the "Defeated Shadowkeeper!!" text.
+//! Tracked: `meta/issues/shadowkeeper-full-fight.md`.
 
 use super::World;
 

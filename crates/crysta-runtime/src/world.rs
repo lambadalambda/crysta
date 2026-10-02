@@ -731,7 +731,7 @@ impl<'a> World<'a> {
 
     /// The push scripts put on Ark (`7F:0018/001A`) while he sleeps
     /// (`$097E & $0400`): the Guardner's vacuum draws him in a pixel a
-    /// frame, against the walls.
+    /// frame, against the walls (`meta/issues/guardner-fidelity.md`).
     fn push_ark(&mut self) {
         let gates = self.globals.scratch.get(&crate::actors::ARK_GATES);
         if gates.is_none_or(|gates| gates & 0x0400 == 0) {
@@ -1649,7 +1649,8 @@ impl<'a> World<'a> {
     /// and checks only that one (`$87:93B9`); `+$04` is not modelled, so
     /// the first interactable actor on the cell stands in. It differs only
     /// where a targetable actor without interaction stands in front of an
-    /// interactable one; the spear's display lacks bit 8.
+    /// interactable one; the spear's display lacks bit 8
+    /// (`meta/issues/runtime-review-edges.md`).
     fn faced_resident(&self, cell: (u16, u16)) -> Option<usize> {
         self.residents
             .iter()

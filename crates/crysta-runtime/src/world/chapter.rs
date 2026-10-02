@@ -7,6 +7,7 @@
 //! runs it, and the end of what the runtime plays. Not modelled: the vortex
 //! (`$90:8436`) and the card's picture; the European title, which the page
 //! geometry refuses (an 8-pixel advance, guess), shows no text.
+//! Tracked: `meta/issues/chapter-end-vortex-card.md`.
 
 use super::{Step, World};
 use assets::layout::per_revision;

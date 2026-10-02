@@ -868,7 +868,8 @@ impl<'a> Machine<'a> {
             // `LDA $002C,X`, the entity before it in the list: for a child
             // spawned after its parent (`COP A1`/`A2`/`A4`, `$80:BC7C`), the
             // parent until it spawns again (guess: the `$11D` orb's trail,
-            // `$90:A2C9`, and the flyer's burst, `$97:BCD4`), for a TAY.
+            // `$90:A2C9`, and the flyer's burst, `$97:BCD4`), for a TAY
+            // (`meta/issues/runtime-review-edges.md`).
             0xBD if self.x && self.operand()? == 0x2C && memory.parent.is_some() => {
                 (self.a, self.entity) = (None, Some(Entity::Parent));
                 (self.zero, self.negative) = (Some(false), Some(false));

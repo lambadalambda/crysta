@@ -7,7 +7,8 @@
 //!
 //! Not modelled: Ark's both-hands lift (resource 3, poses `$39`/`$3A`; the
 //! item grant's lift stands in), the gems' and the empty chest's icons, the
-//! `$0F9` chests and "I have enough" (`$04F8`).
+//! `$0F9` chests and "I have enough" (`$04F8`). Poses tracked:
+//! `meta/issues/ark-underworld-poses.md`.
 
 use super::{Step, World, WorldError};
 use crate::scene::{Presentation, Presses};

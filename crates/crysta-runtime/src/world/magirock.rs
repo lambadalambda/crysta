@@ -6,7 +6,8 @@
 //! models its timing.
 //!
 //! Not modelled: Ark's lift poses by facing (`$84:BF67..BF83`, poses
-//! `$18..$1A`; the pot lift stands in).
+//! `$18..$1A`; the pot lift stands in;
+//! `meta/issues/ark-underworld-poses.md`).
 
 use super::{Step, World, WorldError};
 use crate::scene::Presses;

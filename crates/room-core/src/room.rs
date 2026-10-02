@@ -381,7 +381,8 @@ impl Room {
             // rows, the pits Ark walks onto and falls into (`$80:CC00`).
             // `18`, tower 4's rope, is Open in most of them and Solid in the
             // rest (`docs/tower-four.md` §2); Open here, a first cut: the
-            // runtime keeps Ark on the rope's row.
+            // runtime keeps Ark on the rope's row
+            // (`meta/issues/rope-collision-tables.md`).
             0 | 1 | 2 | 17 | 18 | 20 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),

@@ -16,6 +16,8 @@
 //!
 //! Not modelled: the falling, rope and landing poses, the landing's drop
 //! from 256 pixels up (`$90:FA4E`), and a hit's lean on the rope.
+//! Tracked: `meta/issues/ark-underworld-poses.md`,
+//! `meta/issues/lip-jumps.md`, `meta/issues/fall-damage-teeter.md`.
 
 use super::{Step, World, WorldError};
 use crate::scene::Transfer;

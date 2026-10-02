@@ -253,7 +253,8 @@ const SPAWNS: &[u8] = &[
     DELETE_GROUP,
 ];
 /// The continents' door's parchment set-up and where it goes on, Japanese
-/// (`$90:A4CE`, `$90:A565`) and European (`$97:BDCF`, `$97:BE66`).
+/// (`$90:A4CE`, `$90:A565`) and European (`$97:BDCF`, `$97:BE66`); skipped
+/// until `meta/issues/continent-door-parchment.md`.
 const PARCHMENT: [(usize, usize); 2] = [(0x10_A4CE, 0x10_A565), (0x17_BDCF, 0x17_BE66)];
 /// The enemies' death script (`$85:E27B`), which a script may jump to
 /// (`COP 06`) or go on in (`COP BF`, the show's controller, `$97:CD07`).
@@ -1742,7 +1743,7 @@ impl Actor {
     /// Ark's own script outside the frozen return (`$80:A200`, `A28B`): the
     /// list of his resource, which `COP 8E` waits out, and `COP 8F` that
     /// many times (the Guardner's sleep, `$97:C5BB`). His art is not
-    /// changed here.
+    /// changed here (`meta/issues/ark-underworld-poses.md`).
     fn ark_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
         if self.frozen_return.is_some() {
             return if service == PLAYER_POSE_MOVING {
@@ -3684,7 +3685,8 @@ impl Actor {
                 // A full inventory keeps nothing; the presentation goes on.
                 let kept = around.globals.inventory.add(item);
                 // Elle's cape goes on at once, a stand-in for the armor door
-                // of the menu, which is not ported (`docs/tower-five.md`).
+                // of the menu, which is not ported (`docs/tower-five.md`,
+                // `meta/issues/cape-through-armor-door.md`).
                 if kept && item == CAPE && around.globals.slot.armor().is_none() {
                     around.globals.slot.set_armor(item);
                 }
