@@ -118,5 +118,14 @@ fn tower_threes_fall_resolves_to_the_basement_with_its_flag() {
             (picked.map, picked.mode, picked.selector, picked.position),
             (0x114, 4, 0, (240, 128))
         );
+        // As a record with the chosen destination written in.
+        let direct = fall.resolved(rom.image(), |flag| flag == 0x1F).unwrap();
+        assert_eq!(direct.direct_destination(), Ok(0x114));
+        assert_eq!(direct.destination_position(), (240, 128));
+        assert_eq!(direct.bytes()[..4], fall.bytes()[..4]);
+        assert!(fall.resolved(rom.image(), |_| false).is_none());
+        // A direct record is itself.
+        let plain = &exits.records()[0];
+        assert_eq!(plain.resolved(rom.image(), |_| false).as_ref(), Some(plain));
     }
 }

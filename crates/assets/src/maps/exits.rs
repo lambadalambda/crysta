@@ -151,6 +151,23 @@ impl ExitRecord {
             at += 10;
         }
     }
+    /// The record as the exit check sees it (`$8D:8911`): a direct one
+    /// itself; a conditional one with the destination its list picks written
+    /// in, or `None` when no entry's flag is set.
+    #[must_use]
+    pub fn resolved(&self, image: &[u8], set: impl Fn(u16) -> bool) -> Option<Self> {
+        if self.raw_destination() & 0x8000 == 0 {
+            return Some(self.clone());
+        }
+        let picked = self.conditional(image, set)?;
+        let mut record = self.clone();
+        record.bytes[4..6].copy_from_slice(&picked.map.to_le_bytes());
+        record.bytes[6] = picked.mode;
+        record.bytes[7] = picked.selector;
+        record.bytes[8..10].copy_from_slice(&picked.position.0.to_le_bytes());
+        record.bytes[10..12].copy_from_slice(&picked.position.1.to_le_bytes());
+        Some(record)
+    }
     /// Raw transition mode (byte 6); unknown values are preserved.
     #[must_use]
     pub const fn transition_mode(&self) -> u8 {
