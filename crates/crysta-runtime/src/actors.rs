@@ -585,6 +585,9 @@ enum State {
     Frozen,
     /// Removed by a despawn.
     Gone,
+    /// Driven by the world in place of its script (Shadowkeeper,
+    /// `crate::world`).
+    Held,
 }
 
 /// What a blocking service waits for.
@@ -1094,7 +1097,7 @@ impl Actor {
         }
         match self.state {
             State::Ordinary { .. } => self.tick_ordinary(),
-            State::Frozen | State::Gone | State::Blocked(_) => {}
+            State::Frozen | State::Gone | State::Blocked(_) | State::Held => {}
             State::Waiting(frames) => {
                 self.apply_stream();
                 self.state = if frames <= 1 {

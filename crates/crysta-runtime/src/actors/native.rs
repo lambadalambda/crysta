@@ -203,7 +203,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, engine words the runtime
 /// does not read, and Ark's life, which it takes back. With the evidence.
-const SCRATCH: [(u16, u16); 11] = [
+const SCRATCH: [(u16, u16); 13] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -220,6 +220,12 @@ const SCRATCH: [(u16, u16); 11] = [
     // count): the European show's end waits up to 600 frames for it
     // (`$97:BC2B`), here the whole wait.
     (0x04FA, 0x04FB),
+    // A guardian's word for Ark's recoil (`$93:D7E0`, set; Ark's own
+    // script clears it), and tower 5's top's (`$04A4`).
+    (0x04A4, 0x04A5),
+    // Ark's statuses (`$066C`), which the end of tower 5 clears
+    // (`$90:A3BD`); not kept.
+    (0x066C, 0x066D),
     // The circle window's radius (`$90:A120`), not drawn.
     (0x0474, 0x0475),
     // Ark's life, which the world takes back after the runs.

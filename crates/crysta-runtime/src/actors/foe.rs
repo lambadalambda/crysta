@@ -251,6 +251,47 @@ impl Actor {
         self.struck |= foe.life > 0;
     }
 
+    /// Held for a fight the world drives (Shadowkeeper): its script stops,
+    /// it becomes a counted enemy of its descriptor's profile with that
+    /// descriptor's boxes, and takes no knockback.
+    pub(crate) fn hold_as_boss(&mut self, image: &[u8], descriptor: Option<usize>) {
+        self.state = State::Held;
+        self.hidden = false;
+        self.guard.1 |= NO_KNOCKBACK;
+        let Some(descriptor) = descriptor else {
+            return;
+        };
+        let profile = image
+            .get(descriptor + 4)
+            .and_then(|&index| crate::combat::profile(image, index));
+        self.foe = profile.map(|profile| Foe::new(profile, true));
+        if self.boxes.is_none() {
+            self.boxes = super::cadence::pose_boxes(image, descriptor).map(Rc::new);
+        }
+    }
+
+    /// Whether hits may land on it (`+$04` bit `$0020` clear).
+    pub(crate) fn set_target(&mut self, target: bool) {
+        if target {
+            self.guard.0 &= !NOT_TARGET;
+        } else {
+            self.guard.0 |= NOT_TARGET;
+        }
+    }
+
+    /// Its life, while an enemy.
+    pub(crate) fn foe_life(&self) -> Option<u16> {
+        self.foe.as_ref().map(|foe| foe.life)
+    }
+
+    /// A new life, the explosion called off.
+    pub(crate) fn revive(&mut self, life: u16) {
+        if let Some(foe) = &mut self.foe {
+            (foe.life, foe.exploding, foe.dead, foe.knocked) = (life, None, false, false);
+        }
+        (self.died, self.overlay) = (false, None);
+    }
+
     /// A jump to the death script (`$85:E27B`): an enemy explodes, as its
     /// death check would have it; anything else goes at once (the High
     /// Cadet's hidden controller, `$97:C712`).

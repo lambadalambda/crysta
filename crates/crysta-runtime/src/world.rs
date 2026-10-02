@@ -39,6 +39,7 @@ mod magirock;
 mod pots;
 mod progress;
 mod resurrection;
+mod shadowkeeper;
 mod transition;
 pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
@@ -109,6 +110,8 @@ pub struct World<'a> {
     level_up: Option<levelup::LevelUp>,
     /// Ark falling into a pit, and where he last stood clear of one.
     fall: Option<fall::Fall>,
+    /// Shadowkeeper's fight on `$123`.
+    shadowkeeper: Option<shadowkeeper::Fight>,
     rope: Option<fall::Rope>,
     safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
@@ -360,6 +363,7 @@ impl<'a> World<'a> {
             resurrection: None,
             level_up: None,
             fall: None,
+            shadowkeeper: None,
             rope: None,
             safe: None,
             facing: Direction::Down,
@@ -832,6 +836,7 @@ impl<'a> World<'a> {
         }
         self.make_deletions();
         self.push_ark();
+        self.shadowkeeper_frame();
         // A run's write to Ark's life (`STA $065D`, the bed, `$88:8AE1`).
         let stats = self.globals.slot.stats();
         if let Some(&life) = self.globals.scratch.get(&crate::actors::ARK_LIFE) {
@@ -1034,6 +1039,7 @@ impl<'a> World<'a> {
     /// ([`assets::maps::flag_patches`]) go on the grid as it stands, the
     /// loading script's music is selected, then the pots are found.
     fn finish_load(&mut self) -> Result<(), WorldError> {
+        self.start_shadowkeeper();
         self.apply_load_patches()?;
         self.open_opened_chests();
         self.apply_patches()?;
@@ -2465,6 +2471,7 @@ mod tests {
             resurrection: None,
             level_up: None,
             fall: None,
+            shadowkeeper: None,
             rope: None,
             safe: None,
             spawn_events: new_game_flags(),

@@ -1007,3 +1007,46 @@ fn the_orb_check_lets_the_cape_through_and_throws_ark_out_without_it() {
         }
     }
 }
+
+#[test]
+fn shadowkeeper_falls_after_two_lives_and_the_tower_ends() {
+    // `docs/tower-five.md` §1: Ark walks up to the boss (y < 272: the
+    // fight, flag `$001`); two lives; at none the end controller sends Ark
+    // to the light room `$106`.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x101..=0x107).chain([0x19B]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 136, 300, events).unwrap();
+        world.set_life(999);
+        let boss = world
+            .residents()
+            .iter()
+            .find(|resident| matches!(resident.script, Some(0x93_D876 | 0x99_9B5E)))
+            .map(|resident| resident.record)
+            .unwrap();
+        let mut began = false;
+        for frame in 0..3000 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            let up = (frame < 30).then_some(Direction::Up);
+            world
+                .update(up, if reading { a } else { Presses::default() })
+                .unwrap();
+            began |= world.map() == 0x0123 && world.events()[0] & 2 != 0;
+            if began && frame % 20 == 0 && world.foe_life(boss).is_some_and(|life| life > 0) {
+                world.kill_foe(boss);
+            }
+            if world.map() != 0x0123 {
+                break;
+            }
+        }
+        assert!(began, "{:?}: the fight began", rom.revision());
+        assert_eq!(world.map(), 0x0106, "{:?}", rom.revision());
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+    }
+}
