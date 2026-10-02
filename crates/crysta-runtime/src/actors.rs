@@ -25,8 +25,8 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_FLAGS, ARK_GATES, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION,
-    PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
+    Poke, Scratch, View, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, ENEMIES, FRAMES,
+    PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -111,6 +111,10 @@ const GIVE_ITEM: u8 = 0x54;
 /// Grants an item with its presentation: item, the player's pose word and a
 /// sound id (`$80:9A04`); `$8D:9653` adds the item, or a unit of one held.
 const GRANT_ITEM: u8 = 0x60;
+/// Takes an item (`$80:9A5E`, `$8D:96A0`): Elle takes the thread.
+const TAKE_ITEM: u8 = 0x55;
+/// Jumps when an item would not fit (`$80:9A79`): item, target.
+const NO_ROOM: u8 = 0x56;
 /// Requests dialogue at a bank-first address: bank, then the word
 /// (`$80:8C28`), as `COP 1B` does in the script's own bank.
 const SHOW_TEXT_BANKED: u8 = 0x1C;
@@ -1629,7 +1633,9 @@ impl Actor {
             }
             RANDOMIZE | SLEEP_OFF_SCREEN => return self.engine_service(service, operands, around),
             RETURN => self.pc = self.call.take().unwrap_or(operands),
-            GIVE_ITEM | GRANT_ITEM => return self.item_service(service, operands, bank, around),
+            GIVE_ITEM | GRANT_ITEM | TAKE_ITEM | NO_ROOM => {
+                return self.item_service(service, operands, bank, around)
+            }
             PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
                 return self.stage_service(service, operands, around)
             }
@@ -3614,6 +3620,26 @@ impl Actor {
     ) -> bool {
         let image = around.image;
         match service {
+            TAKE_ITEM => {
+                let Some(&item) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.inventory.remove(item);
+                self.pc = operands + 1;
+            }
+            NO_ROOM => {
+                let (Some(&item), Some(target)) =
+                    (image.get(operands), cadence::word(image, operands + 1))
+                else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if !around.globals.inventory.has_room(item) {
+                    return self.jump(bank, target);
+                }
+                self.pc = operands + 3;
+            }
             GIVE_ITEM => {
                 let (Some(&item), Some(full)) =
                     (image.get(operands), cadence::word(image, operands + 1))
@@ -5366,6 +5392,20 @@ mod script_service_tests {
             tick(&mut actor, &image);
         }
         assert_eq!(actor.selector, 9);
+    }
+
+    #[test]
+    fn cop_55_takes_an_item_and_56_tests_for_room() {
+        // COP 56 $32 -> $8010 (no room); COP 55 $32; yield. At $8010: pose 9.
+        let mut code = vec![2, 0x56, 0x32, 0x10, 0x80, 2, 0x55, 0x32, 2, 0xBD];
+        code.resize(0x10, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        globals.inventory.add(0x32);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.inventory.count(0x32), 0, "Elle takes the thread");
+        assert_ne!(actor.selector, 9);
     }
 
     #[test]

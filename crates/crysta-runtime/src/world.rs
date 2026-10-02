@@ -630,6 +630,13 @@ impl<'a> World<'a> {
     /// enemy count, the player's action word, Prime Blue, the frame counter,
     /// the window, Ark's flags and place.
     fn publish_engine_words(&mut self, (x, y): (u16, u16)) {
+        let stats = self.globals.slot.stats();
+        self.globals
+            .scratch
+            .insert(crate::actors::ARK_MAX_LIFE, stats.max_life);
+        self.globals
+            .scratch
+            .insert(crate::actors::ARK_LIFE, stats.life);
         // The player's action word as runs read it: only a forced action
         // (`$0810`) is modelled; Ark never attacks or jumps here.
         let enemies = self.actors.iter().filter(|actor| actor.counts()).count();
@@ -814,6 +821,13 @@ impl<'a> World<'a> {
         }
         self.make_deletions();
         self.push_ark();
+        // A run's write to Ark's life (`STA $065D`, the bed, `$88:8AE1`).
+        let stats = self.globals.slot.stats();
+        if let Some(&life) = self.globals.scratch.get(&crate::actors::ARK_LIFE) {
+            if life != stats.life {
+                self.globals.slot.set_life(life.min(stats.max_life));
+            }
+        }
         // The light room asks for `$07` (`$90:8B0C`): the tower's end.
         if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
             let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);

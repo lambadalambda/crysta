@@ -909,3 +909,76 @@ fn guardners_have_bodies_and_can_be_hit() {
         assert_eq!(guardners, [(true, true); 2], "{:?}", rom.revision());
     }
 }
+
+/// Frames of a scene, A on each read page, and A every second when `talk`.
+fn play(world: &mut World, frames: usize, talk: bool) {
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for frame in 0..frames {
+        let reading = world.dialogue().is_some() && !world.typing();
+        let ask = talk && world.dialogue().is_none() && frame % 60 == 5;
+        world
+            .update(
+                None,
+                if reading || ask {
+                    a
+                } else {
+                    Presses::default()
+                },
+            )
+            .unwrap();
+    }
+}
+
+/// Elle's house (`$14`), Ark in front of Elle.
+fn before_elle(image: &[u8], events: Vec<u8>) -> World<'_> {
+    let mut world = World::enter_with_events(image, 0x0014, 600, 144, events).unwrap();
+    play(&mut world, 30, false);
+    let elle = world
+        .residents()
+        .iter()
+        .find(|resident| matches!(resident.script, Some(0x88_BC7B | 0x88_C852)))
+        .map(|resident| resident.position)
+        .unwrap();
+    world.place(elle.0, elle.1 + 16);
+    world.face(Direction::Up);
+    world
+}
+
+#[test]
+fn elle_weaves_the_cape_from_the_crystal_thread() {
+    // `docs/tower-five.md` §2: the thread (`$29`), the bed (`$2A`, night),
+    // the weaving and the talk (`$30`, `$2B`), the bed (`$2C`), the cape
+    // (`$2D`, item `$BF`).
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x20..=0x28).chain(0x101..=0x107).chain([0x589]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = before_elle(rom.image(), events);
+        world.give_item(0x32);
+        play(&mut world, 900, true);
+        for flags in [[0x29, 0x2A], [0x2B, 0x2C]] {
+            let events = world.events().to_vec();
+            let mut bed = World::enter_with_events(rom.image(), 0x000F, 296, 116, events).unwrap();
+            play(&mut bed, 700, false);
+            assert!(flags
+                .iter()
+                .all(|&flag| bed.events()[flag / 8] & (1 << (flag % 8)) != 0));
+            world = before_elle(rom.image(), bed.events().to_vec());
+            play(&mut world, 1500, true);
+        }
+        assert!(
+            world.events()[0x2D / 8] & (1 << (0x2D % 8)) != 0,
+            "{:?}",
+            rom.revision()
+        );
+        assert!(
+            world.has_item(0xBF) && !world.has_item(0x32),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

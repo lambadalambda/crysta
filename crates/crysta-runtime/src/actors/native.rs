@@ -195,7 +195,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 9] = [
+const SCRATCH: [(u16, u16); 10] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -212,6 +212,8 @@ const SCRATCH: [(u16, u16); 9] = [
     // count): the European show's end waits up to 600 frames for it
     // (`$97:BC2B`), here the whole wait.
     (0x04FA, 0x04FB),
+    // Ark's life, which the world takes back after the runs.
+    (ARK_LIFE, ARK_LIFE + 1),
     // Ark's state gates: `$8000` paralysed (`$97:C2B2`), `$0400` asleep
     // (`$97:C5AC`); `COP 71` tests them.
     (ARK_GATES, ARK_GATES + 1),
@@ -236,7 +238,8 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 9] = [
+const READABLE: [u16; 10] = [
+    ARK_MAX_LIFE,
     ARK_FLAGS,
     WINDOW_BUSY,
     PLAYER_ACTION,
@@ -247,6 +250,11 @@ const READABLE: [u16; 9] = [
     PLAYER_X,
     PLAYER_Y,
 ];
+/// `$0657` and `$065D`: Ark's most life, and his life, which the bed
+/// fills (`$88:8ADE`).
+pub const ARK_MAX_LIFE: u16 = 0x0657;
+/// See [`ARK_MAX_LIFE`].
+pub const ARK_LIFE: u16 = 0x065D;
 /// `$0978`, a copy of Ark's `+$04`: bit 7 out of play (`$90:FC9B`).
 pub const ARK_FLAGS: u16 = 0x0978;
 /// `$0DC2`, nonzero while the text window is busy (`$97:BF59`).
@@ -313,10 +321,10 @@ fn flag_set(events: &[u8], word: u16) -> bool {
 /// Whether an address is a scratch word's: even, so that no two words
 /// overlap.
 fn scratch(address: u16) -> bool {
-    address.is_multiple_of(2)
-        && SCRATCH
-            .iter()
-            .any(|&(first, last)| (first..=last).contains(&address))
+    // Words from the range's first byte: Ark's life sits at an odd one.
+    SCRATCH.iter().any(|&(first, last)| {
+        (first..=last).contains(&address) && (address - first).is_multiple_of(2)
+    })
 }
 
 /// How a run ended.
@@ -530,8 +538,9 @@ impl<'a> Machine<'a> {
             }
             0xBF | 0x9F => self.own(opcode, memory.own)?,
             // The palette buffer (`$7F:0600..07FF`): a room's colour effect,
-            // not drawn here (`$90:A45C`).
-            0x8F if (0x7F_0600..0x7F_0800).contains(&self.long()?) => {
+            // not drawn here (`$90:A45C`); and the fixed colour after it
+            // (`$7F:0800..0802`, Crysta's night, `$88:8014`).
+            0x8F if (0x7F_0600..0x7F_0803).contains(&self.long()?) => {
                 self.a?;
                 self.pc + 4
             }

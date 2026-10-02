@@ -155,6 +155,18 @@ impl World<'_> {
         true
     }
 
+    /// Puts an item in the inventory, for tests.
+    #[doc(hidden)]
+    pub fn give_item(&mut self, item: u8) {
+        self.globals.inventory.add(item);
+    }
+
+    /// Whether the inventory holds an item.
+    #[must_use]
+    pub fn has_item(&self, item: u8) -> bool {
+        self.globals.inventory.count(item) > 0
+    }
+
     /// Sets Ark's life, for tests.
     #[doc(hidden)]
     pub fn set_life(&mut self, life: u16) {
