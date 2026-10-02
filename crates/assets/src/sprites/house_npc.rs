@@ -207,9 +207,9 @@ mod tests {
             (0x3_8d72, 0),
             (0x8_98d7, 0),
             (0x3_ed62, 0x0e),
-            // A graphics source offset other than 0 (the size may change:
-            // the frames name source tiles).
-            (0x3_ed63, 0x01),
+            // Graphics from another buffer (source offset bit 7; the
+            // offset and size may change: the frames name source tiles).
+            (0x3_ed63, 0x80),
         ] {
             let mut r = fixture();
             r[at] = value;

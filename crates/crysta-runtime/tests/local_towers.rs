@@ -756,3 +756,26 @@ fn the_high_cadet_falls_after_three_real_hits() {
         assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn tower_fours_cadets_have_bodies() {
+    // `docs/tower-four.md` §5.1: the Cadets of `$118` share `$82:EB0B`
+    // (European `$82:EA98`), whose graphics start 16 blocks into the sheet.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x105 / 8] |= 1 << (0x105 % 8);
+        let world = World::enter_with_events(rom.image(), 0x0118, 376, 880, events).unwrap();
+        let cadets: Vec<_> = world
+            .residents()
+            .iter()
+            .filter(|resident| matches!(resident.descriptor, Some(0x02_EB0B | 0x02_EA98)))
+            .map(|resident| resident.body)
+            .collect();
+        assert!(!cadets.is_empty(), "{:?}", rom.revision());
+        assert!(
+            cadets.iter().all(|&body| body),
+            "{:?}: {cadets:?}",
+            rom.revision()
+        );
+    }
+}

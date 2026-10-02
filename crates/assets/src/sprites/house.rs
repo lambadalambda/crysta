@@ -863,10 +863,12 @@ impl<'a> Loader<'a> {
         let graphics_cpu = if reuse {
             None
         } else {
-            // Source offset 0; any VRAM slot and size (the frames name
-            // source tiles); bit 7 of the size: the one-byte `$80:FDA4`
-            // table form (`docs/mode4-descriptors.md`).
-            if d[gfx] != 0 || d[gfx + 2] & 0x80 == 0 || d[gfx + 3] % 3 != 0 {
+            // Any source offset in the sheet (the High Cadet's and tower 4's
+            // Cadets' `$10`, `$82:EB0B`), VRAM slot and size: the frames
+            // name source tiles; bit 7 of the offset (another buffer) is
+            // refused. Bit 7 of the size: the one-byte `$80:FDA4` table form
+            // (`docs/mode4-descriptors.md`).
+            if d[gfx] & 0x80 != 0 || d[gfx + 2] & 0x80 == 0 || d[gfx + 3] % 3 != 0 {
                 return Err(SpriteError::Invalid("unsupported house graphics transfer"));
             }
             Some(cpu(self.read(0xfda4 + usize::from(d[gfx + 3]), 3)?))

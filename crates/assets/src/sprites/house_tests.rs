@@ -329,9 +329,9 @@ fn mode_0022_has_no_extra_movement_pointer_and_keeps_resource_guards() {
         (0x3_ed5a + 3, 0x21), // Unsupported neighboring modes stay refused.
         (0x3_ed5a + 3, 0x24),
         (0x3_ed5a + 4, 1),
-        (0x3_ed5a + 7, 1), // Palette transfer shape.
-        (0x3_ed5a + 8, 7), // Palette destination.
-        (0x3_ed5a + 9, 1), // Graphics transfer shape.
+        (0x3_ed5a + 7, 1),    // Palette transfer shape.
+        (0x3_ed5a + 8, 7),    // Palette destination.
+        (0x3_ed5a + 9, 0x80), // Graphics from another buffer.
     ] {
         let mut invalid = r.clone();
         invalid[at] = value;
