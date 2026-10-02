@@ -18,9 +18,14 @@ const HURT_PUSH: u16 = 10;
 const ARK_IMMUNE: u16 = 43;
 /// The sound of Ark hurt.
 const HURT_SOUND: u8 = 0x07;
-/// Frames Ark lies down before he wakes, after the push (natively 707 from
-/// the hit to the load).
-const DOWN: u16 = 650;
+/// The game over's music (`COP 30 3B`) and its frame, then the text's
+/// frame, Japanese and European (`docs/combat.md` §9).
+const DOWN_MUSIC: u16 = 111;
+const DOWN_TRACK: u8 = 0x3B;
+const DOWN_TEXT: [u16; 2] = [180, 172];
+/// "Ark's senses faded away..." (`$84:DD52`, European `$84:DD11`): a
+/// frameless page over the map.
+const DOWN_TEXTS: [u32; 2] = [0x84_DD52, 0x84_DD11];
 
 /// Ark pushed by a hit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,22 +38,42 @@ pub(super) struct Hurt {
 }
 
 impl World<'_> {
-    /// A frame of Ark down at no life (`$84:DC59`): he lies there, then
-    /// wakes where the game was saved (`$0600..$0607`) with his life full.
+    /// A frame of Ark down at no life (`$84:DC59`): he collapses, the game
+    /// over's music plays, then the text; once it is typed out he wakes
+    /// where the game was saved (`$0600..$0607`) with his life full.
     pub(super) fn down_frame(&mut self) -> Result<Option<Step>, WorldError> {
         let Some(frames) = self.down.take() else {
             return Ok(None);
         };
+        let europe = assets::layout::per_revision(self.image, 0, 1);
+        let text = DOWN_TEXT[europe];
         // He stays down through the transfer's fade, until the load.
-        self.down = Some(frames.saturating_add(1).min(DOWN));
-        if frames + 1 == DOWN {
+        let frame = if frames == u16::MAX - 1 {
+            frames
+        } else {
+            frames.saturating_add(1)
+        };
+        self.down = Some(frame);
+        if frame == DOWN_MUSIC {
+            self.globals.audio.play(DOWN_TRACK, false);
+        }
+        if frame == text {
+            let pages = assets::text::HouseDialogue::decode_at(self.image, DOWN_TEXTS[europe])
+                .unwrap_or_default();
+            if !self.globals.dialogue.request(pages) {
+                self.down = Some(frame - 1);
+            }
+        } else if frame > text && frame < u16::MAX - 1 && !self.globals.dialogue.busy() {
             let stats = self.globals.slot.stats();
             self.globals.slot.set_life(stats.max_life);
+            self.globals.dialogue.request(Vec::new());
             self.globals.transfer = Some(crate::scene::Transfer {
                 map: self.globals.slot.map(),
                 position: self.globals.slot.position(),
                 mode: 0,
             });
+            // Once: he lies on until the load.
+            self.down = Some(u16::MAX - 1);
         }
         self.run_actors()?;
         Ok(Some(Step::Stayed))

@@ -229,9 +229,28 @@ fn reaching_38_exp_raises_ark_to_level_2() {
             .expect("a blob")
             .record;
         assert!(world.kill_foe(record));
-        for _ in 0..10 {
+        // §9: the presentation holds Ark (the level, then life, strength,
+        // defense, luck), and the stats count once it ends.
+        let mut texts = 0;
+        let mut frames = 0;
+        for _ in 0..800 {
+            let was = world.dialogue().is_some();
             world.update(None, Presses::NONE).unwrap();
+            texts += u32::from(!was && world.dialogue().is_some());
+            frames += u32::from(world.levelling());
         }
+        assert!(texts >= 1, "{:?}: {texts}", rom.revision());
+        // Natively control returns at L+516 (JP) / L+489 (EU).
+        let native = if rom.revision() == Revision::Japan {
+            516
+        } else {
+            489
+        };
+        assert!(
+            frames.abs_diff(native) <= 3,
+            "{:?}: {frames}",
+            rom.revision()
+        );
         let stats = world.stats();
         assert_eq!(
             (
@@ -266,11 +285,15 @@ fn at_no_life_ark_wakes_at_the_saved_place_with_full_life() {
         world.place(120, 182);
         assert!(world.poke_foe(record, (120, 182), 4));
         let mut frames = 0;
+        let mut text = false;
         while world.map() != 0x000F && frames < 1200 {
             world.update(None, Presses::NONE).unwrap();
+            text |= world.dialogue().is_some();
             frames += 1;
         }
         assert_eq!(world.map(), 0x000F, "{:?}", rom.revision());
+        // §9: "Ark's senses faded away..." before the fade.
+        assert!(text, "{:?}", rom.revision());
         assert!((600..=800).contains(&frames), "{frames}");
         assert_eq!(world.life(), (28, 28));
     }

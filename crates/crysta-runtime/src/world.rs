@@ -33,6 +33,7 @@ mod contact;
 mod door;
 mod fade;
 mod hurt;
+mod levelup;
 mod magirock;
 mod pots;
 mod progress;
@@ -103,6 +104,8 @@ pub struct World<'a> {
     pickup: Option<magirock::Pickup>,
     /// A tower's end under way.
     resurrection: Option<resurrection::Resurrection>,
+    /// A level being gained.
+    level_up: Option<levelup::LevelUp>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -350,6 +353,7 @@ impl<'a> World<'a> {
             chest: None,
             pickup: None,
             resurrection: None,
+            level_up: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -1088,6 +1092,10 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        if let Some(step) = self.level_up_frame(presses)? {
+            self.apply_patches()?;
+            return Ok((step, None));
+        }
         if let Some(step) = self.resurrection_frame(presses) {
             self.apply_patches()?;
             return Ok((step, None));
@@ -1172,6 +1180,7 @@ impl<'a> World<'a> {
             self.touch();
         }
         self.hurt_ark();
+        self.level_up();
         self.apply_patches()?;
         Ok((step, opened))
     }
@@ -2285,6 +2294,7 @@ mod tests {
             chest: None,
             pickup: None,
             resurrection: None,
+            level_up: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

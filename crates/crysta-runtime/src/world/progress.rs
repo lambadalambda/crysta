@@ -37,30 +37,32 @@ impl World<'_> {
         if exp > 0 {
             let total = self.globals.slot.exp() + exp;
             self.globals.slot.set_exp(total);
-            self.level_up();
         }
     }
 
-    /// Raises Ark while his EXP reaches the next level's (`$85:EA99`, the
-    /// table `$8D:BA61`, European `$8D:B92A`). The native world stops for
-    /// the victory pose and a message per stat (516 frames); not modelled.
-    fn level_up(&mut self) {
+    /// Starts gaining a level, on a free frame, when Ark's EXP reaches the next one's
+    /// (`$85:EA99`, the table `$8D:BA61`, European `$8D:B92A`): one level a
+    /// pass, its presentation in [`super::levelup`].
+    pub(super) fn level_up(&mut self) {
+        // Not while Ark is busy or down (`$85:EA99` checks each free frame).
+        let busy = self.hurt.is_some() || self.down.is_some() || self.thrust.is_some();
+        if self.level_up.is_some() || busy || self.globals.slot.stats().life == 0 {
+            return;
+        }
         let table = assets::layout::per_revision(self.image, LEVELS, LEVELS - 0x137);
         let Some(table) = self.image.get(table..) else {
             return;
         };
-        loop {
-            let stats = self.globals.slot.stats();
-            let (Some(now), Some(next)) = (
-                combat::level(table, stats.level),
-                combat::level(table, stats.level.saturating_add(1)),
-            ) else {
-                return;
-            };
-            if stats.exp < next.exp {
-                return;
-            }
-            self.globals.slot.raise_level(&now, &next);
+        let stats = self.globals.slot.stats();
+        let (Some(now), Some(next)) = (
+            combat::level(table, stats.level),
+            combat::level(table, stats.level.saturating_add(1)),
+        ) else {
+            return;
+        };
+        if stats.exp >= next.exp {
+            let level = stats.level.saturating_add(1);
+            self.level_up = Some(super::levelup::LevelUp::new(now, next, level));
         }
     }
 
