@@ -109,6 +109,7 @@ pub struct World<'a> {
     level_up: Option<levelup::LevelUp>,
     /// Ark falling into a pit, and where he last stood clear of one.
     fall: Option<fall::Fall>,
+    rope: Option<fall::Rope>,
     safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
@@ -359,6 +360,7 @@ impl<'a> World<'a> {
             resurrection: None,
             level_up: None,
             fall: None,
+            rope: None,
             safe: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -1224,6 +1226,7 @@ impl<'a> World<'a> {
         presses: Presses,
         (busy, locked): (bool, bool),
     ) -> Result<(Step, Option<Step>), WorldError> {
+        let direction = self.rope_step(direction);
         let step = self.step_interactive(direction)?;
         self.ground_test();
         // On the plane, not while arriving or mid-step.
@@ -2373,6 +2376,7 @@ mod tests {
             resurrection: None,
             level_up: None,
             fall: None,
+            rope: None,
             safe: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,

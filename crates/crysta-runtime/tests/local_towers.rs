@@ -779,3 +779,66 @@ fn tower_fours_cadets_have_bodies() {
         );
     }
 }
+
+/// `$118` with the Cadets beaten (`$11C`): the platform's walls are open.
+fn tower_four_platform(rom: &Rom) -> World<'_> {
+    let mut events = after_the_intro();
+    for flag in [0x105, 0x11C] {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    World::enter_with_events(rom.image(), 0x0118, 328, 730, events).unwrap()
+}
+
+#[test]
+fn ark_crosses_tower_fours_rope() {
+    // `docs/tower-four.md` §2: the rope (attribute `$12`, row 45) between
+    // the platform and the left ledge; Left and Right walk it.
+    for rom in roms() {
+        let mut world = tower_four_platform(&rom);
+        for _ in 0..120 {
+            world
+                .update(Some(Direction::Left), Presses::default())
+                .unwrap();
+        }
+        assert!(!world.falling(), "{:?}", rom.revision());
+        assert_eq!(world.map(), 0x0118);
+        assert!(
+            world.position().0 < 232,
+            "{:?}: {:?}",
+            rom.revision(),
+            world.position()
+        );
+    }
+}
+
+#[test]
+fn leaning_off_the_rope_drops_ark_a_floor() {
+    // Up on the rope leans; without Down within 60 frames, Ark falls, into
+    // the pit's exit to `$117`.
+    for rom in roms() {
+        let mut world = tower_four_platform(&rom);
+        for _ in 0..40 {
+            world
+                .update(Some(Direction::Left), Presses::default())
+                .unwrap();
+        }
+        assert!(world.on_rope(), "{:?}", rom.revision());
+        let y = world.position().1;
+        world
+            .update(Some(Direction::Up), Presses::default())
+            .unwrap();
+        assert_eq!(
+            world.position().1,
+            y,
+            "{:?}: Up leans, it does not move",
+            rom.revision()
+        );
+        for _ in 0..300 {
+            world.update(None, Presses::default()).unwrap();
+            if world.map() != 0x0118 {
+                break;
+            }
+        }
+        assert_eq!(world.map(), 0x0117, "{:?}", rom.revision());
+    }
+}

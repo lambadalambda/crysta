@@ -1,20 +1,33 @@
-//! Pits and falls (`docs/tower-three.md` §2): a cell of attribute `$14` is
-//! a pit. When every cell under Ark's feet is one (`$80:CC6D`), he falls
-//! (`$84:9F53`: sound `$12`, 8 frames, sound `$10`, 39 frames). Then the
-//! exit under him decides: its conditional list, with flag `$1F` set,
-//! takes him down a floor (`$10F` to `$114`); with none, he loses some life
-//! and stands again where he last stood clear of the pits (`$84:9F9B`,
+//! Pits, ropes and falls (`docs/tower-three.md` §2, `docs/tower-four.md`
+//! §2): a cell of attribute `$14` is a pit, one of `$12` a rope. Ark's
+//! ground test (`$80:CC00`) samples the cells under his 16-pixel box from
+//! (x - 8, y - 16). All pits: he falls (`$84:9F53`: sound `$12`, 8 frames,
+//! sound `$10`, 39 frames). Pits and rope, the top-left a pit and the box's
+//! top 7 to 13 pixels into its cell (`$80:CCB4`): he is on the rope; else
+//! he falls. Then the exit under him decides: its conditional list, with
+//! flag `$1F` set, takes him down a floor (`$10F` to `$114`); with none, he
+//! loses some life and stands again where he last stood safe (`$84:9F9B`,
 //! `$84:B803`).
 //!
-//! Not modelled: the teeter at a pit's edge (`$80:CCB4`), the falling and
-//! landing poses, and the landing's drop from 256 pixels up (`$90:FA4E`).
+//! On the rope (`$84:9C95`) only Left and Right walk; Up or Down leans
+//! (`$84:9BFE`, `9C44`): 16 frames of the lean, then 60 in which the way
+//! held decides (`COP 2B`): the same way falls, the opposite recovers; at
+//! the end, 4 frames of wobble (`$84:9BD9`) and the fall.
+//!
+//! Not modelled: the falling, rope and landing poses, the landing's drop
+//! from 256 pixels up (`$90:FA4E`), and a hit's lean on the rope.
 
 use super::{Step, World, WorldError};
 use crate::scene::Transfer;
 use room_core::Direction;
 
-/// The pit attribute.
+/// The pit and rope attributes, and the one that keeps the safe spot
+/// (`$80:CCF9`).
 const PIT: u16 = 0x14;
+const ROPE: u16 = 0x12;
+const UNSAFE: u16 = 0x13;
+/// The rope's band: the box's top this far into its cell.
+const BAND: std::ops::RangeInclusive<u16> = 7..=13;
 /// Frames of the fall, and the second sound's frame.
 const FALL: u16 = 47;
 const SECOND_SOUND: u16 = 8;
@@ -22,6 +35,10 @@ const SECOND_SOUND: u16 = 8;
 const FALL_SOUNDS: [u8; 2] = [0x12, 0x10];
 /// The flag a fall into an exit sets.
 const FELL: u16 = 0x1F;
+/// A lean's frames: the pose, the window for the pad, the wobble.
+const LEAN_POSE: u16 = 16;
+const LEAN_WINDOW: u16 = LEAN_POSE + 60;
+const LEAN_END: u16 = LEAN_WINDOW + 4;
 
 /// Ark falling.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,14 +46,42 @@ pub(super) struct Fall {
     frame: u16,
 }
 
-/// The cells under Ark's feet at `(x, y)`: his ground box, x - 4..x + 3 and
-/// y - 8..y - 1, over the cells it touches.
-fn feet((x, y): (u16, u16)) -> Vec<(u16, u16)> {
-    let (left, right) = (x.saturating_sub(4) / 16, (x + 3) / 16);
-    let (top, bottom) = (y.saturating_sub(8) / 16, y.saturating_sub(1) / 16);
-    (top..=bottom)
-        .flat_map(|row| (left..=right).map(move |column| (column, row)))
-        .collect()
+/// Ark on a rope: leaning one way, and for how long.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(super) struct Rope {
+    lean: Option<(Direction, u16)>,
+}
+
+/// The four cells `$80:CC00` samples for Ark at `(x, y)`: the box's top
+/// left, the next column when the box is off the grid across, the next row
+/// when it is off the grid down, and the cell diagonal to it.
+fn samples((x, y): (u16, u16)) -> [(u16, u16); 4] {
+    let (left, top) = (x.wrapping_sub(8), y.wrapping_sub(16));
+    let (column, row) = (left / 16, top / 16);
+    let right = column + u16::from(left % 16 != 0);
+    let below = row + u16::from(top % 16 != 0);
+    [(column, row), (right, row), (column, below), (right, below)]
+}
+
+/// What the ground under Ark does (`$80:CC6D`..`CCF0`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ground {
+    Solid,
+    Rope,
+    Fall,
+}
+
+fn ground(attributes: [Option<u16>; 4], y: u16) -> Ground {
+    let hole = |attribute| matches!(attribute, Some(PIT | ROPE));
+    if attributes.iter().all(|&attribute| attribute == Some(PIT)) {
+        Ground::Fall
+    } else if !attributes.into_iter().all(hole) {
+        Ground::Solid
+    } else if attributes[0] == Some(PIT) && BAND.contains(&(y.wrapping_sub(16) % 16)) {
+        Ground::Rope
+    } else {
+        Ground::Fall
+    }
 }
 
 impl World<'_> {
@@ -46,29 +91,70 @@ impl World<'_> {
         self.fall.is_some()
     }
 
+    /// Whether Ark is on a rope.
+    #[must_use]
+    pub const fn on_rope(&self) -> bool {
+        self.rope.is_some()
+    }
+
     /// The cell attribute at `(column, row)` of the room as it stands.
     fn attribute(&self, (column, row): (u16, u16)) -> Option<u16> {
         let at = self.base.index(column, row)?;
         Some((self.base.room.cells()[at] >> 9) & 0x1F)
     }
 
-    /// The ground test after Ark's step: every cell under his feet a pit,
-    /// he falls; none, the place is kept as the last safe one.
+    /// The ground test after Ark's step: a fall, the rope, or solid ground;
+    /// a place without `$13` under it is kept as the last safe one.
     pub(super) fn ground_test(&mut self) {
         if self.fall.is_some() || self.in_transition() {
             return;
         }
-        let under: Vec<_> = feet(self.position())
-            .into_iter()
-            .map(|cell| self.attribute(cell))
-            .collect();
-        if !under.is_empty() && under.iter().all(|&attribute| attribute == Some(PIT)) {
-            self.fall = Some(Fall { frame: 0 });
-            self.thrust = None;
-            self.globals.audio.sound_port3(FALL_SOUNDS[0]);
-        } else if under.iter().all(|&attribute| attribute != Some(PIT)) {
-            self.safe = Some((self.position(), self.facing));
+        let at = self.position();
+        let under = samples(at).map(|cell| self.attribute(cell));
+        match ground(under, at.1) {
+            Ground::Fall => return self.start_fall(),
+            Ground::Rope => self.rope = Some(self.rope.unwrap_or_default()),
+            Ground::Solid => self.rope = None,
         }
+        if !under.contains(&Some(UNSAFE)) {
+            self.safe = Some((at, self.facing));
+        }
+    }
+
+    fn start_fall(&mut self) {
+        self.fall = Some(Fall { frame: 0 });
+        self.rope = None;
+        self.thrust = None;
+        self.globals.audio.sound_port3(FALL_SOUNDS[0]);
+    }
+
+    /// The pad on a rope: Left and Right walk; Up or Down leans. Returns
+    /// the way Ark walks.
+    pub(super) fn rope_step(&mut self, direction: Option<Direction>) -> Option<Direction> {
+        let Some(mut rope) = self.rope else {
+            return direction;
+        };
+        let walked = match (rope.lean, direction) {
+            (Some((way, frames)), held) => {
+                let window = (LEAN_POSE..LEAN_WINDOW).contains(&frames);
+                if window && held == Some(way.opposite()) {
+                    rope.lean = None;
+                } else if (window && held == Some(way)) || frames + 1 >= LEAN_END {
+                    self.start_fall();
+                    return None;
+                } else {
+                    rope.lean = Some((way, frames + 1));
+                }
+                None
+            }
+            (None, Some(way @ (Direction::Up | Direction::Down))) => {
+                rope.lean = Some((way, 0));
+                None
+            }
+            (None, walk) => walk,
+        };
+        self.rope = Some(rope);
+        walked
     }
 
     /// A frame of the fall: the world runs on, Ark held; at its end, down a
@@ -123,10 +209,12 @@ impl World<'_> {
             .set_life(stats.life.saturating_sub(lost).max(1));
         if let Some((safe, facing)) = self.safe {
             let settled = settle(safe, facing);
-            let clear = feet(settled)
-                .into_iter()
-                .all(|cell| self.attribute(cell) != Some(PIT));
-            let (x, y) = if clear { settled } else { safe };
+            let under = samples(settled).map(|cell| self.attribute(cell));
+            let (x, y) = if ground(under, settled.1) == Ground::Fall {
+                safe
+            } else {
+                settled
+            };
             self.place(x, y);
             self.face(facing);
         }
@@ -162,9 +250,29 @@ mod tests {
     }
 
     #[test]
-    fn the_feet_touch_one_to_four_cells() {
-        assert_eq!(feet((24, 40)), [(1, 2)]);
-        assert_eq!(feet((16, 40)), [(0, 2), (1, 2)]);
-        assert_eq!(feet((24, 36)), [(1, 1), (1, 2)]);
+    fn the_samples_cover_the_box_from_its_top_left() {
+        assert_eq!(samples((24, 48)), [(1, 2); 4]);
+        assert_eq!(samples((30, 48)), [(1, 2), (2, 2), (1, 2), (2, 2)]);
+        assert_eq!(samples((24, 50)), [(1, 2), (1, 2), (1, 3), (1, 3)]);
+    }
+
+    #[test]
+    fn a_rope_holds_ark_only_in_its_band() {
+        let (pit, rope, floor) = (Some(PIT), Some(ROPE), Some(0));
+        // The box's top 10 pixels into the pit row above the rope.
+        assert_eq!(
+            ground([pit, pit, rope, rope], 16 * 44 + 10 + 16),
+            Ground::Rope
+        );
+        assert_eq!(
+            ground([pit, pit, rope, rope], 16 * 44 + 3 + 16),
+            Ground::Fall
+        );
+        assert_eq!(
+            ground([rope, rope, pit, pit], 16 * 45 + 10 + 16),
+            Ground::Fall
+        );
+        assert_eq!(ground([pit; 4], 0), Ground::Fall);
+        assert_eq!(ground([pit, floor, pit, pit], 0), Ground::Solid);
     }
 }
