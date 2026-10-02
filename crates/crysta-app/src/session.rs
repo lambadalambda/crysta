@@ -534,7 +534,7 @@ impl Session {
         for (_, _, index) in order {
             if index == usize::MAX {
                 // A push after a hit blinks him every second frame.
-                if !world.ark_blinks() {
+                if !world.ark_blinks() && !world.falling() {
                     frame::draw_sprite(frame, background, camera, player, position);
                 }
                 continue;

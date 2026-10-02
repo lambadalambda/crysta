@@ -112,7 +112,8 @@ impl ExitRecord {
     /// Returns an unflagged destination map ID, without applying lookup bounds.
     ///
     /// # Errors
-    /// Bit 15 selects an unimplemented conditional table, not a direct map ID.
+    /// Bit 15 selects a conditional table ([`Self::conditional`]), not a
+    /// direct map ID.
     pub fn direct_destination(&self) -> Result<u16, ExitError> {
         let raw = self.raw_destination();
         if raw & 0x8000 != 0 {

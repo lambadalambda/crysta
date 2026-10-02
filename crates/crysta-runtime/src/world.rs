@@ -32,6 +32,7 @@ mod chest;
 mod contact;
 mod door;
 mod fade;
+mod fall;
 mod hurt;
 mod levelup;
 mod magirock;
@@ -106,6 +107,9 @@ pub struct World<'a> {
     resurrection: Option<resurrection::Resurrection>,
     /// A level being gained.
     level_up: Option<levelup::LevelUp>,
+    /// Ark falling into a pit, and where he last stood clear of one.
+    fall: Option<fall::Fall>,
+    safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
     /// Which of the player's ordinary frames is showing.
@@ -354,6 +358,8 @@ impl<'a> World<'a> {
             pickup: None,
             resurrection: None,
             level_up: None,
+            fall: None,
+            safe: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
             armed: false,
@@ -1097,23 +1103,7 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((Step::Stayed, None));
         }
-        if let Some(step) = self.contact_frame()? {
-            self.apply_patches()?;
-            return Ok((step, None));
-        }
-        if let Some(step) = self.level_up_frame(presses)? {
-            self.apply_patches()?;
-            return Ok((step, None));
-        }
-        if let Some(step) = self.resurrection_frame(presses) {
-            self.apply_patches()?;
-            return Ok((step, None));
-        }
-        if let Some(step) = self.pickup_frame(presses)? {
-            self.apply_patches()?;
-            return Ok((step, None));
-        }
-        if let Some(step) = self.chest_frame(presses)? {
+        if let Some(step) = self.holding_frame(presses)? {
             self.apply_patches()?;
             return Ok((step, None));
         }
@@ -1151,6 +1141,27 @@ impl<'a> World<'a> {
         self.walk_frame(direction, presses, (busy, locked))
     }
 
+    /// A frame something holds Ark through: a contact, a level gained, a
+    /// fall, a tower's end, a Magirock or a chest.
+    fn holding_frame(&mut self, presses: Presses) -> Result<Option<Step>, WorldError> {
+        if let Some(step) = self.contact_frame()? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.level_up_frame(presses)? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.fall_frame()? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.resurrection_frame(presses) {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.pickup_frame(presses)? {
+            return Ok(Some(step));
+        }
+        self.chest_frame(presses)
+    }
+
     /// The rest of an ordinary frame: Ark walks, then A talks, opens a
     /// door, thrusts or interacts, and touching runs.
     fn walk_frame(
@@ -1160,6 +1171,7 @@ impl<'a> World<'a> {
         (busy, locked): (bool, bool),
     ) -> Result<(Step, Option<Step>), WorldError> {
         let step = self.step_interactive(direction)?;
+        self.ground_test();
         // On the plane, not while arriving or mid-step.
         let free = !busy
             && self.scene.is_none()
@@ -2304,6 +2316,8 @@ mod tests {
             pickup: None,
             resurrection: None,
             level_up: None,
+            fall: None,
+            safe: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),

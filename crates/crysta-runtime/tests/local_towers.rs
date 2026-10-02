@@ -596,3 +596,59 @@ fn tower_twos_switches_open_the_stairs() {
         );
     }
 }
+
+/// Walks Ark right for `steps` frames or until he falls, waits for the
+/// fall, then waits `frames` frames more.
+fn fall_right(world: &mut World, steps: usize, frames: usize) {
+    for _ in 0..steps {
+        if world.falling() {
+            break;
+        }
+        world
+            .update(Some(Direction::Right), Presses::default())
+            .unwrap();
+    }
+    for _ in 0..120 {
+        if world.falling() {
+            break;
+        }
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.falling(), "no fall at {:?}", world.position());
+    for _ in 0..frames {
+        world.update(None, Presses::default()).unwrap();
+    }
+}
+
+#[test]
+fn the_crumbling_row_drops_ark_a_floor_down() {
+    // `docs/tower-three.md` §2, §3: `$10F`'s row tiles over the pit are
+    // floor (`COP 3F 02`) until Ark comes near, then pits 60 frames later.
+    // The exit over rows 0-38 has the conditional destination `$F144`:
+    // flag `$1F` -> `$114`.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x010F, 168, 528, events).unwrap();
+        fall_right(&mut world, 16, 200);
+        // The loader clears flags `$00-$1F`, `$1F` with them.
+        assert_eq!(world.map(), 0x0114, "{:?}", rom.revision());
+        assert_eq!(world.position(), (248, 144), "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
+    // Rows 39+ of `$10F` have no exit: damage, then the last safe spot.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x010F, 152, 688, after_the_intro()).unwrap();
+        let (life, _) = world.life();
+        fall_right(&mut world, 60, 60);
+        assert!(!world.falling(), "{:?}", rom.revision());
+        assert_eq!(world.map(), 0x010F);
+        assert!(world.life().0 < life);
+        let (x, y) = world.position();
+        assert!(x < 176 && y == 688, "{:?}: {:?}", rom.revision(), (x, y));
+    }
+}
