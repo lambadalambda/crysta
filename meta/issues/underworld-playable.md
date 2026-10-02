@@ -27,6 +27,18 @@ The user's goal (2026-10-01): all of Chapter 1's underworld playable, with all f
 7. [Weave the cape and play tower 5](tower-five.md)
 8. [Finish the underworld](underworld-end.md)
 9. [Play the resurrection scenes in full](resurrection-scenes.md)
+10. [Play Shadowkeeper's full fight](shadowkeeper-full-fight.md)
+11. [Equip the cape through the armor door](cape-through-armor-door.md)
+12. [Draw the vortex and the Chapter 2 title card](chapter-end-vortex-card.md)
+13. [Draw the continents' door parchment](continent-door-parchment.md)
+14. [Show Ark's poses in the underworld scenes](ark-underworld-poses.md)
+15. [Model the lips' jumps](lip-jumps.md)
+16. [Use the rope's native collision tables](rope-collision-tables.md)
+17. [Match the Guardner's sleep and vacuum](guardner-fidelity.md)
+18. [Confirm the fall damage and the pit-edge teeter](fall-damage-teeter.md)
+19. [Give the darts their damage and Ark the burn status](darts-and-burn.md)
+20. [Run the frozen display scripts on `$03`](map-03-frozen-scripts.md)
+21. [Close the runtime's review edge cases](runtime-review-edges.md)
 - Also: [Enter the towers from the world map](enter-the-towers.md)
 
 ## Notes
