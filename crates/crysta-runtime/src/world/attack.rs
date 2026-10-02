@@ -59,6 +59,17 @@ impl World<'_> {
         self.globals.slot.set_weapon(item, power);
     }
 
+    /// Equips `item` as the armor (`$064C`).
+    pub fn equip_armor(&mut self, item: u8) {
+        self.globals.slot.set_armor(item);
+    }
+
+    /// The armor Ark wears (`$064C`), if any.
+    #[must_use]
+    pub fn armor(&self) -> Option<u8> {
+        self.globals.slot.armor()
+    }
+
     /// A frame Ark's own state holds him: carrying a pot, down, pushed or
     /// thrusting; the enemies' hit scan on him follows.
     pub(super) fn held_frame(

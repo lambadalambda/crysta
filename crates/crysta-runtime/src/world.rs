@@ -631,6 +631,8 @@ impl<'a> World<'a> {
     /// the window, Ark's flags and place.
     fn publish_engine_words(&mut self, (x, y): (u16, u16)) {
         let stats = self.globals.slot.stats();
+        let armor = self.globals.slot.armor().map_or(0, u16::from);
+        self.globals.scratch.insert(crate::actors::ARK_ARMOR, armor);
         self.globals
             .scratch
             .insert(crate::actors::ARK_MAX_LIFE, stats.max_life);
@@ -762,6 +764,15 @@ impl<'a> World<'a> {
                 // published (`ARK_FLAGS`).
                 match poke {
                     Poke::Ark { flags } => self.globals.ark_flags = flags & 0x8000,
+                    Poke::ArkAt { at, value } if self.arrival.is_none() => {
+                        let (x, y) = self.position();
+                        let (x, y) = if at == 0 { (value, y) } else { (x, value) };
+                        self.walking = WalkingState::new(x, y);
+                        self.run = None;
+                        if let Some(actor) = &mut self.player_actor {
+                            actor.position = (x, y);
+                        }
+                    }
                     Poke::ArkPush { at, value } => {
                         let push = &mut self.globals.ark_push;
                         let axis = if at == 0x18 { &mut push.0 } else { &mut push.1 };

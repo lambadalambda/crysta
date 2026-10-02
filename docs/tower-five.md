@@ -210,6 +210,15 @@ Y; the list walk `$002E,Y`; writes to other actors' `+$04`, `+$08`
 Not reached: the orb check, the `$122` recoil (`COP 84` on Ark), every part
 of Shadowkeeper after `$E767`.
 
+### After the runtime work
+
+The interlude plays on both ROMs: the text commands (`$CB`, `$DF`, any
+label), `COP 55`/`56`, the bed's life (`$0657`, `$065D`) and the night
+colour; Elle's cape is worn at once (a stand-in for the menu's armor
+door). `$11D` lets the cape through (flag `$19B`) and throws Ark back to
+`$11C` without it. Open: `$122`, `$123` and Shadowkeeper, the bodies of
+the plain-pointer descriptors, the second `$120` Guardner.
+
 ## 5. Proposed runtime model (blockers first)
 
 1. **The `$11D` check.** Without it the tower cannot be entered.

@@ -25,7 +25,7 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, ENEMIES, FRAMES,
+    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, ENEMIES, FRAMES,
     PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
@@ -111,6 +111,8 @@ const GIVE_ITEM: u8 = 0x54;
 /// Grants an item with its presentation: item, the player's pose word and a
 /// sound id (`$80:9A04`); `$8D:9653` adds the item, or a unit of one held.
 const GRANT_ITEM: u8 = 0x60;
+/// Elle's cape, which `$11D`'s orb wants worn (`$90:A1F4`).
+const CAPE: u8 = 0xBF;
 /// Takes an item (`$80:9A5E`, `$8D:96A0`): Elle takes the thread.
 const TAKE_ITEM: u8 = 0x55;
 /// Jumps when an item would not fit (`$80:9A79`): item, target.
@@ -2809,7 +2811,7 @@ impl Actor {
             }
             Poke::Flags { set, cleared, .. } => self.write_04(set, cleared),
             // The world keeps Ark's.
-            Poke::Ark { .. } | Poke::ArkPush { .. } => {}
+            Poke::Ark { .. } | Poke::ArkAt { .. } | Poke::ArkPush { .. } => {}
         }
     }
 
@@ -3664,7 +3666,12 @@ impl Actor {
                     return false;
                 };
                 // A full inventory keeps nothing; the presentation goes on.
-                around.globals.inventory.add(item);
+                let kept = around.globals.inventory.add(item);
+                // Elle's cape goes on at once, a stand-in for the armor door
+                // of the menu, which is not ported (`docs/tower-five.md`).
+                if kept && item == CAPE && around.globals.slot.armor().is_none() {
+                    around.globals.slot.set_armor(item);
+                }
                 around.globals.audio.fanfare(track, frames);
                 around.globals.presentation = Some(crate::scene::Presentation {
                     item,

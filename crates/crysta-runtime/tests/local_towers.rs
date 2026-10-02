@@ -980,5 +980,30 @@ fn elle_weaves_the_cape_from_the_crystal_thread() {
             "{:?}",
             rom.revision()
         );
+        assert_eq!(world.armor(), Some(0xBF), "{:?}: worn", rom.revision());
+    }
+}
+
+#[test]
+fn the_orb_check_lets_the_cape_through_and_throws_ark_out_without_it() {
+    // `docs/tower-five.md` §1: `$11D`'s orb is reflected by the cape (flag
+    // `$19B`); without it, it pushes Ark onto the exit back to `$11C`.
+    for rom in roms() {
+        for cape in [true, false] {
+            let mut events = after_the_intro();
+            for flag in 0x101..=0x107 {
+                events[flag / 8] |= 1 << (flag % 8);
+            }
+            let mut world =
+                World::enter_with_events(rom.image(), 0x011D, 128, 192, events).unwrap();
+            if cape {
+                world.equip_armor(0xBF);
+            }
+            play(&mut world, 700, false);
+            let reflected = world.events()[0x19B / 8] & (1 << (0x19B % 8)) != 0;
+            assert_eq!(reflected, cape, "{:?}", rom.revision());
+            assert_eq!(world.map(), if cape { 0x011D } else { 0x011C });
+            assert!(!world.pad_locked(), "{:?}", rom.revision());
+        }
     }
 }

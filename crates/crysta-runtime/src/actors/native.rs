@@ -87,6 +87,14 @@ pub enum Poke {
         /// The word.
         flags: u16,
     },
+    /// Ark's x or y (`LDY $0DEA; STA $0000/0002,Y`): the `$11D` orb pushes
+    /// him back (`$90:A2BF`).
+    ArkAt {
+        /// `0` x, `2` y.
+        at: u16,
+        /// The coordinate.
+        value: u16,
+    },
     /// A push on Ark (`PHX; LDX $0DEA; STA $7F:0018/001A,X; PLX`): the
     /// Guardner's vacuum (`$97:C447`).
     ArkPush {
@@ -193,9 +201,9 @@ const SHADOWS: std::ops::RangeInclusive<u16> = 0x0468..=0x046B;
 /// The PPU's registers.
 const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
-/// Words runs may use: scripts' own variables, and one engine word the
-/// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 10] = [
+/// Words runs may use: scripts' own variables, engine words the runtime
+/// does not read, and Ark's life, which it takes back. With the evidence.
+const SCRATCH: [(u16, u16); 11] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -212,6 +220,8 @@ const SCRATCH: [(u16, u16); 10] = [
     // count): the European show's end waits up to 600 frames for it
     // (`$97:BC2B`), here the whole wait.
     (0x04FA, 0x04FB),
+    // The circle window's radius (`$90:A120`), not drawn.
+    (0x0474, 0x0475),
     // Ark's life, which the world takes back after the runs.
     (ARK_LIFE, ARK_LIFE + 1),
     // Ark's state gates: `$8000` paralysed (`$97:C2B2`), `$0400` asleep
@@ -238,7 +248,8 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 10] = [
+const READABLE: [u16; 11] = [
+    ARK_ARMOR,
     ARK_MAX_LIFE,
     ARK_FLAGS,
     WINDOW_BUSY,
@@ -250,6 +261,9 @@ const READABLE: [u16; 10] = [
     PLAYER_X,
     PLAYER_Y,
 ];
+/// `$064C`: Ark's armor, which the `$11D` orb tests for the cape
+/// (`$90:A1F4`).
+pub const ARK_ARMOR: u16 = 0x064C;
 /// `$0657` and `$065D`: Ark's most life, and his life, which the bed
 /// fills (`$88:8ADE`).
 pub const ARK_MAX_LIFE: u16 = 0x0657;
@@ -318,8 +332,8 @@ fn flag_set(events: &[u8], word: u16) -> bool {
         .is_some_and(|byte| byte & (1 << (flag % 8)) != 0)
 }
 
-/// Whether an address is a scratch word's: even, so that no two words
-/// overlap.
+/// Whether an address is a scratch word's: a word from its range's first
+/// byte, so that no two words overlap.
 fn scratch(address: u16) -> bool {
     // Words from the range's first byte: Ark's life sits at an odd one.
     SCRATCH.iter().any(|&(first, last)| {
@@ -422,6 +436,9 @@ struct Machine<'a> {
     entity: Option<Entity>,
     /// The other entity X holds after a `TYX` or `TAX` (then `x` is false).
     x_entity: Option<Entity>,
+    /// Direct-page words the run keeps for itself (`STA $00`), gone after
+    /// it.
+    direct: BTreeMap<u8, u16>,
     /// Before the run's first instruction, where Y is a linked child's.
     pc_is_start: bool,
 }
@@ -451,6 +468,7 @@ impl<'a> Machine<'a> {
             y: None,
             entity: None,
             x_entity: None,
+            direct: BTreeMap::new(),
             pc_is_start: true,
         }
     }
@@ -478,16 +496,15 @@ impl<'a> Machine<'a> {
         self.pc_is_start = false;
         if matches!(
             opcode,
-            0xAC | 0xA8 | 0x98 | 0xBC | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF | 0xC0
+            0xAC | 0xA8 | 0x98 | 0xBC | 0xBD | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF | 0xC0
         ) && self.entity_op(opcode, memory).is_some()
         {
             return Some(Flow::On);
         }
-        let next = self.poke(opcode, memory);
-        let next = next
-            .or_else(|| self.resume_at(opcode))
-            .or_else(|| self.script_bank(opcode, memory.bank));
-        if let Some(next) = next {
+        if self.at_contact() {
+            return Some(Flow::Stop);
+        }
+        if let Some(next) = self.side_op(opcode, memory) {
             self.pc = next;
             return Some(Flow::On);
         }
@@ -576,6 +593,45 @@ impl<'a> Machine<'a> {
             _ => return Some(Flow::Stop),
         };
         Some(Flow::On)
+    }
+
+    /// `LDA #t; STA $7F:1010,X`: the contact callback, which the actor's
+    /// own recogniser registers (`$90:A1FC`): the run stops before it.
+    fn at_contact(&self) -> bool {
+        self.image
+            .get(self.pc..self.pc + 7)
+            .is_some_and(|code| code[0] == 0xA9 && code[3..] == [0x9F, 0x10, 0x10, 0x7F])
+    }
+
+    /// The instructions outside the main table: writes into other
+    /// entities, a resume, the script bank, direct-page words.
+    fn side_op(&mut self, opcode: u8, memory: &mut Memory<'_>) -> Option<usize> {
+        let next = self.poke(opcode, memory);
+        next.or_else(|| self.resume_at(opcode))
+            .or_else(|| self.script_bank(opcode, memory.bank))
+            .or_else(|| self.direct_page(opcode))
+    }
+
+    /// `STA`, `LDA`, `ADC` on a direct-page word the run keeps for itself
+    /// (`$90:A137`, the `$11D` guardian's circle colour).
+    fn direct_page(&mut self, opcode: u8) -> Option<usize> {
+        if self.narrow || !matches!(opcode, 0x85 | 0xA5 | 0x65) {
+            return None;
+        }
+        let at = *self.image.get(self.pc + 1)?;
+        match opcode {
+            0x85 => {
+                self.direct.insert(at, self.a?);
+            }
+            0xA5 => self.set(*self.direct.get(&at)?),
+            _ => {
+                let (a, value) = (u32::from(self.a?), u32::from(*self.direct.get(&at)?));
+                let sum = a + value + u32::from(self.carry?);
+                self.set(u16::try_from(sum & 0xFFFF).ok()?);
+                self.carry = Some(sum > 0xFFFF);
+            }
+        }
+        Some(self.pc + 2)
     }
 
     /// `SEP #$20; LDA $000C,X`: the bank of the actor's script (the
@@ -669,8 +725,13 @@ impl<'a> Machine<'a> {
                 self.a = None;
                 Some(self.pc + 9)
             }
-            0x99 if self.operand()? == 0x04 && self.y? == Entity::Player => {
-                memory.pokes.push(Poke::Ark { flags: self.a? });
+            0x99 if self.y? == Entity::Player && matches!(self.operand()?, 0 | 2 | 4) => {
+                let (at, value) = (self.operand()?, self.a?);
+                memory.pokes.push(if at == 4 {
+                    Poke::Ark { flags: value }
+                } else {
+                    Poke::ArkAt { at, value }
+                });
                 Some(self.pc + 3)
             }
             0x99 if FIELDS.contains(&self.operand()?) => {
@@ -792,6 +853,15 @@ impl<'a> Machine<'a> {
             // (`$1FC0`, `$97:C589`).
             0xC0 if matches!(self.y, Some(Entity::Id(_))) => {
                 (self.zero, self.carry) = (Some(false), None);
+                self.pc + 3
+            }
+            // `LDA $002C,X`, the entity before it in the list: for a child
+            // spawned after its parent (`COP A1`/`A2`/`A4`, `$80:BC7C`), the
+            // parent until it spawns again (guess: the `$11D` orb's trail,
+            // `$90:A2C9`, and the flyer's burst, `$97:BCD4`), for a TAY.
+            0xBD if self.x && self.operand()? == 0x2C && memory.parent.is_some() => {
+                (self.a, self.entity) = (None, Some(Entity::Parent));
+                (self.zero, self.negative) = (Some(false), Some(false));
                 self.pc + 3
             }
             // TYA of a linked child: its id.
@@ -1541,6 +1611,19 @@ mod tests {
             0x02,
         ];
         assert_eq!(poking(&code, &mut Own::new(), None).0, Some(AT + 14));
+    }
+
+    #[test]
+    fn the_guardians_circle_counts_in_direct_page_words() {
+        // `$90:A137`-like: LDA #3; STA $00; ASL; CLC; ADC $00; STA $00;
+        // LDA $00; STA $0474; INC $0474; COP. 3*2 + 3 = 9, then 10.
+        let code = [
+            0xA9, 0x03, 0x00, 0x85, 0x00, 0x0A, 0x18, 0x65, 0x00, 0x85, 0x00, 0xA5, 0x00, 0x8D,
+            0x74, 0x04, 0xEE, 0x74, 0x04, 0x02,
+        ];
+        let mut words = Scratch::new();
+        assert_eq!(run(&image(&code), AT, &mut words), Some(AT + 19));
+        assert_eq!(words[&0x0474], 10);
     }
 
     #[test]

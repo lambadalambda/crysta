@@ -29,6 +29,8 @@ const LIFE: usize = 0x5D;
 const EXP: usize = 0x90;
 /// `$064A`: the equipped weapon's item (0: none).
 const WEAPON: usize = 0x4A;
+/// `$064C`: the equipped armor's item (0: none).
+const ARMOR: usize = 0x4C;
 /// `$0659`: the equipped weapon's power.
 const WEAPON_POWER: usize = 0x59;
 const EVENTS: usize = 0xC0;
@@ -310,6 +312,17 @@ impl SaveSlot {
     pub fn weapon(&self) -> Option<(u8, u16)> {
         let item = self.word(WEAPON).to_le_bytes()[0];
         (item != 0).then(|| (item, self.word(WEAPON_POWER)))
+    }
+
+    /// The equipped armor's item (`$064C`), if any.
+    #[must_use]
+    pub fn armor(&self) -> Option<u8> {
+        Some(self.word(ARMOR).to_le_bytes()[0]).filter(|&item| item != 0)
+    }
+
+    /// Equips `item` as the armor; its defense is not counted here.
+    pub fn set_armor(&mut self, item: u8) {
+        self.set_word(ARMOR, u16::from(item));
     }
 
     /// Equips `item` with `power` (`$85:B009`, `$85:F4BD`).
