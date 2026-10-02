@@ -181,6 +181,21 @@ picked by flags: `$20` clear -> Chapter 1 (-> `$0F`); `$186` -> `$1F9`;
 | `$127` | JP: the callback freezes at `$90:805F`: label call `$13` in the story (`$90:817D`; only `06`, `08`, `25` are allowed). EU: story (13 pages), choice and the three answers run. The `COP 3F $88` cells become solid stamps (attribute 8 is not in the walker's set), so Ark cannot go into the Hole |
 | `$201`, `$129`, `$128` | refused: "outside the Crysta slice" (`crysta_runtime::admitted`). `$128` already has a static background (`cavern_loads`) |
 
+### After the runtime work
+
+- `$123`: a reduced Shadowkeeper fight in Rust (`world/shadowkeeper.rs`),
+  then the end controller and the 5th resurrection.
+- `$12A`/`$12B`: the door's reload (`$047E`), its text, flags and transfer;
+  the parchment's set-up (`$90:A4CE..A565`) is stepped over, not drawn.
+- `$03` -> `$127`: walk-in exits follow conditional lists (flag 0 always,
+  mode bit 7 tests a clear flag).
+- `$13` and `$127`: Elle's farewell, the story, the choice, the rim
+  (attribute 8 in the map) and a fixed jump (64 px, guess) into the exit.
+- `$201`/`$129`: `world/chapter.rs`, dark for the vortex, the card as the
+  ROM runs it (flag `$06F`, music `$1D`, 60 frames, the text, 720 frames),
+  then `World::chapter_over`. The European title is refused by the page
+  geometry and not shown.
+
 ## 5. Proposed runtime model
 
 1. **The continents' door.** Let native runs read `$047E` (the current
