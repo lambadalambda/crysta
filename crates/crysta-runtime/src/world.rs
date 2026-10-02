@@ -668,64 +668,9 @@ impl<'a> World<'a> {
             .insert(crate::actors::PLAYER_Y, y.wrapping_sub(16));
     }
 
-    /// Makes the writes a run made into other actors, spawned this frame
-    /// or not.
-    fn apply_pokes(&mut self) {
-        use crate::actors::Poke;
-        for poke in std::mem::take(&mut self.globals.pokes) {
-            let (Poke::Word { id, .. } | Poke::Flags { id, .. }) = poke else {
-                // Ark's: only the blink is his own here; the rest is
-                // published (`ARK_FLAGS`).
-                if let Poke::Ark { flags } = poke {
-                    self.globals.ark_flags = flags & 0x8000;
-                }
-                continue;
-            };
-            let spawned = self.globals.spawns.iter_mut().map(|(_, actor)| actor);
-            if let Some(actor) = self
-                .actors
-                .iter_mut()
-                .chain(spawned)
-                .find(|actor| actor.id == id)
-            {
-                actor.take_poke(poke);
-            }
-        }
-    }
-
-    /// Runs every resident's script for one frame and moves bodies.
-    ///
-    /// Each actor sees the player's cell and every other body's cell and
-    /// destination as occupied, so nobody steps onto anybody. When a marked
-    /// cell changes, the room is rebuilt from the base with the new cells
-    /// blocked.
-    fn run_actors(&mut self) -> Result<(), WorldError> {
-        let (x, y) = self.position();
-        self.publish_engine_words((x, y));
-        self.globals.marks.clone_from(&self.blocked);
-        self.globals.views = self
-            .actors
-            .iter()
-            .map(|actor| (actor.id, actor.view()))
-            .collect();
-        for index in 0..self.actors.len() {
-            let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
-            let mut around = surroundings(
-                self.image,
-                &mut self.globals,
-                &self.base,
-                &occupied,
-                (x, y),
-                self.facing,
-            );
-            self.actors[index].tick(&mut around);
-            self.apply_pokes();
-            if self.actors[index].blocked().is_some() {
-                // `$80:8C4A`/`8B85` wait inside the handler: nobody after
-                // this actor runs until the window is answered.
-                break;
-            }
-        }
+    /// The deletions the runs asked for: actors by id (`DA BB 02 A7 FA`),
+    /// the groups of roots that died (`$85:E383`) and of `COP EB`.
+    fn make_deletions(&mut self) {
         for id in std::mem::take(&mut self.globals.deletions) {
             if let Some(actor) = self.actors.iter_mut().find(|actor| actor.id == id) {
                 actor.remove();
@@ -759,6 +704,70 @@ impl<'a> World<'a> {
                 actor.remove();
             }
         }
+    }
+
+    /// Makes the writes a run made into other actors, spawned this frame
+    /// or not.
+    fn apply_pokes(&mut self) {
+        use crate::actors::Poke;
+        for poke in std::mem::take(&mut self.globals.pokes) {
+            let (Poke::Word { id, .. } | Poke::Flags { id, .. }) = poke else {
+                // Ark's: only the blink is his own here; the rest is
+                // published (`ARK_FLAGS`).
+                if let Poke::Ark { flags } = poke {
+                    self.globals.ark_flags = flags & 0x8000;
+                }
+                continue;
+            };
+            let spawned = self.globals.spawns.iter_mut().map(|(_, actor)| actor);
+            if let Some(actor) = self
+                .actors
+                .iter_mut()
+                .chain(spawned)
+                .find(|actor| actor.id == id)
+            {
+                actor.take_poke(poke);
+                refresh_view(&mut self.globals.views, actor);
+            }
+        }
+    }
+
+    /// Runs every resident's script for one frame and moves bodies.
+    ///
+    /// Each actor sees the player's cell and every other body's cell and
+    /// destination as occupied, so nobody steps onto anybody. When a marked
+    /// cell changes, the room is rebuilt from the base with the new cells
+    /// blocked.
+    fn run_actors(&mut self) -> Result<(), WorldError> {
+        let (x, y) = self.position();
+        self.publish_engine_words((x, y));
+        self.globals.marks.clone_from(&self.blocked);
+        self.globals.views = self
+            .actors
+            .iter()
+            .map(|actor| (actor.id, actor.view()))
+            .collect();
+        for index in 0..self.actors.len() {
+            let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
+            let mut around = surroundings(
+                self.image,
+                &mut self.globals,
+                &self.base,
+                &occupied,
+                (x, y),
+                self.facing,
+            );
+            self.actors[index].tick(&mut around);
+            // Runs after this one see it as it is now.
+            refresh_view(&mut self.globals.views, &self.actors[index]);
+            self.apply_pokes();
+            if self.actors[index].blocked().is_some() {
+                // `$80:8C4A`/`8B85` wait inside the handler: nobody after
+                // this actor runs until the window is answered.
+                break;
+            }
+        }
+        self.make_deletions();
         // The light room asks for `$07` (`$90:8B0C`): the tower's end.
         if self.globals.scratch.remove(&crate::actors::PENDING_MAP) == Some(0x0007) {
             let tower = self.globals.scratch.remove(&TOWER_INDEX).unwrap_or(0);
@@ -2210,6 +2219,15 @@ enum Scene {
         /// What it waits for.
         wait: Wait,
     },
+}
+
+/// Puts an actor's view as it is now among the views runs read.
+fn refresh_view(views: &mut Vec<(u16, crate::actors::View)>, actor: &Actor) {
+    let view = actor.view();
+    match views.iter_mut().find(|(id, _)| *id == actor.id) {
+        Some(entry) => entry.1 = view,
+        None => views.push((actor.id, view)),
+    }
 }
 
 /// What one actor sees this frame.

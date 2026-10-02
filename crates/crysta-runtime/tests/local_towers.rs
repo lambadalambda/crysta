@@ -842,3 +842,33 @@ fn leaning_off_the_rope_drops_ark_a_floor() {
         assert_eq!(world.map(), 0x0117, "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn the_dancing_huball_troupe_ends_when_its_balls_are_hit() {
+    // `docs/tower-four.md` §3: eight balls in formation; each hit turns one
+    // into a Hiball. At none: the end text, flag `$11D`, back to `$11A`.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x105 / 8] |= 1 << (0x105 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x011B, 376, 552, events).unwrap();
+        world.set_life(999);
+        for frame in 0..6000 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+            if frame % 30 == 0 {
+                world.hit_spawned(1);
+            }
+            if world.map() != 0x011B {
+                break;
+            }
+        }
+        assert_eq!(world.map(), 0x011A, "{:?}", rom.revision());
+        assert!(world.events()[0x11D / 8] & (1 << (0x11D % 8)) != 0);
+    }
+}

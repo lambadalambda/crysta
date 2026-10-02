@@ -216,8 +216,13 @@ const SPAWNS: [u8; 9] = [
     0xE8,
     DELETE_GROUP,
 ];
-/// The enemies' death script (`$85:E27B`), which a script may jump to.
+/// The enemies' death script (`$85:E27B`), which a script may jump to
+/// (`COP 06`) or go on in (`COP BF`, the show's controller, `$97:CD07`).
 const DEATH: usize = 0x05_E27B;
+
+fn is_death(image: &[u8], target: usize) -> bool {
+    assets::layout::offset(image, DEATH) == Some(target)
+}
 /// The own word that holds the group's root (`7F:102E`).
 const GROUP: u16 = 0x102E;
 /// The own words of an enemy's life (`7F:102A`) and its struck callback
@@ -1226,6 +1231,7 @@ impl Actor {
         let player = native::View {
             id: 0,
             flags: globals.ark_flags | published,
+            word26: 0,
             x: player.0,
             y: player.1,
             facing: u16::from(sense::code(facing)),
@@ -2718,6 +2724,7 @@ impl Actor {
         native::View {
             id: self.id,
             flags: u16::from(self.hidden) << 15 | u16::from(out) << 7,
+            word26: self.own_word(0x26),
             x: self.position.0,
             y: self.position.1,
             facing: u16::from(self.facing_code()),
@@ -3137,7 +3144,7 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                if service == LONG_JUMP && Some(target) == assets::layout::offset(image, DEATH) {
+                if service == LONG_JUMP && is_death(image, target) {
                     self.die(image);
                     return false;
                 } else if service == LONG_JUMP {
@@ -3209,7 +3216,11 @@ impl Actor {
             self.state = State::Frozen;
             return false;
         };
-        self.pc = target;
+        if is_death(image, target) {
+            self.die(image);
+        } else {
+            self.pc = target;
+        }
         false
     }
 
@@ -5198,9 +5209,15 @@ mod script_service_tests {
 
     #[test]
     fn a_jump_to_the_death_script_ends_the_actor() {
-        // COP 06 $85:E27B: an enemy explodes; anything else goes.
+        // COP 06 $85:E27B: an enemy explodes; anything else goes. COP BF
+        // too.
         let code = [2, 0x06, 0x7B, 0xE2, 0x85];
         let (image, mut actor) = actor_running(&code);
+        tick(&mut actor, &image);
+        assert!(actor.is_gone());
+        let mut image = vec![0; AT + 5];
+        image[AT..AT + 5].copy_from_slice(&[2, 0xBF, 0x7B, 0xE2, 0x85]);
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
         tick(&mut actor, &image);
         assert!(actor.is_gone());
         let (image, mut actor) = actor_running(&code);

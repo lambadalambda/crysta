@@ -108,6 +108,8 @@ pub struct View {
     pub id: u16,
     /// `+$04` as far as it is kept: hidden (`$8000`), out of play (`$0080`).
     pub flags: u16,
+    /// `+$26`, a script's word (the show's balls left, `$97:CF3F`).
+    pub word26: u16,
     /// `+$00`.
     pub x: u16,
     /// `+$02`.
@@ -118,7 +120,7 @@ pub struct View {
 
 impl View {
     /// The word at `+field`: x, y, `+$04`, the facing, the layer (always 0
-    /// here).
+    /// here), `+$26`.
     fn field(self, field: u16) -> Option<u16> {
         match field {
             0x00 => Some(self.x),
@@ -126,6 +128,7 @@ impl View {
             0x04 => Some(self.flags),
             0x14 => Some(self.facing),
             0x16 => Some(0),
+            0x26 => Some(self.word26),
             _ => None,
         }
     }
@@ -140,7 +143,8 @@ enum Entity {
     Id(u16),
 }
 
-/// The actor's own bytes runs may use: the parent, which a copy clears as it
+/// The actor's own bytes runs may use: a loop's resume address and count
+/// (`$7F:0000..0003,X`, the show, `$97:CB3E`), the parent, which a copy clears as it
 /// leaves its group (`$7F:001E,X`, `$97:CA09`), the wake callbacks, the
 /// attack kind and the group root (`$7F:1000..102F,X`,
 /// `docs/enemy-scripts.md` §5), `COP CC`'s target
@@ -148,7 +152,8 @@ enum Entity {
 /// (`$7F:201A/201B,X`), the voice fade's intensity (`$7F:201C,X`,
 /// `$88:9CD8`) and the callbacks' script bank (`$7F:2020,X`, `$90:93B9`).
 /// Other fields are the engine's.
-const OWN: [std::ops::RangeInclusive<u16>; 5] = [
+const OWN: [std::ops::RangeInclusive<u16>; 6] = [
+    0x0000..=0x0003,
     0x001E..=0x001F,
     0x1000..=0x102F,
     0x2004..=0x200B,
@@ -178,7 +183,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, and one engine word the
 /// runtime does not read. With the evidence.
-const SCRATCH: [(u16, u16); 8] = [
+const SCRATCH: [(u16, u16); 9] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -191,6 +196,10 @@ const SCRATCH: [(u16, u16); 8] = [
     (0x04CC, 0x04CD),
     // The light room's BG3 scroll (`$90:8AC9`, `$90:8AD5`), not drawn.
     (0x0886, 0x0889),
+    // An engine word the runtime does not keep (guess: a press or an idle
+    // count): the European show's end waits up to 600 frames for it
+    // (`$97:BC2B`), here the whole wait.
+    (0x04FA, 0x04FB),
     // Ark's state gates: `$8000` paralysed (`$97:C2B2`), `$0400` asleep
     // (`$97:C5AC`); `COP 71` tests them.
     (ARK_GATES, ARK_GATES + 1),
@@ -454,7 +463,8 @@ impl<'a> Machine<'a> {
         {
             return Some(Flow::On);
         }
-        if let Some(next) = self.poke(opcode, memory) {
+        let next = self.poke(opcode, memory);
+        if let Some(next) = next.or_else(|| self.resume_at(opcode)) {
             self.pc = next;
             return Some(Flow::On);
         }
@@ -542,6 +552,17 @@ impl<'a> Machine<'a> {
             _ => return Some(Flow::Stop),
         };
         Some(Flow::On)
+    }
+
+    /// `STA $000A,X; RTL`: the script goes on at A in its bank (the show's
+    /// loop, `$97:CB67`).
+    fn resume_at(&self, opcode: u8) -> Option<usize> {
+        let ok = opcode == 0x9D
+            && self.operand() == Some(0x0A)
+            && self.x
+            && !self.narrow
+            && self.image.get(self.pc + 3) == Some(&0x6B);
+        ok.then(|| self.a.map(|a| (self.pc & 0xFF_0000) | usize::from(a)))?
     }
 
     /// Writes into another entity: `TYX`/`TAX` onto it, `STA $7F:k,X` and
@@ -674,13 +695,19 @@ impl<'a> Machine<'a> {
         if self.narrow {
             return None;
         }
-        let view = |entity| match entity {
-            Entity::Player => Some(memory.player),
-            Entity::Parent => memory.parent,
-            Entity::Id(id) => memory
+        let by_id = |id| {
+            memory
                 .views
                 .iter()
-                .find_map(|&(other, view)| (other == id).then_some(view)),
+                .find_map(|&(other, view)| (other == id).then_some(view))
+        };
+        // The parent as it is now; as it was at the spawn once it is gone.
+        let view = |entity| match entity {
+            Entity::Player => Some(memory.player),
+            Entity::Parent => memory
+                .parent
+                .map(|parent| by_id(parent.id).unwrap_or(parent)),
+            Entity::Id(id) => by_id(id),
         };
         self.pc = match opcode {
             0xAC if self.operand()? == 0x0DEA => {
@@ -1326,6 +1353,16 @@ mod tests {
     /// A run of `code` with Y on child `linked` and a parent `0x4001`,
     /// and the writes it leaves for other entities.
     fn poking(code: &[u8], own: &mut Own, linked: Option<u16>) -> (Option<usize>, Vec<Poke>) {
+        poking_among(code, own, linked, &[])
+    }
+
+    /// [`poking`] with the other entities' views.
+    fn poking_among(
+        code: &[u8],
+        own: &mut Own,
+        linked: Option<u16>,
+        views: &[(u16, View)],
+    ) -> (Option<usize>, Vec<Poke>) {
         let run = image(code);
         let (mut words, mut display) = (Scratch::new(), Display::default());
         let mut pokes = Vec::new();
@@ -1344,7 +1381,7 @@ mod tests {
                 ..View::default()
             }),
             linked,
-            views: &[],
+            views,
             carried: &mut None,
             pokes: &mut pokes,
         };
@@ -1363,6 +1400,41 @@ mod tests {
         let (next, pokes) = poking(&code, &mut Own::new(), None);
         assert_eq!(next, Some(AT + 23));
         assert_eq!(pokes, [Poke::Ark { flags: 0x8000 }]);
+    }
+
+    #[test]
+    fn the_shows_loop_resumes_where_it_kept() {
+        // `$97:CB58`: LDA $7F:0002,X; DEC; BEQ +12; STA $7F:0002,X;
+        // LDA $7F:0000,X; STA $000A,X; RTL: on at the kept address.
+        let mut code = vec![
+            0xBF, 0x02, 0x00, 0x7F, 0x3A, 0xF0, 0x0C, 0x9F, 0x02, 0x00, 0x7F, 0xBF, 0x00, 0x00,
+            0x7F, 0x9D, 0x0A, 0x00, 0x6B,
+        ];
+        code.resize(0x40, 0);
+        code.push(0x02);
+        let [low, high] = u16::try_from((AT + 0x40) & 0xFFFF).unwrap().to_le_bytes();
+        let mut own = Own::from([(0x0000, low), (0x0001, high), (0x0002, 3), (0x0003, 0)]);
+        let (next, _) = poking(&code, &mut own, None);
+        assert_eq!(next, Some(AT + 0x40));
+        assert_eq!(own[&0x0002], 2);
+    }
+
+    #[test]
+    fn a_struck_ball_counts_its_parent_down() {
+        // `$97:CF3A`: LDA $7F:001E,X; TAY; LDA $0026,Y; DEC; STA $0026,Y;
+        // COP. The parent as it is now, not as it was at the spawn.
+        let code = [
+            0xBF, 0x1E, 0x00, 0x7F, 0xA8, 0xB9, 0x26, 0x00, 0x3A, 0x99, 0x26, 0x00, 0x02,
+        ];
+        let parent = View {
+            id: 0x4001,
+            word26: 8,
+            ..View::default()
+        };
+        let (next, pokes) = poking_among(&code, &mut Own::new(), None, &[(0x4001, parent)]);
+        assert_eq!(next, Some(AT + 12));
+        let (id, at, value) = (0x4001, 0x26, 7);
+        assert_eq!(pokes, [Poke::Word { id, at, value }]);
     }
 
     #[test]
@@ -1487,6 +1559,7 @@ mod tests {
             player: View {
                 id: 0,
                 flags: 0,
+                word26: 0,
                 x: 0x100,
                 y: 0x88,
                 facing: 3,
