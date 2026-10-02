@@ -16,7 +16,7 @@ impl Layer<'_> {
     /// but 0, 1, 17 and 22 (`$80:E11C`). Attribute 2, the door gaps, blocks
     /// only with `$048A & $8000`, which the towers set; it blocks here.
     /// Cells off the map block.
-    fn blocks(&self, column: i32, row: i32) -> bool {
+    pub(super) fn blocks(&self, column: i32, row: i32) -> bool {
         let (Ok(column), Ok(row)) = (u16::try_from(column), u16::try_from(row)) else {
             return true;
         };

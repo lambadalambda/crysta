@@ -533,3 +533,66 @@ fn ark_pushes_tower_twos_statue_aside() {
         assert!(world.events()[0x284 / 8] & (1 << (0x284 % 8)) != 0);
     }
 }
+
+#[test]
+fn a_pushed_block_on_its_mark_sets_its_flag() {
+    // `docs/tower-two.md`: on `$10B` the watcher `$90:9677` spawns a block
+    // (`$90:FC6E`) at (160,368); pushed Left one cell onto x `$90`, it sets
+    // flag `$002`, and the watcher takes its place.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x010B, 184, 368, events).unwrap();
+        for _ in 0..200 {
+            world
+                .update(Some(Direction::Left), Presses::default())
+                .unwrap();
+        }
+        assert!(world.events()[0] & 4 != 0, "{:?}: flag 2", rom.revision());
+        assert!(
+            world.events()[0] & 2 == 0,
+            "{:?}: no wrong mark",
+            rom.revision()
+        );
+        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn tower_twos_switches_open_the_stairs() {
+    // `docs/tower-two.md`: the two hidden switches on `$109` answer A from
+    // beside them (flags `$286`, `$287`, a cell patch each); with both,
+    // the controller sets `$28C` and `$28D` and opens the stairs.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0109, 264, 160, events).unwrap();
+        for (x, y) in [(264, 144), (504, 144)] {
+            world.place(x, y + 16);
+            world.face(Direction::Up);
+            for _ in 0..3 {
+                world.update(None, Presses::default()).unwrap();
+            }
+            world.update(None, a).unwrap();
+            for _ in 0..30 {
+                world.update(None, Presses::default()).unwrap();
+            }
+        }
+        for _ in 0..200 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { a } else { Presses::default() })
+                .unwrap();
+        }
+        let flag = |n: usize| world.events()[n / 8] & (1 << (n % 8)) != 0;
+        assert!(
+            flag(0x286) && flag(0x287) && flag(0x28C) && flag(0x28D),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

@@ -47,13 +47,21 @@ pub struct Memory<'m> {
     /// The parent's, through `LDA $7F:001E,X; TAY`, as it was at the
     /// spawn (`$97:C1E6`).
     pub parent: Option<View>,
+    /// The child `COP 99` linked, which Y holds as the run starts.
+    pub linked: Option<u16>,
+    /// Every actor by id, for an id in a field (`LDY $0026,X`).
+    pub views: &'m [(u16, View)],
+    /// A left at a `BRA`/`JMP` the script loop follows, and its target,
+    /// for a run that starts there (`$90:FCC6`: `INC; BRA` to `STA $0026,X`).
+    pub carried: &'m mut Option<(usize, u16)>,
 }
 
 /// What a run reads of another entity through Y.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct View {
-    /// `+$00`, `+$02`.
+    /// `+$00`.
     pub x: u16,
+    /// `+$02`.
     pub y: u16,
     /// `+$14`, the facing code.
     pub facing: u16,
@@ -77,6 +85,8 @@ impl View {
 enum Entity {
     Player,
     Parent,
+    /// An actor by its id.
+    Id(u16),
 }
 
 /// The actor's own bytes runs may use: the wake callbacks and the attack
@@ -140,7 +150,8 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 8] = [
+const READABLE: [u16; 9] = [
+    ARK_FLAGS,
     WINDOW_BUSY,
     PLAYER_ACTION,
     PRIME_BLUE,
@@ -150,6 +161,8 @@ const READABLE: [u16; 8] = [
     PLAYER_X,
     PLAYER_Y,
 ];
+/// `$0978`, a copy of Ark's `+$04`: bit 7 out of play (`$90:FC9B`).
+pub const ARK_FLAGS: u16 = 0x0978;
 /// `$0DC2`, nonzero while the text window is busy (`$97:BF59`).
 pub const WINDOW_BUSY: u16 = 0x0DC2;
 /// `$0952`, Ark's x less 8.
@@ -243,7 +256,10 @@ pub struct Paused {
 pub(super) fn run(image: &[u8], at: usize, memory: &mut Memory<'_>) -> Option<Ran> {
     let fresh = Paused {
         pc: at,
-        a: None,
+        a: memory
+            .carried
+            .take()
+            .and_then(|(target, a)| (target == at).then_some(a)),
         zero: None,
         negative: None,
         carry: None,
@@ -269,6 +285,7 @@ fn go(mut machine: Machine<'_>, memory: &mut Memory<'_>, fresh: bool) -> Option<
                     && !machine.narrow
                     && machine.x
                     && machine.stack.is_empty();
+                *memory.carried = machine.jump_target().zip(machine.a).filter(|_| settled);
                 return settled.then_some(Ran::Next(machine.pc));
             }
         }
@@ -305,6 +322,8 @@ struct Machine<'a> {
     /// The entity Y holds, and the one A holds for a `TAY`.
     y: Option<Entity>,
     entity: Option<Entity>,
+    /// Before the run's first instruction, where Y is a linked child's.
+    pc_is_start: bool,
 }
 
 impl<'a> Machine<'a> {
@@ -331,6 +350,7 @@ impl<'a> Machine<'a> {
             stack,
             y: None,
             entity: None,
+            pc_is_start: true,
         }
     }
 
@@ -351,8 +371,14 @@ impl<'a> Machine<'a> {
     /// another recogniser; `None` refuses the run.
     fn step(&mut self, memory: &mut Memory<'_>) -> Option<Flow> {
         let opcode = *self.image.get(self.pc)?;
-        if matches!(opcode, 0xAC | 0xA8 | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF)
-            && self.entity_op(opcode, memory).is_some()
+        if self.pc_is_start && memory.linked.is_some() {
+            self.y = memory.linked.map(Entity::Id);
+        }
+        self.pc_is_start = false;
+        if matches!(
+            opcode,
+            0xAC | 0xA8 | 0x98 | 0xBC | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF
+        ) && self.entity_op(opcode, memory).is_some()
         {
             return Some(Flow::On);
         }
@@ -436,6 +462,19 @@ impl<'a> Machine<'a> {
         Some(Flow::On)
     }
 
+    /// Where the `BRA` or `JMP` at the pc goes, if it is one.
+    fn jump_target(&self) -> Option<usize> {
+        let bank = self.pc & 0xFF_0000;
+        match *self.image.get(self.pc)? {
+            0x80 => {
+                let offset = i8::from_ne_bytes([*self.image.get(self.pc + 1)?]);
+                Some(bank | ((self.pc + 2).wrapping_add_signed(isize::from(offset)) & 0xFFFF))
+            }
+            0x4C => Some(bank | usize::from(self.operand()?)),
+            _ => None,
+        }
+    }
+
     /// `STA` / `STZ` on a PPU register, a byte, or two when wide.
     fn register(&self, opcode: u8, display: &mut Display) -> Option<usize> {
         let address = self.operand()?;
@@ -501,6 +540,10 @@ impl<'a> Machine<'a> {
         let view = |entity| match entity {
             Entity::Player => Some(memory.player),
             Entity::Parent => memory.parent,
+            Entity::Id(id) => memory
+                .views
+                .iter()
+                .find_map(|&(other, view)| (other == id).then_some(view)),
         };
         self.pc = match opcode {
             0xAC if self.operand()? == 0x0DEA => {
@@ -516,6 +559,20 @@ impl<'a> Machine<'a> {
             0xA8 => {
                 self.y = Some(self.entity?);
                 self.pc + 1
+            }
+            // TYA of a linked child: its id.
+            0x98 => {
+                let Entity::Id(id) = self.y? else {
+                    return None;
+                };
+                self.set(id);
+                self.pc + 1
+            }
+            // LDY $0026,X: an id kept there.
+            0xBC if self.operand()? == 0x26 && self.x => {
+                let id = |at| u16::from(memory.own.get(&at).copied().unwrap_or(0));
+                self.y = Some(Entity::Id(id(0x26) | id(0x27) << 8));
+                self.pc + 3
             }
             0xB9 | 0xD9 => {
                 let value = view(self.y?)?.field(self.operand()?)?;
@@ -870,6 +927,9 @@ mod tests {
                 position: &mut (0, 0),
                 player: View::default(),
                 parent: None,
+                linked: None,
+                views: &[],
+                carried: &mut None,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -911,6 +971,9 @@ mod tests {
             position: &mut (0, 0),
             player: View::default(),
             parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -955,6 +1018,9 @@ mod tests {
             position: &mut (0, 0),
             player: View::default(),
             parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -990,6 +1056,9 @@ mod tests {
                 position: &mut (0, 0),
                 player: View::default(),
                 parent: None,
+                linked: None,
+                views: &[],
+                carried: &mut None,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
@@ -1020,6 +1089,9 @@ mod tests {
             position: &mut (0x80, 0x80),
             player: View::default(),
             parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
         };
         assert_eq!(next(super::run(&cadet, AT, &mut memory)), Some(AT + 35));
         // Target 8 left and 64 below: no branch, and the second PLA finds
@@ -1058,6 +1130,9 @@ mod tests {
                 x: 0x80,
                 ..View::default()
             }),
+            linked: None,
+            views: &[],
+            carried: &mut None,
         };
         assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
         assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
@@ -1170,6 +1245,9 @@ mod tests {
             position: &mut (0, 0),
             player: View::default(),
             parent: None,
+            linked: None,
+            views: &[],
+            carried: &mut None,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

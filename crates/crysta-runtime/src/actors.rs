@@ -25,8 +25,8 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Scratch, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP,
-    PRIME_BLUE, WINDOW_BUSY,
+    Scratch, View, ARK_FLAGS, ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y,
+    PREVIOUS_MAP, PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -394,6 +394,18 @@ const PLAYER_HEIGHT: u8 = 0xD4;
 /// Jumps when Ark is busy, down or out of play, or `$097E & m1`, or
 /// `$097C & m2`; else goes on (`$80:A016`): m1, m2, the target.
 const ARK_BUSY: u8 = 0x71;
+/// Clears the cells under the actor's box (`$80:93D4`): mode, column, row;
+/// a pushed block before it moves (`$90:FC6E`). Its marks go.
+const UNSEAL: u8 = 0x40;
+/// Patches a map cell (`$80:9486`): column, row, tile word.
+const PATCH_AT: u8 = 0x43;
+/// Jumps when the cell beyond the box is solid, Up, Down, Left, Right
+/// (`$80:AB2E..AB88`): the target.
+const BLOCKED_UP: u8 = 0xC2;
+const BLOCKED_RIGHT: u8 = 0xC5;
+/// Jumps while the pad holds every bit of a mask (`$80:9007`): mask,
+/// target.
+const HELD: u8 = 0x2B;
 /// The pad bits a push holds (as `COP 2A $FFF0`).
 const PAD_HELD: u16 = 0xFFF0;
 /// Starts a line move toward `$7F:2004/2006,X` (`$80:AE38`): legs, pose,
@@ -607,6 +619,12 @@ pub struct Actor {
     spawned: bool,
     /// The parent as it was at the spawn, for `$7F:001E,X` reads.
     parent: Option<native::View>,
+    /// The id other actors' runs know it by (`views`, `LDY $0026,X`).
+    pub(crate) id: u16,
+    /// The child the last `COP 99` spawned, for the run after it.
+    linked: Option<u16>,
+    /// A a run left at a jump, and the jump's target, for a run there.
+    carried: Option<(usize, u16)>,
     /// Normalized offset of the next command.
     pc: usize,
     state: State,
@@ -715,6 +733,9 @@ impl Actor {
             line: None,
             spawned: false,
             parent: None,
+            id: 0,
+            linked: None,
+            carried: None,
             parameter: 0,
             frozen_return: None,
             base: Base::Common,
@@ -1089,6 +1110,13 @@ impl Actor {
         if image.get(layer_test..layer_test + SAME_LAYER.len()) == Some(&SAME_LAYER) {
             return tested_branch(image, layer_test + SAME_LAYER.len(), true);
         }
+        // `PHX; TYX; COP A7; PLX` with Y the child kept in `+$26` (the
+        // block watchers, `$90:96CC`): the child goes.
+        if image.get(at..at + 5) == Some(&[0xDA, 0xBB, 0x02, 0xA7, 0xFA]) {
+            let id = |at| u16::from(self.own.get(&at).copied().unwrap_or(0));
+            around.globals.deletions.push(id(0x26) | id(0x27) << 8);
+            return Some(at + 5);
+        }
         if image.get(at..at + OFF_SCREEN_TEST.len()) == Some(&OFF_SCREEN_TEST) {
             let on_screen = !self.off_screen(around.globals.view);
             return tested_branch(image, at + OFF_SCREEN_TEST.len(), on_screen);
@@ -1175,6 +1203,9 @@ impl Actor {
             position: &mut self.position,
             player,
             parent: self.parent,
+            linked: self.linked.take(),
+            views: &globals.views,
+            carried: &mut self.carried,
         }
     }
 
@@ -1495,7 +1526,16 @@ impl Actor {
                 return self.stage_service(service, operands, around)
             }
             TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
-            STAMP | UNSTAMP | SEAL | BLOCK => return self.cell_service(service, operands, around),
+            STAMP
+            | UNSTAMP
+            | SEAL
+            | BLOCK
+            | UNSEAL
+            | PATCH_AT
+            | HELD
+            | BLOCKED_UP..=BLOCKED_RIGHT => {
+                return self.cell_service(service, operands, bank, around)
+            }
             HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | SPAWN | SPAWN_LINKED
             | SPAWN_AT | SPAWN_OFFSET | MUSIC_WAIT | 0x6A | 0x76 => {
                 return self.door_service(service, operands, bank, around)
@@ -2484,12 +2524,26 @@ impl Actor {
             self.position.0.wrapping_add(dx),
             self.position.1.wrapping_add(dy),
         );
-        around
-            .globals
-            .spawns
-            .push((script, self.child(script, flags, at)));
+        let mut child = self.child(script, flags, at);
+        child.id = around.globals.next_id;
+        around.globals.next_id = around.globals.next_id.wrapping_add(1).max(0x4000);
+        if service == SPAWN_LINKED {
+            self.linked = Some(child.id);
+        }
+        // The child is an entity at once: runs this frame see it.
+        around.globals.views.push((child.id, child.view()));
+        around.globals.spawns.push((script, child));
         self.pc = operands + length;
         true
+    }
+
+    /// What other actors' runs read of it through `,Y`.
+    pub(crate) fn view(&self) -> native::View {
+        native::View {
+            x: self.position.0,
+            y: self.position.1,
+            facing: u16::from(self.facing_code()),
+        }
     }
 
     /// A child as the spawns make it (`$80:BCA4`): the parent's mirror,
@@ -2505,6 +2559,7 @@ impl Actor {
         child.resources.clone_from(&self.resources);
         child.descriptor = self.descriptor;
         child.boxes.clone_from(&self.boxes);
+        child.pose_ticks.clone_from(&self.pose_ticks);
         child.legs = self.legs;
         child.hidden = flags & 0x8000 != 0;
         child.walls = flags & 0x0006 == 0x0004;
@@ -2525,11 +2580,66 @@ impl Actor {
         &mut self,
         service: u8,
         operands: usize,
+        bank: usize,
         around: &mut Surroundings<'_>,
     ) -> bool {
         let image = around.image;
         match service {
             BLOCK => return self.block_service(operands, around),
+            UNSEAL => {
+                // `$80:C012`: the cells under the box, as `COP 3F` set them.
+                let Some(&[mode, dx, dy]) = image.get(operands..operands + 3) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let signed = |by: u8| i16::from(i8::from_ne_bytes([by])) * 16;
+                let base = if mode == 0 { self.position } else { (0, 0) };
+                let at = (
+                    base.0.wrapping_add_signed(signed(dx)),
+                    base.1.wrapping_add_signed(signed(dy)),
+                );
+                for cell in self.cells_under(at) {
+                    self.stamps.retain(|&stamped| stamped != cell);
+                }
+                self.pc = operands + 3;
+            }
+            PATCH_AT => {
+                let Some(&[column, row, low, high]) = image.get(operands..operands + 4) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                let tile = u16::from_le_bytes([low, high]) & 0x1FF;
+                around
+                    .globals
+                    .patches
+                    .push((u16::from(column), u16::from(row), tile));
+                self.pc = operands + 4;
+            }
+            HELD => {
+                let (Some(mask), Some(target)) = (
+                    cadence::word(image, operands),
+                    cadence::word(image, operands + 2),
+                ) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                // Bit 0 asks `$048A & $8000` too (`$80:902D`), not modelled.
+                let mask = mask & !1;
+                if around.globals.pad & mask == mask {
+                    return self.jump(bank, target);
+                }
+                self.pc = operands + 4;
+            }
+            BLOCKED_UP..=BLOCKED_RIGHT => {
+                let Some(target) = cadence::word(image, operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                if self.blocked_beyond(service - BLOCKED_UP, around) {
+                    return self.jump(bank, target);
+                }
+                self.pc = operands + 2;
+            }
             STAMP | UNSTAMP => {
                 let Some(&[0, dx, dy]) = image.get(operands..operands + 3) else {
                     self.state = State::Frozen;
@@ -2557,21 +2667,85 @@ impl Actor {
                 } else {
                     (0, 0)
                 };
-                // `$80:BF8E`: the cell under (x - 8, y - 16), as the
-                // collision cell of a body there.
-                let cell = (
-                    base.0.wrapping_add_signed(signed(dx)).wrapping_sub(8) / 16,
-                    base.1.wrapping_add_signed(signed(dy)).wrapping_sub(16) / 16,
+                let at = (
+                    base.0.wrapping_add_signed(signed(dx)),
+                    base.1.wrapping_add_signed(signed(dy)),
                 );
                 let attribute = (u16::from(mode) << 9 >> 9) & 0x1F;
-                self.stamps.retain(|&stamped| stamped != cell);
-                if !matches!(attribute, 0 | 1 | 2 | 17 | 22) {
-                    self.stamps.push(cell);
+                for cell in self.cells_under(at) {
+                    self.stamps.retain(|&stamped| stamped != cell);
+                    if !matches!(attribute, 0 | 1 | 2 | 17 | 22) {
+                        self.stamps.push(cell);
+                    }
                 }
                 self.pc = operands + 3;
             }
         }
         true
+    }
+
+    /// The box (x offset, width, y offset, height) of the pose shown, from
+    /// its first record (`7F:0028..002E`); a body's 16 pixels without one.
+    fn box_shape(&self) -> [i8; 4] {
+        self.boxes
+            .as_ref()
+            .and_then(|boxes| boxes.get(usize::from(self.selector))?.first())
+            .map_or([-8, 16, -16, 16], |record| record.sprite)
+    }
+
+    /// The cells `COP 3F` sets for a body at `at` (`$80:BF8E`): a box of
+    /// fewer than three cells across and down marks the one under (x - 8,
+    /// y - 16); a larger one every cell under the box (`$80:BFD3`, tower 2's
+    /// 32-pixel blocks).
+    fn cells_under(&self, at: (u16, u16)) -> Vec<(u16, u16)> {
+        let [bx, bw, by, bh] = self.box_shape().map(i16::from);
+        let (columns, rows) = (bw.max(0) >> 4, bh.max(0) >> 4);
+        if columns + rows < 3 {
+            return vec![(at.0.wrapping_sub(8) / 16, at.1.wrapping_sub(16) / 16)];
+        }
+        let (left, top) = (
+            at.0.wrapping_add_signed(bx) / 16,
+            at.1.wrapping_add_signed(by) / 16,
+        );
+        (0..rows.cast_unsigned())
+            .flat_map(|row| {
+                (0..columns.cast_unsigned()).map(move |column| (left + column, top + row))
+            })
+            .collect()
+    }
+
+    /// Whether the cells just beyond the actor's box toward `direction` (0
+    /// Up, 1 Down, 2 Left, 3 Right) stop it: a wall for enemies, or a body.
+    fn blocked_beyond(&self, direction: u8, around: &Surroundings<'_>) -> bool {
+        let [bx, bw, by, bh] = self.box_shape().map(i32::from);
+        let (x, y) = (i32::from(self.position.0), i32::from(self.position.1));
+        let (left, top, right, bottom) = (x + bx, y + by, x + bx + bw - 1, y + by + bh - 1);
+        let cells: Vec<(i32, i32)> = match direction {
+            0 => (left >> 4..=right >> 4)
+                .map(|c| (c, (top - 1) >> 4))
+                .collect(),
+            1 => (left >> 4..=right >> 4)
+                .map(|c| (c, (bottom + 1) >> 4))
+                .collect(),
+            2 => (top >> 4..=bottom >> 4)
+                .map(|r| ((left - 1) >> 4, r))
+                .collect(),
+            _ => (top >> 4..=bottom >> 4)
+                .map(|r| ((right + 1) >> 4, r))
+                .collect(),
+        };
+        let layer = walls::Layer {
+            cells: around.cells,
+            width: around.width,
+            height: around.height,
+        };
+        cells.into_iter().any(|(column, row)| {
+            layer.blocks(column, row)
+                || around
+                    .occupied
+                    .iter()
+                    .any(|&(c, r)| (i32::from(c), i32::from(r)) == (column, row))
+        })
     }
 
     /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns

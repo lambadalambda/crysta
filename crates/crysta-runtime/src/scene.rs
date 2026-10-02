@@ -96,6 +96,14 @@ pub struct Globals {
     /// Actors scripts spawned (`COP A2`, `A4`), not yet in the map: script
     /// (normalized) and the child, with what it took from its parent.
     pub spawns: Vec<(usize, crate::actors::Actor)>,
+    /// The ids the next spawns take.
+    pub next_id: u16,
+    /// Every actor's id and place this frame, as `,Y` reads see them.
+    pub views: Vec<(u16, crate::actors::View)>,
+    /// Actors another's script deleted (`PHX; TYX; COP A7; PLX`).
+    pub deletions: Vec<u16>,
+    /// The cells bodies mark and seal this frame, as the map has them.
+    pub marks: Vec<(u16, u16)>,
     /// Music and sound effect requests ([`crate::audio`]).
     pub audio: crate::audio::Audio,
     /// The colour math scripts set ([`crate::display`]).
@@ -235,6 +243,10 @@ impl Globals {
             counters: vec![0; 0x80],
             patches: Vec::new(),
             spawns: Vec::new(),
+            next_id: 0x4000,
+            views: Vec::new(),
+            deletions: Vec::new(),
+            marks: Vec::new(),
             audio: crate::audio::Audio::default(),
             display: crate::display::Display::default(),
             pan: None,

@@ -301,7 +301,9 @@ impl<'a> World<'a> {
                 let seed = u32::from(map)
                     .wrapping_mul(0x9E37_79B9)
                     .wrapping_add(u32::try_from(index).unwrap_or(0).wrapping_mul(0x85EB_CA6B));
-                Actor::for_resident(image, map, resident, seed)
+                let mut actor = Actor::for_resident(image, map, resident, seed);
+                actor.id = 0x0100 + u16::try_from(index).unwrap_or(0);
+                actor
             })
             .collect();
         let base = if candidate {
@@ -612,14 +614,10 @@ impl<'a> World<'a> {
         Ok(step)
     }
 
-    /// Runs every resident's script for one frame and moves bodies.
-    ///
-    /// Each actor sees the player's cell and every other body's cell and
-    /// destination as occupied, so nobody steps onto anybody. When a marked
-    /// cell changes, the room is rebuilt from the base with the new cells
-    /// blocked.
-    fn run_actors(&mut self) -> Result<(), WorldError> {
-        let (x, y) = self.position();
+    /// The engine words runs read this frame ([`crate::actors`]): the
+    /// enemy count, the player's action word, Prime Blue, the frame counter,
+    /// the window, Ark's flags and place.
+    fn publish_engine_words(&mut self, (x, y): (u16, u16)) {
         // The player's action word as runs read it: only a forced action
         // (`$0810`) is modelled; Ark never attacks or jumps here.
         let enemies = self.actors.iter().filter(|actor| actor.counts()).count();
@@ -647,12 +645,32 @@ impl<'a> World<'a> {
             u16::from(self.globals.dialogue.busy()),
         );
         self.globals.ark_busy = self.hurt.is_some() || self.down.is_some();
+        // Ark's `+$04`: in play (bit 2), or out of it (bit 7) when down.
+        let flags = if self.down.is_some() { 0x0084 } else { 0x0004 };
+        self.globals.scratch.insert(crate::actors::ARK_FLAGS, flags);
         self.globals
             .scratch
             .insert(crate::actors::PLAYER_X, x.wrapping_sub(8));
         self.globals
             .scratch
             .insert(crate::actors::PLAYER_Y, y.wrapping_sub(16));
+    }
+
+    /// Runs every resident's script for one frame and moves bodies.
+    ///
+    /// Each actor sees the player's cell and every other body's cell and
+    /// destination as occupied, so nobody steps onto anybody. When a marked
+    /// cell changes, the room is rebuilt from the base with the new cells
+    /// blocked.
+    fn run_actors(&mut self) -> Result<(), WorldError> {
+        let (x, y) = self.position();
+        self.publish_engine_words((x, y));
+        self.globals.marks.clone_from(&self.blocked);
+        self.globals.views = self
+            .actors
+            .iter()
+            .map(|actor| (actor.id, actor.view()))
+            .collect();
         for index in 0..self.actors.len() {
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(
@@ -668,6 +686,11 @@ impl<'a> World<'a> {
                 // `$80:8C4A`/`8B85` wait inside the handler: nobody after
                 // this actor runs until the window is answered.
                 break;
+            }
+        }
+        for id in std::mem::take(&mut self.globals.deletions) {
+            if let Some(actor) = self.actors.iter_mut().find(|actor| actor.id == id) {
+                actor.remove();
             }
         }
         // The light room asks for `$07` (`$90:8B0C`): the tower's end.
