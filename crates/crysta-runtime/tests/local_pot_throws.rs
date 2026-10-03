@@ -12,7 +12,8 @@ use std::path::{Path, PathBuf};
 
 /// Not modelled yet: the dash-throw and jump-throw (measured once), and
 /// the fall the pot shows as an exit drops it (`$84:C5CB`, stream `$6A`);
-/// the drop itself is [`carrying_onto_an_exit_drops_the_pot`].
+/// the drop itself is [`carrying_onto_an_exit_drops_the_pot`]. Tracked:
+/// `meta/issues/pot-extras.md`.
 const LATER: [&str; 3] = [
     "exit-while-carrying",
     "throw-right-dashing",

@@ -220,6 +220,10 @@ mod tests {
             })
         );
         display.write(MATH_LAYERS, 0x23);
-        assert_eq!(display.darkening(), None, "addition is not modelled");
+        assert_eq!(
+            display.darkening(),
+            None,
+            "addition is not modelled (meta/issues/colour-addition.md)"
+        );
     }
 }

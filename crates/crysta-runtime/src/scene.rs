@@ -276,7 +276,8 @@ impl Globals {
     }
 
     /// `COP 4B`: stores a word at `$0640 + op`, or with bit 7 adds it in BCD,
-    /// capped at 9999. Bit 6's subtraction is not modelled; returns false.
+    /// capped at 9999. Bit 6's subtraction is not modelled; returns false
+    /// (`meta/issues/partial-cop-services.md`).
     pub fn count(&mut self, op: u8, word: u16) -> bool {
         let at = usize::from(op & 0x3F);
         let Some(slot) = self.counters.get_mut(at..at + 2) else {

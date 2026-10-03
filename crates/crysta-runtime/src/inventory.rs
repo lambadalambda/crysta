@@ -84,7 +84,7 @@ impl Inventory {
     /// Takes one `item` (`$8D:96A0`); `false` when none is held. Item 0
     /// takes nothing and succeeds. The last one empties its slot; a count
     /// of 0 wraps, as the engine's `DEC` does. Unequipping (`$0648`) is
-    /// not modelled.
+    /// not modelled (`meta/issues/unequip-on-remove.md`).
     pub fn remove(&mut self, item: u8) -> bool {
         if item == 0 {
             return true;

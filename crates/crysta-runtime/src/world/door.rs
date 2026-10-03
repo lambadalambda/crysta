@@ -12,6 +12,7 @@
 //! Not modelled: the player's poses (`COP CB`), the `$7F:1020` writes, and
 //! `$87:C7F1`'s other branch, which with `$04F6` nonzero wants the raw word
 //! `$00F3` (every door found is `$1CF3`; what sets `$04F6` is not traced).
+//! Tracked: `meta/issues/door-player-poses.md`.
 
 use super::{World, WorldError};
 use room_core::Direction;

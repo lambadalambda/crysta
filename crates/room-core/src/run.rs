@@ -9,7 +9,8 @@
 //! opposite one brakes the frame after. The brake slides 15 pixels over 16 frames
 //! (sound `$0D`), and a direction from its fifth frame walks off. A wall
 //! ends the dash: a walk if the direction is held, else a stand.
-//! Diagonals, the dash attack and the dash jump are not modelled.
+//! Diagonals, the dash attack and the dash jump are not modelled
+//! (`meta/issues/dash-diagonals-attack-jump.md`).
 
 use crate::{Direction, FrameInput, MovementOutput, Room, Unqualified, WalkingState};
 

@@ -128,7 +128,7 @@ pub fn draw(canvas: &mut Canvas, art: &ShopArt, shown: Shown) {
 /// Draws the damage digits floating over the bodies hit: 8x8 OBJ tiles
 /// `$40 + d`, 7 pixels apart, centred on the body (`$85:E55C`). The
 /// critical hit's and Ark's colours (palettes 5 and 3) are not modelled;
-/// all use palette 4.
+/// all use palette 4 (`meta/issues/tower-hud.md`).
 pub fn draw_digits(
     canvas: &mut Canvas,
     art: &ShopArt,

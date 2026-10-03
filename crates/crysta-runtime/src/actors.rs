@@ -289,7 +289,8 @@ const PPU_WRITE: u8 = 0x76;
 /// on past the table too.
 const SWITCH: u8 = 0x22;
 /// Picks the movement resource base (`$7F:0022`, `$80:A975`): `$4000 +
-/// n << 12`, or with `FF` a word and a bank, which is not modelled.
+/// n << 12`, or with `FF` a word and a bank, which is not modelled
+/// (`meta/issues/partial-cop-services.md`).
 const SPEED: u8 = 0xB0;
 /// Selects one of Ark's direct animation resources and starts a movement
 /// selector through the following pose wait (`$80:A200..A2D8`). Operands:
@@ -398,7 +399,7 @@ const CONTACT: [Option<u8>; 7] = [
 /// (the hit scan `$85:D281`).
 const GUARD_04: u16 = 0x0033;
 /// The `+$04` bits scripts may set and clear: those modelled, and some
-/// accepted and not modelled. The guide clears and sets 12 around the
+/// accepted and not modelled (`meta/issues/partial-cop-services.md`). The guide clears and sets 12 around the
 /// freezing's whitening (`$88:B507`, `$88:B53F`) and clears 8, the
 /// dispatcher's target bit, before it leaves (`$88:AF1A`). Bit 13 lets a
 /// hidden body move (`$80:C967`), as every body does here (the Guardner's
@@ -2921,7 +2922,8 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                // Bit 0 asks `$048A & $8000` too (`$80:902D`), not modelled.
+                // Bit 0 asks `$048A & $8000` too (`$80:902D`), not modelled
+                // (`meta/issues/partial-cop-services.md`).
                 let mask = mask & !1;
                 if around.globals.pad & mask == mask {
                     return self.jump(bank, target);
@@ -2998,7 +3000,8 @@ impl Actor {
         }
         // Blocked every way, a wall-follower would test round and round
         // without a yield (`$11A`'s ring, `$97:B445`; natively `$0868` bit 7
-        // tests another map, not modelled): it waits a frame instead.
+        // tests another map, not modelled): it waits a frame instead
+        // (`meta/issues/partial-cop-services.md`).
         self.blocked_tests += 1;
         self.blocked_tests <= 4 && self.jump(bank, target)
     }
@@ -3111,7 +3114,8 @@ impl Actor {
     /// from (sx, sy) to (dx, dy), adds 16 and yields; then sleeps `wait` at
     /// the next yield and goes on. Layer 0 (own `$7F:201B`) is the first,
     /// with its collision; the second layer's copies change only the
-    /// picture and are not modelled. Returns whether execution continues.
+    /// picture and are not modelled (`meta/issues/partial-cop-services.md`).
+    /// Returns whether execution continues.
     fn block_service(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
         let Some(&[n, limit, sx, sy, dx, dy, wait]) = around.image.get(operands..operands + 7)
         else {

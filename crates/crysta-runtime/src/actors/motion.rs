@@ -11,7 +11,8 @@
 //! list starts over, the streams start over too (`$7F:0014`/`0016` keep
 //! their first pointers): the town walker's up walk moves 16 pixels in
 //! each 31-tick repetition, 64 in four. The Y axis is never flipped here:
-//! vertical flips (`+$08` bit `$8000`) are not modelled.
+//! vertical flips (`+$08` bit `$8000`) are not modelled
+//! (`meta/issues/vertical-flip-motion.md`).
 
 use std::rc::Rc;
 

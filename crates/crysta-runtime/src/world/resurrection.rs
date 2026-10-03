@@ -8,7 +8,8 @@
 //! A first, still version: a black screen with the parchment's text and
 //! its button wait, then the flag and the transfer. Not modelled: the
 //! scenes of `$07` (bespoke Mode 7 and Mode 3 code, `$86:BB4A..C585`), the
-//! parchment map's picture and the souls.
+//! parchment map's picture and the souls
+//! (`meta/issues/resurrection-scenes.md`).
 
 use super::{Step, World};
 use crate::scene::{Presses, Transfer};

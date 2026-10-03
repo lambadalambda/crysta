@@ -8,7 +8,8 @@
 //! exactly one side is open, beside and diagonally ahead (`$80:C203`/`C2B4`
 //! count them). Positions wrap at the plane's edges (`$8D:8D6D`). Measured
 //! on the native route: 60 of 60 step starts. Own-cell tiles `$88..$8F`
-//! (`$80:C440`) are not modelled; `$03` has none.
+//! (`$80:C440`) are not modelled; `$03` has none
+//! (`meta/issues/plane-own-cell-tiles.md`).
 
 use room_core::Direction;
 

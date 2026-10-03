@@ -14,7 +14,8 @@
 //!
 //! Not modelled: the loads' own frames (3 to 5 natively, more between the
 //! house and the town, which only lengthens the dark). Script transfers
-//! fade by their mode ([`super::fade`]).
+//! fade by their mode ([`super::fade`]). Load frames tracked:
+//! `meta/issues/map-load-frames.md`.
 
 use super::{Step, World, WorldError, EXIT_SOUND, STAIRS, STAIRS_UP};
 use crate::WORLD_MAPS;
