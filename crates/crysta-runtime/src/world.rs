@@ -1470,6 +1470,8 @@ impl<'a> World<'a> {
             self.globals.presentation = None;
         }
         self.pickup = None;
+        (self.fall, self.jump, self.rope) = (None, None, None);
+        (self.thrust, self.recoil) = (None, None);
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
