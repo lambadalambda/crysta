@@ -207,7 +207,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Close the runtime's review edge cases](issues/runtime-review-edges.md)
 - [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [Spend the map loads' own frames](issues/map-load-frames.md)
-- [Flip movement streams on the vertical axis](issues/vertical-flip-motion.md)
 - [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
 - [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [Finish the partial COP services](issues/partial-cop-services.md)

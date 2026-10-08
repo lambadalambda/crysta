@@ -270,17 +270,15 @@ pub(super) fn frozen_return_streams(image: &[u8]) -> bool {
     else {
         return false;
     };
-    let resource = motion::Resource {
-        base: 0x6000,
-        bytes: packet.data.into(),
-    };
+    let resource = motion::Resource::wram(0x6000, packet.data.into());
     let leg = |selector, expected: &[i16]| {
-        let Some(mut motion) =
-            motion::Motion::start(resource.clone(), selector, false, false, None)
+        let Some(mut motion) = motion::Motion::start(resource.clone(), selector, false, None)
         else {
             return false;
         };
-        expected.iter().all(|&dy| motion.step() == Some((0, dy)))
+        expected
+            .iter()
+            .all(|&dy| motion.step((false, false)) == Some((0, dy)))
     };
     leg(0, &[0])
         && leg(0x0F, &[3, 2, 2].repeat(12))

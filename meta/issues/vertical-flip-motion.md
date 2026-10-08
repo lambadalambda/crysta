@@ -15,3 +15,7 @@ Movement streams (`actors/motion.rs`) negate velocities on a flipped X axis only
 ## Acceptance Criteria
 
 - A test with a vertically flipped actor moves as natively.
+
+## Progress
+
+- Done: `COP B4`/`B5`/`B9` set, clear and toggle `vflip`; the streams read both flips each frame (`$80:F297`, `F2F3`); children inherit it. Drawing a flipped actor is in [shadowkeeper-full-fight](shadowkeeper-full-fight.md).

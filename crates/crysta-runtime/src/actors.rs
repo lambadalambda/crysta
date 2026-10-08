@@ -48,6 +48,19 @@ const CLEAR_HFLIP: u8 = 0xB6;
 const SET_HFLIP: u8 = 0xB7;
 /// Toggles the horizontal mirror (`$80:AA51`).
 const TOGGLE_HFLIP: u8 = 0xB8;
+/// Set, clear and toggle the vertical flip, `+$08` bit `$8000`
+/// (`$80:AA15`, `AA24`, `AA60`).
+const SET_VFLIP: u8 = 0xB4;
+const CLEAR_VFLIP: u8 = 0xB5;
+const TOGGLE_VFLIP: u8 = 0xB9;
+const FLIPS: [u8; 6] = [
+    CLEAR_HFLIP,
+    SET_HFLIP,
+    TOGGLE_HFLIP,
+    SET_VFLIP,
+    CLEAR_VFLIP,
+    TOGGLE_VFLIP,
+];
 /// Resolves the pose and yields until it is done.
 const WAIT: u8 = 0x8E;
 /// Shows the published text and blocks the world until it is acknowledged;
@@ -324,7 +337,11 @@ enum Base {
     /// 00` names the first, taken here to be the actor's own, as for every
     /// mover in the slice.
     Own,
-    /// Anywhere else (`COP B0 FF`, other bases): no movement is modelled.
+    /// A ROM bank's table (`COP B0 FF word bank`): the bank's offset and
+    /// the table's address in it.
+    Rom(usize, u16),
+    /// Another private resource (`COP B0 n`, n not 0 or 2): no movement is
+    /// modelled (`meta/issues/partial-cop-services.md`).
     Unknown,
 }
 /// Music: play a track (`$80:90D4`), fade out and play one (`$80:9107`),
@@ -656,6 +673,8 @@ pub struct Actor {
     pub selector: u8,
     /// Horizontal mirror in force.
     pub hflip: bool,
+    /// Vertical flip in force (`+$08` bit `$8000`).
+    pub vflip: bool,
     /// Frames since the pose changed or a qualified action restarted it.
     pub pose_age: u32,
     /// Whether a step is under way.
@@ -782,7 +801,7 @@ pub struct Actor {
     /// A pose's movement streams (`COP 81`/`87`), through the next wait.
     motion: Option<motion::Motion>,
     /// The common and the own movement resource, once read.
-    resources: [Option<motion::Resource>; 2],
+    resources: [Option<motion::Resource>; 3],
     /// Further cells `COP 3D` marked.
     stamps: Vec<(u16, u16)>,
     /// `COP 65`'s hit target and return address, when the actor can be hit.
@@ -813,6 +832,7 @@ impl Actor {
             facing: Direction::Down,
             selector: initial,
             hflip: false,
+            vflip: false,
             pose_age: 0,
             walking: false,
             hidden: false,
@@ -853,7 +873,7 @@ impl Actor {
             base: Base::Common,
             descriptor: None,
             motion: None,
-            resources: [None, None],
+            resources: [None, None, None],
             pc,
             state,
             // A zero seed would stay zero.
@@ -1496,6 +1516,19 @@ impl Actor {
         };
     }
 
+    /// `COP B4`..`B9`: sets, clears or toggles the mirror or the vertical
+    /// flip.
+    fn flip(&mut self, service: u8) {
+        match service {
+            CLEAR_HFLIP => self.set_pose(self.selector, false),
+            SET_HFLIP => self.set_pose(self.selector, true),
+            TOGGLE_HFLIP => self.set_pose(self.selector, !self.hflip),
+            SET_VFLIP => self.vflip = true,
+            CLEAR_VFLIP => self.vflip = false,
+            _ => self.vflip = !self.vflip,
+        }
+    }
+
     fn set_pose(&mut self, selector: u8, hflip: bool) {
         self.ark_list = None;
         if self.selector != selector || self.hflip != hflip {
@@ -1678,12 +1711,8 @@ impl Actor {
             LINE_START | LINE_STEP => return self.line_service(service, operands, image),
             PROFILE => return self.profile_service(operands, image),
             ARK_BUSY => return self.ark_busy(operands, bank, around),
-            CLEAR_HFLIP | SET_HFLIP | TOGGLE_HFLIP => {
-                let (selector, hflip) = (self.selector, self.hflip);
-                self.set_pose(
-                    selector,
-                    service == SET_HFLIP || (service == TOGGLE_HFLIP && !hflip),
-                );
+            _ if FLIPS.contains(&service) => {
+                self.flip(service);
                 self.pc = operands;
             }
             WAIT => return self.wait_for_pose(operands),
@@ -1945,9 +1974,7 @@ impl Actor {
             .legs
             .then(|| self.movement(image))
             .flatten()
-            .and_then(|movement| {
-                motion::Motion::start(movement, selector, hflip, false, Some(list))
-            })
+            .and_then(|movement| motion::Motion::start(movement, selector, false, Some(list)))
         else {
             self.state = State::Frozen;
             return false;
@@ -1993,13 +2020,7 @@ impl Actor {
         self.stream = None;
         let list = self.pose_list(pose);
         self.motion = self.movement(image).and_then(|resource| {
-            motion::Motion::start(
-                resource,
-                selector,
-                hflip,
-                self.interaction & 0x80 != 0,
-                list,
-            )
+            motion::Motion::start(resource, selector, self.interaction & 0x80 != 0, list)
         });
         // As `COP 80`, the handlers write `+$0A` (`$80:A1CB`, `$80:A1F7`).
         self.continuation = Some(operands + length);
@@ -2014,6 +2035,13 @@ impl Actor {
         let slot = match self.base {
             Base::Common => 0,
             Base::Own => 1,
+            Base::Rom(bank, table) => {
+                if self.resources[2].is_none() {
+                    let bytes = image.get(bank..(bank + 0x1_0000).min(image.len()))?;
+                    self.resources[2] = Some(motion::Resource::rom(bytes.into(), table));
+                }
+                return self.resources[2].clone();
+            }
             Base::Unknown => return None,
         };
         if self.resources[slot].is_none() {
@@ -2024,10 +2052,10 @@ impl Actor {
                 (assets::maps::actors::rom_offset(pointer)?, 0x2000)
             };
             let packet = assets::compression::decode(image.get(source..)?, size).ok()?;
-            self.resources[slot] = Some(motion::Resource {
-                base: if slot == 0 { 0x6000 } else { 0x4000 },
-                bytes: packet.data.into(),
-            });
+            self.resources[slot] = Some(motion::Resource::wram(
+                if slot == 0 { 0x6000 } else { 0x4000 },
+                packet.data.into(),
+            ));
         }
         self.resources[slot].clone()
     }
@@ -2244,7 +2272,7 @@ impl Actor {
     /// pose wait is over.
     fn apply_stream(&mut self) {
         let (dx, dy) = if let Some(motion) = &mut self.motion {
-            motion.step().unwrap_or((0, 0))
+            motion.step((self.hflip, self.vflip)).unwrap_or((0, 0))
         } else if let Some((direction, applied, speed)) = self.stream {
             let pixels = if speed == 0 {
                 i16::from(applied % 2 == 0)
@@ -2855,7 +2883,7 @@ impl Actor {
     fn child(&self, script: usize, flags: u16, at: (u16, u16)) -> Self {
         let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
         let mut child = Self::new(at, Some(runtime), 0, 1);
-        child.hflip = self.hflip;
+        (child.hflip, child.vflip) = (self.hflip, self.vflip);
         child.palette = self.palette;
         child.priority = self.priority;
         child.base = self.base;
@@ -3748,13 +3776,24 @@ impl Actor {
         let fetched = if service == SWITCH {
             self.switch_target(operands, bank, image)
         } else {
-            image.get(operands).map(|&base| {
+            image.get(operands).and_then(|&base| {
                 self.base = match base {
                     2 => Base::Common,
                     0 => Base::Own,
+                    0xFF => {
+                        let &[low, high, bank] = image.get(operands + 1..operands + 4)? else {
+                            return None;
+                        };
+                        self.resources[2] = None;
+                        // A bank outside the ROM: nothing to read.
+                        assets::maps::actors::rom_offset(&[0, 0x80, bank])
+                            .map_or(Base::Unknown, |bank| {
+                                Base::Rom(bank & !0xFFFF, u16::from_le_bytes([low, high]))
+                            })
+                    }
                     _ => Base::Unknown,
                 };
-                operands + if base == 0xFF { 4 } else { 1 }
+                Some(operands + if base == 0xFF { 4 } else { 1 })
             })
         };
         let Some(next) = fetched else {
@@ -4858,10 +4897,10 @@ mod cadence_tests {
         let mut actor = Actor::for_player(&image, 0, (40, 48), Some(0x80_8000), None);
         actor.pose_ticks = Some(vec![Some(2)]);
         let words: [u16; 7] = [0, 0x6004, 0, 0, 1, 0xFFFF, 0x6004];
-        actor.resources[0] = Some(motion::Resource {
-            base: 0x6000,
-            bytes: words.iter().flat_map(|word| word.to_le_bytes()).collect(),
-        });
+        actor.resources[0] = Some(motion::Resource::wram(
+            0x6000,
+            words.iter().flat_map(|word| word.to_le_bytes()).collect(),
+        ));
 
         assert!(actor.moving_pose(POSE_MOVING, 0, &image));
         assert!(
@@ -5302,6 +5341,46 @@ mod script_service_tests {
         let y = actor.position.1;
         tick(&mut actor, &image);
         assert_eq!((actor.position.1, actor.priority), (y - 8, 3));
+    }
+
+    #[test]
+    fn cop_b0_ff_moves_by_a_rom_resource() {
+        // COP B0 FF $9000 $B2; COP 81 0; COP 8E. At $B2:9000 the table, X's
+        // stream at +$10: 3 a frame, looping.
+        let mut image = vec![0; 0x33_0000];
+        image[AT..AT + 11].copy_from_slice(&[2, 0xB0, 0xFF, 0x00, 0x90, 0xB2, 2, 0x81, 0, 2, 0x8E]);
+        for (at, word) in [
+            (0, 0x10u16),
+            (0x12, 1),
+            (0x14, 3),
+            (0x16, 0xFFFF),
+            (0x18, 0x12),
+        ] {
+            let at = 0x32_9000 + at;
+            image[at..at + 2].copy_from_slice(&word.to_le_bytes());
+        }
+        let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
+        tick(&mut actor, &image);
+        tick(&mut actor, &image);
+        assert_eq!(actor.position.0, 56 + 6);
+        assert!(actor.frozen_at().is_none());
+    }
+
+    #[test]
+    fn cop_b4_b5_and_b9_set_clear_and_toggle_the_vertical_flip() {
+        // COP B4; yield; COP B5; yield; COP B9; yield; COP B9; yield.
+        let code = [
+            2, 0xB4, 2, 0xBD, 2, 0xB5, 2, 0xBD, 2, 0xB9, 2, 0xBD, 2, 0xB9, 2, 0xBD,
+        ];
+        let (image, mut actor) = actor_running(&code);
+        let flips: Vec<bool> = (0..4)
+            .map(|_| {
+                tick(&mut actor, &image);
+                actor.vflip
+            })
+            .collect();
+        assert_eq!(flips, [true, false, true, false]);
+        assert!(actor.frozen_at().is_none());
     }
 
     #[test]

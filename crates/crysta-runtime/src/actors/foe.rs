@@ -187,7 +187,7 @@ impl Actor {
         self.stream = None;
         self.motion = self
             .movement(image)
-            .and_then(|resource| motion::Motion::start(resource, selector, mirrored, true, None));
+            .and_then(|resource| motion::Motion::start(resource, selector, true, None));
     }
 
     /// A frame of a hit's aftermath. Returns whether it took the frame from
@@ -234,7 +234,7 @@ impl Actor {
             .motion
             .as_mut()
             .filter(|motion| motion.running())
-            .and_then(motion::Motion::step);
+            .and_then(|motion| motion.step((self.hflip, self.vflip)));
         if let Some(delta) = step {
             self.displace(delta);
             return;
