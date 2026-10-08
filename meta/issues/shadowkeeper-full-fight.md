@@ -23,3 +23,8 @@
 ## Notes
 
 - Research: `docs/tower-five.md` §1, §5.5.
+
+## Subissues
+
+- [Run `$123`'s intro natively](shadowkeeper-intro.md)
+- [Run Shadowkeeper's scripts natively](shadowkeeper-scripts.md)
