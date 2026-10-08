@@ -574,3 +574,33 @@ fn queued_actions_in_snapshots_must_have_an_admitted_source_or_lane() {
         assert_eq!(s, restored);
     }
 }
+
+#[test]
+fn a_fall_lets_the_held_pot_fly_from_sixteen_pixels_ahead() {
+    // `$84:9F5B` -> `$84:C649`: the pot leaves 16 pixels toward the facing
+    // on the throw's stream; Ark stays where he is.
+    let r = room();
+    let a = admission(&r);
+    let mut s = state(&r, 40, 352, Direction::Right);
+    lift(&mut s, &r);
+    assert!(s.drop_into_flight(&r));
+    assert_eq!(s.phase(), Phase::Empty);
+    assert_eq!(s.flight().map(|f| (f.x, f.y)), Some((59, 352)));
+    assert!(!s.drop_into_flight(&r));
+    let mut broke = None;
+    for _ in 0..30 {
+        let out = s.step(&a, Input::default()).unwrap();
+        broke = broke.or(out.broke);
+    }
+    assert!(broke.is_some());
+    assert_eq!(s.position(), (40, 352));
+}
+
+#[test]
+fn a_held_pot_goes_where_ark_is_put() {
+    let r = room();
+    let mut s = state(&r, 40, 352, Direction::Right);
+    lift(&mut s, &r);
+    s.carry_to(WalkingState::new(40, 400));
+    assert_eq!((s.position(), s.phase()), ((40, 400), Phase::Held));
+}

@@ -153,6 +153,8 @@ const RECOVERY: u8 = 32;
 /// A flight's speed and the launch point's distance from Ark.
 const SPEED: u16 = 3;
 const LAUNCH: u16 = 10;
+/// A fall's launch point's distance from Ark (`$84:C649`).
+const DROP_LAUNCH: u16 = 16;
 /// The cellar door actor, whose callback counts the hits (`$0640`).
 const DOOR: (u16, u16) = (184, 352);
 /// Collision types a flight stops on (`$80:D1FB`, pot `+$16` = 0).
@@ -324,6 +326,31 @@ impl PotState {
         }
         (self.phase, self.object, self.queued) = (Phase::Empty, 0, None);
         true
+    }
+    /// Lets the pot Ark carries fly as he falls (`$84:9F5B`, `$84:C649`):
+    /// from 16 pixels toward his facing, on the throw's stream. Returns
+    /// whether he held one.
+    pub fn drop_into_flight(&mut self, ground: &Room) -> bool {
+        if self.phase != Phase::Held {
+            return false;
+        }
+        let (x, y) = self.position();
+        let at = match self.facing {
+            Direction::Down => (x, y + DROP_LAUNCH),
+            Direction::Up => (x, y.saturating_sub(DROP_LAUNCH)),
+            Direction::Left => (x.saturating_sub(DROP_LAUNCH), y),
+            Direction::Right => (x + DROP_LAUNCH, y),
+        };
+        (self.phase, self.queued) = (Phase::Empty, None);
+        self.launch(at, ground);
+        true
+    }
+    /// Moves Ark with the pot in hand to `walking`, as a drop from a lip
+    /// does; without one, nothing.
+    pub fn carry_to(&mut self, walking: WalkingState) {
+        if self.phase == Phase::Held {
+            self.walking = walking;
+        }
     }
     /// Current facing, including delayed turns.
     #[must_use]
@@ -562,12 +589,19 @@ impl PotState {
     /// its first step.
     fn release(&mut self, ground: &Room, out: &mut Output) {
         let (x, y) = self.position();
-        let (x, y) = match self.facing {
+        let at = match self.facing {
             Direction::Down => (x, y + LAUNCH),
             Direction::Up => (x, y.saturating_sub(LAUNCH - 2)),
             Direction::Left => (x.saturating_sub(LAUNCH), y),
             Direction::Right => (x + LAUNCH, y),
         };
+        out.held_changed = Some(None);
+        out.sound = Some(Sound::Release);
+        self.launch(at, ground);
+    }
+
+    /// The flight's start at `(x, y)` and its first step.
+    fn launch(&mut self, (x, y): (u16, u16), ground: &Room) {
         self.flight = Some(Flying {
             x,
             y,
@@ -576,8 +610,6 @@ impl PotState {
             stopped: false,
             door: DoorContact::Clear,
         });
-        out.held_changed = Some(None);
-        out.sound = Some(Sound::Release);
         self.advance_flight(ground);
     }
 
