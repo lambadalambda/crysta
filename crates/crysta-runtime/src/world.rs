@@ -42,6 +42,7 @@ mod pots;
 mod progress;
 mod resurrection;
 mod shadowkeeper;
+mod status;
 mod transition;
 pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
@@ -66,6 +67,8 @@ pub struct World<'a> {
     down: Option<u16>,
     /// `$04CE`: life still to add, a point a frame ([`life`]).
     pending_life: u16,
+    /// The burn's script holding Ark ([`status`]).
+    burn: Option<status::Burn>,
     /// Frames before an enemy can hurt Ark again.
     ark_immune: u16,
     /// The thrust lists' records and boxes.
@@ -347,6 +350,7 @@ impl<'a> World<'a> {
             hurt: None,
             down: None,
             pending_life: 0,
+            burn: None,
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::from_rom(image),
             walking: WalkingState::new(x, y),
@@ -1080,6 +1084,7 @@ impl<'a> World<'a> {
             previous.copied().unwrap_or(0),
         );
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
+        self.clear_statuses();
         self.start_shadowkeeper();
         self.apply_load_patches()?;
         self.open_opened_chests();
@@ -1287,6 +1292,7 @@ impl<'a> World<'a> {
             return Ok((Step::Stayed, None));
         }
         self.life_frame();
+        self.status_frame();
         if let Some(step) = self.holding_frame(presses)? {
             self.apply_patches()?;
             return Ok((step, None));
@@ -1338,6 +1344,9 @@ impl<'a> World<'a> {
             return Ok(Some(step));
         }
         if let Some(step) = self.jump_frame()? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.burn_frame()? {
             return Ok(Some(step));
         }
         if let Some(step) = self.resurrection_frame(presses) {
@@ -2524,6 +2533,7 @@ mod tests {
             hurt: None,
             down: None,
             pending_life: 0,
+            burn: None,
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::default(),
             walking: WalkingState::new(56, 64),

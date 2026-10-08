@@ -5460,16 +5460,9 @@ mod script_service_tests {
 
     fn profile(life: u16) -> crate::combat::Profile {
         crate::combat::Profile {
-            resist: 0,
-            weak: 0,
             level: 1,
             life,
-            exp: 0,
-            gems: 0,
-            drop_mask: 0,
-            attacks: [0; 2],
-            defense: 0,
-            luck: 0,
+            ..crate::combat::Profile::default()
         }
     }
 

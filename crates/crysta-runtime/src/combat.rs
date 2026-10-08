@@ -2,7 +2,7 @@
 //! the damage each side deals, and the level table.
 
 /// Ark's stats (`$064E` block).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Stats {
     /// `$0656`.
     pub level: u8,
@@ -43,7 +43,7 @@ impl Stats {
 }
 
 /// An enemy's 25-byte profile (`$8D:BDFA[n]`).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Profile {
     /// +2: attack types it resists (high nibble) and by how much (2 bits each).
     pub resist: u16,
@@ -61,6 +61,12 @@ pub struct Profile {
     pub drop_mask: u8,
     /// +`$0F` + 5k: attack of kind k (10 bits).
     pub attacks: [u16; 2],
+    /// +`$10` + 5k bits 3-6: the element of kind k (`$85:DB5F`'s row).
+    pub elements: [u8; 2],
+    /// +`$11` + 5k: the attack types of kind k.
+    pub types: [u16; 2],
+    /// +`$13` + 5k: the luck of kind k, for its status and critical rolls.
+    pub lucks: [u8; 2],
     /// +`$11`.
     pub defense: u16,
     /// +`$13`.
@@ -91,6 +97,9 @@ impl Profile {
             gems: decimal(word(bytes, 0x0D) & 0x0FFF),
             drop_mask: bytes[0x0E] >> 4,
             attacks: [word(bytes, 0x0F) & 0x3FF, word(bytes, 0x14) & 0x3FF],
+            elements: [(bytes[0x10] & 0x78) >> 3, (bytes[0x15] & 0x78) >> 3],
+            types: [word(bytes, 0x11), word(bytes, 0x16)],
+            lucks: [bytes[0x13], bytes[0x18]],
             defense: word(bytes, 0x11),
             luck: bytes[0x13],
         }
@@ -165,7 +174,7 @@ fn variance(damage: u16, counter: u16) -> u16 {
     })
     .max(1);
     if counter & 0x100 == 0 {
-        damage + delta
+        damage.saturating_add(delta)
     } else {
         damage.saturating_sub(delta).max(1)
     }
@@ -219,19 +228,130 @@ pub fn ark_damage(stats: &Stats, kind: Kind, profile: &Profile, roll: Roll) -> D
     }
 }
 
-/// An enemy's hit on Ark with its attack of kind `kind` (`$85:D30C`..).
-#[must_use]
-pub fn enemy_damage(profile: &Profile, kind: usize, stats: &Stats, counter: u16) -> u16 {
+/// Ark as an enemy's hit reads him.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ArkSide {
+    /// His stats.
+    pub stats: Stats,
+    /// `$064E` and `$0650`: the types he resists, by how much; the second
+    /// for attacks of type `$0400`.
+    pub resist: [u16; 2],
+    /// `$0652` and `$0654`: the types he is weak to, the same way.
+    pub weak: [u16; 2],
+    /// `$0652 | $0654`: `$F800` without `$03FF` makes him immune.
+    pub immune: u16,
+    /// `$066C`: his statuses (`$0200` halves his defense).
+    pub statuses: u16,
+    /// `$8D:BD92` for the armor worn: the status bits it blocks.
+    pub armor_blocks: u16,
+}
+
+/// What an enemy's hit does to Ark.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EnemyHit {
+    /// The life taken.
+    pub amount: u16,
+    /// The enemy critical hit (element 13): the digits' colours.
+    pub critical: bool,
+    /// Ark is immune (`$85:DA98`): no damage, no status.
+    pub immune: bool,
+    /// The element whose status roll succeeded (0 too: it ends the burn
+    /// and the sleep).
+    pub status: Option<u8>,
+}
+
+impl EnemyHit {
+    const fn immune() -> Self {
+        Self {
+            amount: 0,
+            critical: false,
+            immune: true,
+            status: None,
+        }
+    }
+}
+
+/// The critical element.
+const CRITICAL: u8 = 13;
+
+/// The status bit of each element (`$85:DB63`, the status table's third
+/// word): what an armor's `$8D:BD92` word blocks.
+pub(crate) const STATUS_BITS: [u16; 16] = [
+    0, 0x8000, 0x4000, 0x2000, 0x1000, 0x0800, 0x0400, 0x0200, 0x0100, 0x0080, 0x0040, 0x0020, 0,
+    0, 0x0010, 0x0008,
+];
+
+/// An enemy's hit on Ark with its attack of kind `kind` (`$85:D648`):
+/// the damage (`$85:DE8F`, `DF0B`), Ark's types (`$85:D93D`), the status
+/// roll (`$85:DA9E`), the critical roll (`$85:DB23`) and the variance
+/// (`$85:DE3A`). `roll` is the random generator (`$86:8236`): a byte per
+/// roll the hit makes.
+#[allow(clippy::verbose_bit_mask)] // the ROM's `BIT #$03FF`
+pub fn enemy_hit(
+    profile: &Profile,
+    kind: usize,
+    ark: &ArkSide,
+    counter: u16,
+    roll: &mut impl FnMut() -> u8,
+) -> EnemyHit {
     let attack = u32::from(profile.attacks.get(kind).copied().unwrap_or(0));
+    let element = profile.elements.get(kind).copied().unwrap_or(0);
+    let luck = profile.lucks.get(kind).copied().unwrap_or(0);
+    let types = profile.types.get(kind).copied().unwrap_or(0);
     let raw = ((u32::from(profile.level) + 7) * attack) >> 3;
+    let stats = &ark.stats;
+    let defense = if ark.statuses & 0x0200 == 0 {
+        stats.defense
+    } else {
+        stats.defense / 2
+    };
     let defense =
-        u32::from(stats.armor) + (u32::from(stats.level) + 7) * u32::from(stats.defense) / 4 / 3;
-    let damage = if raw > defense {
+        u32::from(stats.armor) + (u32::from(stats.level) + 7) * u32::from(defense) / 4 / 3;
+    let mut damage = if raw > defense {
         raw - defense
     } else {
         u32::from(profile.level >> 2) + 1
     };
-    variance(u16::try_from(damage).unwrap_or(u16::MAX), counter).min(9999)
+    // Type `$0400` reads Ark's second words and skips the `$F800` test
+    // (`$85:D99E` -> `DA1D`).
+    let second = usize::from(types & 0x0400 != 0);
+    if kind != 0 && types != 0 {
+        let half = damage / 2;
+        match type_factor(ark.resist[second], types) {
+            Some(0) => return EnemyHit::immune(),
+            Some(1) => damage /= 2,
+            Some(_) => damage /= 4,
+            None => {}
+        }
+        match type_factor(ark.weak[second], types) {
+            Some(1) => damage += half,
+            Some(2 | 3) => damage += 2 * half,
+            _ => {}
+        }
+    }
+    if second == 0 && ark.immune & 0xF800 != 0 && ark.immune & 0x03FF == 0 {
+        return EnemyHit::immune();
+    }
+    let damage = damage.max(1);
+    // c = luck + 8 - Ark's luck, at least 4 (8-bit, `$85:DAC3`).
+    let chance = {
+        let c = luck.wrapping_add(8).wrapping_sub(stats.luck);
+        if c & 0x80 != 0 || c < 4 {
+            4
+        } else {
+            c
+        }
+    };
+    let blocked = ark.armor_blocks & STATUS_BITS[usize::from(element & 15)] != 0;
+    let rolled = (!blocked && roll() & 0x1F < chance).then_some(element);
+    let critical = element == CRITICAL && roll() & 0x7F < chance;
+    let damage = u16::try_from(if critical { damage * 2 } else { damage }).unwrap_or(u16::MAX);
+    EnemyHit {
+        amount: variance(damage, counter).min(9999),
+        critical,
+        immune: false,
+        status: rolled,
+    }
 }
 
 /// The stat table's pointers (`$8D:BDFA`, European `$8D:BCC3`), into bank
@@ -337,12 +457,111 @@ mod tests {
         );
     }
 
+    /// Rolls that never succeed (`$1F` and `$7F` are never below c).
+    fn missing() -> impl FnMut() -> u8 {
+        || 0xFF
+    }
+
+    fn ark() -> ArkSide {
+        ArkSide {
+            stats: Stats::start(),
+            ..ArkSide::default()
+        }
+    }
+
     #[test]
     fn a_blob_takes_three_from_ark() {
         let blob = Profile::decode(&BLOB);
-        assert_eq!(enemy_damage(&blob, 0, &Stats::start(), 0), 3);
+        let hit = |counter| enemy_hit(&blob, 0, &ark(), counter, &mut missing()).amount;
+        assert_eq!(hit(0), 3);
         // Measured 2: the variance takes one.
-        assert_eq!(enemy_damage(&blob, 0, &Stats::start(), 0x0108), 2);
+        assert_eq!(hit(0x0108), 2);
+    }
+
+    #[test]
+    fn the_kinds_carry_their_elements_and_the_critical_doubles() {
+        let blob = Profile::decode(&BLOB);
+        assert_eq!((blob.elements, blob.lucks), ([0, 13], [5, 5]));
+        // Kind 1, element 13 (`$85:DB23`): c = 5 + 8 - 3 = 10, `& $7F`.
+        let rolls = [0x1F, 9];
+        let mut next = rolls.into_iter();
+        let hit = enemy_hit(&blob, 1, &ark(), 0, &mut || next.next().unwrap());
+        assert_eq!((hit.amount, hit.critical), (6, true));
+        let mut next = [0x1F, 10].into_iter();
+        let hit = enemy_hit(&blob, 1, &ark(), 0, &mut || next.next().unwrap());
+        assert_eq!((hit.amount, hit.critical), (3, false));
+    }
+
+    #[test]
+    fn the_status_roll_takes_luck_and_the_armor() {
+        let blob = Profile::decode(&BLOB);
+        // c = 10: `RNG & $1F` below it succeeds (`$85:DAC3`).
+        let mut low = || 9;
+        assert_eq!(enemy_hit(&blob, 0, &ark(), 0, &mut low).status, Some(0));
+        let mut high = || 10;
+        assert_eq!(enemy_hit(&blob, 0, &ark(), 0, &mut high).status, None);
+        // A lucky Ark: c at least 4.
+        let lucky = ArkSide {
+            stats: Stats {
+                luck: 200,
+                ..Stats::start()
+            },
+            ..ArkSide::default()
+        };
+        let mut three = || 3;
+        assert_eq!(enemy_hit(&blob, 0, &lucky, 0, &mut three).status, Some(0));
+        // An armor that blocks the element's bit rolls nothing (`$85:DAB0`);
+        // the critical (13) has no bit, so its status roll still runs.
+        let armored = ArkSide {
+            armor_blocks: 0x0020,
+            ..ark()
+        };
+        let mut burning = blob;
+        burning.elements = [0, 11];
+        let mut rolls = 0;
+        let hit = enemy_hit(&burning, 1, &armored, 0, &mut || {
+            rolls += 1;
+            0
+        });
+        assert_eq!((hit.status, rolls), (None, 0));
+        let hit = enemy_hit(&blob, 1, &armored, 0, &mut || 0);
+        assert_eq!((hit.status, hit.critical), (Some(13), true));
+    }
+
+    #[test]
+    fn arks_types_resist_and_weaken_a_typed_kind() {
+        // The attack's type bit 15 against Ark's words (`$85:D994`): the
+        // factor is the field's low two bits.
+        let mut blob = Profile::decode(&BLOB);
+        blob.types = [0, 0x8000];
+        let hit = |side: &ArkSide| enemy_hit(&blob, 1, side, 0, &mut missing());
+        let resists = |factor: u16| ArkSide {
+            resist: [0x8000 | factor, 0],
+            ..ark()
+        };
+        // Factor 0: immune (`$85:DA98`); 1 halves; 2 quarters, at least 1.
+        let immune = hit(&resists(0));
+        assert_eq!((immune.amount, immune.immune), (0, true));
+        assert_eq!(hit(&resists(1)).amount, 1);
+        assert_eq!(hit(&resists(2)).amount, 1);
+        // Weak: a half of the damage before, once or twice.
+        let weak = |factor: u16| ArkSide {
+            weak: [0x8000 | factor, 0],
+            ..ark()
+        };
+        assert_eq!(hit(&weak(1)).amount, 4);
+        assert_eq!(hit(&weak(2)).amount, 5);
+        // Kind 0 skips the types.
+        assert_eq!(
+            enemy_hit(&blob, 0, &resists(0), 0, &mut missing()).amount,
+            3
+        );
+        // `$F800` without `$03FF` in Ark's words: immune to all.
+        let shielded = ArkSide {
+            immune: 0x0800,
+            ..ark()
+        };
+        assert!(enemy_hit(&blob, 0, &shielded, 0, &mut missing()).immune);
     }
 
     #[test]

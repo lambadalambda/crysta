@@ -26,4 +26,5 @@
 
 - Research: `docs/darts-and-burn.md`.
 - The darts hurt: the launchers are hittable records of profile 5 whose pose packet the art decoder refuses; the runtime made enemies only of bodies. Now any hittable record with a profile attacks.
-- Open: the enemies' attack kinds (`7F:102C`), the elements, the enemy critical hit and the statuses (burn, sleep) of `$85:DA9E`.
+- An enemy's hit follows `$85:D648`: the attack kind (`7F:102C`), Ark's type words (`$064E`..`$0654`), the status roll with the armor table (`$8D:BD92`), the enemy critical (element 13) and the immune path (`$85:D70C`). The burn runs (`world/status.rs`): 120 frames, the script holds Ark, "...TOASTED", 60 frames out of reach; a map load clears it (`$85:DFA8`).
+- Open: the other statuses' runners (sleep, element 10, and the rest: no underworld enemy gives them); a native trace of a dart hit and a flyer's burn.

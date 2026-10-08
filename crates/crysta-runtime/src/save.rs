@@ -143,6 +143,25 @@ impl SaveSlot {
         self.bytes[at..at + 2].copy_from_slice(&value.to_le_bytes());
     }
 
+    /// The word at WRAM `address` in `$0600..$07FF`, which the slot keeps.
+    #[must_use]
+    pub fn word_at(&self, address: u16) -> u16 {
+        usize::from(address)
+            .checked_sub(WRAM)
+            .filter(|&at| at + 2 <= ITEMS)
+            .map_or(0, |at| self.word(at))
+    }
+
+    /// Writes the word at WRAM `address` in `$0600..$07FF`.
+    pub fn set_word_at(&mut self, address: u16, value: u16) {
+        if let Some(at) = usize::from(address)
+            .checked_sub(WRAM)
+            .filter(|&at| at + 2 <= ITEMS)
+        {
+            self.set_word(at, value);
+        }
+    }
+
     /// The map (`$047E` at the save).
     #[must_use]
     pub fn map(&self) -> u16 {

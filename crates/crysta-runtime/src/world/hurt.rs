@@ -18,6 +18,11 @@ const HURT_PUSH: u16 = 10;
 const ARK_IMMUNE: u16 = 43;
 /// The sound of Ark hurt.
 const HURT_SOUND: u8 = 0x07;
+/// An immune hit's sound and frames out of reach (`$85:D70C`).
+const GUARD_SOUND: u8 = 0x09;
+const GUARD_IMMUNE: u16 = 16;
+/// The armors' status blocks (`$8D:BD92`), from item `$A0` on.
+const ARMOR_BLOCKS: usize = 0x0D_BD92;
 /// The game over's music (`COP 30 3B`) and its frame, then the text's
 /// frame, Japanese and European (`docs/combat.md` §9).
 const DOWN_MUSIC: u16 = 111;
@@ -122,22 +127,44 @@ impl World<'_> {
             return;
         }
         let body = boxes::place(ARK_BODY, self.position(), false);
-        let Some((profile, from)) = self.actors.iter().find_map(|actor| {
+        let Some((profile, from, kind)) = self.actors.iter().find_map(|actor| {
             let attack = actor.hurt_box()?;
             let profile = actor.foe.as_ref()?.profile;
-            boxes::overlap(attack, body).then_some((profile, actor.position))
+            boxes::overlap(attack, body).then_some((profile, actor.position, actor.attack_kind()))
         }) else {
             return;
         };
         let stats = self.globals.slot.stats();
-        let damage = combat::enemy_damage(&profile, 0, &stats, self.globals.frames);
+        let hit = combat::enemy_hit(
+            &profile,
+            kind,
+            &self.ark_side(),
+            self.globals.frames,
+            &mut || {
+                self.globals.random.step();
+                self.globals.random.word().to_le_bytes()[0]
+            },
+        );
+        if hit.immune {
+            // `$85:D70C`: a guard sound, 16 frames out of reach.
+            self.globals.audio.sound_port3(GUARD_SOUND);
+            self.ark_immune = GUARD_IMMUNE;
+            return;
+        }
+        if let Some(element) = hit.status {
+            self.take_status(element);
+        }
         self.globals
             .slot
-            .set_life(stats.life.saturating_sub(damage));
+            .set_life(stats.life.saturating_sub(hit.amount));
         self.globals.digits.push(Digits {
             at: (self.position().0, self.position().1.saturating_sub(24)),
-            amount: damage,
-            kind: DigitKind::Ark,
+            amount: hit.amount,
+            kind: if hit.critical {
+                DigitKind::Critical
+            } else {
+                DigitKind::Ark
+            },
             age: 0,
         });
         self.globals.audio.sound_port3(HURT_SOUND);
@@ -148,6 +175,31 @@ impl World<'_> {
             frame: 0,
         });
         self.ark_immune = ARK_IMMUNE;
+    }
+
+    /// Ark as an enemy's hit reads him: his stats, his types and his
+    /// statuses from the slot (`$064E`..), and what his armor blocks
+    /// (`$8D:BD92`, European `$8D:BC5B`).
+    fn ark_side(&self) -> combat::ArkSide {
+        let slot = &self.globals.slot;
+        let armor_blocks = slot
+            .armor()
+            .and_then(|armor| armor.checked_sub(0xA0))
+            .and_then(|index| {
+                let table =
+                    assets::layout::per_revision(self.image, ARMOR_BLOCKS, ARMOR_BLOCKS - 0x137);
+                let at = table + usize::from(index) * 2;
+                self.image.get(at..at + 2)
+            })
+            .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]));
+        combat::ArkSide {
+            stats: slot.stats(),
+            resist: [slot.word_at(0x064E), slot.word_at(0x0650)],
+            weak: [slot.word_at(0x0652), slot.word_at(0x0654)],
+            immune: slot.word_at(0x0652) | slot.word_at(0x0654),
+            statuses: self.statuses(),
+            armor_blocks,
+        }
     }
 
     /// Ark's life and the most he can have.

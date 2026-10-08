@@ -146,6 +146,12 @@ impl Actor {
         Some(self.place(self.record()?.attack))
     }
 
+    /// The kind of its attack (`7F:102C`, which scripts set: a bullet's
+    /// 1), for the enemy's hit on Ark.
+    pub(crate) fn attack_kind(&self) -> usize {
+        self.own.get(&0x102C).map_or(0, |&kind| usize::from(kind))
+    }
+
     /// Whether a hit does it no damage (`+$06 & $0020`).
     pub(crate) const fn unharmed(&self) -> bool {
         self.guard.1 & NO_DAMAGE != 0
