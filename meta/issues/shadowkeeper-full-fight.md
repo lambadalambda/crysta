@@ -13,6 +13,7 @@
 - Run the native intro: the darkness, the torches and the camera's pan.
 - Run the native body script, or model its claws, tail, shots and phases.
 - Show the "Defeated Shadowkeeper!!" text.
+- Draw vertically flipped actors (`+$08` bit `$8000`, `COP B4`/`B5`/`B9`): the runtime moves them flipped but does not export the flip to the drawing.
 
 ## Acceptance Criteria
 
