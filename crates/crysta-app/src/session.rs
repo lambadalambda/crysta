@@ -437,7 +437,8 @@ impl Session {
         // level up, a lift, his script's list (`World::ark_pose`).
         if let Some(pose) = self.world.ark_pose() {
             let art = (pose.art(), pose.list, pose.hflip);
-            return (self.carry_frame(art, u64::from(pose.age), pose.once), None);
+            let ark = self.carry_frame(art, u64::from(pose.age), pose.once);
+            return (ark, self.flying_pot());
         }
         // The spear's thrust plays its list once (`docs/combat-graphics.md`).
         if let Some((list, age, hflip)) = self.world.attack_pose() {
@@ -478,19 +479,26 @@ impl Session {
                 once,
             )
         });
-        let pot = self.world.pot().and_then(|pot| match (pot.flight, carry) {
-            // Drawn at its height above the ground point (`$0999`).
-            (Some((x, y, height)), _) => Some((
-                (x, y.wrapping_add_signed(height)),
-                self.carry_frame((pot.art, CarryArt::FLIGHT, false), self.tick, false)?,
-            )),
-            (None, Some((pose, tick, once))) => Some((
+        let pot = self.flying_pot().or_else(|| {
+            let pot = self.world.pot()?;
+            let (pose, tick, once) = carry?;
+            Some((
                 self.world.position(),
                 self.carry_frame((pot.art, pose.pot_selector, pose.pot_hflip), tick, once)?,
-            )),
-            (None, None) => None,
+            ))
         });
         (ark, pot)
+    }
+
+    /// A thrown or dropped pot in the air, drawn at its height above the
+    /// ground point (`$0999`).
+    fn flying_pot(&mut self) -> Option<Placed> {
+        let pot = self.world.pot()?;
+        let (x, y, height) = pot.flight?;
+        Some((
+            (x, y.wrapping_add_signed(height)),
+            self.carry_frame((pot.art, CarryArt::FLIGHT, false), self.tick, false)?,
+        ))
     }
 
     /// Composes the view: background, depth-sorted sprites, then dialogue.
