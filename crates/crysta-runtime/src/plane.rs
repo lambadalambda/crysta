@@ -7,8 +7,9 @@
 //! or more blocks (`$80:C469`), and a blocked step slides sideways when
 //! exactly one side is open, beside and diagonally ahead (`$80:C203`/`C2B4`
 //! count them). Positions wrap at the plane's edges (`$8D:8D6D`). Measured
-//! on the native route: 60 of 60 step starts. Own-cell tiles `$88..$8F`
-//! (`$80:C440`) are not modelled; `$03` has none
+//! on the native route: 60 of 60 step starts. The rule is `$80:C469`'s
+//! while `$048A` bit 13 is clear, as on `$03`; the other one, and the
+//! own-cell tiles `$88..$8F` it tests (`$80:C440`), are not modelled
 //! (`meta/issues/plane-own-cell-tiles.md`).
 
 use room_core::Direction;
