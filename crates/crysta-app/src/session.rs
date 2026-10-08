@@ -350,7 +350,12 @@ impl Session {
         }
         let cached = self.backgrounds.get_mut(&map).expect("loaded background");
         cached.update(self.background_clock.tick());
-        cached.apply_patches(cartridge.image(), map, self.world.patched_cells());
+        cached.apply_patches(
+            cartridge.image(),
+            map,
+            self.world.patched_cells(),
+            self.world.second_patched_cells(),
+        );
     }
 
     /// Decodes bodies for the current roster, recomputed when it changes.

@@ -62,6 +62,7 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
         second: None,
         sky: None,
         front: None,
+        second_cells: Vec::new(),
         patches: Patches::default(),
         world: true,
         mode7: assets::maps::visual::mode7::Mode7View::from_rom(cartridge.image())
@@ -111,11 +112,24 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         Some(layer) if layer.presentation() == Presentation::Front => (Some(layer), None),
         layer => (None, layer),
     };
+    let second_cells: Vec<u16> = front
+        .as_ref()
+        .or(layer.as_ref())
+        .map(|layer| {
+            layer
+                .layer()
+                .cells()
+                .iter()
+                .map(|cell| cell.raw() & 511)
+                .collect()
+        })
+        .unwrap_or_default();
     if let Some(front) = &front {
-        let all = 0..front.layer().cells().len();
+        let all = 0..second_cells.len();
+        let layer = (front, &second_cells[..]);
         overlay_front(
             &mut background,
-            front,
+            layer,
             (scene.tiles(), scene.palette()),
             all,
         );
@@ -142,6 +156,7 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         region,
         animation,
         sky,
+        second_cells,
         second,
         front,
         patches: Patches::default(),
@@ -180,13 +195,38 @@ fn render(scene: &StaticBackground) -> Result<(crate::frame::Background, Vec<u8>
     Ok((background, indices))
 }
 
+/// A patched cell: column, row, metatile.
+pub type Patched = (u16, u16, u16);
+
 /// Cells the world's scripts have re-tiled, and what they looked like.
 #[derive(Default)]
 struct Patches {
     /// The map's static scene, decoded on the first patch.
     scene: Option<StaticBackground>,
     /// Cells drawn with a patched tile: column, row, tile.
-    drawn: Vec<(u16, u16, u16)>,
+    drawn: Vec<Patched>,
+    /// The second layer's.
+    second: Vec<Patched>,
+}
+
+/// The cells whose tile changes from `drawn` to `now`, with their new tile:
+/// the patched ones, and those no longer patched back to `original`.
+fn changed(
+    drawn: &[Patched],
+    now: &[Patched],
+    original: impl Fn(usize) -> Option<u16>,
+    width: usize,
+) -> Vec<Patched> {
+    let mut cells: Vec<Patched> = drawn
+        .iter()
+        .filter(|&&(column, row, _)| !now.iter().any(|&(c, r, _)| (c, r) == (column, row)))
+        .filter_map(|&(column, row, _)| {
+            let tile = original(usize::from(row) * width + usize::from(column))?;
+            Some((column, row, tile))
+        })
+        .collect();
+    cells.extend(now.iter().filter(|cell| !drawn.contains(cell)));
+    cells
 }
 
 impl Patches {
@@ -211,6 +251,8 @@ pub struct CachedBackground {
     sky: Option<Sky>,
     /// The second layer in front of the first ([`overlay_front`]).
     front: Option<SecondLayer>,
+    /// The second layer's metatiles now, patches included.
+    second_cells: Vec<u16>,
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
@@ -307,7 +349,7 @@ impl CachedBackground {
                     i64::from(camera.0) + i64::try_from(column).unwrap_or(0) - drift,
                     width,
                 );
-                let cell = usize::from(layer.cells()[y / 16 * layer.width() + x / 16].raw() & 511);
+                let cell = usize::from(self.second_cells[y / 16 * layer.width() + x / 16]);
                 if cell == 0 {
                     continue;
                 }
@@ -332,57 +374,102 @@ impl CachedBackground {
         }
     }
 
-    /// Draws the world's patched cells (`COP 44`), and restores cells that
-    /// are no longer patched, from the map's own metatiles.
-    pub fn apply_patches(&mut self, image: &[u8], map: u16, patched: &[(u16, u16, u16)]) {
-        if self.patches.drawn == patched {
+    /// Draws the world's patched cells (`COP 44`, `COP 46`) on both
+    /// layers, and restores cells that are no longer patched, from the
+    /// map's own metatiles.
+    pub fn apply_patches(
+        &mut self,
+        image: &[u8],
+        map: u16,
+        patched: &[Patched],
+        second: &[Patched],
+    ) {
+        if self.patches.drawn == patched && self.patches.second == second {
             return;
         }
         self.patches.scene(image, map);
         let Some(scene) = &self.patches.scene else {
             return;
         };
-        let width = scene.layer().width();
-        let original = |column: u16, row: u16| {
-            let cell = usize::from(row) * width + usize::from(column);
-            scene.layer().cells().get(cell).map(|cell| cell.raw() & 511)
-        };
-        let mut redraw: Vec<(u16, u16, u16)> = self
-            .patches
-            .drawn
-            .iter()
-            .filter(|&&(column, row, _)| !patched.iter().any(|&(c, r, _)| (c, r) == (column, row)))
-            .filter_map(|&(column, row, _)| Some((column, row, original(column, row)?)))
-            .collect();
-        redraw.extend(
-            patched
-                .iter()
-                .filter(|cell| !self.patches.drawn.contains(cell)),
+        let first_original =
+            |cell: usize| scene.layer().cells().get(cell).map(|cell| cell.raw() & 511);
+        let first = changed(
+            &self.patches.drawn,
+            patched,
+            first_original,
+            scene.layer().width(),
         );
+        let shown = self
+            .front
+            .as_ref()
+            .or(self.second.as_ref().map(|second| &second.layer));
+        let second_width = shown.map_or(1, |layer| layer.layer().width());
+        let second_original = |cell: usize| {
+            shown?
+                .layer()
+                .cells()
+                .get(cell)
+                .map(|cell| cell.raw() & 511)
+        };
+        let changed_second = changed(&self.patches.second, second, second_original, second_width);
+        for &(column, row, tile) in &changed_second {
+            let cell = usize::from(row) * second_width + usize::from(column);
+            if let Some(slot) = self.second_cells.get_mut(cell) {
+                *slot = tile;
+            }
+        }
         let backdrop = self
             .animation
             .as_ref()
             .and_then(|animation| animation.backdrop);
-        for (column, row, tile) in redraw {
+        // The first layer's tile at a cell now: patched or the map's own.
+        let now = |column: u16, row: u16| {
+            patched
+                .iter()
+                .find(|&&(c, r, _)| (c, r) == (column, row))
+                .map(|&(_, _, tile)| tile)
+                .or_else(|| {
+                    first_original(usize::from(row) * scene.layer().width() + usize::from(column))
+                })
+        };
+        let mut redraw: Vec<(u16, u16)> = first
+            .iter()
+            .map(|&(column, row, _)| (column, row))
+            .collect();
+        if self.front.is_some() {
+            redraw.extend(changed_second.iter().map(|&(column, row, _)| (column, row)));
+            redraw.sort_unstable();
+            redraw.dedup();
+        }
+        for (column, row) in redraw {
+            let Some(tile) = now(column, row) else {
+                continue;
+            };
             let at = (usize::from(column), usize::from(row));
             draw_metatile(scene, &mut self.frame, at, tile, backdrop);
             if let Some(front) = &self.front {
-                let cell = usize::from(row) * front.layer().width() + usize::from(column);
+                let cell = usize::from(row) * second_width + usize::from(column);
+                let layer = (front, &self.second_cells[..]);
                 overlay_front(
                     &mut self.frame,
-                    front,
+                    layer,
                     (scene.tiles(), scene.palette()),
                     cell..=cell,
                 );
             }
         }
         self.patches.drawn = patched.to_vec();
+        self.patches.second = second.to_vec();
     }
 
     /// Advances the animation to `age` frames into the visit.
     pub fn update(&mut self, age: u64) {
         if let Some(animation) = &mut self.animation {
-            animation.update(age, &mut self.frame, self.front.as_ref());
+            let front = self
+                .front
+                .as_ref()
+                .map(|front| (front, &self.second_cells[..]));
+            animation.update(age, &mut self.frame, front);
         }
     }
 }
@@ -535,7 +622,7 @@ impl Animated {
         &mut self,
         age: u64,
         frame: &mut crate::frame::Background,
-        front: Option<&SecondLayer>,
+        front: Option<(&SecondLayer, &[u16])>,
     ) {
         let key = self.source.phase_key(age);
         if self.key.as_ref() == Some(&key) {
@@ -582,20 +669,19 @@ impl Animated {
 /// Draws the second layer's `cells` in front of the first
 /// ([`Presentation::Front`], `docs/tower-second-layer.md` §3): an opaque
 /// pixel covers the first layer's unless it is low over a high one, and
-/// brings its priority. The layers share tiles and colours.
+/// brings its priority. The layers share tiles and colours; `now` holds
+/// the second layer's metatiles, patches included.
 fn overlay_front(
     frame: &mut crate::frame::Background,
-    front: &SecondLayer,
+    (front, now): (&SecondLayer, &[u16]),
     (tiles, palette): (&[Tile4bpp], &[Bgr555; 128]),
     cells: impl IntoIterator<Item = usize>,
 ) {
     let width = front.layer().width();
     for cell in cells {
-        let Some(words) = front
-            .layer()
-            .cells()
+        let Some(words) = now
             .get(cell)
-            .and_then(|cell| front.metatiles().get(usize::from(cell.raw() & 511)))
+            .and_then(|&tile| front.metatiles().get(usize::from(tile)))
         else {
             continue;
         };
@@ -872,6 +958,44 @@ mod front_tests {
 }
 
 #[cfg(test)]
+mod second_patch_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn a_second_layer_patch_redraws_the_front_layer() {
+        // `$101`'s door (`docs/block-patch.md`): its second-layer cells go
+        // empty; the first layer shows there, and comes back unpatched.
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let mut cached = load(&rom, 0x101, &crysta_runtime::world::new_game_flags()).unwrap();
+        let scene = assets::maps::visual::first_background(rom.image(), 0x101).unwrap();
+        let cell = |cached: &CachedBackground| {
+            let width = cached.frame.width;
+            (0..256)
+                .map(|at| cached.frame.pixels[(4 * 16 + at / 16) * width + 7 * 16 + at % 16])
+                .collect::<Vec<_>>()
+        };
+        let before = cell(&cached);
+        cached.apply_patches(rom.image(), 0x101, &[], &[(7, 4, 0)]);
+        let first: Vec<u32> = (0..256)
+            .map(|at| {
+                let (x, y) = (7 * 16 + at % 16, 4 * 16 + at / 16);
+                let index = match scene.pixel(x, y).unwrap() {
+                    IndexedPixel::Transparent => 0,
+                    IndexedPixel::Opaque { palette_index, .. } => palette_index,
+                };
+                static_rgb(index, &scene, (x, y))
+            })
+            .collect();
+        assert_eq!(cell(&cached), first);
+        assert_ne!(first, before, "the door covered the first layer");
+        cached.apply_patches(rom.image(), 0x101, &[], &[]);
+        assert_eq!(cell(&cached), before);
+    }
+}
+
+#[cfg(test)]
 mod patch_tests {
     #[test]
     #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
@@ -888,9 +1012,9 @@ mod patch_tests {
         };
         let before = cell(&cached);
         // The blue door's broken tile from its second hit; the cell holds $181.
-        cached.apply_patches(rom.image(), 0xC, &[(11, 21, 0xCB)]);
+        cached.apply_patches(rom.image(), 0xC, &[(11, 21, 0xCB)], &[]);
         assert_ne!(cell(&cached), before);
-        cached.apply_patches(rom.image(), 0xC, &[]);
+        cached.apply_patches(rom.image(), 0xC, &[], &[]);
         assert_eq!(cell(&cached), before, "restored when the patch is gone");
     }
 
