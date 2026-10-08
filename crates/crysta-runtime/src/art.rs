@@ -29,7 +29,9 @@ pub struct Raster {
     pub height: usize,
     /// Offset of the top-left pixel from the actor's origin.
     pub offset: (i16, i16),
-    /// Row-major `0xAARRGGBB`; alpha is `0xFF` or zero, nothing between.
+    /// Row-major `0xAARRGGBB`; alpha is zero (transparent), `0xFF`, or
+    /// `0xFE` for OBJ palettes 4 to 7, the ones colour math takes
+    /// ([`MATH_ALPHA`]).
     pub pixels: Vec<u32>,
 }
 
@@ -75,6 +77,12 @@ impl From<SpriteError> for ArtError {
         Self::Sprite(error)
     }
 }
+
+/// The first colour of OBJ palette 4: palettes 4 to 7 take colour math,
+/// 0 to 3 never do.
+const MATH_PALETTES: u8 = 192;
+/// A raster pixel's alpha in OBJ palettes 4 to 7.
+pub const MATH_ALPHA: u8 = 0xFE;
 
 /// Rasterizes one composition into placed pixels.
 ///
@@ -125,7 +133,12 @@ pub fn raster(
                             index: palette_index,
                         })?;
                     let [r, g, b] = colour.rgb8();
-                    0xFF00_0000 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
+                    let alpha = if palette_index >= MATH_PALETTES {
+                        MATH_ALPHA
+                    } else {
+                        0xFF
+                    };
+                    u32::from(alpha) << 24 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
                 }
             });
         }
@@ -233,6 +246,23 @@ pub struct Animation {
 }
 
 impl Animation {
+    /// The same frames, every opaque pixel marked as colour math takes it
+    /// or not ([`MATH_ALPHA`]).
+    #[must_use]
+    pub fn with_math(mut self, math: bool) -> Self {
+        let alpha = u32::from(if math { MATH_ALPHA } else { 0xFF }) << 24;
+        for pixel in self
+            .frames
+            .iter_mut()
+            .flat_map(|frame| frame.pixels.iter_mut())
+        {
+            if *pixel >> 24 != 0 {
+                *pixel = (*pixel & 0x00FF_FFFF) | alpha;
+            }
+        }
+        self
+    }
+
     /// The raster showing `tick` frames after the list started.
     ///
     /// The list loops: the ordinary loop re-selects the pose and waits for
@@ -477,10 +507,15 @@ impl Body {
         let frozen = (field != 0 && self.shown_slot(field) == Some(FROZEN_SLOT))
             .then(|| frozen_palette(image))
             .flatten();
-        match frozen {
-            Some(palette) => self.recoloured(selector, hflip, &palette),
-            None => self.animation(selector, hflip),
-        }
+        let shown = match frozen {
+            Some(palette) => self.recoloured(selector, hflip, &palette)?,
+            None => self.animation(selector, hflip)?,
+        };
+        // Colour math follows the slot shown, not the one decoded.
+        Ok(match self.shown_slot(field) {
+            Some(slot) => shown.with_math(slot >= 4),
+            None => shown,
+        })
     }
 
     /// The header's initial selector.

@@ -790,6 +790,9 @@ fn raster_rgba_sha256(raster: &Raster) -> String {
         .iter()
         .flat_map(|&argb| {
             let [alpha, red, green, blue] = argb.to_be_bytes();
+            // Opaque is opaque: the colour-math mark (`MATH_ALPHA`) is no
+            // part of the composition.
+            let alpha = if alpha == 0 { 0 } else { 0xFF };
             [red, green, blue, alpha]
         })
         .collect();

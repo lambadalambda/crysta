@@ -589,6 +589,7 @@ impl Session {
         if self.world.display().shows_bg1() {
             clouds.add_second_layer(frame, camera, self.background_clock.tick());
         }
+        clouds.subtract_second_layer(frame, camera);
         clouds.extend_edges(frame, camera);
         self.draw_labels(frame, camera);
         let world = &self.world;

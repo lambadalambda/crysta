@@ -21,6 +21,9 @@ pub struct Canvas {
     pub pixels: Vec<u32>,
     /// Width in pixels.
     pub width: usize,
+    /// Whether colour math takes each pixel: the background's do, a
+    /// sprite's in OBJ palettes 0 to 3 do not.
+    pub math: Vec<bool>,
 }
 
 impl Canvas {
@@ -30,6 +33,7 @@ impl Canvas {
         Self {
             pixels: vec![0; width * VIEW_HEIGHT],
             width,
+            math: vec![true; width * VIEW_HEIGHT],
         }
     }
 
@@ -309,10 +313,14 @@ fn blit(
                 continue;
             };
             if !(occluded && background.occludes(x, y)) {
-                canvas.set(
-                    (world_x - camera.0, world_y - camera.1),
-                    pixel & 0x00FF_FFFF,
-                );
+                let at = (world_x - camera.0, world_y - camera.1);
+                canvas.set(at, pixel & 0x00FF_FFFF);
+                let math = pixel >> 24 == u32::from(crysta_runtime::art::MATH_ALPHA);
+                if let (Ok(x), Ok(y)) = (usize::try_from(at.0), usize::try_from(at.1)) {
+                    if x < canvas.width && y < VIEW_HEIGHT {
+                        canvas.math[y * canvas.width + x] = math;
+                    }
+                }
             }
         }
     }

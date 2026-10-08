@@ -113,12 +113,9 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         layer => (None, layer),
     };
     // The cells of a layer that shows; patches to another are not drawn.
-    let shown = layer.as_ref().filter(|layer| {
-        matches!(
-            layer.presentation(),
-            Presentation::Added | Presentation::Sky
-        )
-    });
+    let shown = layer
+        .as_ref()
+        .filter(|layer| layer.presentation() != Presentation::Hidden);
     let second_cells: Vec<u16> = front
         .as_ref()
         .or(shown)
@@ -145,7 +142,7 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         .filter(|layer| {
             matches!(
                 layer.presentation(),
-                Presentation::Added | Presentation::Sky
+                Presentation::Added | Presentation::Sky | Presentation::Subtracted
             )
         })
         .map(|layer| Second {
@@ -327,7 +324,11 @@ impl CachedBackground {
         camera: (i32, i32),
         age: u64,
     ) {
-        let Some(second) = self.second.as_ref().filter(|second| !second.layer.fixed()) else {
+        let Some(second) = self
+            .second
+            .as_ref()
+            .filter(|second| second.layer.presentation() == Presentation::Added)
+        else {
             return;
         };
         let (tiles, palette) = self
@@ -368,6 +369,47 @@ impl CachedBackground {
                 ) {
                     *pixel = add(*pixel, rgb(palette[usize::from(palette_index)]));
                 }
+            }
+        }
+    }
+
+    /// Subtracts the second layer from the view (`$11B`, `$123`:
+    /// `docs/tower-second-layer.md` §4.6): on the subscreen, it darkens the
+    /// pixels colour math takes (the first layer, the backdrop and OBJ
+    /// palettes 4 to 7), in full; where it is clear nothing changes. It
+    /// scrolls with the camera.
+    pub fn subtract_second_layer(&self, canvas: &mut crate::frame::Canvas, camera: (i32, i32)) {
+        let Some(second) = self
+            .second
+            .as_ref()
+            .filter(|second| second.layer.presentation() == Presentation::Subtracted)
+        else {
+            return;
+        };
+        let layer = second.layer.layer();
+        let (width, height) = (layer.width() * 16, layer.height() * 16);
+        for (at, pixel) in canvas.pixels.iter_mut().enumerate() {
+            if !canvas.math[at] {
+                continue;
+            }
+            let (column, row) = (signed(at % canvas.width), signed(at / canvas.width));
+            let (Ok(x), Ok(y)) = (
+                usize::try_from(camera.0 + column),
+                usize::try_from(camera.1 + row),
+            ) else {
+                continue;
+            };
+            if x >= width || y >= height {
+                continue;
+            }
+            let cell = usize::from(self.second_cells[y / 16 * layer.width() + x / 16]);
+            if let Ok(IndexedPixel::Opaque { palette_index, .. }) = graphics::sample_metatile(
+                &second.layer.metatiles()[cell],
+                &second.tiles,
+                x % 16,
+                y % 16,
+            ) {
+                *pixel = subtract(*pixel, rgb(second.palette[usize::from(palette_index)]));
             }
         }
     }
@@ -569,6 +611,13 @@ impl Sky {
 /// of 3 lines, `$1F` down to 0, from line 1).
 fn sky_subtraction(row: usize) -> u8 {
     u8::try_from(31_usize.saturating_sub(row / 3)).unwrap_or(0)
+}
+
+/// The SNES's colour subtraction: each channel floors at zero.
+fn subtract(main: u32, sub: u32) -> u32 {
+    let channel =
+        |shift: u32| ((main >> shift) & 0xFF).saturating_sub((sub >> shift) & 0xFF) << shift;
+    channel(16) | channel(8) | channel(0)
 }
 
 /// The SNES's colour addition: each channel saturates.

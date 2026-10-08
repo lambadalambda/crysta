@@ -593,8 +593,10 @@ fn the_frozen_townsfolk_draw_in_obj_palette_3() {
             continue;
         }
         frozen += 1;
+        // As the hosts show it: in palette 3, which colour math does not
+        // take (alpha `$FF`).
         let raster = body
-            .recoloured(resident.selector, resident.hflip, &palette)
+            .shown(image, (resident.selector, resident.hflip), resident.palette)
             .unwrap()
             .frame_at(0)
             .clone();
