@@ -10,6 +10,17 @@ enum Material {
     Partial,
 }
 
+/// Type 18, tower 4's rope, as a second sample (`docs/tower-four.md` §2):
+/// the Open pair table's Open handler, the partial one's Solid, and the
+/// solid one's Open for Left and Right, Solid for Up and Down.
+const fn rope_second(first: Material, direction: Direction) -> Material {
+    match first {
+        Material::Open => Material::Open,
+        Material::Solid if direction.horizontal() => Material::Open,
+        Material::Partial | Material::Solid => Material::Solid,
+    }
+}
+
 /// Finite source-qualified aliases, not arbitrary material remapping.
 ///
 /// The enclosing data identity must authenticate the map/profile and policy.
@@ -338,6 +349,15 @@ impl Room {
         Ok(())
     }
 
+    /// The stored type of the cell under (x, y), when on the grid.
+    fn kind(&self, x: u16, y: u16) -> Option<u8> {
+        let (col, row) = (x / 16, y / 16);
+        (col < self.width && row < self.height).then(|| {
+            ((self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)] >> 9) & 31)
+                as u8
+        })
+    }
+
     fn material(
         &self,
         x: u16,
@@ -379,10 +399,8 @@ impl Room {
             // sixteen directional tables (`$80:D542`, `D8E8`, `DC60`,
             // `DFDC`, `$40` apart): the tower tops' floor, tower 2's statue
             // rows, the pits Ark walks onto and falls into (`$80:CC00`).
-            // `18`, tower 4's rope, is Open in most of them and Solid in the
-            // rest (`docs/tower-four.md` §2); Open here, a first cut: the
-            // runtime keeps Ark on the rope's row
-            // (`meta/issues/rope-collision-tables.md`).
+            // `18`, tower 4's rope, is Open in the first tables; as a second
+            // sample it takes its pair tables ([`rope_second`]).
             0 | 1 | 2 | 17 | 18 | 20 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
@@ -417,10 +435,16 @@ impl Room {
             let neighbor = (perpendicular & !15)
                 .checked_add(16)
                 .ok_or(Unqualified::ArithmeticOverflow)?;
-            if direction.horizontal() {
-                self.material(u, neighbor, direction, old_edge)?
+            let (x, y) = if direction.horizontal() {
+                (u, neighbor)
             } else {
-                self.material(neighbor, v, direction, old_edge)?
+                (neighbor, v)
+            };
+            let second = self.material(x, y, direction, old_edge)?;
+            if self.kind(x, y) == Some(18) {
+                rope_second(first, direction)
+            } else {
+                second
             }
         };
         Ok((first, second))
@@ -575,6 +599,51 @@ mod tests {
         assert_eq!((held.x, held.y, held.dy), (24, 32, 0));
         assert_eq!(held.attempted_dy, 3);
         assert!(held.blocked);
+    }
+
+    #[test]
+    fn a_rope_second_sample_takes_its_pair_tables() {
+        // Type 18 (`docs/tower-four.md` §2): Open in the first and the Open
+        // pair tables, Solid after a partial first sample, and after a solid
+        // one Open for Left/Right, Solid for Up/Down.
+        let rope = |first: u16, at: [usize; 2]| {
+            let mut cells = vec![0; 4 * 4];
+            cells[at[0]] = first << 9;
+            cells[at[1]] = 18 << 9;
+            cells
+        };
+        for room in [
+            Room::new(4, 4, rope(12, [9, 10])).unwrap(),
+            Room::new(4, 4, rope(12, [9, 10]))
+                .unwrap()
+                .with_passive_directional_collision(),
+        ] {
+            // Down at x 36 (samples x 28 and 44, q 12): solid then rope, Up
+            // and Down's S table: Solid, no nudge.
+            let down = room.resolve(36, 31, Some(Direction::Down), 0, 2).unwrap();
+            assert_eq!((down.0, down.2), (36, true));
+        }
+        for room in [
+            Room::new(4, 4, rope(12, [6, 10])).unwrap(),
+            Room::new(4, 4, rope(12, [6, 10]))
+                .unwrap()
+                .with_passive_directional_collision(),
+        ] {
+            // Right at y 44 (samples y 28 and 44, q 12): solid then rope,
+            // Right's S table: Open, so the S/O nudge.
+            let right = room.resolve(23, 44, Some(Direction::Right), 2, 0).unwrap();
+            assert_eq!((right.1, right.2), (45, true));
+        }
+        for room in [
+            Room::new(4, 4, rope(16, [6, 10])).unwrap(),
+            Room::new(4, 4, rope(16, [6, 10]))
+                .unwrap()
+                .with_passive_directional_collision(),
+        ] {
+            // Partial then rope: P/S, no nudge at q 12.
+            let right = room.resolve(23, 44, Some(Direction::Right), 2, 0).unwrap();
+            assert_eq!((right.1, right.2), (44, true));
+        }
     }
 
     #[test]

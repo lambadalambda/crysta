@@ -103,7 +103,7 @@ impl Room {
             return Ok(12);
         } // $E838/$E750/$E777 class3 override
         let kind = ((raw >> 9) & 31) as u8;
-        if matches!(kind, 5 | 6 | 7 | 21 | 29) || (kind == 8 && self.type8_special_bit_clear) {
+        if matches!(kind, 5 | 6 | 7 | 18 | 21 | 29) || (kind == 8 && self.type8_special_bit_clear) {
             return Ok(kind);
         }
         // Retain existing finite policies (notably town25), without broadening them.
@@ -126,7 +126,7 @@ impl Room {
             6 | 7 => Ok(kind),
             // Both $E85C[8] and $E88F[8] are $0F, even with raw bit15 set.
             8 if self.type8_special_bit_clear => Ok(15),
-            5 | 12 | 14 | 16 | 21 | 29 => Ok(15),
+            5 | 12 | 14 | 16 | 18 | 21 | 29 => Ok(15),
             25 => {
                 // Authenticate the existing scoped alias even for a raw probe.
                 let col = u16::try_from(cell.0).map_err(|_| Unqualified::SampleOutOfBounds)?;
@@ -379,6 +379,12 @@ impl Room {
         let plus = Response::Block(i32::from(edge.q() >= 8));
         let minus = Response::Block(-i32::from(edge.q() < 8));
         let solid = Response::Block(0);
+        // The rope as a second sample (`super::rope_second`).
+        let second = match second {
+            18 if partial(first) || !(open(first) || edge.direction.horizontal()) => 12,
+            18 => 0,
+            _ => second,
+        };
         if second == 8 {
             // O/P/S table [8] targets are direction- and order-dependent.
             // Up: D3F1/D3CD/D3E6; Down: D7BE/D7C1/D7C8;
