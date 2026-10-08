@@ -1,6 +1,6 @@
 //! Native background presentation, separate from the asset inspector's checkerboard.
 use crate::frame::{rgb, signed, Canvas, CLASSIC_WIDTH, VIEW_HEIGHT};
-use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
+use assets::graphics::{self, BgTileWord, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::maps::visual::{
@@ -61,6 +61,7 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
         animation: None,
         second: None,
         sky: None,
+        front: None,
         patches: Patches::default(),
         world: true,
         mode7: assets::maps::visual::mode7::Mode7View::from_rom(cartridge.image())
@@ -103,10 +104,23 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
             .ok()
         })
         .filter(|source| !source.is_empty());
-    // Drawn as added light or as a sky; not yet in front or subtracted
+    // Drawn in front, as added light or as a sky; not yet subtracted
     // (`meta/issues/tower-second-layer.md`).
-    let second = SecondLayer::from_rom(image, map)
-        .ok()
+    let layer = SecondLayer::from_rom(image, map).ok();
+    let (front, layer) = match layer {
+        Some(layer) if layer.presentation() == Presentation::Front => (Some(layer), None),
+        layer => (None, layer),
+    };
+    if let Some(front) = &front {
+        let all = 0..front.layer().cells().len();
+        overlay_front(
+            &mut background,
+            front,
+            (scene.tiles(), scene.palette()),
+            all,
+        );
+    }
+    let second = layer
         .filter(|layer| {
             matches!(
                 layer.presentation(),
@@ -122,13 +136,14 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         .as_ref()
         .filter(|second| second.layer.fixed())
         .map(|second| Sky::new(second, &indices));
-    let animation = source.map(|source| Animated::new(scene, source, backdrop));
+    let animation = source.map(|source| Animated::new(scene, source, backdrop, front.as_ref()));
     Ok(CachedBackground {
         frame: background,
         region,
         animation,
         sky,
         second,
+        front,
         patches: Patches::default(),
         world: false,
         mode7: None,
@@ -194,6 +209,8 @@ pub struct CachedBackground {
     second: Option<Second>,
     /// A fixed second layer behind the first.
     sky: Option<Sky>,
+    /// The second layer in front of the first ([`overlay_front`]).
+    front: Option<SecondLayer>,
     patches: Patches,
     /// A world map: its camera follows the player unclamped (`$87:9123`).
     pub world: bool,
@@ -349,6 +366,15 @@ impl CachedBackground {
         for (column, row, tile) in redraw {
             let at = (usize::from(column), usize::from(row));
             draw_metatile(scene, &mut self.frame, at, tile, backdrop);
+            if let Some(front) = &self.front {
+                let cell = usize::from(row) * front.layer().width() + usize::from(column);
+                overlay_front(
+                    &mut self.frame,
+                    front,
+                    (scene.tiles(), scene.palette()),
+                    cell..=cell,
+                );
+            }
         }
         self.patches.drawn = patched.to_vec();
     }
@@ -356,7 +382,7 @@ impl CachedBackground {
     /// Advances the animation to `age` frames into the visit.
     pub fn update(&mut self, age: u64) {
         if let Some(animation) = &mut self.animation {
-            animation.update(age, &mut self.frame);
+            animation.update(age, &mut self.frame, self.front.as_ref());
         }
     }
 }
@@ -459,28 +485,41 @@ fn add(main: u32, sub: u32) -> u32 {
 }
 
 impl Animated {
-    fn new(scene: StaticBackground, source: SceneAnimation, backdrop: Option<u32>) -> Self {
+    /// The animation of `scene`'s first layer, and of the second in front
+    /// of it: a cell is redrawn when either layer's metatile there uses an
+    /// animated tile or colour row.
+    fn new(
+        scene: StaticBackground,
+        source: SceneAnimation,
+        backdrop: Option<u32>,
+        front: Option<&SecondLayer>,
+    ) -> Self {
         let tiles: std::collections::HashSet<usize> = source.tiles().collect();
         let rows: std::collections::HashSet<usize> =
             source.colors().map(|color| color / 16).collect();
-        let animated: Vec<bool> = scene
-            .metatiles()
-            .iter()
-            .map(|words| {
-                words.iter().any(|word| {
-                    tiles.contains(&usize::from(word.tile_index()))
-                        || rows.contains(&usize::from(word.palette()))
+        let moving = |cells: &[assets::maps::MapCell], metatiles: &[[BgTileWord; 4]]| {
+            let animated: Vec<bool> = metatiles
+                .iter()
+                .map(|words| {
+                    words.iter().any(|word| {
+                        tiles.contains(&usize::from(word.tile_index()))
+                            || rows.contains(&usize::from(word.palette()))
+                    })
                 })
-            })
-            .collect();
-        let cells = scene
-            .layer()
-            .cells()
-            .iter()
-            .enumerate()
-            .filter(|(_, cell)| animated.get(usize::from(cell.raw() & 511)) == Some(&true))
-            .map(|(i, _)| i)
-            .collect();
+                .collect();
+            cells
+                .iter()
+                .enumerate()
+                .filter(|(_, cell)| animated.get(usize::from(cell.raw() & 511)) == Some(&true))
+                .map(|(i, _)| i)
+                .collect::<Vec<usize>>()
+        };
+        let mut cells = moving(scene.layer().cells(), scene.metatiles());
+        if let Some(front) = front {
+            cells.extend(moving(front.layer().cells(), front.metatiles()));
+            cells.sort_unstable();
+            cells.dedup();
+        }
         Self {
             tiles: scene.tiles().to_vec(),
             palette: *scene.palette(),
@@ -492,7 +531,12 @@ impl Animated {
         }
     }
 
-    fn update(&mut self, age: u64, frame: &mut crate::frame::Background) {
+    fn update(
+        &mut self,
+        age: u64,
+        frame: &mut crate::frame::Background,
+        front: Option<&SecondLayer>,
+    ) {
         let key = self.source.phase_key(age);
         if self.key.as_ref() == Some(&key) {
             return;
@@ -527,7 +571,54 @@ impl Animated {
                 }
             }
         }
+        if let Some(front) = front {
+            let cells = self.cells.iter().copied();
+            overlay_front(frame, front, (&self.tiles, &self.palette), cells);
+        }
         self.key = Some(key);
+    }
+}
+
+/// Draws the second layer's `cells` in front of the first
+/// ([`Presentation::Front`], `docs/tower-second-layer.md` §3): an opaque
+/// pixel covers the first layer's unless it is low over a high one, and
+/// brings its priority. The layers share tiles and colours.
+fn overlay_front(
+    frame: &mut crate::frame::Background,
+    front: &SecondLayer,
+    (tiles, palette): (&[Tile4bpp], &[Bgr555; 128]),
+    cells: impl IntoIterator<Item = usize>,
+) {
+    let width = front.layer().width();
+    for cell in cells {
+        let Some(words) = front
+            .layer()
+            .cells()
+            .get(cell)
+            .and_then(|cell| front.metatiles().get(usize::from(cell.raw() & 511)))
+        else {
+            continue;
+        };
+        let (column, row) = (cell % width * 16, cell / width * 16);
+        for y in 0..16 {
+            for x in 0..16 {
+                let Ok(IndexedPixel::Opaque {
+                    palette_index,
+                    priority,
+                }) = graphics::sample_metatile(words, tiles, x, y)
+                else {
+                    continue;
+                };
+                let at = (row + y) * frame.width + column + x;
+                if column + x >= frame.width || at >= frame.pixels.len() {
+                    continue;
+                }
+                if priority || !frame.high[at] {
+                    frame.pixels[at] = rgb(palette[usize::from(palette_index)]);
+                    frame.high[at] = priority;
+                }
+            }
+        }
     }
 }
 
@@ -729,6 +820,54 @@ mod tests {
         assert_eq!(exterior_backdrop(&image, &scene).unwrap(), 0x00FF_0000);
         image[0xD_8C53] ^= 1;
         assert!(exterior_backdrop(&image, &scene).is_err());
+    }
+}
+
+#[cfg(test)]
+mod front_tests {
+    use super::*;
+
+    #[test]
+    #[ignore = "requires owned JP ROM: set CRYSTA_JP_ROM"]
+    fn a_tower_floors_second_layer_stands_in_front() {
+        // `$101` (`docs/tower-second-layer.md` §3): an opaque L2 pixel wins
+        // unless it is low over a high L1 pixel; its priority is kept.
+        let bytes = std::fs::read(std::env::var("CRYSTA_JP_ROM").unwrap()).unwrap();
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let cached = load(&rom, 0x101, &crysta_runtime::world::new_game_flags()).unwrap();
+        let scene = assets::maps::visual::first_background(rom.image(), 0x101).unwrap();
+        let front = SecondLayer::from_rom(rom.image(), 0x101).unwrap();
+        let width = front.layer().width();
+        let (mut fronts, mut highs) = (0, 0);
+        for y in 0..cached.frame.height {
+            for x in 0..cached.frame.width {
+                let cell = front.layer().cells()[y / 16 * width + x / 16];
+                let words = &front.metatiles()[usize::from(cell.raw() & 511)];
+                let Ok(IndexedPixel::Opaque {
+                    palette_index,
+                    priority,
+                }) = graphics::sample_metatile(words, scene.tiles(), x % 16, y % 16)
+                else {
+                    continue;
+                };
+                let first_high = matches!(
+                    scene.pixel(x, y),
+                    Ok(IndexedPixel::Opaque { priority: true, .. })
+                );
+                let at = y * cached.frame.width + x;
+                if priority || !first_high {
+                    assert_eq!(
+                        cached.frame.pixels[at],
+                        rgb(scene.palette()[usize::from(palette_index)]),
+                        "({x}, {y})"
+                    );
+                    assert_eq!(cached.frame.high[at], priority);
+                    fronts += 1;
+                    highs += usize::from(priority);
+                }
+            }
+        }
+        assert!(fronts > 1000 && highs > 100, "{fronts} {highs}");
     }
 }
 
