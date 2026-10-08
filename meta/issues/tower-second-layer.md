@@ -16,3 +16,10 @@ The app draws a map's second layer (BG2) only in Crysta (`$0A`-`$21`) and on `$1
 ## Acceptance Criteria
 
 - A tower door that a script opens matches native frames before and after, on both layers.
+
+## Progress
+
+- Research: `docs/tower-second-layer.md`. The second layer is the front layer on towers 1, 2 and 4 (the layers swapped, profile `$07`): torches, pillars, ledges, door frames.
+- `assets::maps::visual::profile` reads each map's display profile and classifies the layer: front, added, sky, subtracted, hidden.
+- The app draws the front layer over the first by priority, the towers' skies and added light, and the second layer's patches (`COP 46` layers 1 to `$7F`, flag patches), which the runtime now keeps.
+- Open: the subtracted layer of `$11B` and `$123` (it needs which sprite pixels take colour math: OBJ palettes 4-7); the added light's low pixels under a sprite (`docs/tower-second-layer.md` §4.4).
