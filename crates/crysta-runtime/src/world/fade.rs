@@ -246,8 +246,9 @@ impl World<'_> {
         }
     }
 
-    /// A frame of a transfer's fades, if one is under way: the actors run,
-    /// the player stands, and the fade out's last frame loads the map. The
+    /// A frame of a transfer's fades, if one is under way: the actors of the
+    /// nested frame run (`$8D:89D4`..`8ADE`; enemies stand still), the
+    /// player stands, and the fade out's last frame loads the map. The
     /// load clears the pad mask, as every load does; the next map's scripts
     /// lock it again where they hold the player (the guide in the reloaded
     /// `$21`, `$88:AEC5`).
@@ -256,7 +257,7 @@ impl World<'_> {
             return Ok(None);
         };
         if fading.game_frame() {
-            self.run_actors()?;
+            self.run_some_actors(true)?;
         }
         let (next, load) = fading.tick(&mut self.globals.transfer);
         let Some(transfer) = load else {

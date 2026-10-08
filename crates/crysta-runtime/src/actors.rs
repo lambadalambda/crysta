@@ -691,6 +691,9 @@ pub struct Actor {
     pub pose_age: u32,
     /// Whether a step is under way.
     pub walking: bool,
+    /// `+$04` bit 12: it runs in the nested frame of a transfer's fade
+    /// (`$80:C85E`); the main loop runs every actor.
+    nested: bool,
     /// Entity `+$04` bit 15: not drawn, not animated, not moved.
     pub hidden: bool,
     /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
@@ -850,6 +853,7 @@ impl Actor {
             vflip: false,
             pose_age: 0,
             walking: false,
+            nested: false,
             hidden: false,
             priority: 2,
             palette: 0,
@@ -1001,6 +1005,7 @@ impl Actor {
             .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         // Wall collision (`docs/enemy-scripts.md` §6) for enemies' bodies.
         actor.walls = resident.body && hittable && header & 0x0006 == 0x0004;
+        actor.nested = header & 0x1000 != 0;
         actor.foe = resident
             .descriptor
             .filter(|_| hittable)
@@ -2741,11 +2746,14 @@ impl Actor {
         let script = image.get(operands..operands + 3).and_then(long);
         let word = |at: usize| cadence::word(image, operands + at);
         let grouped = GROUP_SPAWNS.iter().find(|&&(group, _)| group == service);
+        let copied = (self.flags_04() | 0x8000) & !0x1000;
         let (script, flags, offset, length) = match grouped.map_or(service, |&(_, as_)| as_) {
             SPAWN | SPAWN_LINKED => (script, word(3), Some((0, 0)), 5),
-            // No flags word: the child keeps the parent's `+$04` (`$80:BCA4`).
-            SPAWN_AFTER => (script, Some(self.flags_04()), Some((0, 0)), 3),
-            SPAWN_AT => (script, Some(0), word(3).zip(word(5)), 7),
+            // No flags word: the child keeps the parent's `+$04`, hidden
+            // and out of the nested frame (`$80:BCD2`: `ORA #$8000`, `AND
+            // #$EFFF`).
+            SPAWN_AFTER => (script, Some(copied), Some((0, 0)), 3),
+            SPAWN_AT => (script, Some(copied), word(3).zip(word(5)), 7),
             _ => (script, word(7), word(3).zip(word(5)), 9),
         };
         let (Some(script), Some(flags), Some((dx, dy))) = (script, flags, offset) else {
@@ -2856,6 +2864,7 @@ impl Actor {
     /// `+$04` as the runtime keeps it, for a spawn that copies it.
     fn flags_04(&self) -> u16 {
         u16::from(self.hidden) << 15
+            | u16::from(self.nested) << 12
             | u16::from(self.touchable) << 9
             | if self.walls { WALLS_04 } else { 0 }
             | self.guard.0
@@ -2877,6 +2886,12 @@ impl Actor {
         self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;
         self.guard.0 = (self.guard.0 | set & GUARD_04) & !cleared;
         self.walls = (self.walls || set & WALLS_04 != 0) && cleared & WALLS_04 == 0;
+        self.nested = (self.nested || set & 0x1000 != 0) && cleared & 0x1000 == 0;
+    }
+
+    /// Whether it runs in the nested frame of a transfer's fade.
+    pub(crate) const fn runs_nested(&self) -> bool {
+        self.nested
     }
 
     /// Takes a write another actor's run made into it.
@@ -2925,6 +2940,7 @@ impl Actor {
         child.pose_ticks.clone_from(&self.pose_ticks);
         child.legs = self.legs;
         child.hidden = flags & 0x8000 != 0;
+        child.nested = flags & 0x1000 != 0;
         child.walls = flags & 0x0006 == 0x0004;
         child.guard.0 = flags & GUARD_04;
         child.spawned = true;
@@ -5502,6 +5518,14 @@ mod script_service_tests {
             panic!("one spawn");
         };
         assert_eq!((*script, child.position), (0x08_8029, actor.position));
+        // Without a flags word the child takes the parent's, hidden and out
+        // of the nested frame (`$80:BCD2`), until its script shows it.
+        assert!(child.hidden && !actor.hidden);
+        let (image, mut actor) = actor_running(&code);
+        actor.write_04(0x1000, 0);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert!(actor.runs_nested() && !globals.spawns[0].1.runs_nested());
     }
 
     #[test]

@@ -833,6 +833,12 @@ impl<'a> World<'a> {
     /// cell changes, the room is rebuilt from the base with the new cells
     /// blocked.
     fn run_actors(&mut self) -> Result<(), WorldError> {
+        self.run_some_actors(false)
+    }
+
+    /// Runs the actors; `nested`, only those of the nested frame (`+$04`
+    /// bit 12, `$80:C85E`), as a transfer's fade does.
+    fn run_some_actors(&mut self, nested: bool) -> Result<(), WorldError> {
         let (x, y) = self.position();
         self.publish_engine_words((x, y));
         self.globals.marks.clone_from(&self.blocked);
@@ -842,6 +848,9 @@ impl<'a> World<'a> {
             .map(|actor| (actor.id, actor.view()))
             .collect();
         for index in 0..self.actors.len() {
+            if nested && !self.actors[index].runs_nested() {
+                continue;
+            }
             let occupied = occupied_by_others(&self.actors, &self.residents, index, (x, y));
             let mut around = surroundings(
                 self.image,
