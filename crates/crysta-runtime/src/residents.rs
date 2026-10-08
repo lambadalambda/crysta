@@ -104,16 +104,16 @@ pub enum Conversation {
     },
 }
 
-/// The player's own `FD` record (`$84:A129`, entry `$84:A12E`): the host
-/// owns the player (`docs/house-scene.md`).
-const PLAYER: u32 = 0x84_A12E;
-
 /// `FB` compact services that loop over the engine's per-frame tile and
 /// palette animation (`$8D:93xx`, `docs/house-scene.md`'s **C**; `$17` and
 /// `$19`'s pair until flag `$35`, `COP 8A`/`93`, `8C`/`95`): display work,
 /// not scripts. Other compact actors, such as the town's scene `$88:84EF`,
-/// are scripts and run.
-const SERVICES: [u32; 4] = [0x87_98C2, 0x87_98EB, 0x88_C697, 0x88_C6B8];
+/// are scripts and run. The world map's view (`$87:990A`: its HDMA) and
+/// horizon band (`$84:E3E6`: OBJ on the camera that shape the fog) are the
+/// hosts' too (`docs/world-map-mode7.md`).
+const SERVICES: [u32; 6] = [
+    0x87_98C2, 0x87_98EB, 0x88_C697, 0x88_C6B8, 0x87_990A, 0x84_E3E6,
+];
 
 /// Residents a map installs for a given event-flag state.
 ///
@@ -138,6 +138,8 @@ pub fn residents(
     Ok(present
         .iter()
         .enumerate()
+        // The player's record is Ark, whom the host owns.
+        .filter(|(_, record)| !record.installs_player(image))
         .map(|(index, record)| {
             let actor = decoded[index].as_ref().ok();
             let initial = actor.map_or(0, HouseActor::initial);
@@ -161,11 +163,11 @@ pub fn residents(
         })
         .filter(|resident| {
             resident.script.is_none_or(|script| {
-                // Named in the image's revision; all five are recorded, and
-                // the European slice test would show one that is not.
-                std::iter::once(PLAYER)
-                    .chain(SERVICES)
-                    .all(|japan| layout::at(image, japan) != Some(script))
+                // Named in the image's revision; all are recorded, and the
+                // European slice test would show one that is not.
+                SERVICES
+                    .iter()
+                    .all(|&japan| layout::at(image, japan) != Some(script))
             }) && !despawns(image, resident, events)
         })
         .collect())

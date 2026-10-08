@@ -101,6 +101,20 @@ impl SpawnRecord {
     pub fn descriptor_offset(&self) -> Option<usize> {
         rom_offset(self.bytes.get(7..10).filter(|_| self.opcode <= 1)?)
     }
+    /// Whether the record installs the player: its header's flags (`+$04`)
+    /// set bit `$0400`, which `$80:F46E` sends to the player's setup
+    /// (`$80:F7F3`). Map `$03`'s `FD` record is Ark; `$114`'s landing's is
+    /// not.
+    #[must_use]
+    pub fn installs_player(&self, image: &[u8]) -> bool {
+        let header = self
+            .script()
+            .filter(|_| matches!(self.opcode, 0x00 | 0x01 | 0xFD))
+            .map(|script| ((script - 5) & 0x3F_FFFF) as usize);
+        header
+            .and_then(|at| image.get(at + 1..at + 3))
+            .is_some_and(|flags| flags[1] & 0x04 != 0)
+    }
     /// Runtime address of the actor script this record installs.
     ///
     /// The record's pointer field is followed by a five-byte header, so the

@@ -132,6 +132,7 @@ jp_address	eu_address	kind	method	confidence	note
 84:BE98	84:BE98	sprite	exact	high	run 0xbe bytes; code; crates/assets/src/sprites/pandora.rs:704
 84:C2B8	84:C2B8	sprite	exact	high	run 0x3f bytes +table +shape; code; crates/assets/src/sprites/pandora.rs:721
 84:C701	84:C701	sprite	exact	high	run 0x3f4 bytes +shape; code; crates/assets/src/sprites/pandora.rs:718
+84:E3E6	84:E3AB	script	exact	high	run 0xd5 bytes +shape; code; crates/crysta-runtime/src/residents.rs:115
 85:0000	85:0000	bank	bank	high	bank of 11 weighted addresses in it; run 0x8000 bytes +table +shape +lz; code; crates/assets/src/text/pandora.rs:191
 85:81E4	85:81E4	text	exact	high	run 0x50f bytes +code +shape; code; crates/assets/src/text/window.rs:19
 85:96BE	85:970E	text	exact	high	run 0x2d bytes; code; crates/assets/src/text/pandora.rs:188
@@ -142,6 +143,7 @@ jp_address	eu_address	kind	method	confidence	note
 85:C800	85:C898	text	exact	high	run 0x2e bytes; test; crates/assets/src/text/pandora/tests.rs:200 (+1)
 85:C802	85:C89A	text	aligned	medium	gap 0x2 bytes, same length (one side); text page, no script names it: confirm with the EU text decoder; test; crates/assets/src/text/pandora/tests.rs:200
 85:E27B	85:E313	script	exact	high	verbatim 0x15 bytes; code; crates/crysta-runtime/src/actors/foe.rs
+87:990A	87:98C7	script	exact	high	run 0x54 bytes +shape; code; crates/crysta-runtime/src/residents.rs:115
 C6:2191	C8:2191	music	exact	high	run 0x777f bytes +shape; code; crates/crysta-app/src/music_data.rs:108
 86:959C	86:959C	sprite	exact	high	run 0x1ea bytes +code; code; crates/assets/src/maps/scripts.rs:14 (+8)
 86:959F	86:959F	map	aligned	medium	gap 0x16 bytes, same length; test; crates/assets/src/maps/visual.rs:1109

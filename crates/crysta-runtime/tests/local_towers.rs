@@ -80,6 +80,25 @@ fn the_underworld_entrance_leads_into_tower_one() {
 }
 
 #[test]
+fn no_script_on_the_underworld_map_freezes() {
+    // `$03`'s player record (`FD`, header flags `$0400`, `$80:F46E`) is
+    // Ark; the horizon band (`$84:E3E6`) and the view's HDMA (`$87:990A`)
+    // are the hosts' to draw (`docs/world-map-mode7.md`).
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in 0x20..=0x2D {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0003, 216, 880, events).unwrap();
+        for _ in 0..60 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert_eq!(world.frozen_scripts(), [], "{:?}", rom.revision());
+        assert!(world.residents().is_empty(), "{:?}", rom.revision());
+    }
+}
+
+#[test]
 fn ark_walks_in_from_the_bottom_of_tower_one() {
     // `docs/tower-entry.md`: selector `$66` places Ark at (256,1024) and
     // walks him up 17 pixels to (256,1007), the pad locked.
