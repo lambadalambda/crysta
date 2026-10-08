@@ -349,13 +349,14 @@ impl Room {
         Ok(())
     }
 
-    /// The stored type of the cell under (x, y), when on the grid.
-    fn kind(&self, x: u16, y: u16) -> Option<u8> {
+    /// Whether the cell under (x, y) is a rope: type 18, its bit 15 clear
+    /// (a flagged cell is solid whatever its type).
+    fn rope(&self, x: u16, y: u16) -> bool {
         let (col, row) = (x / 16, y / 16);
-        (col < self.width && row < self.height).then(|| {
-            ((self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)] >> 9) & 31)
-                as u8
-        })
+        col < self.width
+            && row < self.height
+            && self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)] & 0xBE00
+                == 18 << 9
     }
 
     fn material(
@@ -441,7 +442,7 @@ impl Room {
                 (neighbor, v)
             };
             let second = self.material(x, y, direction, old_edge)?;
-            if self.kind(x, y) == Some(18) {
+            if self.rope(x, y) {
                 rope_second(first, direction)
             } else {
                 second
