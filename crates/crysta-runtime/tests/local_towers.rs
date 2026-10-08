@@ -704,7 +704,7 @@ fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
         let mut world =
             World::enter_with_events(rom.image(), 0x010F, 152, 688, after_the_intro()).unwrap();
         let (life, _) = world.life();
-        fall_right(&mut world, 60, 47);
+        fall_right(&mut world, 60, 50);
         // Then back, hidden, a pixel a frame each way (`$84:A01E`).
         let mut path = vec![world.position()];
         while world.falling() && path.len() < 400 {
@@ -748,6 +748,58 @@ fn a_fall_that_takes_the_last_life_sends_ark_down() {
         assert_ne!(world.map(), 0x010F, "{:?}", rom.revision());
         let (life, max) = world.life();
         assert_eq!(life, max);
+    }
+}
+
+#[test]
+fn a_lip_drop_and_its_fall_keep_the_native_frames() {
+    // A native JP trace (2026-10-08): from the first frame Ark sinks 3
+    // pixels (d), the drop's `$13` shows and its sound plays; at d+12 the
+    // fall starts, its `$18` and sound `$12` a frame later, `$10` 9 frames
+    // after; at d+62 Ark loses life and walks back a pixel a frame, at 736
+    // by d+109, and walks again 3 frames on.
+    use crysta_runtime::audio::Cue;
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x010F, 136, 736, after_the_intro()).unwrap();
+        let mut rows = vec![];
+        let mut previous = world.position().1;
+        for _ in 0..160 {
+            world
+                .update(Some(Direction::Down), Presses::default())
+                .unwrap();
+            let sounds: Vec<u16> = world
+                .take_cues()
+                .into_iter()
+                .filter_map(|cue| match cue {
+                    Cue::Sound(sound) => Some(sound),
+                    Cue::Track { .. } => None,
+                })
+                .collect();
+            let y = world.position().1;
+            let pose = world.ark_pose().map(|pose| (pose.list, pose.age));
+            rows.push((y, y.wrapping_sub(previous), pose, sounds, world.life().0));
+            previous = y;
+        }
+        let d = rows.iter().position(|row| row.1 == 3).unwrap();
+        let at = |frame: usize| &rows[d + frame];
+        assert_eq!(at(0).2, Some((0x13, 0)), "{:?}", rom.revision());
+        assert!(at(0).3.contains(&0x1000), "{:?}", rom.revision());
+        assert_eq!(rows[d - 1].2, None, "{:?}", rom.revision());
+        assert_eq!(at(12).0, 784, "{:?}", rom.revision());
+        assert_eq!(
+            at(12).2.map(|pose| pose.0),
+            Some(0x13),
+            "{:?}",
+            rom.revision()
+        );
+        assert_eq!(at(13).2, Some((0x18, 0)), "{:?}", rom.revision());
+        assert!(at(13).3.contains(&0x1200), "{:?}", rom.revision());
+        assert!(at(22).3.contains(&0x1000), "{:?}", rom.revision());
+        assert_eq!((at(61).0, at(61).4), (784, 28), "{:?}", rom.revision());
+        assert_eq!((at(62).0, at(62).4), (783, 24), "{:?}", rom.revision());
+        assert_eq!((at(108).0, at(109).0), (737, 736), "{:?}", rom.revision());
+        assert_eq!((at(111).0, at(112).0), (736, 737), "{:?}", rom.revision());
     }
 }
 

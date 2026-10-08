@@ -39,9 +39,11 @@ const DROP: u16 = 3;
 const JUMP_SOUND: u8 = 0x10;
 /// The rope's band: the box's top this far into its cell.
 const BAND: std::ops::RangeInclusive<u16> = 7..=13;
-/// Frames of the fall, and the second sound's frame.
-const FALL: u16 = 47;
-const SECOND_SOUND: u16 = 8;
+/// Frames of the fall, and the second sound's frame: its script starts the
+/// frame after the test (`$84:9F53`), waits 8 and 39 (`COP C1` resumes a
+/// frame after).
+const FALL: u16 = 50;
+const SECOND_SOUND: u16 = 10;
 /// The fall's sounds (port 3).
 const FALL_SOUNDS: [u8; 2] = [0x12, 0x10];
 /// The flag a fall into an exit sets.
@@ -57,6 +59,8 @@ pub(super) struct Fall {
     frame: u16,
     /// Where he goes back to, hidden, once the fall is over.
     back: Option<(u16, u16)>,
+    /// The pose the test's frame keeps, before the script runs.
+    before: Option<ArkPose>,
 }
 
 impl Fall {
@@ -65,12 +69,15 @@ impl Fall {
         self.frame >= FALL
     }
 
-    /// Resource 0's `$18`, once (`$84:A8BC`); nothing once he is hidden.
+    /// Resource 0's `$18`, once (`$84:A8BC`), from the frame after the
+    /// test; nothing once he is hidden.
     pub(super) const fn pose(self) -> Option<ArkPose> {
-        if self.landed() {
+        if self.frame == 0 {
+            self.before
+        } else if self.landed() {
             None
         } else {
-            Some(ArkPose::new(0, 0x18, false, self.frame, true))
+            Some(ArkPose::new(0, 0x18, false, self.frame - 1, true))
         }
     }
 }
@@ -84,9 +91,10 @@ pub(super) struct Jump {
 
 impl Jump {
     /// Resource 0's `$13`, or `$15` facing Up, looped (`$84:A873`,
-    /// `$84:A899`); none with a pot, a carry pose.
+    /// `$84:A899`), from the frame after the test; none with a pot, a carry
+    /// pose.
     pub(super) const fn pose(self, facing: Direction) -> Option<ArkPose> {
-        if self.carrying {
+        if self.carrying || self.frame == 0 {
             return None;
         }
         let list = if matches!(facing, Direction::Up) {
@@ -94,7 +102,7 @@ impl Jump {
         } else {
             0x13
         };
-        Some(ArkPose::new(0, list, false, self.frame, false))
+        Some(ArkPose::new(0, list, false, self.frame - 1, false))
     }
 
     /// The pot in hand: `$097C & $0300` picks the carry's drop
@@ -226,7 +234,6 @@ impl World<'_> {
             });
             self.rope = None;
             self.thrust = None;
-            self.globals.audio.sound_port3(JUMP_SOUND);
             return;
         }
         match ground(under, at.1) {
@@ -240,13 +247,14 @@ impl World<'_> {
     }
 
     fn start_fall(&mut self) {
+        let before = self.ark_pose();
         self.fall = Some(Fall {
             frame: 0,
             back: None,
+            before,
         });
         self.rope = None;
         self.thrust = None;
-        self.globals.audio.sound_port3(FALL_SOUNDS[0]);
     }
 
     /// A frame of a drop from a lip: Ark sinks, an exit under him is
@@ -258,6 +266,9 @@ impl World<'_> {
         };
         jump.frame += 1;
         let carrying = jump.carrying;
+        if jump.frame == 1 {
+            self.globals.audio.sound_port3(JUMP_SOUND);
+        }
         let (x, y) = self.position();
         self.walking = room_core::WalkingState::new(x, y + DROP);
         if let Some(step) = self.take_exit()? {
@@ -272,16 +283,17 @@ impl World<'_> {
         let upper = |attribute| floor(attribute) || matches!(attribute, Some(UNSAFE | PIT));
         let lower = !low(at.1) || (floor(under[2]) && floor(under[3]));
         if upper(under[0]) && upper(under[1]) && lower {
-            self.jump = None;
             // `$80:CE01` reads three of them (`CMP $08` goes untested).
             let falls = under[..3].iter().all(|&attribute| attribute == Some(PIT));
             // With a pot: the carry's control again (`$84:AC02`).
             if carrying {
                 self.carry_to_landing(falls);
             }
+            // The drop's pose stays a frame.
             if falls {
                 self.start_fall();
             }
+            self.jump = None;
         }
         self.run_actors()?;
         Ok(Some(Step::Walked))
@@ -325,35 +337,42 @@ impl World<'_> {
             return Ok(None);
         };
         if let Some(to) = fall.back {
-            let at = self.position();
-            // There Ark is shown and his stand script set (`$84:9FE6`); he
-            // is free the next frame.
-            if at == to {
-                self.run_actors()?;
-                return Ok(Some(Step::Stayed));
-            }
-            let toward = |from: u16, to: u16| match from.cmp(&to) {
-                std::cmp::Ordering::Less => from + 1,
-                std::cmp::Ordering::Equal => from,
-                std::cmp::Ordering::Greater => from - 1,
-            };
-            self.walking = room_core::WalkingState::new(toward(at.0, to.0), toward(at.1, to.1));
-            self.fall = Some(fall);
+            self.step_back(to);
+            self.fall = (self.position() != to).then_some(fall);
             self.run_actors()?;
             return Ok(Some(Step::Walked));
         }
         fall.frame += 1;
-        if fall.frame == SECOND_SOUND {
-            self.globals.audio.sound_port3(FALL_SOUNDS[1]);
+        match fall.frame {
+            1 => self.globals.audio.sound_port3(FALL_SOUNDS[0]),
+            SECOND_SOUND => self.globals.audio.sound_port3(FALL_SOUNDS[1]),
+            _ => {}
         }
         if fall.landed() {
             fall.back = self.land();
-            self.fall = fall.back.is_some().then_some(fall);
-        } else {
-            self.fall = Some(fall);
+            // The way back starts on the same frame.
+            if let Some(to) = fall.back {
+                self.step_back(to);
+            }
+            self.fall = fall.back.filter(|&to| self.position() != to).map(|_| fall);
+            self.run_actors()?;
+            return Ok(Some(Step::Walked));
         }
+        self.fall = Some(fall);
         self.run_actors()?;
         Ok(Some(Step::Stayed))
+    }
+
+    /// A pixel each way toward `to`; there Ark is shown and his stand
+    /// script set (`$84:9FE6`), and the fall is over.
+    fn step_back(&mut self, to: (u16, u16)) {
+        let toward = |from: u16, to: u16| match from.cmp(&to) {
+            std::cmp::Ordering::Less => from + 1,
+            std::cmp::Ordering::Equal => from,
+            std::cmp::Ordering::Greater => from - 1,
+        };
+        let at = self.position();
+        self.walking = room_core::WalkingState::new(toward(at.0, to.0), toward(at.1, to.1));
     }
 
     /// The fall's end (`$8D:8756`): the exit under Ark, or, with some life
