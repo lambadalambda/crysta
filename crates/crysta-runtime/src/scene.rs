@@ -275,21 +275,27 @@ impl Globals {
         }
     }
 
-    /// `COP 4B`: stores a word at `$0640 + op`, or with bit 7 adds it in BCD,
-    /// capped at 9999. Bit 6's subtraction is not modelled; returns false
-    /// (`meta/issues/partial-cop-services.md`).
-    pub fn count(&mut self, op: u8, word: u16) -> bool {
-        let at = usize::from(op & 0x3F);
-        let Some(slot) = self.counters.get_mut(at..at + 2) else {
-            return false;
+    /// `COP 4B` (`$80:975B`): stores a word at `$0640 + op`; with bit 7,
+    /// adds it in BCD, capped at 9999; with bit 6, subtracts it in BCD down
+    /// to 0 at `$0640 + (op & $BF)`. Returns the operand bytes the script
+    /// skips: 3, or 1 for the subtraction, which reads its word without
+    /// skipping it. `None` past `$06BF`, the counters' end (bits 6 and 7
+    /// together; no script in the ROM sets bit 6).
+    pub fn count(&mut self, op: u8, word: u16) -> Option<usize> {
+        let (at, skip) = match op & 0xC0 {
+            0x40 | 0xC0 => (op & 0xBF, 1),
+            _ => (op & 0x7F, 3),
         };
+        let at = usize::from(at);
+        let slot = self.counters.get_mut(at..at + 2)?;
+        let held = u16::from_le_bytes([slot[0], slot[1]]);
         let value = match op & 0xC0 {
             0 => word,
-            0x80 => bcd_add(u16::from_le_bytes([slot[0], slot[1]]), word),
-            _ => return false,
+            0x80 => bcd_add(held, word),
+            _ => bcd_sub(held, word),
         };
         slot.copy_from_slice(&value.to_le_bytes());
-        true
+        Some(skip)
     }
 
     /// A counter's word, as [`Self::count`] keeps it.
@@ -321,14 +327,23 @@ impl Globals {
 
 /// Four-digit BCD addition, capped at 9999.
 fn bcd_add(a: u16, b: u16) -> u16 {
-    let decimal = |bcd: u16| {
-        (0..4)
-            .rev()
-            .fold(0u32, |n, i| n * 10 + u32::from((bcd >> (i * 4)) & 0xF))
-    };
-    let sum = (decimal(a) + decimal(b)).min(9999);
+    bcd((decimal(a) + decimal(b)).min(9999))
+}
+
+/// Four-digit BCD subtraction, floored at 0.
+fn bcd_sub(a: u16, b: u16) -> u16 {
+    bcd(decimal(a).saturating_sub(decimal(b)))
+}
+
+fn decimal(bcd: u16) -> u32 {
+    (0..4)
+        .rev()
+        .fold(0, |n, i| n * 10 + u32::from((bcd >> (i * 4)) & 0xF))
+}
+
+fn bcd(n: u32) -> u16 {
     (0..4).fold(0, |bcd, i| {
-        bcd | (u16::try_from(sum / 10u32.pow(i) % 10).unwrap_or(0) << (i * 4))
+        bcd | (u16::try_from(n / 10u32.pow(i) % 10).unwrap_or(0) << (i * 4))
     })
 }
 

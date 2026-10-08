@@ -3246,11 +3246,11 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                if !around.globals.count(op, word) {
+                let Some(skip) = around.globals.count(op, word) else {
                     self.state = State::Frozen;
                     return false;
-                }
-                self.pc = operands + 3;
+                };
+                self.pc = operands + skip;
             }
             YIELD => {
                 self.pc = operands;
@@ -6172,8 +6172,23 @@ mod scene_service_tests {
         globals.count(0x02, 0x9999);
         globals.count(0x82, 5);
         assert_eq!(globals.counter(2), 0x9999);
-        // Bit 6's subtraction is refused rather than guessed.
-        assert!(!globals.count(0x40, 1));
+        // Bit 6 subtracts in BCD down to 0 (`$80:979D`), and reads its
+        // word without skipping it: the script goes on after the op byte.
+        assert_eq!(globals.count(0x42, 0x0999), Some(1));
+        assert_eq!(globals.counter(2), 0x9000);
+        assert_eq!(globals.count(0x42, 0x9001), Some(1));
+        assert_eq!(globals.counter(2), 0);
+        assert_eq!(globals.count(0x02, 7), Some(3));
+    }
+
+    #[test]
+    fn cop_4b_with_bit_6_goes_on_after_its_op_byte() {
+        // COP 4B $40 with the word's bytes `2, $80` (a `COP 80`); the
+        // script runs them next: `COP 80 3`, and BCD 9000 - 8002 = 0998.
+        let mut globals = Globals::with_events(vec![0; 512]);
+        globals.count(0x00, 0x9000);
+        let (_, actor) = run(&[(0, &[2, 0x4B, 0x40, 2, 0x80, 3, 2, 0xBD])], &mut globals);
+        assert_eq!((globals.counter(0), actor.selector), (0x0998, 3));
     }
 
     #[test]
