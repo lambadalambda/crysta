@@ -168,8 +168,10 @@ fn shifted_pose_list(
             }
             return Ok(PandoraPoseList { selector, frames });
         }
-        // Facings 4..7 are the stairs' own (`docs/ark-poses.md`).
-        if prefix[0] >= 128 || prefix[1] > 7 {
+        // Facings 4..7 are the stairs' own (`docs/ark-poses.md`), 8 the
+        // level up's recovery (resource 2's `$20`); the byte goes to the
+        // facing (`$1014`), not the drawing.
+        if prefix[0] >= 128 || prefix[1] > 8 {
             return Err(SpriteError::Invalid("unsupported Pandora list command"));
         }
         let anchor = usize::from(word(take(bytes, at + 2, 2)?, 0));
@@ -248,10 +250,22 @@ impl PandoraSprites {
                 selectors,
             )?);
         }
+        // Ark's resources (`$80:A24F`) and the lists the runtime shows:
+        // the carry, the stairs and the lift, the fall (`$18`), the drop
+        // (`$13`, `$15`), the level up (`$1D`, then 2's `$20`), the rope's
+        // lean (1's 6, 7; its walk and stand hold the spear,
+        // [`Mode4Art::with_weapon`]), the Magirock and the chest's lifts
+        // (3's `$18`..`$1A`, `$39`, `$3A`), the burn (5's 4, 5) and the sleep
+        // (5's 7, 8).
         for (resource, selectors) in [
-            (0, &[3, 4, 5][..]),
-            (1, &[9, 10, 11][..]),
-            (3, &[15, 16, 17, 24, 25, 26][..]),
+            (0, &[3, 4, 5, 0x13, 0x15, 0x18, 0x1D][..]),
+            (1, &[6, 7, 9, 10, 11][..]),
+            (2, &[0x20][..]),
+            (
+                3,
+                &[15, 16, 17, 0x18, 0x19, 0x1A, 24, 25, 26, 0x39, 0x3A][..],
+            ),
+            (5, &[4, 5, 7, 8][..]),
         ] {
             art.push(ark_art(&mut loader, resource, selectors)?);
         }
@@ -539,8 +553,25 @@ impl Mode4Art {
     /// # Errors
     /// Refuses a list outside the qualified shapes.
     pub fn thrust(image: &[u8], weapon: u8, selector: u8) -> Result<Self, SpriteError> {
+        Self::with_weapon(image, 4, weapon, selector)
+    }
+
+    /// A list of Ark's `resource` (`$80:A24F`) whose frames hold the
+    /// weapon: OBJ palette 1 takes its colour set, as the thrust's (the
+    /// rope's walk and stand, resource 1's `$0F` and `$10`).
+    ///
+    /// # Errors
+    /// As [`Self::thrust`].
+    pub fn with_weapon(
+        image: &[u8],
+        resource: u8,
+        weapon: u8,
+        selector: u8,
+    ) -> Result<Self, SpriteError> {
         let mut loader = Loader::new(image);
-        let entry = loader.read(located(image, 0xa24f)? + 4 * 6, 6)?.to_vec();
+        let entry = loader
+            .read(located(image, 0xa24f)? + usize::from(resource) * 6, 6)?
+            .to_vec();
         let sheet = loader.read(pointer(&entry[3..])?, 0x4000)?;
         let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(sheet)?.into();
         let colours =
