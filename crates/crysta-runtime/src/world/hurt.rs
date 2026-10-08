@@ -109,7 +109,9 @@ impl World<'_> {
     /// paralysis, `$97:C2C8`).
     #[must_use]
     pub fn ark_blinks(&self) -> bool {
-        self.hurt.is_some_and(|hurt| hurt.frame % 2 == 0) || self.globals.ark_flags & 0x8000 != 0
+        self.hurt.is_some_and(|hurt| hurt.frame % 2 == 0)
+            || self.globals.ark_flags & 0x8000 != 0
+            || self.fall.is_some_and(super::fall::Fall::landed)
     }
 
     /// The enemies' hit scan on Ark (`$85:D30C`): an attack box touching

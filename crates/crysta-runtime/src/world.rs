@@ -36,6 +36,7 @@ mod fade;
 mod fall;
 mod hurt;
 mod levelup;
+mod life;
 mod magirock;
 mod pots;
 mod progress;
@@ -63,6 +64,8 @@ pub struct World<'a> {
     hurt: Option<hurt::Hurt>,
     /// Frames since Ark went down at no life.
     down: Option<u16>,
+    /// `$04CE`: life still to add, a point a frame ([`life`]).
+    pending_life: u16,
     /// Frames before an enemy can hurt Ark again.
     ark_immune: u16,
     /// The thrust lists' records and boxes.
@@ -343,6 +346,7 @@ impl<'a> World<'a> {
             thrust: None,
             hurt: None,
             down: None,
+            pending_life: 0,
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::from_rom(image),
             walking: WalkingState::new(x, y),
@@ -1282,6 +1286,7 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((Step::Stayed, None));
         }
+        self.life_frame();
         if let Some(step) = self.holding_frame(presses)? {
             self.apply_patches()?;
             return Ok((step, None));
@@ -2519,6 +2524,7 @@ mod tests {
             thrust: None,
             hurt: None,
             down: None,
+            pending_life: 0,
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::default(),
             walking: WalkingState::new(56, 64),

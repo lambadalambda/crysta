@@ -20,3 +20,7 @@ A fall without a floor below costs a thirty-second of the most life, at least 4,
 ## Notes
 
 - Marker: `world/fall.rs`. Research: `docs/tower-three.md`.
+
+## Progress
+
+- The damage is `$84:D4F4`'s: a sixteenth of the life or of half the most life, whichever is more, at least 4; life can reach 0, and the upkeep then sends Ark down ([life-upkeep](life-upkeep.md)). Its digits show over Ark, and he is hidden the frame he lands. Open: the teeter.

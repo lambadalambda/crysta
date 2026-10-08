@@ -40,6 +40,7 @@ The user's goal (2026-10-01): all of Chapter 1's underworld playable, with all f
 20. [Run the frozen display scripts on `$03`](map-03-frozen-scripts.md)
 21. [Close the runtime's review edge cases](runtime-review-edges.md)
 22. [Draw the towers' second layer](tower-second-layer.md)
+23. [Run the per-frame life upkeep](life-upkeep.md)
 - Also: [Enter the towers from the world map](enter-the-towers.md)
 
 ## Notes

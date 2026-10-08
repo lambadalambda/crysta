@@ -55,6 +55,13 @@ pub(super) struct Fall {
     frame: u16,
 }
 
+impl Fall {
+    /// Whether the fall has ended this frame: Ark is hidden.
+    pub(super) const fn landed(self) -> bool {
+        self.frame >= FALL
+    }
+}
+
 /// Ark jumping down from a lip: frames into it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Jump {
@@ -209,18 +216,21 @@ impl World<'_> {
     }
 
     /// A frame of the fall: the world runs on, Ark held; at its end, down a
-    /// floor or back to the last safe place.
+    /// floor or back to the last safe place, hidden for that frame
+    /// (`$84:9FD8`, `COP BC`); the next he is back (`$84:9FE6`).
     pub(super) fn fall_frame(&mut self) -> Result<Option<Step>, WorldError> {
         let Some(mut fall) = self.fall.take() else {
             return Ok(None);
         };
+        if fall.landed() {
+            return Ok(None);
+        }
         fall.frame += 1;
         if fall.frame == SECOND_SOUND {
             self.globals.audio.sound_port3(FALL_SOUNDS[1]);
         }
-        if fall.frame < FALL {
-            self.fall = Some(fall);
-        } else {
+        self.fall = Some(fall);
+        if fall.landed() {
             self.land();
         }
         self.run_actors()?;
@@ -251,14 +261,9 @@ impl World<'_> {
                 return;
             }
         }
-        // `$84:D4F4`: a thirty-second of the most life, at least 4; Ark keeps
-        // 1 (guesses). Only on a tower floor (`$048A` bit 15).
+        // Only on a tower floor (`$84:9F9B`).
         if self.globals.tower_floor() {
-            let stats = self.globals.slot.stats();
-            let lost = (stats.max_life / 32).max(4);
-            self.globals
-                .slot
-                .set_life(stats.life.saturating_sub(lost).max(1));
+            self.fall_cost();
         }
         if let Some((safe, facing)) = self.safe {
             let settled = settle(safe, facing);

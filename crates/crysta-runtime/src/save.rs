@@ -27,6 +27,8 @@ const MONEY: usize = 0x94;
 const LIFE: usize = 0x5D;
 /// `$0690`: the EXP, three BCD bytes.
 const EXP: usize = 0x90;
+/// `$07EF`: nonzero, Ark regenerates on tower floors (`$85:E168`).
+const REGENERATION: usize = 0x1EF;
 /// `$0648`: the item in use, which the field's X button uses (0: none).
 const IN_USE: usize = 0x48;
 /// `$064A`: the equipped weapon's item (0: none).
@@ -342,6 +344,12 @@ impl SaveSlot {
     pub fn set_weapon(&mut self, item: u8, power: u16) {
         self.set_word(WEAPON, u16::from(item));
         self.set_word(WEAPON_POWER, power);
+    }
+
+    /// Whether Ark regenerates (`$07EF`).
+    #[must_use]
+    pub fn regenerates(&self) -> bool {
+        self.word(REGENERATION) != 0
     }
 
     /// The Prime Blue word `$07ED`.

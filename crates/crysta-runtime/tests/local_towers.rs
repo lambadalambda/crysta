@@ -673,6 +673,33 @@ fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
 }
 
 #[test]
+fn a_fall_that_takes_the_last_life_sends_ark_down() {
+    // `$84:D4F4` takes at least 4; at no life the upkeep sends Ark down
+    // (`$85:E15B`), and he wakes at home with all his life.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x010F, 152, 688, after_the_intro()).unwrap();
+        world.set_life(3);
+        fall_right(&mut world, 60, 0);
+        while world.life().0 > 0 && world.falling() {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert_eq!(world.life().0, 0, "{:?}", rom.revision());
+        let digits = world.digits();
+        assert_eq!(digits.last().map(|digits| digits.amount), Some(4));
+        for _ in 0..1200 {
+            if world.map() != 0x010F {
+                break;
+            }
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert_ne!(world.map(), 0x010F, "{:?}", rom.revision());
+        let (life, max) = world.life();
+        assert_eq!(life, max);
+    }
+}
+
+#[test]
 fn a_pedestal_on_tower_threes_second_floor_toggles_its_flag() {
     // `docs/tower-three.md` §3: A on a pedestal (`$90:FBB3`) sets its flag
     // (`$001-$004`, `JSL $80:BBCD`); on `$110` the next press clears it.
