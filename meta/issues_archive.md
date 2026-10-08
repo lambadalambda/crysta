@@ -163,3 +163,4 @@
 - [x] [Run the per-frame life upkeep](issues/life-upkeep.md)
 - [x] [Use the rope's native collision tables](issues/rope-collision-tables.md)
 - [x] [Confirm the fall damage and the pit-edge teeter](issues/fall-damage-teeter.md)
+- [x] [Close the runtime's review edge cases](issues/runtime-review-edges.md)

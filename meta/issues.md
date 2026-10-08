@@ -86,7 +86,6 @@
 - [ ] [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
 - [ ] [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
 - [ ] [Run the frozen display scripts on `$03`](issues/map-03-frozen-scripts.md)
-- [ ] [Close the runtime's review edge cases](issues/runtime-review-edges.md)
 - [ ] [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [ ] [Spend the map loads' own frames](issues/map-load-frames.md)
 - [ ] [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
