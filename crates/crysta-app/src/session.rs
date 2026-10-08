@@ -545,9 +545,10 @@ impl Session {
         for (_, _, index) in order {
             if index == usize::MAX {
                 // A push after a hit blinks him every second frame; the
-                // fall's end hides him (`World::ark_blinks`).
+                // fall's end hides him (`World::ark_blinks`). A landing
+                // draws him above his place, over the high tiles.
                 if !world.ark_blinks() {
-                    frame::draw_sprite(frame, background, camera, player, position);
+                    draw_ark(frame, background, camera, player, world);
                 }
                 continue;
             }
@@ -718,6 +719,25 @@ pub enum SpriteKey {
     Body(usize, u8, bool, u8),
     /// The helper art's list: an explosion, a dropped gem.
     Overlay(u32, u8),
+}
+
+/// Ark at his place, or above it over the high tiles while a landing drops
+/// him (`World::ark_lift`, `World::ark_over`).
+fn draw_ark(
+    canvas: &mut Canvas,
+    background: &frame::Background,
+    camera: (i32, i32),
+    raster: &Raster,
+    world: &World<'_>,
+) {
+    let draw = if world.ark_over() {
+        frame::draw_sprite_over
+    } else {
+        frame::draw_sprite
+    };
+    let mut lifted = raster.clone();
+    lifted.offset.1 = lifted.offset.1.saturating_add(world.ark_lift());
+    draw(canvas, background, camera, &lifted, world.position());
 }
 
 /// A resident's sequence as its body and palette field show it, or its
