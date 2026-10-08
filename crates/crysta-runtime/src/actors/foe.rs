@@ -203,8 +203,6 @@ impl Actor {
             return false;
         };
         foe.immune = foe.immune.saturating_sub(1);
-        // The overlay's and the push's poses go on as the script's would.
-        self.pose_age = self.pose_age.wrapping_add(1);
         let busy = if let Some(mut gem) = foe.gem {
             gem.age += 1;
             self.hidden = gem.age >= GEM_BLINKS && gem.age % 2 == 1;
@@ -231,6 +229,11 @@ impl Actor {
             false
         };
         self.foe = Some(foe);
+        // The overlay's and the push's poses go on as the script's would;
+        // an idle foe's age is the script's frame's.
+        if busy {
+            self.pose_age = self.pose_age.wrapping_add(1);
+        }
         busy
     }
 

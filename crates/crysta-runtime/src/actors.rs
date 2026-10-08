@@ -5652,6 +5652,20 @@ mod script_service_tests {
     }
 
     #[test]
+    fn an_idle_foe_ages_its_pose_a_frame_a_frame() {
+        // Pose 7, then yields in a loop: a foe's pose ages as anyone's.
+        let code = [2, 0x80, 7, 2, 0xBD, 0x80, 0xFC];
+        let (image, mut plain) = actor_running(&code);
+        let (_, mut foe) = actor_running(&code);
+        foe.foe = Some(foe::Foe::new(profile(20), false));
+        for _ in 0..10 {
+            tick(&mut plain, &image);
+            tick(&mut foe, &image);
+        }
+        assert_eq!(foe.pose_age, plain.pose_age);
+    }
+
+    #[test]
     fn a_jump_to_the_death_script_ends_the_actor() {
         // COP 06 $85:E27B: an enemy explodes; anything else goes. COP BF
         // too.
