@@ -305,6 +305,18 @@ impl Globals {
     pub fn write_flag(&mut self, word: u16) {
         write_flag(&mut self.events, word);
     }
+
+    /// Takes one `item` (`$8D:96A0`); `false` when none is held. When its
+    /// last one goes and it is the item in use, nothing is in use any more
+    /// (`$8D:96CB`).
+    pub fn take_item(&mut self, item: u8) -> bool {
+        let last = self.inventory.count(item) == 1;
+        let taken = self.inventory.remove(item);
+        if taken && last && self.slot.item_in_use() == Some(item) {
+            self.slot.set_item_in_use(None);
+        }
+        taken
+    }
 }
 
 /// Four-digit BCD addition, capped at 9999.
@@ -746,5 +758,24 @@ mod tests {
         // An empty request is accepted and shows nothing.
         assert!(dialogue.request(Vec::new()));
         assert!(!dialogue.busy());
+    }
+
+    #[test]
+    fn taking_the_last_item_in_use_puts_it_away() {
+        let mut globals = Globals::default();
+        globals.inventory.add(0x59);
+        globals.inventory.add(0x59);
+        globals.slot.set_item_in_use(Some(0x59));
+        assert!(globals.take_item(0x59));
+        assert_eq!(globals.slot.item_in_use(), Some(0x59), "one is left");
+        assert!(globals.take_item(0x59));
+        assert_eq!(globals.slot.item_in_use(), None);
+        // Another item's last one leaves the item in use.
+        globals.inventory.add(0x59);
+        globals.inventory.add(0x10);
+        globals.slot.set_item_in_use(Some(0x59));
+        assert!(globals.take_item(0x10));
+        assert_eq!(globals.slot.item_in_use(), Some(0x59));
+        assert!(!globals.take_item(0x10), "none is held");
     }
 }

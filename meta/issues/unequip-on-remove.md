@@ -15,3 +15,7 @@
 ## Acceptance Criteria
 
 - A test removes an equipped item and finds it unequipped.
+
+## Progress
+
+- Done: `Globals::take_item` puts the item in use (`SaveSlot::item_in_use`, `$0648`) away with its last one; `COP` take-item uses it.

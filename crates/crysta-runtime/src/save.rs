@@ -27,6 +27,8 @@ const MONEY: usize = 0x94;
 const LIFE: usize = 0x5D;
 /// `$0690`: the EXP, three BCD bytes.
 const EXP: usize = 0x90;
+/// `$0648`: the item in use, which the field's X button uses (0: none).
+const IN_USE: usize = 0x48;
 /// `$064A`: the equipped weapon's item (0: none).
 const WEAPON: usize = 0x4A;
 /// `$064C`: the equipped armor's item (0: none).
@@ -318,6 +320,17 @@ impl SaveSlot {
     #[must_use]
     pub fn armor(&self) -> Option<u8> {
         Some(self.word(ARMOR).to_le_bytes()[0]).filter(|&item| item != 0)
+    }
+
+    /// The item in use (`$0648`), if any.
+    #[must_use]
+    pub fn item_in_use(&self) -> Option<u8> {
+        Some(self.word(IN_USE).to_le_bytes()[0]).filter(|&item| item != 0)
+    }
+
+    /// Puts `item` in use, or none.
+    pub fn set_item_in_use(&mut self, item: Option<u8>) {
+        self.set_word(IN_USE, u16::from(item.unwrap_or(0)));
     }
 
     /// Equips `item` as the armor; its defense is not counted here.

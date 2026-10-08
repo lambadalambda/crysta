@@ -158,3 +158,4 @@
 - [x] [Play tower 1's intro pan and text](issues/tower-one-intro.md)
 - [x] [Draw tower 1's statues and plaque](issues/tower-one-statues.md)
 - [x] [Hide Ark behind the stairway's frame on the stairs](issues/stair-depth.md)
+- [x] [Unequip an item when it is taken away](issues/unequip-on-remove.md)

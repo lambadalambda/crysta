@@ -3648,7 +3648,7 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                around.globals.inventory.remove(item);
+                around.globals.take_item(item);
                 self.pc = operands + 1;
             }
             NO_ROOM => {

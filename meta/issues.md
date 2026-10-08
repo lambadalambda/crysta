@@ -95,5 +95,4 @@
 - [ ] [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
 - [ ] [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [ ] [Finish the partial COP services](issues/partial-cop-services.md)
-- [ ] [Unequip an item when it is taken away](issues/unequip-on-remove.md)
 - [ ] [Draw colour addition](issues/colour-addition.md)
