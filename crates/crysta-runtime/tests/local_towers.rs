@@ -881,6 +881,111 @@ fn the_darts_of_tower_threes_second_floor_hurt_ark() {
 }
 
 #[test]
+fn a_dart_pushes_ark_as_the_native_trace_does() {
+    // A native JP trace (2026-10-08) of Ark idle at (680,472): the hit's
+    // sound on port 2; list `$0E` and a pixel a frame left for 10 frames,
+    // one more at h+27 (stream `$38`); free at h+29; hit again at h+43 in
+    // the same box; the launcher's cycle is 194 frames.
+    use crysta_runtime::audio::Cue;
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0110, 680, 472, events).unwrap();
+        world.set_life(99);
+        let mut rows = vec![];
+        for _ in 0..500 {
+            world.update(None, Presses::default()).unwrap();
+            let sounds: Vec<u16> = world
+                .take_cues()
+                .into_iter()
+                .filter_map(|cue| match cue {
+                    Cue::Sound(sound) => Some(sound),
+                    Cue::Track { .. } => None,
+                })
+                .collect();
+            let pose = world.ark_pose().map(|pose| (pose.list, pose.age));
+            rows.push((world.position().0, world.life().0, pose, sounds));
+        }
+        let hits: Vec<usize> = (1..rows.len())
+            .filter(|&i| rows[i].1 < rows[i - 1].1)
+            .collect();
+        let h = hits[0];
+        assert!(rows[h].3.contains(&0x0007), "{:?}", rom.revision());
+        let xs: Vec<u16> = (h..=h + 28).map(|i| rows[i].0).collect();
+        let mut expected: Vec<u16> = (0..=10).map(|step| 680 - step).collect();
+        expected.extend([670; 16]);
+        expected.extend([669, 669]);
+        assert_eq!(xs, expected, "{:?}", rom.revision());
+        assert_eq!(rows[h + 1].2, Some((0x0E, 0)), "{:?}", rom.revision());
+        assert_eq!(rows[h + 28].2, None, "{:?}", rom.revision());
+        assert_eq!(hits[1], h + 43, "{:?}: {hits:?}", rom.revision());
+        let natively = [h, h + 43, h + 198, h + 241, h + 392];
+        assert_eq!(hits[..5], natively, "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn the_burn_follows_the_native_trace() {
+    // A native JP trace (2026-10-08) of a flyer's bullet on `$116`: the
+    // hit (h) sets the burn; at h+1 the push's first pixel and pose, and
+    // the burn's script takes Ark; resource 5's list 4 from h+2 with the
+    // text, list 5 from h+59; the burn ends at h+120 and Ark stands at
+    // h+122.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in [0x103, 0x105] {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0116, 300, 760, events).unwrap();
+        let mut rows = vec![];
+        let mut burned = None;
+        for i in 0..4000 {
+            world.set_life(99);
+            let before = world.life().0;
+            world.update(None, Presses::default()).unwrap();
+            let pose = world
+                .ark_pose()
+                .map(|pose| (pose.resource, pose.list, pose.age));
+            rows.push((world.life().0 < before, pose, world.dialogue().is_some()));
+            if burned.is_none() && pose.is_some_and(|pose| (pose.0, pose.1) == (5, 4)) {
+                burned = Some(i);
+            }
+            if burned.is_some_and(|start| i > start + 130) {
+                break;
+            }
+            if burned.is_none() && world.ark_pose().is_none() && i % 200 == 199 {
+                world.place(300, 760);
+            }
+        }
+        let start = burned.unwrap_or_else(|| panic!("{:?}: no burn", rom.revision()));
+        let h = start - 2;
+        assert!(rows[h].0, "{:?}", rom.revision());
+        assert_eq!(
+            rows[h + 1].1.map(|pose| pose.1),
+            Some(0x0D),
+            "{:?}",
+            rom.revision()
+        );
+        assert_eq!(rows[h + 2].1, Some((5, 4, 0)), "{:?}", rom.revision());
+        assert!(rows[h + 2].2, "{:?}", rom.revision());
+        assert_eq!(
+            rows[h + 58].1.map(|pose| pose.1),
+            Some(4),
+            "{:?}",
+            rom.revision()
+        );
+        assert_eq!(rows[h + 59].1, Some((5, 5, 0)), "{:?}", rom.revision());
+        assert_eq!(
+            rows[h + 121].1.map(|pose| pose.1),
+            Some(5),
+            "{:?}",
+            rom.revision()
+        );
+        assert_eq!(rows[h + 122].1, None, "{:?}", rom.revision());
+    }
+}
+
+#[test]
 fn a_pedestal_on_tower_threes_second_floor_toggles_its_flag() {
     // `docs/tower-three.md` §3: A on a pedestal (`$90:FBB3`) sets its flag
     // (`$001-$004`, `JSL $80:BBCD`); on `$110` the next press clears it.
@@ -1187,6 +1292,64 @@ fn guardners_have_bodies_and_can_be_hit() {
             .map(|resident| (resident.body, world.foe_life(resident.record).is_some()))
             .collect();
         assert_eq!(guardners, [(true, true); 2], "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn a_guardners_bolt_puts_ark_to_sleep_and_its_vacuum_draws_him_in() {
+    // Native JP traces (2026-10-08) on `$117`, the Guardner at (384,480):
+    // the bolt hurts and its contact callback takes Ark at once (`$97:C5A9`):
+    // list 7 for 132 frames, 8 for 32; the vacuum pulls him a pixel every
+    // third frame, x to within 2 of the Guardner's, then y until his probe
+    // is 26 below it (y 514), through the sleep and after; then `$118`.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0117, 376, 576, after_the_intro()).unwrap();
+        let mut rows = vec![];
+        for _ in 0..700 {
+            world.update(None, Presses::default()).unwrap();
+            let pose = world.ark_pose().map(|pose| (pose.resource, pose.list));
+            rows.push((world.map(), world.position(), pose, world.life().0));
+        }
+        let hit = (1..rows.len())
+            .find(|&i| rows[i].3 < rows[i - 1].3)
+            .unwrap();
+        let sleep = (hit..rows.len())
+            .find(|&i| rows[i].2 == Some((5, 7)))
+            .unwrap();
+        assert!(sleep - hit <= 2, "{:?}: {hit} {sleep}", rom.revision());
+        let lists: Vec<_> = rows[sleep..sleep + 165].iter().map(|row| row.2).collect();
+        assert!(
+            lists[..132].iter().all(|&list| list == Some((5, 7))),
+            "{:?}",
+            rom.revision()
+        );
+        assert!(
+            lists[132..164].iter().all(|&list| list == Some((5, 8))),
+            "{:?}",
+            rom.revision()
+        );
+        // The hit's first pixel, then the pull.
+        assert_eq!(rows[sleep].1, (376, 577), "{:?}", rom.revision());
+        let moves: Vec<usize> = (sleep + 1..rows.len())
+            .filter(|&i| rows[i].0 == 0x0117 && rows[i].1 != rows[i - 1].1)
+            .collect();
+        assert!(
+            moves.windows(2).all(|pair| pair[1] - pair[0] == 3),
+            "{:?}",
+            rom.revision()
+        );
+        let path: Vec<(u16, u16)> = moves.iter().map(|&i| rows[i].1).collect();
+        assert_eq!(path.first(), Some(&(377, 577)), "{:?}", rom.revision());
+        assert!(path.contains(&(382, 577)), "{:?}", rom.revision());
+        assert_eq!(path.last(), Some(&(382, 514)), "{:?}", rom.revision());
+        let last = rows.last().unwrap();
+        assert_eq!(
+            (last.0, last.1),
+            (0x0118, (384, 848)),
+            "{:?}",
+            rom.revision()
+        );
     }
 }
 

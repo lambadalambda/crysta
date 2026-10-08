@@ -23,10 +23,12 @@ const LOAD_COUNTERS: std::ops::RangeInclusive<u16> = 0x067C..=0x068A;
 const FLOOR_CLEARS: u16 = 0xE800;
 const FLOOR_COUNTERS: std::ops::RangeInclusive<u16> = 0x0672..=0x067A;
 /// The burn's script: Ark's 60 invulnerable frames (`7F:1020 = $3C`), his
-/// two poses (57 and 1 frames), then up to 62 frames while it lasts.
+/// two poses (57 and 1 frames), then up to 62 frames while it lasts, and
+/// two more to his stand (`$84:DC2E`).
 const BURN_IMMUNE: u16 = 60;
 const BURN_POSES: u16 = 58;
 const BURN_HOLD: u16 = BURN_POSES + 62;
+const BURN_TAIL: u16 = 2;
 /// "...TOASTED" (`COP 1B`, Japanese and European).
 const TOASTED: [u32; 2] = [0x84_DC40, 0x84_DC0D];
 
@@ -64,12 +66,14 @@ fn rolled(statuses: u16, row: Row) -> (u16, Option<u16>) {
     }
 }
 
-/// The burn's script under way: frames into it, or waiting for a hit's
-/// push to end (`COP DF` waits out `$097C & $0810`).
+/// The burn's script: set by the runner, it takes Ark the next frame
+/// (`COP DF`), cutting a hit's push; then frames into it, and the frame its
+/// hold ended on.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Burn {
     Waiting,
-    Frame(u16),
+    Starting,
+    Frame(u16, Option<u16>),
 }
 
 impl Burn {
@@ -77,11 +81,13 @@ impl Burn {
     pub(super) const fn pose(self) -> Option<super::pose::ArkPose> {
         use super::pose::ArkPose;
         match self {
-            Self::Waiting => None,
-            Self::Frame(frame) if frame < BURN_POSES - 1 => {
+            Self::Waiting | Self::Starting => None,
+            Self::Frame(frame, _) if frame < BURN_POSES - 1 => {
                 Some(ArkPose::new(5, 4, false, frame, true))
             }
-            Self::Frame(frame) => Some(ArkPose::new(5, 5, false, frame - (BURN_POSES - 1), true)),
+            Self::Frame(frame, _) => {
+                Some(ArkPose::new(5, 5, false, frame - (BURN_POSES - 1), true))
+            }
         }
     }
 }
@@ -150,9 +156,14 @@ impl World<'_> {
         let Some(burn) = self.burn else {
             return Ok(None);
         };
-        let frame = match burn {
-            Burn::Waiting if self.hurt.is_some() => return Ok(None),
+        let (frame, ended) = match burn {
+            // The hit's push goes on this frame.
             Burn::Waiting => {
+                self.burn = Some(Burn::Starting);
+                return Ok(None);
+            }
+            Burn::Starting => {
+                self.hurt = None;
                 self.ark_immune = BURN_IMMUNE;
                 self.thrust = None;
                 if !self.globals.dialogue.busy() {
@@ -161,15 +172,18 @@ impl World<'_> {
                         assets::text::HouseDialogue::decode_at(self.image, at).unwrap_or_default();
                     self.globals.dialogue.request(pages);
                 }
-                0
+                (0, None)
             }
-            Burn::Frame(frame) => frame + 1,
+            Burn::Frame(frame, ended) => (frame + 1, ended),
         };
         // Enemies still hit him once his 60 frames are out.
         self.hurt_ark();
         let burning = self.statuses() & BURN != 0;
-        self.burn =
-            (frame < BURN_POSES || (burning && frame < BURN_HOLD)).then_some(Burn::Frame(frame));
+        let held = frame < BURN_POSES || (burning && frame < BURN_HOLD);
+        let ended = ended.or((!held).then_some(frame));
+        self.burn = ended
+            .is_none_or(|ended| frame < ended + BURN_TAIL)
+            .then_some(Burn::Frame(frame, ended));
         self.run_actors()?;
         Ok(Some(Step::Stayed))
     }
@@ -251,6 +265,11 @@ mod tests {
         // The table's row 11 is the burn.
         assert_eq!(row(&image, 11), Some(BURN_ROW));
         world.take_status(11);
+        // The runner's frame; the script takes Ark the next.
+        world
+            .update(None, crate::scene::Presses::default())
+            .unwrap();
+        assert_eq!(world.burn, Some(Burn::Starting));
         let start = world.position();
         let mut held = 0;
         loop {
@@ -269,9 +288,9 @@ mod tests {
                 assert!(world.globals.dialogue.busy(), "...TOASTED");
             }
         }
-        // The status's 120 frames, its first counted on its start: the
-        // script's poses, then the wait.
-        assert_eq!(held, 119);
+        // The status's 120 frames, its first counted on the runner's: the
+        // script's poses, the wait, and two frames to his stand.
+        assert_eq!(held, 120);
         assert_eq!(world.statuses() & BURN, 0);
         // Another element's roll only ends the burn (no runner for it).
         world.take_status(11);

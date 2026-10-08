@@ -327,6 +327,27 @@ const REPEAT_MOVING: u8 = 0x87;
 const COMMON_SOURCE: usize = 0x2B_F037;
 const COMMON_SIZE: usize = 0x1A0C;
 
+/// The first `frames` moves of a common movement selector (`$7E:6000`),
+/// mirrored or not, its streams looping: the hurt pushes' `$36`..`$38`.
+pub(crate) fn common_moves(
+    image: &[u8],
+    selector: u8,
+    hflip: bool,
+    frames: usize,
+) -> Vec<(i16, i16)> {
+    let resource = assets::layout::offset(image, COMMON_SOURCE)
+        .and_then(|source| assets::compression::decode(image.get(source..)?, COMMON_SIZE).ok())
+        .map(|packet| motion::Resource::wram(0x6000, packet.data.into()));
+    let Some(mut motion) =
+        resource.and_then(|resource| motion::Motion::start(resource, selector, false, None))
+    else {
+        return Vec::new();
+    };
+    (0..frames)
+        .map_while(|_| motion.step((hflip, false)))
+        .collect()
+}
+
 /// Which movement resource an actor's streams read (`$7F:0022`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Base {

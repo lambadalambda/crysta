@@ -549,14 +549,9 @@ impl<'a> Machine<'a> {
                 self.set(memory.random);
                 self.pc + 3
             }
-            0xAD if !self.narrow && self.operand().is_some_and(|at| PROBE.contains(&at)) => {
-                let (x, y) = memory.probe;
-                self.set(if self.operand() == Some(PROBE[0]) {
-                    x
-                } else {
-                    y
-                });
-                self.pc + 3
+            // Ark's probe, loaded or compared (the vacuum's line, `$97:C455`).
+            0xAD | 0xCD if !self.narrow && self.operand().is_some_and(|at| PROBE.contains(&at)) => {
+                self.probe(opcode, memory.probe)?
             }
             0x9D | 0x9E | 0xBD | 0xDD | 0xDE
                 if self.operand().is_some_and(|field| FIELDS.contains(&field)) =>
@@ -1054,6 +1049,21 @@ impl<'a> Machine<'a> {
     fn operand(&self) -> Option<u16> {
         let bytes = self.image.get(self.pc + 1..self.pc + 3)?;
         Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+    }
+
+    /// `LDA` or `CMP` of Ark's probe word.
+    fn probe(&mut self, opcode: u8, (x, y): (u16, u16)) -> Option<usize> {
+        let value = if self.operand() == Some(PROBE[0]) {
+            x
+        } else {
+            y
+        };
+        if opcode == 0xAD {
+            self.set(value);
+        } else {
+            self.compare(value)?;
+        }
+        Some(self.pc + 3)
     }
 
     fn address(&self) -> Option<u16> {
@@ -1843,6 +1853,38 @@ mod tests {
         };
         assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
         assert_eq!(own[&0x2006], 0x70);
+    }
+
+    #[test]
+    fn the_vacuum_compares_its_line_with_arks_probe() {
+        // `$97:C44E`: LDA $0002,X; CLC; ADC #$1A; CMP $0968; BEQ; BMI;
+        // LDA #1; BRA.
+        let code = [
+            0xBD, 0x02, 0x00, 0x18, 0x69, 0x1A, 0x00, 0xCD, 0x68, 0x09, 0xF0, 0x08, 0x30, 0x05,
+            0xA9, 0x01, 0x00, 0x80, 0x03, 0x80, 0x00,
+        ];
+        let run = image(&code);
+        let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
+        let mut memory = Memory {
+            words: &mut words,
+            own: &mut own,
+            display: &mut display,
+            random: 0,
+            probe: (0, 0x200),
+            events: &mut [],
+            sleep: &mut 0,
+            position: &mut (0, 0x1E0),
+            player: View::default(),
+            parent: None,
+            linked: None,
+            previous: None,
+            views: &[],
+            carried: &mut None,
+            pokes: &mut Vec::new(),
+            bank: 0x97,
+        };
+        // 0x1E0 + 0x1A < 0x200: BMI to the -1 branch.
+        assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 19));
     }
 
     #[test]

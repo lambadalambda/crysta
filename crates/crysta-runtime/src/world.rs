@@ -113,8 +113,6 @@ pub struct World<'a> {
     plane: Option<Plane>,
     /// The actor whose contact callback runs next frame.
     touched: Option<usize>,
-    /// The player's recoil from a contact.
-    recoil: Option<contact::Recoil>,
     /// A wooden door the player is opening.
     opening: Option<door::Opening>,
     /// A chest the player is opening.
@@ -384,7 +382,6 @@ impl<'a> World<'a> {
             pots: None,
             plane: None,
             touched: None,
-            recoil: None,
             opening: None,
             chest: None,
             pickup: None,
@@ -752,16 +749,18 @@ impl<'a> World<'a> {
         }
     }
 
-    /// The push scripts put on Ark (`7F:0018/001A`) while he sleeps
-    /// (`$097E & $0400`): the Guardner's vacuum draws him in a pixel a
-    /// frame, against the walls (`meta/issues/guardner-fidelity.md`).
+    /// The push scripts put on Ark (`7F:0018/001A`, `$80:D0D7`): the
+    /// Guardner's vacuum draws him in a pixel every third frame, against
+    /// the walls, through his sleep and after it.
     fn push_ark(&mut self) {
-        let gates = self.globals.scratch.get(&crate::actors::ARK_GATES);
-        if gates.is_none_or(|gates| gates & 0x0400 == 0) {
-            self.globals.ark_push = (0, 0);
-            return;
-        }
-        let (dx, dy) = self.globals.ark_push;
+        let push = self.globals.ark_push;
+        // A push lasts the frame (`$80:D0F0`).
+        self.globals.ark_push = (0, 0);
+        self.push_by(push);
+    }
+
+    /// Moves Ark by `(dx, dy)` as walls let him, x first (a script's move).
+    fn push_by(&mut self, (dx, dy): (i16, i16)) {
         let mut at = self.position();
         let axes = [
             (dx, Direction::Left, Direction::Right),
@@ -781,8 +780,6 @@ impl<'a> World<'a> {
                 at = (moved.x, moved.y);
             }
         }
-        // A push lasts the frame (`$80:D0F0`).
-        self.globals.ark_push = (0, 0);
         if at != self.position() {
             self.walking = WalkingState::new(at.0, at.1);
             if let Some(actor) = &mut self.player_actor {
@@ -963,6 +960,8 @@ impl<'a> World<'a> {
             let runtime = u32::try_from(script).ok().map(|script| 0x80_0000 | script);
             let actor = Actor::for_player(self.image, self.map, position, runtime, source);
             self.player_actor = Some(actor);
+            // His new controller ends a hit's push (`COP DF`, `$80:B827`).
+            self.hurt = None;
             if self.player_turn == PlayerTurn::Ran {
                 self.player_turn = PlayerTurn::Deferred;
             }
@@ -1379,12 +1378,10 @@ impl<'a> World<'a> {
         self.walk_frame(direction, presses, (busy, locked))
     }
 
-    /// A frame something holds Ark through: a contact, a level gained, a
-    /// fall, a tower's end, a Magirock or a chest.
+    /// A frame something holds Ark through: a level gained, a fall, a
+    /// tower's end, a Magirock or a chest; first a contact's callback.
     fn holding_frame(&mut self, presses: Presses) -> Result<Option<Step>, WorldError> {
-        if let Some(step) = self.contact_frame()? {
-            return Ok(Some(step));
-        }
+        self.contact_frame();
         if let Some(step) = self.level_up_frame(presses)? {
             return Ok(Some(step));
         }
@@ -1499,7 +1496,7 @@ impl<'a> World<'a> {
         }
         self.pickup = None;
         (self.fall, self.jump, self.rope) = (None, None, None);
-        (self.thrust, self.recoil) = (None, None);
+        (self.thrust, self.hurt) = (None, None);
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
@@ -2605,7 +2602,6 @@ mod tests {
             pots: None,
             plane: None,
             touched: None,
-            recoil: None,
             opening: None,
             chest: None,
             pickup: None,

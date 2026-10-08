@@ -55,8 +55,9 @@ pub struct Globals {
     /// `$0454`: the pad buttons held this frame, as the SNES pad word; only
     /// the directions are fed.
     pub pad: u16,
-    /// `$097C & $0810`: the player is in a forced action, such as a recoil,
-    /// which `COP DF` waits out.
+    /// `$097C & $0810`: the player is in a forced action, which `COP DF`
+    /// waits out. Only `$8D:D9B1`/`$8D:DAD9` set those bits, none of
+    /// which the runtime runs; a hit's or a contact's push does not.
     pub player_action: bool,
     /// Ark is out of the scripts' reach (`COP 71`): pushed, down or held
     /// by the world.

@@ -57,8 +57,9 @@ pub(super) const fn by_facing(
 
 impl World<'_> {
     /// The pose a state shows of Ark: his script's own list (the
-    /// Guardner's sleep), a landing, a fall, a drop, the rope, the burn, a
-    /// level up, a chest or a Magirock; `None` when he walks or stands.
+    /// Guardner's sleep), a landing, a fall, a drop, the burn, a hit's push,
+    /// the rope, a level up, a chest or a Magirock; `None` when he walks or
+    /// stands.
     #[must_use]
     pub fn ark_pose(&self) -> Option<ArkPose> {
         self.player_actor
@@ -68,6 +69,7 @@ impl World<'_> {
             .or_else(|| self.fall.and_then(super::fall::Fall::pose))
             .or_else(|| self.jump.and_then(|jump| jump.pose(self.facing)))
             .or_else(|| self.burn.and_then(super::status::Burn::pose))
+            .or_else(|| self.hurt.and_then(super::hurt::Hurt::pose))
             .or_else(|| {
                 let walking = self.walking.active_direction();
                 self.rope

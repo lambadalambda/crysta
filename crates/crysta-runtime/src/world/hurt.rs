@@ -10,15 +10,17 @@ use room_core::Direction;
 
 /// Ark's body box (dx, w, dy, h).
 const ARK_BODY: [i8; 4] = [-5, 10, -16, 14];
-/// Frames Ark is pushed by a hit, the pad locked (`$84:80B2`..).
-const HURT: u16 = 26;
-/// Of those, the frames that move him.
-const HURT_PUSH: u16 = 10;
+/// Frames Ark is held by a hit, the pad locked: the push's script
+/// (`$84:80B2`..), its stand, then his own (`$84:8018`..).
+const HURT: u16 = 28;
+/// Of those, the frames of the push's pose and stream: 10 pixels, 16 still,
+/// one more as the stream loops before `COP 8E` sees its end.
+const HURT_PUSH: usize = 27;
 /// Frames before Ark can be hit again (`7F:1020`).
-const ARK_IMMUNE: u16 = 43;
-/// The sound of Ark hurt.
+pub(super) const ARK_IMMUNE: u16 = 43;
+/// The sound of Ark hurt (port 2, `$87:CDAD`).
 const HURT_SOUND: u8 = 0x07;
-/// An immune hit's sound and frames out of reach (`$85:D70C`).
+/// An immune hit's sound (port 2) and frames out of reach (`$85:D70C`).
 const GUARD_SOUND: u8 = 0x09;
 const GUARD_IMMUNE: u16 = 16;
 /// The armors' status blocks (`$8D:BD92`), from item `$A0` on.
@@ -40,6 +42,54 @@ pub(super) struct Hurt {
     /// The way back to the attacker, which he faces afterwards.
     toward: Direction,
     frame: u16,
+    /// The push's stream, a move a frame.
+    moves: [(i16, i16); HURT_PUSH],
+}
+
+impl Hurt {
+    /// A push `away`, then facing `toward`: the stream of [`Self::list`].
+    pub(super) fn new(image: &[u8], away: Direction, toward: Direction) -> Self {
+        let (_, stream, hflip) = Self::list(away);
+        let mut moves = [(0, 0); HURT_PUSH];
+        for (slot, step) in moves
+            .iter_mut()
+            .zip(crate::actors::common_moves(image, stream, hflip, HURT_PUSH))
+        {
+            *slot = step;
+        }
+        Self {
+            away,
+            toward,
+            frame: 0,
+            moves,
+        }
+    }
+
+    /// Resource 0's push list for the way he goes (`$84:80B2`..`80CC`):
+    /// `$0D` down, `$0C` up, `$0E` sideways, mirrored to the right.
+    const fn list(away: Direction) -> (u8, u8, bool) {
+        match away {
+            Direction::Down => (0x0D, 0x37, false),
+            Direction::Up => (0x0C, 0x36, false),
+            Direction::Left => (0x0E, 0x38, false),
+            Direction::Right => (0x0E, 0x38, true),
+        }
+    }
+
+    /// The push's pose, from the frame after the hit.
+    pub(super) const fn pose(self) -> Option<super::pose::ArkPose> {
+        let (list, _, hflip) = Self::list(self.away);
+        if self.frame == 0 || self.frame as usize > HURT_PUSH {
+            return None;
+        }
+        Some(super::pose::ArkPose::new(
+            0,
+            list,
+            hflip,
+            self.frame - 1,
+            false,
+        ))
+    }
 }
 
 impl World<'_> {
@@ -92,11 +142,8 @@ impl World<'_> {
             return Ok(None);
         };
         hurt.frame += 1;
-        if hurt.frame <= HURT_PUSH {
-            let input = room_core::FrameInput {
-                direction: Some(hurt.away),
-            };
-            let _ = self.walking.step(&self.room.room, input);
+        if let Some(&(dx, dy)) = hurt.moves.get(usize::from(hurt.frame) - 1) {
+            self.push_by((dx, dy));
         }
         if hurt.frame < HURT {
             self.hurt = Some(hurt);
@@ -128,13 +175,25 @@ impl World<'_> {
             return;
         }
         let body = boxes::place(ARK_BODY, self.position(), false);
-        let Some((profile, from, kind)) = self.actors.iter().find_map(|actor| {
-            let attack = actor.hurt_box()?;
-            let profile = actor.foe.as_ref()?.profile;
-            boxes::overlap(attack, body).then_some((profile, actor.position, actor.attack_kind()))
-        }) else {
+        let Some((index, profile, from, kind)) =
+            self.actors.iter().enumerate().find_map(|(index, actor)| {
+                let attack = actor.hurt_box()?;
+                let profile = actor.foe.as_ref()?.profile;
+                boxes::overlap(attack, body).then_some((
+                    index,
+                    profile,
+                    actor.position,
+                    actor.attack_kind(),
+                ))
+            })
+        else {
             return;
         };
+        // The attacker's contact callback runs next frame (`$85:D65E`): the
+        // Guardner's bolt takes Ark that way.
+        if self.actors[index].contact().is_some() {
+            self.touched = Some(index);
+        }
         let stats = self.globals.slot.stats();
         let hit = combat::enemy_hit(
             &profile,
@@ -148,7 +207,7 @@ impl World<'_> {
         );
         if hit.immune {
             // `$85:D70C`: a guard sound, 16 frames out of reach.
-            self.globals.audio.sound_port3(GUARD_SOUND);
+            self.globals.audio.sound_port2(GUARD_SOUND);
             self.ark_immune = GUARD_IMMUNE;
             return;
         }
@@ -168,13 +227,13 @@ impl World<'_> {
             },
             age: 0,
         });
-        self.globals.audio.sound_port3(HURT_SOUND);
+        self.globals.audio.sound_port2(HURT_SOUND);
         self.thrust = None;
-        self.hurt = Some(Hurt {
-            away: away(from, self.position()),
-            toward: away(self.position(), from),
-            frame: 0,
-        });
+        self.hurt = Some(Hurt::new(
+            self.image,
+            away(from, self.position()),
+            away(self.position(), from),
+        ));
         self.ark_immune = ARK_IMMUNE;
     }
 
