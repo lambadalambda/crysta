@@ -663,8 +663,19 @@ fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
         let mut world =
             World::enter_with_events(rom.image(), 0x010F, 152, 688, after_the_intro()).unwrap();
         let (life, _) = world.life();
-        fall_right(&mut world, 60, 60);
+        fall_right(&mut world, 60, 47);
+        // Then back, hidden, a pixel a frame each way (`$84:A01E`).
+        let mut path = vec![world.position()];
+        while world.falling() && path.len() < 400 {
+            assert!(world.ark_blinks());
+            world.update(None, Presses::default()).unwrap();
+            path.push(world.position());
+        }
         assert!(!world.falling(), "{:?}", rom.revision());
+        assert!(path.len() > 2, "{:?}: {path:?}", rom.revision());
+        assert!(path.windows(2).all(|pair| {
+            pair[0].0.abs_diff(pair[1].0) <= 1 && pair[0].1.abs_diff(pair[1].1) <= 1
+        }));
         assert_eq!(world.map(), 0x010F);
         assert!(world.life().0 < life);
         let (x, y) = world.position();
@@ -696,6 +707,33 @@ fn a_fall_that_takes_the_last_life_sends_ark_down() {
         assert_ne!(world.map(), 0x010F, "{:?}", rom.revision());
         let (life, max) = world.life();
         assert_eq!(life, max);
+    }
+}
+
+#[test]
+fn a_lip_drops_ark_three_pixels_a_frame_into_the_pit_below() {
+    // `$10F` rows 46-47 are lips (attribute 8) over the pits from row 48:
+    // standing on them starts the drop (`$80:CED1`, `$80:CF50`), stream
+    // `$27` of resource 0 (3 pixels down a frame, walls off), until every
+    // sample is a pit (`$80:CDA2`): then the fall.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x010F, 136, 736, after_the_intro()).unwrap();
+        let mut ys = vec![];
+        for _ in 0..40 {
+            if world.falling() {
+                break;
+            }
+            world
+                .update(Some(Direction::Down), Presses::default())
+                .unwrap();
+            ys.push(world.position().1);
+        }
+        assert!(world.falling(), "{:?}: {ys:?}", rom.revision());
+        let drops = ys.windows(2).filter(|pair| pair[1] == pair[0] + 3).count();
+        assert!(drops >= 5, "{:?}: {ys:?}", rom.revision());
+        // Every sample a pit: row 48 under the box's top.
+        assert!(world.position().1 - 16 >= 48 * 16, "{:?}", rom.revision());
     }
 }
 

@@ -111,11 +111,15 @@ impl MapRoom {
             .map_err(|source| RoomError::Refused { map, source })?
             .with_material_policy(qualified_policy(map, self.width, self.height))
             .map_err(|source| RoomError::Policy { map, source })?;
-        if self.room.passive_directional_type8_special_bit_clear() {
-            room = room.with_passive_directional_type8_special_bit_clear();
-        } else if self.room.passive_directional_collision() {
-            room = room.with_passive_directional_collision();
-        }
+        room = match (
+            self.room.passive_directional_collision(),
+            self.room.type8_special_bit_clear(),
+        ) {
+            (true, true) => room.with_passive_directional_type8_special_bit_clear(),
+            (true, false) => room.with_passive_directional_collision(),
+            (false, true) => room.with_type8_special_bit_clear(),
+            (false, false) => room,
+        };
         Ok(Self {
             room,
             attributes: self.attributes.clone(),
@@ -356,9 +360,13 @@ pub fn room(image: &[u8], map: u16) -> Result<MapRoom, RoomError> {
         .map_err(|source| RoomError::Policy { map, source })?;
     // The tour's corridor turns along slopes (types 6/7): the directional
     // candidate reproduces its native legs to (72,80); see `local_story`.
-    if BOX_MAPS.contains(&map) {
-        built = built.with_passive_directional_type8_special_bit_clear();
-    }
+    // Lips (type 8) with `$097C & 4` clear: the world never walks Ark
+    // while he falls (`world::fall`).
+    built = if BOX_MAPS.contains(&map) {
+        built.with_passive_directional_type8_special_bit_clear()
+    } else {
+        built.with_type8_special_bit_clear()
+    };
     Ok(MapRoom {
         room: built,
         map,

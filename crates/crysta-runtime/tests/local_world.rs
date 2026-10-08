@@ -449,14 +449,14 @@ fn walking_and_doorways_connect_most_of_the_slice() {
         reached.contains(&0x000A),
         "the town was not reached: {reached:?}"
     );
-    // 18 of the 24 are reachable by walking and opening doorways. The six that
-    // are not are recorded rather than rounded away: $1A, $1B and $1C are
-    // southern town houses, and E, $20 and $21 lie below C's blue door, which
-    // opens through progression rather than geometry.
+    // 21 of the 24 are reachable by walking, dropping off the town's lips
+    // (type 8, one way down) and opening doorways. The three that are not
+    // are recorded rather than rounded away: E, $20 and $21 lie below C's
+    // blue door, which opens through progression rather than geometry.
     let missing: Vec<_> = MAPS.filter(|map| !reached.contains(map)).collect();
     assert_eq!(
         missing,
-        vec![0x000E, 0x001A, 0x001B, 0x001C, 0x0020, 0x0021],
+        vec![0x000E, 0x0020, 0x0021],
         "reachability changed; reached {reached:?}"
     );
 }

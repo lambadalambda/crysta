@@ -1364,7 +1364,6 @@ impl<'a> World<'a> {
         let direction = self.rope_step(direction);
         let step = self.step_interactive(direction)?;
         self.ground_test();
-        self.lip_test(step);
         // On the plane, not while arriving or mid-step.
         let free = !busy
             && self.scene.is_none()

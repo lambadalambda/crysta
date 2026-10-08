@@ -28,12 +28,11 @@ use room_core::Direction;
 const PIT: u16 = 0x14;
 const ROPE: u16 = 0x12;
 const UNSAFE: u16 = 0x13;
-/// The lip (`$80:CF30`): Ark on one jumps down (`$80:CF50`, the Hole's
-/// rim, `docs/underworld-end.md` §2); 2 pixels a frame for 32 frames, into
-/// the Hole's exit (guess), sound `$10`.
-const LIP: u16 = 0x08;
-const HOLE: u16 = 0x0127;
-const JUMP: u16 = 32;
+/// The lips: the attributes of class 8 in `$80:CF30`. Two under Ark's
+/// box start a drop (`$80:CED1`, `$80:CF50`): sound `$10`, stream `$27` of
+/// resource 0, 3 pixels down a frame with the walls off (`$84:A873`).
+const LIPS: [u16; 3] = [0x08, UNSAFE, 0x1F];
+const DROP: u16 = 3;
 const JUMP_SOUND: u8 = 0x10;
 /// The rope's band: the box's top this far into its cell.
 const BAND: std::ops::RangeInclusive<u16> = 7..=13;
@@ -49,14 +48,16 @@ const LEAN_POSE: u16 = 16;
 const LEAN_WINDOW: u16 = LEAN_POSE + 60;
 const LEAN_END: u16 = LEAN_WINDOW + 4;
 
-/// Ark falling.
+/// Ark falling, then back to his safe spot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Fall {
     frame: u16,
+    /// Where he goes back to, hidden, once the fall is over.
+    back: Option<(u16, u16)>,
 }
 
 impl Fall {
-    /// Whether the fall has ended this frame: Ark is hidden.
+    /// Whether the fall is over and Ark, hidden, goes back.
     pub(super) const fn landed(self) -> bool {
         self.frame >= FALL
     }
@@ -64,9 +65,7 @@ impl Fall {
 
 /// Ark jumping down from a lip: frames into it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Jump {
-    frame: u16,
-}
+pub(super) struct Jump;
 
 /// Ark on a rope: leaning one way, and for how long.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -83,6 +82,23 @@ fn samples((x, y): (u16, u16)) -> [(u16, u16); 4] {
     let right = column + u16::from(left % 16 != 0);
     let below = row + u16::from(top % 16 != 0);
     [(column, row), (right, row), (column, below), (right, below)]
+}
+
+/// Whether the box's top is past the middle of its cell, where the tests
+/// read the lower samples too (`$24 > 8`).
+const fn low(y: u16) -> bool {
+    y.wrapping_sub(16) % 16 > 8
+}
+
+/// Whether Ark stands on a lip (`$80:CED1`): both upper samples of class
+/// 8, or, low in the cell, both lower ones.
+fn lip(attributes: [Option<u16>; 4], y: u16) -> bool {
+    let lips = |a: Option<u16>, b: Option<u16>| {
+        [a, b]
+            .iter()
+            .all(|attribute| attribute.is_some_and(|attribute| LIPS.contains(&attribute)))
+    };
+    lips(attributes[0], attributes[1]) || (low(y) && lips(attributes[2], attributes[3]))
 }
 
 /// What the ground under Ark does (`$80:CC6D`..`CCF0`).
@@ -128,11 +144,17 @@ impl World<'_> {
     /// The ground test after Ark's step: a fall, the rope, or solid ground;
     /// a place without `$13` under it is kept as the last safe one.
     pub(super) fn ground_test(&mut self) {
-        if self.fall.is_some() || self.in_transition() {
+        if self.fall.is_some() || self.jump.is_some() || self.in_transition() {
             return;
         }
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
+        if lip(under, at.1) {
+            self.jump = Some(Jump);
+            self.rope = None;
+            self.globals.audio.sound_port3(JUMP_SOUND);
+            return;
+        }
         match ground(under, at.1) {
             Ground::Fall => return self.start_fall(),
             Ground::Rope => self.rope = Some(self.rope.unwrap_or_default()),
@@ -144,43 +166,39 @@ impl World<'_> {
     }
 
     fn start_fall(&mut self) {
-        self.fall = Some(Fall { frame: 0 });
+        self.fall = Some(Fall {
+            frame: 0,
+            back: None,
+        });
         self.rope = None;
         self.thrust = None;
         self.globals.audio.sound_port3(FALL_SOUNDS[0]);
     }
 
-    /// A step down refused by a lip (attribute 8, which the walker admits
-    /// only on its directional candidate): Ark jumps from it, as `$80:CF50`
-    /// does once he stands on it.
-    pub(super) fn lip_test(&mut self, step: Step) {
-        // Only the Hole's rim is measured (tower 4's lips are not).
-        let refused = matches!(
-            step,
-            Step::Refused(room_core::Unqualified::UnsupportedType(8))
-        );
-        if !refused || self.facing != Direction::Down || self.map != HOLE {
-            return;
-        }
-        let (x, y) = self.position();
-        let below = samples((x, y + 16)).map(|cell| self.attribute(cell));
-        if below[..2] == [Some(LIP); 2] {
-            self.jump = Some(Jump { frame: 0 });
-            self.globals.audio.sound_port3(JUMP_SOUND);
-        }
-    }
-
-    /// A frame of a jump from a lip: Ark drops, the world runs on; the
-    /// exit under him is taken once he stands again.
+    /// A frame of a drop from a lip: Ark sinks, an exit under him is
+    /// taken, and once every sample is floor, `$13` or a pit he lands, or
+    /// with only pits under him falls (`$80:CDA2`, `$80:CE01`).
     pub(super) fn jump_frame(&mut self) -> Result<Option<Step>, WorldError> {
-        let Some(mut jump) = self.jump.take() else {
+        if self.jump.is_none() {
             return Ok(None);
-        };
+        }
         let (x, y) = self.position();
-        self.walking = room_core::WalkingState::new(x, y + 2);
-        jump.frame += 1;
-        if jump.frame < JUMP {
-            self.jump = Some(jump);
+        self.walking = room_core::WalkingState::new(x, y + DROP);
+        if let Some(step) = self.take_exit()? {
+            self.jump = None;
+            return Ok(Some(step));
+        }
+        let at = self.position();
+        let under = samples(at).map(|cell| self.attribute(cell));
+        let settles = |attribute: Option<u16>| {
+            attribute.is_some_and(|attribute| matches!(attribute, 0..=2 | UNSAFE | PIT))
+        };
+        let rows = if low(at.1) { 4 } else { 2 };
+        if under[..rows].iter().copied().all(settles) {
+            self.jump = None;
+            if under.iter().all(|&attribute| attribute == Some(PIT)) {
+                self.start_fall();
+            }
         }
         self.run_actors()?;
         Ok(Some(Step::Walked))
@@ -216,30 +234,45 @@ impl World<'_> {
     }
 
     /// A frame of the fall: the world runs on, Ark held; at its end, down a
-    /// floor or back to the last safe place, hidden for that frame
-    /// (`$84:9FD8`, `COP BC`); the next he is back (`$84:9FE6`).
+    /// floor, or back to the last safe place. The helper `$0DEE` takes the
+    /// spot (`$84:B803`) and Ark, hidden, goes to it a pixel a frame each
+    /// way (`$84:A01E`); there he is shown and free (`$84:9FE6`).
     pub(super) fn fall_frame(&mut self) -> Result<Option<Step>, WorldError> {
         let Some(mut fall) = self.fall.take() else {
             return Ok(None);
         };
-        if fall.landed() {
-            return Ok(None);
+        if let Some(to) = fall.back {
+            let at = self.position();
+            if at == to {
+                return Ok(None);
+            }
+            let toward = |from: u16, to: u16| match from.cmp(&to) {
+                std::cmp::Ordering::Less => from + 1,
+                std::cmp::Ordering::Equal => from,
+                std::cmp::Ordering::Greater => from - 1,
+            };
+            self.walking = room_core::WalkingState::new(toward(at.0, to.0), toward(at.1, to.1));
+            self.fall = Some(fall);
+            self.run_actors()?;
+            return Ok(Some(Step::Walked));
         }
         fall.frame += 1;
         if fall.frame == SECOND_SOUND {
             self.globals.audio.sound_port3(FALL_SOUNDS[1]);
         }
-        self.fall = Some(fall);
         if fall.landed() {
-            self.land();
+            fall.back = self.land();
+            self.fall = fall.back.is_some().then_some(fall);
+        } else {
+            self.fall = Some(fall);
         }
         self.run_actors()?;
         Ok(Some(Step::Stayed))
     }
 
-    /// The fall's end (`$8D:8756`): the exit under Ark, or his last safe
-    /// place with some life lost.
-    fn land(&mut self) {
+    /// The fall's end (`$8D:8756`): the exit under Ark, or, with some life
+    /// lost, the last safe place he goes back to.
+    fn land(&mut self) -> Option<(u16, u16)> {
         let (x, y) = self.position();
         let record = self
             .exits
@@ -258,24 +291,22 @@ impl World<'_> {
                     position: (down.position.0 + 8, down.position.1 + 16),
                     mode: down.mode,
                 });
-                return;
+                return None;
             }
         }
         // Only on a tower floor (`$84:9F9B`).
         if self.globals.tower_floor() {
             self.fall_cost();
         }
-        if let Some((safe, facing)) = self.safe {
-            let settled = settle(safe, facing);
-            let under = samples(settled).map(|cell| self.attribute(cell));
-            let (x, y) = if ground(under, settled.1) == Ground::Fall {
-                safe
-            } else {
-                settled
-            };
-            self.place(x, y);
-            self.face(facing);
-        }
+        let (safe, facing) = self.safe?;
+        let settled = settle(safe, facing);
+        let under = samples(settled).map(|cell| self.attribute(cell));
+        self.face(facing);
+        Some(if ground(under, settled.1) == Ground::Fall {
+            safe
+        } else {
+            settled
+        })
     }
 }
 
