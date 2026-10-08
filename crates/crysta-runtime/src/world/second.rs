@@ -58,13 +58,19 @@ impl World<'_> {
     /// as the ones before left it.
     pub(super) fn apply_second(&mut self) {
         for (from, to) in std::mem::take(&mut self.globals.second_copies) {
-            let tile = self
-                .second
-                .as_ref()
-                .and_then(|layer| Some(layer.cells[layer.index(from)?]));
-            if let Some(tile) = tile {
-                self.patch_second(to, tile);
-            }
+            self.copy_second(from, to);
+        }
+    }
+
+    /// Copies a cell of the second layer onto another; a cell off the layer
+    /// is skipped (the game wraps; no chapter-1 copy needs it).
+    fn copy_second(&mut self, from: (u16, u16), to: (u16, u16)) {
+        let tile = self
+            .second
+            .as_ref()
+            .and_then(|layer| Some(layer.cells[layer.index(from)?]));
+        if let Some(tile) = tile {
+            self.patch_second(to, tile);
         }
     }
 
@@ -79,10 +85,9 @@ impl World<'_> {
                     for dx in 0..u16::from(size.0) {
                         let source = (u16::from(from.0) + dx, u16::from(from.1) + dy);
                         let target = (u16::from(to.0) + dx, u16::from(to.1) + dy);
-                        self.globals.second_copies.push((source, target));
+                        self.copy_second(source, target);
                     }
                 }
-                self.apply_second();
             }
         }
     }

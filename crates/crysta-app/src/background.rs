@@ -112,9 +112,16 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
         Some(layer) if layer.presentation() == Presentation::Front => (Some(layer), None),
         layer => (None, layer),
     };
+    // The cells of a layer that shows; patches to another are not drawn.
+    let shown = layer.as_ref().filter(|layer| {
+        matches!(
+            layer.presentation(),
+            Presentation::Added | Presentation::Sky
+        )
+    });
     let second_cells: Vec<u16> = front
         .as_ref()
-        .or(layer.as_ref())
+        .or(shown)
         .map(|layer| {
             layer
                 .layer()
@@ -412,7 +419,7 @@ impl CachedBackground {
                 .map(|cell| cell.raw() & 511)
         };
         let changed_second = changed(&self.patches.second, second, second_original, second_width);
-        for &(column, row, tile) in &changed_second {
+        for &(column, row, tile) in changed_second.iter().filter(|_| shown.is_some()) {
             let cell = usize::from(row) * second_width + usize::from(column);
             if let Some(slot) = self.second_cells.get_mut(cell) {
                 *slot = tile;
