@@ -255,15 +255,15 @@ impl PandoraSprites {
         // (`$13`, `$15`; the landing's `$14`), the level up (`$1D`, then
         // 2's `$20`), the rope's lean (1's 6, 7; its walk and stand hold the spear,
         // [`Mode4Art::with_weapon`]), the Magirock and the chest's lifts
-        // (3's `$18`..`$1A`, `$39`, `$3A`), the burn (5's 4, 5) and the sleep
-        // (5's 7, 8).
+        // (3's `$18`..`$1A`, `$39`, `$3A`), the drop with a pot (3's `$1D`,
+        // `$20`), the burn (5's 4, 5) and the sleep (5's 7, 8).
         for (resource, selectors) in [
             (0, &[3, 4, 5, 0x13, 0x14, 0x15, 0x18, 0x1D][..]),
             (1, &[6, 7, 9, 10, 11][..]),
             (2, &[0x20][..]),
             (
                 3,
-                &[15, 16, 17, 0x18, 0x19, 0x1A, 24, 25, 26, 0x39, 0x3A][..],
+                &[15, 16, 17, 0x18, 0x19, 0x1A, 0x1D, 0x20, 0x39, 0x3A][..],
             ),
             (5, &[4, 5, 7, 8][..]),
         ] {
@@ -839,7 +839,7 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
         let lists = direct_lists(
             loader,
             sheet,
-            &[25, 26, 29, 30, 43, 44, 45, 46, 47, 48, 60],
+            &[25, 26, 29, 30, 37, 38, 43, 44, 45, 46, 47, 48, 60],
             240,
             256,
         )?;
@@ -878,6 +878,8 @@ pub enum PandoraCarryMotion {
     Walking,
     /// Throw windup/release; subsequent free-flight pot list is selector 60.
     Throwing,
+    /// A drop from a lip with the pot in hand (`$84:9F13`, `$84:9F33`).
+    Dropping,
 }
 /// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
 /// the brake that ends it.
@@ -945,13 +947,18 @@ impl PandoraSprites {
             }
             PandoraCarryMotion::Walking => (0x80_a255, 9 + axis, if facing < 2 { 29 } else { 30 }),
             PandoraCarryMotion::Throwing => (0x80_a261, 15 + axis, 46 + axis),
+            // `COP 83 1D 03` / `20 03` and the pot's `COP 80 25` / `26`
+            // (`$84:C3F6`, `C3FF`), Up apart, unmirrored (`COP B6`).
+            PandoraCarryMotion::Dropping if facing == 1 => (0x80_a261, 0x20, 0x26),
+            PandoraCarryMotion::Dropping => (0x80_a261, 0x1D, 0x25),
         };
+        let hflip = facing == 2 && motion != PandoraCarryMotion::Dropping;
         Some(PandoraCarryPose {
             ark_art,
             ark_selector,
             pot_selector,
-            ark_hflip: facing == 2,
-            pot_hflip: facing == 2,
+            ark_hflip: hflip,
+            pot_hflip: hflip,
         })
     }
 }
