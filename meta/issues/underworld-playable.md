@@ -42,6 +42,7 @@ The user's goal (2026-10-01): all of Chapter 1's underworld playable, with all f
 22. [Draw the towers' second layer](tower-second-layer.md)
 23. [Run the per-frame life upkeep](life-upkeep.md)
 24. [Draw the world map's horizon band](world-map-horizon-band.md)
+25. [Jump with B](jump.md)
 - Also: [Enter the towers from the world map](enter-the-towers.md)
 
 ## Notes

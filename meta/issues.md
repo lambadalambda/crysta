@@ -86,6 +86,7 @@
 - [ ] [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
 - [ ] [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
 - [ ] [Draw the world map's horizon band](issues/world-map-horizon-band.md)
+- [ ] [Jump with B](issues/jump.md)
 - [ ] [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [ ] [Spend the map loads' own frames](issues/map-load-frames.md)
 - [ ] [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
