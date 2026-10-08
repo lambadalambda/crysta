@@ -199,7 +199,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw the continents' door parchment](issues/continent-door-parchment.md)
 - [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
 - [Model the lips' jumps](issues/lip-jumps.md)
-- [Use the rope's native collision tables](issues/rope-collision-tables.md)
 - [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
 - [Confirm the fall damage and the pit-edge teeter](issues/fall-damage-teeter.md)
 - [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)

@@ -19,3 +19,7 @@ Collision type 18, tower 4's rope, is Open in all directions (`room-core/src/roo
 ## Notes
 
 - Research: `docs/tower-four.md` §2.
+
+## Progress
+
+- Done: type 18 takes its pair tables on both resolvers (`rope_second`, the directional `pair_response`), tested at every remainder; a flagged cell stays solid.

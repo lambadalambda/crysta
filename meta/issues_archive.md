@@ -161,3 +161,4 @@
 - [x] [Unequip an item when it is taken away](issues/unequip-on-remove.md)
 - [x] [Flip movement streams on the vertical axis](issues/vertical-flip-motion.md)
 - [x] [Run the per-frame life upkeep](issues/life-upkeep.md)
+- [x] [Use the rope's native collision tables](issues/rope-collision-tables.md)
