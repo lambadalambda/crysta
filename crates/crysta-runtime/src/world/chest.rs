@@ -5,10 +5,9 @@
 //! chest's flag `$500 + n` is set. A full inventory shows "overloaded" and
 //! closes the lid again. On load, `$8D:912B` draws the opened chests open.
 //!
-//! Not modelled: Ark's both-hands lift (resource 3, poses `$39`/`$3A`; the
-//! item grant's lift stands in), the gems' and the empty chest's icons, the
-//! `$0F9` chests and "I have enough" (`$04F8`). Poses tracked:
-//! `meta/issues/ark-underworld-poses.md`.
+//! Ark's both-hands lift (resource 3's `$39`/`$3A`) and the item held are
+//! [`Opening::pose`]. Not modelled: the gems' and the empty chest's icons,
+//! the `$0F9` chests and "I have enough" (`$04F8`).
 
 use super::{Step, World, WorldError};
 use crate::scene::{Presentation, Presses};
@@ -46,6 +45,19 @@ pub(super) struct Opening {
     frame: u16,
     /// Frames of the fanfare left, once it plays.
     fanfare: Option<u16>,
+}
+
+impl Opening {
+    /// Resource 3's `$39` then `$3A`, both hands up (`$84:BF45`); from the
+    /// text on, the item held by facing, resource 0's 3, 4 or 5
+    /// (`$84:BF8F`).
+    pub(super) const fn pose(self, facing: room_core::Direction) -> super::pose::ArkPose {
+        match self.frame {
+            0 => super::pose::ArkPose::new(3, 0x39, false, 0, true),
+            frame if frame < TEXT => super::pose::ArkPose::new(3, 0x3A, false, frame - 1, true),
+            frame => super::pose::by_facing(0, [3, 4, 5], facing, frame - TEXT),
+        }
+    }
 }
 
 /// What a frame of the opening does.

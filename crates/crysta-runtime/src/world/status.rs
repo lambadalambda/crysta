@@ -72,6 +72,20 @@ pub(super) enum Burn {
     Frame(u16),
 }
 
+impl Burn {
+    /// Resource 5's list 4 (57 frames), then 5 held (`$84:DBF1`).
+    pub(super) const fn pose(self) -> Option<super::pose::ArkPose> {
+        use super::pose::ArkPose;
+        match self {
+            Self::Waiting => None,
+            Self::Frame(frame) if frame < BURN_POSES - 1 => {
+                Some(ArkPose::new(5, 4, false, frame, true))
+            }
+            Self::Frame(frame) => Some(ArkPose::new(5, 5, false, frame - (BURN_POSES - 1), true)),
+        }
+    }
+}
+
 impl World<'_> {
     /// A hit's successful status roll for `element`. Only the burn is set:
     /// no other has its runner.

@@ -14,11 +14,12 @@
 //! held decides (`COP 2B`): the same way falls, the opposite recovers; at
 //! the end, 4 frames of wobble (`$84:9BD9`) and the fall.
 //!
-//! Not modelled: the falling, rope and landing poses, the landing's drop
-//! from 256 pixels up (`$90:FA4E`), and a hit's lean on the rope.
-//! Tracked: `meta/issues/ark-underworld-poses.md`,
-//! `meta/issues/lip-jumps.md`, `meta/issues/fall-damage-teeter.md`.
+//! The fall's, the drop's and the rope's poses are [`Fall::pose`],
+//! [`Jump::pose`] and [`Rope::pose`]. Not modelled: the landing's drop
+//! from 256 pixels up (`$90:FA4E`), a hit's lean on the rope, the drop
+//! while carrying (`meta/issues/ark-underworld-poses.md`).
 
+use super::pose::ArkPose;
 use super::{Step, World, WorldError};
 use crate::scene::Transfer;
 use room_core::Direction;
@@ -62,16 +63,68 @@ impl Fall {
     pub(super) const fn landed(self) -> bool {
         self.frame >= FALL
     }
+
+    /// Resource 0's `$18`, once (`$84:A8BC`); nothing once he is hidden.
+    pub(super) const fn pose(self) -> Option<ArkPose> {
+        if self.landed() {
+            None
+        } else {
+            Some(ArkPose::new(0, 0x18, false, self.frame, true))
+        }
+    }
 }
 
-/// Ark dropping from a lip.
+/// Ark dropping from a lip: frames into it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Jump;
+pub(super) struct Jump {
+    frame: u16,
+}
+
+impl Jump {
+    /// Resource 0's `$13`, or `$15` facing Up, looped (`$84:A873`,
+    /// `$84:A899`).
+    pub(super) const fn pose(self, facing: Direction) -> ArkPose {
+        let list = if matches!(facing, Direction::Up) {
+            0x15
+        } else {
+            0x13
+        };
+        ArkPose::new(0, list, false, self.frame, false)
+    }
+}
 
 /// Ark on a rope: leaning one way, and for how long.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(super) struct Rope {
     lean: Option<(Direction, u16)>,
+}
+
+impl Rope {
+    /// Resource 1's lists (`$84:A8E1`..`A8F6`, `$84:A3B0`, `$84:9BE6`): the
+    /// walk `$0F`, mirrored going Left; the stand `$10`, mirrored facing
+    /// Left; a lean's `$10`, then 6 (Down) or 7 (Up); its wobble 6 or 7.
+    /// `frames` runs the walk's loop.
+    pub(super) const fn pose(
+        self,
+        facing: Direction,
+        walking: Option<Direction>,
+        frames: u16,
+    ) -> ArkPose {
+        let left = matches!(facing, Direction::Left);
+        match (self.lean, walking) {
+            (Some((_, frames)), _) if frames < LEAN_POSE => {
+                ArkPose::new(1, 0x10, left, frames, false)
+            }
+            (Some((Direction::Up, frames)), _) => {
+                ArkPose::new(1, 7, false, frames - LEAN_POSE, false)
+            }
+            (Some((_, frames)), _) => ArkPose::new(1, 6, left, frames - LEAN_POSE, false),
+            (None, Some(way)) => {
+                ArkPose::new(1, 0x0F, matches!(way, Direction::Left), frames, false)
+            }
+            (None, None) => ArkPose::new(1, 0x10, left, frames, false),
+        }
+    }
 }
 
 /// The four cells `$80:CC00` samples for Ark at `(x, y)`: the box's top
@@ -148,7 +201,7 @@ impl World<'_> {
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
         if lip(under, at.1) {
-            self.jump = Some(Jump);
+            self.jump = Some(Jump { frame: 0 });
             self.rope = None;
             self.thrust = None;
             self.globals.audio.sound_port3(JUMP_SOUND);
@@ -178,9 +231,10 @@ impl World<'_> {
     /// taken, and once every sample is floor, `$13` or a pit he lands, or
     /// with only pits under him falls (`$80:CDA2`, `$80:CE01`).
     pub(super) fn jump_frame(&mut self) -> Result<Option<Step>, WorldError> {
-        if self.jump.is_none() {
+        let Some(jump) = &mut self.jump else {
             return Ok(None);
-        }
+        };
+        jump.frame += 1;
         let (x, y) = self.position();
         self.walking = room_core::WalkingState::new(x, y + DROP);
         if let Some(step) = self.take_exit()? {
@@ -330,6 +384,39 @@ fn settle((x, y): (u16, u16), facing: Direction) -> (u16, u16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_rope_shows_its_walk_its_stand_and_its_lean() {
+        let pose = |rope: Rope, facing, walking| {
+            let pose = rope.pose(facing, walking, 0);
+            (pose.list, pose.hflip)
+        };
+        let still = Rope::default();
+        assert_eq!(
+            pose(still, Direction::Left, Some(Direction::Left)),
+            (0x0F, true)
+        );
+        assert_eq!(
+            pose(still, Direction::Right, Some(Direction::Right)),
+            (0x0F, false)
+        );
+        assert_eq!(pose(still, Direction::Left, None), (0x10, true));
+        let lean = |way, frames| Rope {
+            lean: Some((way, frames)),
+        };
+        assert_eq!(
+            pose(lean(Direction::Down, 3), Direction::Down, None),
+            (0x10, false)
+        );
+        assert_eq!(
+            pose(lean(Direction::Down, LEAN_POSE), Direction::Down, None),
+            (6, false)
+        );
+        assert_eq!(
+            pose(lean(Direction::Up, LEAN_POSE), Direction::Up, None),
+            (7, false)
+        );
+    }
 
     #[test]
     fn the_safe_spot_settles_back_from_the_pit() {

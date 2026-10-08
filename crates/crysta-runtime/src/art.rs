@@ -281,7 +281,14 @@ pub struct CarryArt {
     /// Ark's thrust lists with the spear ([`Mode4Art::thrust`]); empty when
     /// they do not decode.
     thrust: Vec<Mode4Art>,
+    /// Ark's lists that hold the spear on the rope: resource 1's `$0F` and
+    /// `$10` ([`Mode4Art::with_weapon`]).
+    rope: Vec<(u8, Mode4Art)>,
 }
+
+/// Ark's resource 1, whose rope lists hold the spear.
+const ROPE_ART: u32 = 0x80_A255;
+const ROPE_LISTS: [u8; 2] = [0x0F, 0x10];
 
 /// The id [`CarryArt::animation`] knows Ark's thrust by: resource 4's base.
 pub const THRUST: u32 = 0xA5_A000;
@@ -304,6 +311,10 @@ impl CarryArt {
                 .map(|list| Mode4Art::thrust(image, SPEAR, list))
                 .collect::<Result<_, _>>()
                 .unwrap_or_default(),
+            rope: ROPE_LISTS
+                .into_iter()
+                .filter_map(|list| Some((list, Mode4Art::with_weapon(image, 1, SPEAR, list).ok()?)))
+                .collect(),
         })
     }
 
@@ -314,14 +325,25 @@ impl CarryArt {
     /// Refuses an art or a list the decoder does not hold, or frames outside
     /// the qualified shape.
     pub fn animation(&self, art: u32, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
-        if art == THRUST {
-            let thrust = self
-                .thrust
-                .get(usize::from(selector))
-                .ok_or(SpriteError::Invalid("no such thrust list"))?;
+        // The lists that hold the spear; the rope art's others are the
+        // stairs', below.
+        let held = match art {
+            THRUST => Some(
+                self.thrust
+                    .get(usize::from(selector))
+                    .ok_or(SpriteError::Invalid("no such thrust list"))?,
+            ),
+            ROPE_ART => self
+                .rope
+                .iter()
+                .find(|(list, _)| *list == selector)
+                .map(|(_, art)| art),
+            _ => None,
+        };
+        if let Some(held) = held {
             return animate(
-                thrust.list().frames(),
-                (thrust.graphics(), thrust.palette(), thrust.palette_base()),
+                held.list().frames(),
+                (held.graphics(), held.palette(), held.palette_base()),
                 hflip,
             );
         }

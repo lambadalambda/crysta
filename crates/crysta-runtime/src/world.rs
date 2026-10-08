@@ -20,6 +20,7 @@ use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::flag_patches::{self, Patch};
 use assets::maps::scripts::EventFlags;
 use assets::sprites::PandoraRunMotion;
+pub use pose::ArkPose;
 use room_core::arrival::{Arrival, ReturnRoute};
 use room_core::run::Run;
 use room_core::{
@@ -38,7 +39,9 @@ mod hurt;
 mod levelup;
 mod life;
 mod magirock;
+mod pose;
 mod pots;
+
 mod progress;
 mod resurrection;
 mod second;

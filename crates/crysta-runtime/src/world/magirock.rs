@@ -5,9 +5,8 @@
 //! `$900 + n` and the stone gone. The script's own code is native; this
 //! models its timing.
 //!
-//! Not modelled: Ark's lift poses by facing (`$84:BF67..BF83`, poses
-//! `$18..$1A`; the pot lift stands in;
-//! `meta/issues/ark-underworld-poses.md`).
+//! Ark's lift by facing (`$84:BF67..BF83`, resource 3's `$18..$1A`) is
+//! [`Pickup::pose`].
 
 use super::{Step, World, WorldError};
 use crate::scene::Presses;
@@ -36,6 +35,11 @@ impl Pickup {
     /// Frames since the press, for Ark's lift.
     pub(super) const fn frame(self) -> u16 {
         self.frame
+    }
+
+    /// Resource 3's lift by facing, `$18`, `$19`, `$1A` (`$84:BF5D`).
+    pub(super) const fn pose(self, facing: room_core::Direction) -> super::pose::ArkPose {
+        super::pose::by_facing(3, [0x18, 0x19, 0x1A], facing, self.frame)
     }
 }
 

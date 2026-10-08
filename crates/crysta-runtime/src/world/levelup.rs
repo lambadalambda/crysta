@@ -5,9 +5,9 @@
 //! frames, and the new stats count, Ark immune for 60 frames. The enemies
 //! run on; Ark cannot be hurt.
 //!
-//! Not modelled: Ark's victory and recovery poses (resource 0 list `$1D`,
-//! resource 2 list `$20`) and the window's scrolling lines (each text shows
-//! on its own). Poses tracked: `meta/issues/ark-underworld-poses.md`.
+//! Ark's victory and recovery (resource 0's `$1D`, resource 2's `$20`) are
+//! [`LevelUp::pose`]. Not modelled: the window's scrolling lines (each text
+//! shows on its own).
 
 use super::{Step, World, WorldError};
 use crate::combat::Level;
@@ -52,6 +52,15 @@ pub(super) struct LevelUp {
 }
 
 impl LevelUp {
+    /// Resource 0's `$1D` from the start (`$84:A8C8`), then resource 2's
+    /// `$20` once the window closed (`$84:A8D7`); each once.
+    pub(super) const fn pose(&self) -> super::pose::ArkPose {
+        match self.recovering {
+            Some(frames) => super::pose::ArkPose::new(2, 0x20, false, frames, true),
+            None => super::pose::ArkPose::new(0, 0x1D, false, self.frame, true),
+        }
+    }
+
     /// From level `from` to `to` (one level).
     pub(super) fn new(from: Level, to: Level, level: u8) -> Self {
         let rises = [

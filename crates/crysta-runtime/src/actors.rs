@@ -758,6 +758,9 @@ pub struct Actor {
     /// service named (`COP 84`, `89`), which `COP 8E`/`8F` wait out.
     ark: bool,
     ark_list: Option<u16>,
+    /// The resource and list `ark_pose` showed, and whether `COP 89`
+    /// repeats it: Ark's own art.
+    ark_shown: Option<(u8, u8, bool)>,
     /// The child the last `COP 99` spawned, for the run after it.
     linked: Option<u16>,
     /// A a run left at a jump, and the jump's target, for a run there.
@@ -878,6 +881,7 @@ impl Actor {
             blocked_tests: 0,
             ark: false,
             ark_list: None,
+            ark_shown: None,
             linked: None,
             carried: None,
             parameter: 0,
@@ -1541,6 +1545,7 @@ impl Actor {
 
     fn set_pose(&mut self, selector: u8, hflip: bool) {
         self.ark_list = None;
+        self.ark_shown = None;
         if self.selector != selector || self.hflip != hflip {
             self.selector = selector;
             self.hflip = hflip;
@@ -1779,11 +1784,21 @@ impl Actor {
         *self.pose_ticks.as_ref()?.get(usize::from(selector))?
     }
 
+    /// The pose of Ark's own art his script shows: once, or looped while
+    /// `COP 89` repeats it ([`crate::world::ArkPose`]).
+    pub(crate) fn ark_shown(&self) -> Option<crate::world::ArkPose> {
+        let (resource, list, repeat) = self.ark_shown?;
+        let age = u16::try_from(self.pose_age).unwrap_or(u16::MAX);
+        Some(crate::world::ArkPose::new(
+            resource, list, self.hflip, age, !repeat,
+        ))
+    }
+
     /// `COP 84 sel list resource` and `COP 89 count list sel resource` on
     /// Ark's own script outside the frozen return (`$80:A200`, `A28B`): the
     /// list of his resource, which `COP 8E` waits out, and `COP 8F` that
-    /// many times (the Guardner's sleep, `$97:C5BB`). His art is not
-    /// changed here (`meta/issues/ark-underworld-poses.md`).
+    /// many times (the Guardner's sleep, `$97:C5BB`), shown as his art
+    /// ([`Self::ark_shown`]).
     fn ark_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
         if self.frozen_return.is_some() {
             return if service == PLAYER_POSE_MOVING {
@@ -1793,23 +1808,30 @@ impl Actor {
                 false
             };
         }
-        // Byte 0 the count (`+$22`), byte 1 the list, the last the resource.
-        let length = if service == ARK_POSE_REPEAT { 4 } else { 3 };
-        let bytes = image.get(operands..operands + length);
-        let records = bytes.and_then(|bytes| {
-            assets::sprites::boxes::ark_list(image, bytes[length - 1], bytes[1]).ok()
-        });
-        let (Some(bytes), Some(records)) = (bytes, records) else {
+        // `COP 84 list sel resource`; `COP 89` has the count (`+$22`) first.
+        let repeat = service == ARK_POSE_REPEAT;
+        let length = if repeat { 4 } else { 3 };
+        let Some(bytes) = image.get(operands..operands + length) else {
             self.state = State::Frozen;
             return false;
         };
-        let count = bytes[0];
+        let (count, list, resource) = if repeat {
+            (Some(bytes[0]), bytes[1], bytes[3])
+        } else {
+            (None, bytes[0], bytes[2])
+        };
+        let Ok(records) = assets::sprites::boxes::ark_list(image, resource, list) else {
+            self.state = State::Frozen;
+            return false;
+        };
         let ticks: u16 = records
             .iter()
             .map(|record| u16::from(record.duration) + 1)
             .sum();
         self.ark_list = Some(ticks.max(1));
-        self.repeats = Some(u16::from(count));
+        self.ark_shown = Some((resource, list, repeat));
+        self.pose_age = 0;
+        self.repeats = count.map(u16::from);
         self.pc = operands + length;
         true
     }
