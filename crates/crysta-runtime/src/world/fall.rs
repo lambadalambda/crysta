@@ -28,10 +28,11 @@ use room_core::Direction;
 const PIT: u16 = 0x14;
 const ROPE: u16 = 0x12;
 const UNSAFE: u16 = 0x13;
-/// The lips: the attributes of class 8 in `$80:CF30`. Two under Ark's
-/// box start a drop (`$80:CED1`, `$80:CF50`): sound `$10`, stream `$27` of
-/// resource 0, 3 pixels down a frame with the walls off (`$84:A873`).
-const LIPS: [u16; 3] = [0x08, UNSAFE, 0x1F];
+/// The attributes of class 8 in `$80:CF30`: a lip, a pit, `$1F`. Two
+/// under Ark's box, not both pits, start a drop (`$80:CED1`, `$80:CF50`):
+/// sound `$10`, stream `$27` of resource 0, 3 pixels down a frame with the
+/// walls off (`$84:A873`).
+const LIPS: [u16; 3] = [0x08, PIT, 0x1F];
 const DROP: u16 = 3;
 const JUMP_SOUND: u8 = 0x10;
 /// The rope's band: the box's top this far into its cell.
@@ -63,7 +64,7 @@ impl Fall {
     }
 }
 
-/// Ark jumping down from a lip: frames into it.
+/// Ark dropping from a lip.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Jump;
 
@@ -91,13 +92,10 @@ const fn low(y: u16) -> bool {
 }
 
 /// Whether Ark stands on a lip (`$80:CED1`): both upper samples of class
-/// 8, or, low in the cell, both lower ones.
+/// 8 and not both pits, or, low in the cell, both lower ones.
 fn lip(attributes: [Option<u16>; 4], y: u16) -> bool {
-    let lips = |a: Option<u16>, b: Option<u16>| {
-        [a, b]
-            .iter()
-            .all(|attribute| attribute.is_some_and(|attribute| LIPS.contains(&attribute)))
-    };
+    let class = |attribute: Option<u16>| matches!(attribute, Some(a) if LIPS.contains(&a));
+    let lips = |a, b| class(a) && class(b) && !(a == Some(PIT) && b == Some(PIT));
     lips(attributes[0], attributes[1]) || (low(y) && lips(attributes[2], attributes[3]))
 }
 
@@ -152,6 +150,7 @@ impl World<'_> {
         if lip(under, at.1) {
             self.jump = Some(Jump);
             self.rope = None;
+            self.thrust = None;
             self.globals.audio.sound_port3(JUMP_SOUND);
             return;
         }
@@ -190,13 +189,15 @@ impl World<'_> {
         }
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
-        let settles = |attribute: Option<u16>| {
-            attribute.is_some_and(|attribute| matches!(attribute, 0..=2 | UNSAFE | PIT))
-        };
-        let rows = if low(at.1) { 4 } else { 2 };
-        if under[..rows].iter().copied().all(settles) {
+        // The upper samples settle on floor, `$13` or a pit; the lower
+        // ones, read low in the cell, on floor only.
+        let floor = |attribute: Option<u16>| matches!(attribute, Some(0..=2));
+        let upper = |attribute| floor(attribute) || matches!(attribute, Some(UNSAFE | PIT));
+        let lower = !low(at.1) || (floor(under[2]) && floor(under[3]));
+        if upper(under[0]) && upper(under[1]) && lower {
             self.jump = None;
-            if under.iter().all(|&attribute| attribute == Some(PIT)) {
+            // `$80:CE01` reads three of them (`CMP $08` goes untested).
+            if under[..3].iter().all(|&attribute| attribute == Some(PIT)) {
                 self.start_fall();
             }
         }
@@ -243,8 +244,11 @@ impl World<'_> {
         };
         if let Some(to) = fall.back {
             let at = self.position();
+            // There Ark is shown and his stand script set (`$84:9FE6`); he
+            // is free the next frame.
             if at == to {
-                return Ok(None);
+                self.run_actors()?;
+                return Ok(Some(Step::Stayed));
             }
             let toward = |from: u16, to: u16| match from.cmp(&to) {
                 std::cmp::Ordering::Less => from + 1,

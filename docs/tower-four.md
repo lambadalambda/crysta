@@ -86,7 +86,7 @@ on `$118` and `$11A` a fall off a rope over a pit without exit costs life.
 Rows of `$08` above `$117`'s holes, on `$118` (27..30, 23..24) and along the
 pits of `$119`/`$11A`. Down, Left, Right first samples: Open; Up first:
 `$80:D506` (Partial unless `$097C & 4`). Both top samples of class 8
-(table `$80:CF30`: `$08`, `$13`, `$1F`) -> `$80:CF50`: `$097C |= 1`, Ark
+(table `$80:CF30`: `$08`, `$14`, `$1F`; not two pits) -> `$80:CF50`: `$097C |= 1`, Ark
 `COP CB 01 $84:9ECC` (facing 1) / `$84:9EBC`: pose `$13` with move
 selector `$27`, sound `$10` (guess: a slide off the lip; carrying:
 `$84:9F13`/`9F33`). Not on the needed path: `$117`'s holes can be entered

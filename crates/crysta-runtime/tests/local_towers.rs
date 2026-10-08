@@ -738,6 +738,31 @@ fn a_lip_drops_ark_three_pixels_a_frame_into_the_pit_below() {
 }
 
 #[test]
+fn no_map_puts_a_partial_cell_beside_a_lip() {
+    // room-core refuses that pair for vertical steps (`lip_second`): a
+    // corner nudge no material pair gives.
+    for rom in roms() {
+        for map in 0..0x200 {
+            let Ok(built) = crysta_runtime::room(rom.image(), map) else {
+                continue;
+            };
+            let width = usize::from(built.width);
+            let kind = |cell: &u16| (cell >> 9) & 0x1F;
+            for row in built.room.cells().chunks(width) {
+                for pair in row.windows(2) {
+                    let (a, b) = (kind(&pair[0]), kind(&pair[1]));
+                    assert!(
+                        !((matches!(a, 5 | 16) && b == 8) || (a == 8 && matches!(b, 5 | 16))),
+                        "{:?} {map:#x}",
+                        rom.revision()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
 fn the_darts_of_tower_threes_second_floor_hurt_ark() {
     // `docs/darts-and-burn.md` §1: the right launcher at (704, 464) (row
     // `$1D`) shoots a box over x 656..704, y 456..464 once Ark is within
