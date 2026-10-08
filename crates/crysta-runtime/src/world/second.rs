@@ -75,8 +75,8 @@ impl World<'_> {
     }
 
     /// A load flag patch on the second layer.
-    pub(super) fn apply_second_load_patch(&mut self, patch: &Patch) {
-        match *patch {
+    pub(super) fn apply_second_load_patch(&mut self, patch: Patch) {
+        match patch {
             Patch::Tile { cell, tile } => {
                 self.patch_second((cell.0.into(), cell.1.into()), tile & 0x1FF);
             }

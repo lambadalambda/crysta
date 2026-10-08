@@ -1125,7 +1125,7 @@ impl<'a> World<'a> {
         let (width, height) = (self.base.width, self.base.height);
         for patch in &patches {
             if patch.second_layer {
-                self.apply_second_load_patch(&patch.patch);
+                self.apply_second_load_patch(patch.patch);
                 continue;
             }
             match patch.patch {
