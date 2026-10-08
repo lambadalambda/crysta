@@ -4,7 +4,8 @@ use assets::graphics::{self, Bgr555, IndexedPixel, Tile4bpp};
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use assets::maps::visual::{
-    camera::CameraRegion, scene_animation::SceneAnimation, SecondLayer, StaticBackground,
+    camera::CameraRegion, profile::Presentation, scene_animation::SceneAnimation, SecondLayer,
+    StaticBackground,
 };
 
 /// Presentation age since entry, advanced by host simulation updates, not redraws.
@@ -102,11 +103,21 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
             .ok()
         })
         .filter(|source| !source.is_empty());
-    let second = SecondLayer::from_rom(image, map).ok().map(|layer| Second {
-        layer,
-        tiles: scene.tiles().to_vec(),
-        palette: *scene.palette(),
-    });
+    // Drawn as added light or as a sky; not yet in front or subtracted
+    // (`meta/issues/tower-second-layer.md`).
+    let second = SecondLayer::from_rom(image, map)
+        .ok()
+        .filter(|layer| {
+            matches!(
+                layer.presentation(),
+                Presentation::Added | Presentation::Sky
+            )
+        })
+        .map(|layer| Second {
+            layer,
+            tiles: scene.tiles().to_vec(),
+            palette: *scene.palette(),
+        });
     let sky = second
         .as_ref()
         .filter(|second| second.layer.fixed())

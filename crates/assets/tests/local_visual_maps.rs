@@ -437,3 +437,35 @@ fn the_light_room_loads_its_own_colours_over_the_towers() {
         "a 1x1 page"
     );
 }
+
+#[test]
+fn the_tower_maps_show_their_second_layer_by_their_profile() {
+    // `docs/tower-second-layer.md` §2.
+    use assets::maps::visual::profile::Presentation::{Added, Front, Hidden, Sky, Subtracted};
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    for (map, shown) in [
+        (0x0Bu16, Added),
+        (0x000A, Added),
+        (0x0100, Sky),
+        (0x0101, Front),
+        (0x0106, Added),
+        (0x0107, Sky),
+        (0x0108, Front),
+        (0x010F, Added),
+        (0x0116, Front),
+        (0x011B, Subtracted),
+        (0x0121, Added),
+        (0x0122, Hidden),
+        (0x0123, Subtracted),
+    ] {
+        let layer = assets::maps::visual::SecondLayer::from_rom(rom.image(), map)
+            .unwrap_or_else(|error| panic!("{map:#x}: {error}"));
+        assert_eq!(layer.presentation(), shown, "{map:#x}");
+    }
+    // No second layer named.
+    for map in [0x0114u16, 0x0127] {
+        assert!(assets::maps::visual::SecondLayer::from_rom(rom.image(), map).is_err());
+    }
+}

@@ -28,30 +28,12 @@ impl CameraRegion {
                 .get(at..at + n)
                 .ok_or(unsupported("truncated camera source"))
         };
-        let word = |at: usize| bytes(at, 2).map(|b| usize::from(u16::from_le_bytes([b[0], b[1]])));
         let located = |japan: usize| relocated(image, japan, "unrecorded camera source");
-        // `$86955C..959B` reads bank `$82`'s entry first (the towers'), then
-        // bank `$83`'s.
-        let first = located(0x28000)?;
-        let scenes = if word(first + map)? != 0 {
-            first
-        } else {
-            located(0x38000)?
-        };
-        let prefix = bytes((scenes & 0x3f_0000) + word(scenes + map)?, 2)?;
-        // `$86:9581` keeps the first byte in `$048B`; `$868C69..8C86` sets
-        // `$0868` from the selector's top bits and indexes `$96BB64 +
-        // 2*(selector & $3F)`. Neither changes the region.
-        // The European table is `$99:C2AE` (the operand at `$86:8C85`).
-        let table = located(0x16_bb64)?;
-        let display = (table & 0x3f_0000) + word(table + usize::from(prefix[1] & 0x3f) * 2)?;
         // Profile byte +4 bit 6 selects `$0866 = 256`, else 224
-        // (`$868CDE..8CE6`; the towers).
-        let vertical_extent = if bytes(display + 4, 1)?[0] & 0x40 == 0 {
-            224
-        } else {
-            256
-        };
+        // (`$868CDE..8CE6`; the towers). The profile does not change the
+        // region.
+        let display = super::profile::display_profile(image, map_id)?;
+        let vertical_extent = if display[4] & 0x40 == 0 { 224 } else { 256 };
         // European `$99:C57A`, the operand at `$86:9375`.
         let record_offset = located(0x16_be30)? + map;
         let record = bytes(record_offset, 2)?;

@@ -3,6 +3,7 @@ pub mod camera;
 pub mod crysta_animation;
 pub mod mode7;
 pub mod pandora;
+pub mod profile;
 pub mod scene_animation;
 pub mod world;
 
@@ -112,22 +113,23 @@ pub struct SecondLayer {
     layer: StaticLayer,
     metatiles: Vec<[BgTileWord; 4]>,
     drifts: bool,
-    fixed: bool,
+    presentation: profile::Presentation,
 }
 
-/// Tower 1's ground floor, whose second layer is a fixed backdrop.
-const TOWER_ONE: u16 = 0x0100;
+/// The tower maps, the light rooms and the Hole (`docs/tower-second-layer.md`).
+const TOWERS: std::ops::RangeInclusive<u16> = 0x0100..=0x012B;
 
 impl SecondLayer {
     /// Decodes the second layer (`10 02`) and its metatiles
     /// (`20 00 40 00 02`) the map's loading script names.
     ///
     /// # Errors
-    /// Rejects maps outside the Crysta slice `$0A..=$21` and tower 1, a script that
-    /// names either resource not with one source (the cellars name none), and
-    /// resources that do not decode.
+    /// Rejects maps outside the Crysta slice `$0A..=$21` and the towers, a
+    /// script that names either resource not with one source (the cellars
+    /// name none), resources that do not decode, and a map without its
+    /// display profile.
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, VisualMapError> {
-        if !(0x000A..=0x0021).contains(&map_id) && map_id != TOWER_ONE {
+        if !(0x000A..=0x0021).contains(&map_id) && !TOWERS.contains(&map_id) {
             return Err(VisualMapError::Unsupported(
                 "unqualified second layer map ID",
             ));
@@ -179,16 +181,22 @@ impl SecondLayer {
             layer,
             metatiles,
             drifts: map_id == 0x000A,
-            fixed: map_id == TOWER_ONE,
+            presentation: profile::presentation(&profile::display_profile(image, map_id)?),
         })
     }
 
+    /// How the map shows it ([`profile::presentation`]).
+    #[must_use]
+    pub const fn presentation(&self) -> profile::Presentation {
+        self.presentation
+    }
+
     /// Whether it stands still on the screen behind the first layer, as
-    /// tower 1's night sky does (`docs/tower-entry.md`), rather than being
-    /// added onto the view.
+    /// the towers' night sky does (`docs/tower-entry.md`), rather than
+    /// being added onto the view.
     #[must_use]
     pub const fn fixed(&self) -> bool {
-        self.fixed
+        matches!(self.presentation, profile::Presentation::Sky)
     }
 
     /// Whether it drifts a pixel left and down every three frames, as the
