@@ -1338,6 +1338,10 @@ impl<'a> World<'a> {
         self.life_frame();
         self.status_frame();
         if let Some(step) = self.holding_frame(presses)? {
+            // The pot's own entity flies on while Ark falls or drops.
+            if self.fall.is_some() || self.jump.is_some() {
+                self.fly_pot()?;
+            }
             self.apply_patches()?;
             return Ok((step, None));
         }

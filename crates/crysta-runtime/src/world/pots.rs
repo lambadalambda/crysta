@@ -4,7 +4,8 @@
 //! component, by the native rules (`docs/pots.md`). The world owns ordinary
 //! walking between actions and hands it to the component on an A press it
 //! admits, until the pot has broken; it strikes the hittable actors a
-//! flight's box overlaps.
+//! flight's box overlaps. Ark's steps with a pot meet the ground as his
+//! walk does ([`World::carried_ground_test`]).
 
 use super::{Step, World, WorldError};
 use crate::actors::Actor;
@@ -157,6 +158,13 @@ impl World<'_> {
             });
         }
         let state = self.pots.as_ref()?.state?;
+        if let Some(jump) = self.jump.filter(|jump| jump.carrying()) {
+            return Some(Carry {
+                motion: PandoraCarryMotion::Dropping,
+                facing: state.facing() as u8,
+                tick: u8::try_from(jump.frame()).unwrap_or(u8::MAX),
+            });
+        }
         let motion = match state.phase() {
             Phase::Empty => return None,
             Phase::Lifting => PandoraCarryMotion::Lifting,
@@ -300,7 +308,69 @@ impl World<'_> {
             return Ok(Some(Step::Stayed));
         }
         self.leave_carrying(pots)?;
+        self.carried_ground_test(pots);
         Ok(Some(Step::Walked))
+    }
+
+    /// The ground test after a step with a pot, or while one flies: a lip
+    /// drops Ark with it in hand (`$84:9F13`), a pit lets it fly from 16
+    /// pixels ahead as he falls (`$84:9F5B`, `$84:C649`), a rope puts it
+    /// down (`$84:9C95`, `$84:C5CB`).
+    fn carried_ground_test(&mut self, pots: &mut Pots) {
+        let Some(state) = &mut pots.state else {
+            return;
+        };
+        let held = state.phase() == Phase::Held;
+        if self.in_transition() || !(held || state.phase() == Phase::Empty) {
+            return;
+        }
+        self.ground_test();
+        if !held {
+            return;
+        }
+        if let Some(jump) = &mut self.jump {
+            jump.hold_pot();
+        } else if self.fall.is_some() {
+            self.fly_carried(pots);
+        } else if self.rope.is_some() {
+            self.drop_carried(pots);
+        }
+    }
+
+    /// A frame of a flying pot while Ark falls or drops: it flies on where
+    /// he is.
+    pub(super) fn fly_pot(&mut self) -> Result<(), WorldError> {
+        let Some(mut pots) = self.pots.take() else {
+            return Ok(());
+        };
+        let (walking, facing) = (self.walking, self.facing);
+        let flying = pots.owned
+            && pots.state.as_mut().is_some_and(|state| {
+                state.flight().is_some() && state.rebase(walking, facing).is_ok()
+            });
+        if flying {
+            let animation = self.animation;
+            let step = self.pot_step(&mut pots, None, false);
+            (self.walking, self.facing, self.animation) = (walking, facing, animation);
+            step?;
+        }
+        self.pots = Some(pots);
+        Ok(())
+    }
+
+    /// Ark lands from a lip with the pot still in hand; onto pits, he
+    /// falls and it flies (`$84:9F53`).
+    pub(super) fn carry_to_landing(&mut self, falls: bool) {
+        let Some(mut pots) = self.pots.take() else {
+            return;
+        };
+        if let Some(state) = &mut pots.state {
+            state.carry_to(self.walking);
+        }
+        if falls {
+            self.fly_carried(&mut pots);
+        }
+        self.pots = Some(pots);
     }
 
     /// An exit under a carry step: Ark drops the pot (`$84:C5CB`, sound
@@ -310,13 +380,33 @@ impl World<'_> {
         if !self.in_transition() {
             return Ok(());
         }
-        if let Some(state) = &mut pots.state {
-            if state.drop_held() {
-                self.globals.audio.sound_port3(RELEASE_SOUND);
-                pots.owned = false;
-            }
-        }
+        self.drop_carried(pots);
         Ok(())
+    }
+
+    /// Ark puts the pot he carries down (`$84:C5CB`, sound `$12`,
+    /// unbroken).
+    fn drop_carried(&mut self, pots: &mut Pots) {
+        if pots.state.as_mut().is_some_and(PotState::drop_held) {
+            self.globals.audio.sound_port3(RELEASE_SOUND);
+            pots.owned = false;
+        }
+    }
+
+    /// The pot Ark carries flies from 16 pixels ahead as he falls
+    /// (`$84:9F5B`, `$84:C649`).
+    fn fly_carried(&mut self, pots: &mut Pots) {
+        let Some((_, ground)) = &pots.collision else {
+            return;
+        };
+        if pots
+            .state
+            .as_mut()
+            .is_some_and(|state| state.drop_into_flight(ground))
+        {
+            self.globals.audio.sound_port3(RELEASE_SOUND);
+            pots.throw_room = Some(ground.clone());
+        }
     }
 
     /// Strikes the hittable actors a flight's box overlaps (x±8, y±8 each,

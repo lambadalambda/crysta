@@ -965,6 +965,59 @@ fn tower_four_platform(rom: &Rom) -> World<'_> {
 }
 
 #[test]
+fn a_pit_takes_ark_carrying_a_pot_and_the_pot_flies_on() {
+    // `$117`'s pot at (8,46), its pit at rows 35-36 (`$84:9F53`): the
+    // fall lets the pot fly from 16 pixels ahead (`$84:C649`).
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0117, 152, 752, after_the_intro()).unwrap();
+        for _ in 0..20 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        world
+            .update(Some(Direction::Left), Presses::default())
+            .unwrap();
+        let lift = Presses {
+            confirm: true,
+            ..Presses::default()
+        };
+        world.update(None, lift).unwrap();
+        for _ in 0..40 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert!(world.carry().is_some(), "{:?}", rom.revision());
+        while world.position().0 < 200 {
+            world
+                .update(Some(Direction::Right), Presses::default())
+                .unwrap();
+        }
+        let mut flew = false;
+        for _ in 0..120 {
+            if world.falling() {
+                break;
+            }
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+        }
+        assert!(
+            world.falling(),
+            "{:?}: {:?}",
+            rom.revision(),
+            world.position()
+        );
+        assert_eq!(world.carry(), None, "{:?}", rom.revision());
+        for _ in 0..120 {
+            flew |= world.pot().is_some_and(|pot| pot.flight.is_some());
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert!(flew, "{:?}", rom.revision());
+        assert_eq!(world.pot(), None, "{:?}", rom.revision());
+        assert!(!world.falling(), "{:?}", rom.revision());
+    }
+}
+
+#[test]
 fn ark_crosses_tower_fours_rope() {
     // `docs/tower-four.md` §2: the rope (attribute `$12`, row 45) between
     // the platform and the left ledge; Left and Right walk it.

@@ -15,9 +15,10 @@
 //! the end, 4 frames of wobble (`$84:9BD9`) and the fall.
 //!
 //! The fall's, the drop's and the rope's poses are [`Fall::pose`],
-//! [`Jump::pose`] and [`Rope::pose`]. Not modelled: the landing's drop
-//! from 256 pixels up (`$90:FA4E`), a hit's lean on the rope, the drop
-//! while carrying (`meta/issues/ark-underworld-poses.md`).
+//! [`Jump::pose`] and [`Rope::pose`]; a drop with a pot in hand is a carry
+//! pose (`World::carry`). Not modelled: the rope after a jump (B), which
+//! wobbles Ark off in the air or leans him on landing (`$0986 & $3C00`,
+//! `$84:9BF8`; `meta/issues/jump.md`).
 
 use super::pose::ArkPose;
 use super::{Step, World, WorldError};
@@ -74,22 +75,40 @@ impl Fall {
     }
 }
 
-/// Ark dropping from a lip: frames into it.
+/// Ark dropping from a lip: frames into it, and whether he holds a pot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Jump {
     frame: u16,
+    carrying: bool,
 }
 
 impl Jump {
     /// Resource 0's `$13`, or `$15` facing Up, looped (`$84:A873`,
-    /// `$84:A899`).
-    pub(super) const fn pose(self, facing: Direction) -> ArkPose {
+    /// `$84:A899`); none with a pot, a carry pose.
+    pub(super) const fn pose(self, facing: Direction) -> Option<ArkPose> {
+        if self.carrying {
+            return None;
+        }
         let list = if matches!(facing, Direction::Up) {
             0x15
         } else {
             0x13
         };
-        ArkPose::new(0, list, false, self.frame, false)
+        Some(ArkPose::new(0, list, false, self.frame, false))
+    }
+
+    /// The pot in hand: `$097C & $0300` picks the carry's drop
+    /// (`$84:9EBC`).
+    pub(super) const fn hold_pot(&mut self) {
+        self.carrying = true;
+    }
+
+    pub(super) const fn carrying(self) -> bool {
+        self.carrying
+    }
+
+    pub(super) const fn frame(self) -> u16 {
+        self.frame
     }
 }
 
@@ -201,7 +220,10 @@ impl World<'_> {
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
         if lip(under, at.1) {
-            self.jump = Some(Jump { frame: 0 });
+            self.jump = Some(Jump {
+                frame: 0,
+                carrying: false,
+            });
             self.rope = None;
             self.thrust = None;
             self.globals.audio.sound_port3(JUMP_SOUND);
@@ -235,6 +257,7 @@ impl World<'_> {
             return Ok(None);
         };
         jump.frame += 1;
+        let carrying = jump.carrying;
         let (x, y) = self.position();
         self.walking = room_core::WalkingState::new(x, y + DROP);
         if let Some(step) = self.take_exit()? {
@@ -251,7 +274,12 @@ impl World<'_> {
         if upper(under[0]) && upper(under[1]) && lower {
             self.jump = None;
             // `$80:CE01` reads three of them (`CMP $08` goes untested).
-            if under[..3].iter().all(|&attribute| attribute == Some(PIT)) {
+            let falls = under[..3].iter().all(|&attribute| attribute == Some(PIT));
+            // With a pot: the carry's control again (`$84:AC02`).
+            if carrying {
+                self.carry_to_landing(falls);
+            }
+            if falls {
                 self.start_fall();
             }
         }
