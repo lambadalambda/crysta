@@ -63,6 +63,15 @@ the pad, Ark's controller `$90:FADA` (pose `$13` loop), `$0970 = $FF00`
 landing pose `$14`; pad control `$84:87C1`. Flag `$1F` is not cleared in
 these scripts (guess: the loader clears the low temporary flags).
 
+Native frames (JP trace, `docs/native-warp.md`; Down held from (136,736),
+d = the first frame Ark sinks 3 pixels, y 745 -> 748): the test's frame
+(y 745, `$097C = 1`) keeps the walk pose; the drop's script runs from d
+(`$13` from age 0, sound `$10`, port write a frame later). At d+12 (y 784,
+only pits under him) `$097C = 2` with `$13` still shown; the fall script
+runs from d+13 (`$18`, sound `$12`), `$10` at d+22, the damage and the
+first pixel back at d+62. Back at the safe spot (y 736) at d+109, he walks
+again at d+112. `$0956` reads 3 during the fall.
+
 ## 3. Scripts
 
 | Script | JP | EU |

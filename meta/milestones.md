@@ -198,7 +198,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw the vortex and the Chapter 2 title card](issues/chapter-end-vortex-card.md)
 - [Draw the continents' door parchment](issues/continent-door-parchment.md)
 - [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
-- [Model the lips' jumps](issues/lip-jumps.md)
 - [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
 - [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
 - [Draw the world map's horizon band](issues/world-map-horizon-band.md)
