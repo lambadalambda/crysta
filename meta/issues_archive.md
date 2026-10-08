@@ -166,3 +166,4 @@
 - [x] [Close the runtime's review edge cases](issues/runtime-review-edges.md)
 - [x] [Run the frozen display scripts on `$03`](issues/map-03-frozen-scripts.md)
 - [x] [Model the lips' jumps](issues/lip-jumps.md)
+- [x] [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
