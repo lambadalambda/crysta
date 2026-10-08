@@ -738,6 +738,31 @@ fn a_lip_drops_ark_three_pixels_a_frame_into_the_pit_below() {
 }
 
 #[test]
+fn the_darts_of_tower_threes_second_floor_hurt_ark() {
+    // `docs/darts-and-burn.md` §1: the right launcher at (704, 464) (row
+    // `$1D`) shoots a box over x 656..704, y 456..464 once Ark is within
+    // `$60`; profile 5's attack.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0110, 680, 472, events).unwrap();
+        world.set_life(99);
+        // A 194-frame cycle; the launcher (profile 5, life 0, `+$04 & $20`:
+        // no target) keeps shooting.
+        let mut hits = 0;
+        for _ in 0..600 {
+            let before = world.life().0;
+            world.update(None, Presses::default()).unwrap();
+            if world.life().0 < before {
+                hits += 1;
+                world.place(680, 472);
+            }
+        }
+        assert!(hits >= 2, "{:?}: {hits}", rom.revision());
+    }
+}
+
+#[test]
 fn a_pedestal_on_tower_threes_second_floor_toggles_its_flag() {
     // `docs/tower-three.md` §3: A on a pedestal (`$90:FBB3`) sets its flag
     // (`$001-$004`, `JSL $80:BBCD`); on `$110` the next press clears it.

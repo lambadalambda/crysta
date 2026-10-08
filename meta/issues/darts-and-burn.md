@@ -21,3 +21,9 @@
 ## Notes
 
 - Research: `docs/tower-three.md` §7, `docs/tower-four.md` §2.
+
+## Progress
+
+- Research: `docs/darts-and-burn.md`.
+- The darts hurt: the launchers are hittable records of profile 5 whose pose packet the art decoder refuses; the runtime made enemies only of bodies. Now any hittable record with a profile attacks.
+- Open: the enemies' attack kinds (`7F:102C`), the elements, the enemy critical hit and the statuses (burn, sleep) of `$85:DA9E`.

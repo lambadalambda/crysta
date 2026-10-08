@@ -981,23 +981,25 @@ impl Actor {
             .descriptor
             .and_then(|descriptor| image.get(descriptor + 3))
             == Some(&4);
-        actor.pose_ticks = resident
-            .descriptor
-            .filter(|_| resident.body || mode4)
-            .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         // An enemy: hittable (header `+$04` bit `$0200`), its descriptor's
-        // byte 4 naming its profile (`$80:FACF`).
+        // byte 4 naming its profile (`$80:FACF`). The hit scans read the
+        // header and the boxes, not the art: `$110`'s dart launchers, whose
+        // packet the art decoder refuses, attack as well.
         let header = resident
             .script
             .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
             .and_then(|script| image.get(script.checked_sub(4)?..script.checked_sub(2)?))
             .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]));
         let hittable = header & 0x0200 != 0;
+        actor.pose_ticks = resident
+            .descriptor
+            .filter(|_| resident.body || mode4 || hittable)
+            .and_then(|descriptor| cadence::pose_ticks(image, descriptor));
         // Wall collision (`docs/enemy-scripts.md` §6) for enemies' bodies.
         actor.walls = resident.body && hittable && header & 0x0006 == 0x0004;
         actor.foe = resident
             .descriptor
-            .filter(|_| resident.body && hittable)
+            .filter(|_| hittable)
             .and_then(|descriptor| image.get(descriptor + 4))
             .and_then(|&index| crate::combat::profile(image, index))
             .map(|profile| {
