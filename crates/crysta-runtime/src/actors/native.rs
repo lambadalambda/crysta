@@ -49,6 +49,8 @@ pub struct Memory<'m> {
     pub parent: Option<View>,
     /// The child `COP 99` linked, which Y holds as the run starts.
     pub linked: Option<u16>,
+    /// The entity before it in the list, `+$2C` (`$80:BC7C`).
+    pub previous: Option<u16>,
     /// Every actor by id, for an id in a field (`LDY $0026,X`).
     pub views: &'m [(u16, View)],
     /// A left at a `BRA`/`JMP` the script loop follows, and its target,
@@ -867,13 +869,12 @@ impl<'a> Machine<'a> {
                 (self.zero, self.carry) = (Some(false), None);
                 self.pc + 3
             }
-            // `LDA $002C,X`, the entity before it in the list: for a child
-            // spawned after its parent (`COP A1`/`A2`/`A4`, `$80:BC7C`), the
-            // parent until it spawns again (guess: the `$11D` orb's trail,
-            // `$90:A2C9`, and the flyer's burst, `$97:BCD4`), for a TAY
-            // (`meta/issues/runtime-review-edges.md`).
-            0xBD if self.x && self.operand()? == 0x2C && memory.parent.is_some() => {
-                (self.a, self.entity) = (None, Some(Entity::Parent));
+            // `LDA $002C,X`, the entity before it in the list (`$80:BC7C`:
+            // a child's parent until another spawns after it, or one
+            // between them goes; the flyer's burst, `$97:BCD4`, the `$11D`
+            // orb's trail, `$90:A2C9`), for a TAY.
+            0xBD if self.x && self.operand()? == 0x2C && memory.previous.is_some() => {
+                (self.a, self.entity) = (None, memory.previous.map(Entity::Id));
                 (self.zero, self.negative) = (Some(false), Some(false));
                 self.pc + 3
             }
@@ -1292,6 +1293,7 @@ mod tests {
                 player: View::default(),
                 parent: None,
                 linked: None,
+                previous: None,
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
@@ -1338,6 +1340,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1387,6 +1390,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1427,6 +1431,7 @@ mod tests {
                 player: View::default(),
                 parent: None,
                 linked: None,
+                previous: None,
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
@@ -1464,6 +1469,7 @@ mod tests {
                 player: View::default(),
                 parent: None,
                 linked: None,
+                previous: None,
                 views: &[],
                 carried: &mut None,
                 pokes: &mut Vec::new(),
@@ -1497,6 +1503,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1537,6 +1544,7 @@ mod tests {
                 ..View::default()
             }),
             linked,
+            previous: Some(0x4002),
             views,
             carried: &mut None,
             pokes: &mut pokes,
@@ -1591,6 +1599,26 @@ mod tests {
         let (next, pokes) = poking_among(&code, &mut Own::new(), None, &[(0x4001, parent)]);
         assert_eq!(next, Some(AT + 12));
         let (id, at, value) = (0x4001, 0x26, 7);
+        assert_eq!(pokes, [Poke::Word { id, at, value }]);
+    }
+
+    #[test]
+    fn the_entity_before_in_the_list_is_the_previous_not_the_parent() {
+        // `LDA $002C,X; TAY; LDA $0026,Y; DEC; STA $0026,Y; COP`: `+$2C`
+        // is the entity before it in the list (`$80:BC7C`), here not its
+        // parent (`docs/runtime-review-edges.md` §2).
+        let code = [
+            0xBD, 0x2C, 0x00, 0xA8, 0xB9, 0x26, 0x00, 0x3A, 0x99, 0x26, 0x00, 0x02,
+        ];
+        let view = |id, word26| View {
+            id,
+            word26,
+            ..View::default()
+        };
+        let views = [(0x4001, view(0x4001, 3)), (0x4002, view(0x4002, 8))];
+        let (next, pokes) = poking_among(&code, &mut Own::new(), None, &views);
+        assert_eq!(next, Some(AT + 11));
+        let (id, at, value) = (0x4002, 0x26, 7);
         assert_eq!(pokes, [Poke::Word { id, at, value }]);
     }
 
@@ -1726,6 +1754,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1773,6 +1802,7 @@ mod tests {
                 ..View::default()
             }),
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1805,6 +1835,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),
@@ -1921,6 +1952,7 @@ mod tests {
             player: View::default(),
             parent: None,
             linked: None,
+            previous: None,
             views: &[],
             carried: &mut None,
             pokes: &mut Vec::new(),

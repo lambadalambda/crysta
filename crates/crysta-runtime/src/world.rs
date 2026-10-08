@@ -332,6 +332,8 @@ impl<'a> World<'a> {
                     .wrapping_add(u32::try_from(index).unwrap_or(0).wrapping_mul(0x85EB_CA6B));
                 let mut actor = Actor::for_resident(image, map, resident, seed);
                 actor.id = 0x0100 + u16::try_from(index).unwrap_or(0);
+                // The records' entities follow one another in the list.
+                actor.previous = (index > 0).then(|| actor.id - 1);
                 actor
             })
             .collect();
@@ -914,7 +916,13 @@ impl<'a> World<'a> {
         }
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
-            self.actors.remove(index);
+            let gone = self.actors.remove(index);
+            // The next one in the list now follows the one before it.
+            for actor in &mut self.actors {
+                if actor.previous == Some(gone.id) {
+                    actor.previous = gone.previous;
+                }
+            }
         }
         // Found after removals, which move indices.
         if let Some(index) = self
@@ -1174,6 +1182,14 @@ impl<'a> World<'a> {
     fn spawn_actors(&mut self) {
         for (script, mut actor) in std::mem::take(&mut self.globals.spawns) {
             actor.set_map(self.map);
+            // A child goes after its parent in the list, or at its head
+            // without one (`$80:BC7C`, `COP 99`): the next one follows it.
+            actor.previous = actor.parent_id();
+            for other in &mut self.actors {
+                if other.previous == actor.previous {
+                    other.previous = Some(actor.id);
+                }
+            }
             let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
             self.residents.push(Resident {
                 position: actor.position,

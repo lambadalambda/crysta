@@ -747,6 +747,8 @@ pub struct Actor {
     spawned: bool,
     /// The parent as it was at the spawn, for `$7F:001E,X` reads.
     parent: Option<native::View>,
+    /// The entity before it in the list (`+$2C`), which the world keeps.
+    pub(crate) previous: Option<u16>,
     /// The id other actors' runs know it by (`views`, `LDY $0026,X`).
     pub(crate) id: u16,
     /// It heads a group (`7F:001E = $FFFF`, `$80:BB60`).
@@ -878,6 +880,7 @@ impl Actor {
             line: None,
             spawned: false,
             parent: None,
+            previous: None,
             id: 0,
             root: false,
             struck: false,
@@ -1368,6 +1371,7 @@ impl Actor {
             player,
             parent: self.parent,
             linked: self.linked.take(),
+            previous: self.previous,
             views: &globals.views,
             carried: &mut self.carried,
             pokes: &mut globals.pokes,
@@ -2892,6 +2896,11 @@ impl Actor {
     /// Whether it runs in the nested frame of a transfer's fade.
     pub(crate) const fn runs_nested(&self) -> bool {
         self.nested
+    }
+
+    /// The id of the parent it was spawned after, if any.
+    pub(crate) fn parent_id(&self) -> Option<u16> {
+        self.parent.map(|parent| parent.id).filter(|&id| id != 0)
     }
 
     /// Takes a write another actor's run made into it.
