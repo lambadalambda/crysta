@@ -164,3 +164,4 @@
 - [x] [Use the rope's native collision tables](issues/rope-collision-tables.md)
 - [x] [Confirm the fall damage and the pit-edge teeter](issues/fall-damage-teeter.md)
 - [x] [Close the runtime's review edge cases](issues/runtime-review-edges.md)
+- [x] [Run the frozen display scripts on `$03`](issues/map-03-frozen-scripts.md)

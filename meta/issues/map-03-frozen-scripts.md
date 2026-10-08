@@ -15,3 +15,7 @@ With the Crysta flags `$20`-`$2D` set, three display scripts on `$03` freeze (`$
 ## Acceptance Criteria
 
 - No script on `$03` freezes in the flag survey.
+
+## Progress
+
+- Done: `$03`'s `FD` record is the player's (header flags `$0400`, `$80:F46E`) and no resident; `$87:990A` (the view's HDMA) and `$84:E3E6` (the horizon band) are the hosts' (`docs/world-map-mode7.md`). The band's drawing: [world-map-horizon-band](world-map-horizon-band.md).
