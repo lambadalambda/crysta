@@ -158,6 +158,53 @@ All of `$93:D876`-`$E8xx` moves to bank `$99`, `- $3D18`, in EU. The parts:
 - Torches: a child at a torch row toggles its bit (`EOR $04A4`) and patches
   the tiles (`COP 46`, `$E4B5`). Which part puts them out: guess, the tail.
 
+### Shadowkeeper natively (JP trace, 2026-10-08)
+
+Reached by the warp (`docs/native-warp.md`): flags `$101`-`$107`, `$19B`,
+`$1A6` (bitmap `$06C0`), `$122`, then north; Ark arrives on `$123` at
+(128,976). A bot fought with Ark's life kept full and the spear `$81`
+(attack 30, power 20, defense 2): the lives are native, the hit counts hold
+for those stats only. Phases 3 (charge) and 7 (torch) did not happen.
+
+- Intro: per camera band one torch bit in `$04A4` (`$8F:809A`). At Ark y
+  < 272 (frame 61130) he is held at 272, the pad locked (`$FF50`), `$0DEC`
+  = the intro actor, which climbs to y 192: the camera 159 -> 80 in 124
+  frames. At 61254 `$04A4 = $7F`, flag `$001`, music 5; the head (`$D916`)
+  opens a circular window (`COP 63 01`): `$0474` +1 a frame while wisps
+  (`$8F:80B5`, `COP 9A`, random flips) spawn every 3 frames, then -2 a
+  frame with wisps `$8F:80B2`. 61548: phase 9, the camera on the body; the
+  tail shows, hides at phase `$A`. Pad free at 61752.
+- Entities: body `$1080` (stats `$3C`, life 58, then 100), head `$1440`,
+  claw holder `$1100`, claws `$14C0`/`$1500` (stats `$46`, life 38), tail
+  controller `$1480` and 11 segments, Ark clamp `$13C0`, end controller
+  `$10C0`; all at (128,192), the offsets in their compositions.
+- Stage 1: the body is immune (`+$04 & $30` in the hit scan's `$04E2`
+  mask). Far (|dy| >= 64): phase 8, 4 volleys of 3 shots 9-18 frames apart
+  after a 6-frame flash; about 2.7 px a frame, the side ones drifting out;
+  20 damage. 1 in 8 phase 3. Near: phase 5 two-claw slam (`COP 6F` quake,
+  rocks `$E35F`); phases 6 and `$D` one claw's swipe and a flame (`$E3B1`),
+  12-16 damage. A dead claw sets root `+$26` bit 1 or 2, clears the
+  holder's `+$14`/`+$16`, leaves debris (62046, 62190; 2 hits each).
+- Stage 2 (62205, `INC $0498`): phase `$B` the tail above the body, `$C`
+  the tail's head swings; `$04A8` clear -> phase `$E`, the body hittable,
+  advancing (camera 80 -> 60), single volleys. Phase `$10` the sting:
+  sparks `$DFB7`, sound `$2D`, a line onto Ark, the impact `$DFF8`. Life 58
+  in 2 hits; `$DB09`: explosion (`COP A0 $DE12`), life 100 (3 hits).
+- Last death (63304): phase `$11`, pad lock, `INC $049A` (hit scan off),
+  the tail's segments explode every 3 frames; 63364 the body hidden,
+  `$0498 = 0`; 63425 `$04FA = 1`; `COP 06 $85:E27B`.
+- After: the level-up pages; `$90:A3AE`: music 1, 120 frames
+  (`$97:B41B`), then its first text `$90:A3EB`, the windowless banner
+  "Defeated Shadowkeeper!!" (63995); the guardian's text; `COP 14` -> `$106`.
+- Without the stand-in the runtime freezes at once: the intro at
+  `$8F:828F` (the VRAM fill loop), the body at `$93:E767` (`STA $04AA`).
+  Missing: spawns `9A`, `A0`, `EA`; services `04`, `5A`, `63`, `6F`, `A8`,
+  `AF`, `E4`, and the intro's HDMA `4E`/`8A`/`93`/`AA`; writes to `$04A6`,
+  `$04A8`, `$04AA`, `$049A`, `$0DEC`, `INC`/`STZ $0498`, `EOR $04A4`; reads
+  of `$0812`/`$0822`/`$081E`, `$0958`/`$095A`; the `+$2E` list walk;
+  writes into other actors' `+$0A`/`+$0C`/`+$0E`, x/y, `+$04`,
+  `+$14`/`+$16`; the death callback `$7F:1012`; `JSL $86:81B0`.
+
 ## 3. Scripts
 
 | Script | JP | EU |
