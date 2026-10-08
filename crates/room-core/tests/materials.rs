@@ -204,3 +204,50 @@ fn partial_solid_nudges_align_then_block_without_freezing_cadence() {
         }
     }
 }
+
+#[test]
+fn lips_match_the_directional_tables_at_every_remainder() {
+    // Type 8 with `$097C & 4` clear: Open in the Down/Left/Right first
+    // tables, Partial in Up's (`$80:D506`); as a second sample the O/P/S
+    // tables' entries 8. The directional path is the source translation; a
+    // partial first sample with a lip beside it vertically (a corner nudge
+    // either way) is refused, and no map has one.
+    for direction in DIRECTIONS {
+        for q in 0..16 {
+            for (a, b) in [8, 0, 2, 12, 16]
+                .into_iter()
+                .flat_map(|a| [8, 0, 2, 12, 16].map(|b| (a, b)))
+                .filter(|&(a, b)| a == 8 || b == 8)
+            {
+                let (x, y, first, second) = geometry(direction, q);
+                let mut cells = vec![0; 2048];
+                cells[first] = a << 9;
+                cells[second] = b << 9;
+                let ordinary = Room::new(32, 64, cells.clone())
+                    .unwrap()
+                    .with_type8_special_bit_clear();
+                let source = Room::new(32, 64, cells)
+                    .unwrap()
+                    .with_passive_directional_type8_special_bit_clear();
+                let vertical = matches!(direction, Direction::Up | Direction::Down);
+                if a == 16 && b == 8 && vertical && q != 0 {
+                    let mut state = WalkingState::new(x, y);
+                    let input = FrameInput {
+                        direction: Some(direction),
+                    };
+                    let refused = (0..3).any(|_| state.step(&ordinary, input).is_err());
+                    assert!(refused, "{direction:?} q={q} {a}/{b}");
+                    continue;
+                }
+                let run = |room: &Room| {
+                    let mut state = WalkingState::new(x, y);
+                    let input = FrameInput {
+                        direction: Some(direction),
+                    };
+                    (0..3).map(|_| state.step(room, input)).last().unwrap()
+                };
+                assert_eq!(run(&ordinary), run(&source), "{direction:?} q={q} {a}/{b}");
+            }
+        }
+    }
+}

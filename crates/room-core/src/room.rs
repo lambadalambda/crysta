@@ -21,6 +21,28 @@ const fn rope_second(first: Material, direction: Direction) -> Material {
     }
 }
 
+/// Type 8, a lip, as a second sample: the O/P/S pair tables' entries 8
+/// (Up `$80:D3F1`/`D3CD`/`D3E6`, Down `D7BE`/`D7C1`/`D7C8`, Left
+/// `DB66`/`DB7B`/`DB86`, Right `DEDC`/`DEF1`/`DEFC`). After a partial first
+/// sample Up and Down nudge either way (`$80:D3CD`), which no material pair
+/// gives: refused (no map has a partial cell beside a lip), but for Up from
+/// a lip, which blocks without a nudge as the two cells match.
+const fn lip_second(
+    (first, first_lip): (Material, bool),
+    direction: Direction,
+) -> Result<Material, Unqualified> {
+    Ok(match first {
+        Material::Open if matches!(direction, Direction::Up) => Material::Solid,
+        Material::Open => Material::Open,
+        Material::Partial if first_lip && matches!(direction, Direction::Up) => Material::Partial,
+        Material::Partial if !direction.horizontal() => {
+            return Err(Unqualified::UnsupportedType(8));
+        }
+        Material::Solid if !direction.horizontal() => Material::Open,
+        Material::Partial | Material::Solid => Material::Solid,
+    })
+}
+
 /// Finite source-qualified aliases, not arbitrary material remapping.
 ///
 /// The enclosing data identity must authenticate the map/profile and policy.
@@ -220,6 +242,17 @@ impl Room {
         self
     }
 
+    /// Admit type8 on the ordinary resolver, as its first and pair tables
+    /// give it, asserting `$097C & $0004 == 0` throughout every
+    /// resolve using this room: the host never walks the player while he
+    /// falls. A partial first sample with a lip beside it vertically stays
+    /// refused.
+    #[must_use]
+    pub fn with_type8_special_bit_clear(mut self) -> Self {
+        self.type8_special_bit_clear = true;
+        self
+    }
+
     /// Additionally admit directional type8 with the special-mode bit clear.
     ///
     /// Asserts all contracts of [`Self::with_passive_directional_collision`] and
@@ -243,6 +276,13 @@ impl Room {
     /// Whether directional type8's explicit `$097C & 4 == 0` contract is installed.
     #[must_use]
     pub const fn passive_directional_type8_special_bit_clear(&self) -> bool {
+        self.passive_directional && self.type8_special_bit_clear
+    }
+
+    /// Whether type8's `$097C & 4 == 0` contract is installed, on either
+    /// resolver.
+    #[must_use]
+    pub const fn type8_special_bit_clear(&self) -> bool {
         self.type8_special_bit_clear
     }
 
@@ -349,14 +389,15 @@ impl Room {
         Ok(())
     }
 
-    /// Whether the cell under (x, y) is a rope: type 18, its bit 15 clear
-    /// (a flagged cell is solid whatever its type).
-    fn rope(&self, x: u16, y: u16) -> bool {
+    /// The stored type of the cell under (x, y) when its bit 15 is clear (a
+    /// flagged cell is solid whatever its type).
+    fn unflagged_kind(&self, x: u16, y: u16) -> Option<u8> {
         let (col, row) = (x / 16, y / 16);
-        col < self.width
-            && row < self.height
-            && self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)] & 0xBE00
-                == 18 << 9
+        if col >= self.width || row >= self.height {
+            return None;
+        }
+        let raw = self.cells[usize::from(row) * usize::from(self.width) + usize::from(col)];
+        (raw & 0x8000 == 0).then_some(((raw >> 9) & 31) as u8)
     }
 
     fn material(
@@ -401,8 +442,13 @@ impl Room {
             // `DFDC`, `$40` apart): the tower tops' floor, tower 2's statue
             // rows, the pits Ark walks onto and falls into (`$80:CC00`).
             // `18`, tower 4's rope, is Open in the first tables; as a second
-            // sample it takes its pair tables ([`rope_second`]).
-            0 | 1 | 2 | 17 | 18 | 20 | 22 => Ok(Material::Open),
+            // sample it takes its pair tables ([`rope_second`]). `8`, a lip,
+            // with `$097C & 4` clear (Ark not falling): Open in the first
+            // tables but Up's, `$80:D506` -> Partial; as a second sample
+            // [`lip_second`].
+            8 if !self.type8_special_bit_clear => Err(Unqualified::UnsupportedType(8)),
+            8 if direction == Direction::Up => Ok(Material::Partial),
+            0 | 1 | 2 | 8 | 17 | 18 | 20 | 22 => Ok(Material::Open),
             12 | 14 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
@@ -442,10 +488,13 @@ impl Room {
                 (neighbor, v)
             };
             let second = self.material(x, y, direction, old_edge)?;
-            if self.rope(x, y) {
-                rope_second(first, direction)
-            } else {
-                second
+            match self.unflagged_kind(x, y) {
+                Some(18) => rope_second(first, direction),
+                Some(8) => {
+                    let first_lip = self.unflagged_kind(u, v) == Some(8);
+                    lip_second((first, first_lip), direction)?
+                }
+                _ => second,
             }
         };
         Ok((first, second))
