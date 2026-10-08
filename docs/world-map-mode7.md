@@ -94,9 +94,22 @@ No scaling. Nothing on the map is a sprite except:
   the town sprite (its source was not traced).
 - 40 static OBJ (OAM 3-42, tiles `$101..$11F`, palette 5, y 27..63). These
   are the same in every frame. Because of TM/TS they only darken the
-  horizon band (lines 52-67) and show on lines 68..79. Their writer was not
-  found (open).
+  horizon band (lines 52-67); none reaches line 68. Their writer is the
+  type-01 record `$83:8909` on `$03` (script `$84:E3E6`, EU `$84:E3AB`;
+  descriptor `$83:F92E`): after `COP BC` it sets its place to the camera
+  plus (`$80`, `$35`) every frame, so it is fixed on the screen at
+  (128,53). Its pose packet `$B1:BE49` (unpacked to `$7E:7000`) is the
+  piece list; +$08 = `$0100` takes the second name table. Palette 5 is a
+  grey ramp (1..30).
 - The towers and Crysta are **map tiles** in the `$03` layer, not sprites.
+
+The FB record `$87:990A` (EU `$87:98C7`) sets up the per-line HDMA above
+(M7A/M7D scale, M7SEL, mosaic, the fog's CGADSUB/COLDATA, the backdrop,
+TM/TS) when its parameter (+$06, `$80:F70E`) is 0, as on `$03` and `$23`.
+Map `$02` passes 1: CGADSUB `$83`, the A/D table `$87:99A1`, COLDATA
+`$9E4F` or `$9E2E` by the flag word `$815E` (`COP 08`; not traced). The
+hosts draw these tables (`mode7.rs`); the runtime does not run either
+script (`residents.rs` `SERVICES`).
 
 Animation (guess): three actors `$87:98BF` (params `$0A/$0B/$1D`, from the
 `$83:88FB` spawn list, `$8D:9331/$93B2`) and `$87:98EB` (`$8D:93D8/$940D`,
@@ -185,7 +198,8 @@ EU states come from a fresh replay of `eu-pandora-tour.inputs` +
 
 ## Open
 
-- The writer of the 40 horizon OBJ, and the world-map Ark sprite source.
+- Drawing the horizon band's OBJ into the fog subtraction, and the
+  world-map Ark sprite source.
 - The exact palette/char animation scripts (`$8D:9331..94C4`).
 - The second HDMA variant at `$87:995E` (A/D table `$87:99A1`, COLDATA
   `$87:9E4F`/`$9E2E`), selected by actor param `$0006` (guess: another
