@@ -36,6 +36,7 @@ mod door;
 mod fade;
 mod fall;
 mod hurt;
+mod landing;
 mod levelup;
 mod life;
 mod magirock;
@@ -73,6 +74,8 @@ pub struct World<'a> {
     pending_life: u16,
     /// The burn's script holding Ark ([`status`]).
     burn: Option<status::Burn>,
+    /// The landing on `$114` holding Ark ([`landing`]).
+    landing: Option<landing::Landing>,
     /// The second layer and the cells scripts patched in it ([`second`]).
     second: Option<second::Layer>,
     second_patched: Vec<(u16, u16, u16)>,
@@ -360,6 +363,7 @@ impl<'a> World<'a> {
             down: None,
             pending_life: 0,
             burn: None,
+            landing: None,
             second: None,
             second_patched: Vec::new(),
             ark_immune: 0,
@@ -1113,6 +1117,7 @@ impl<'a> World<'a> {
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.clear_statuses();
         self.start_shadowkeeper();
+        self.start_landing();
         self.load_second();
         self.apply_load_patches()?;
         self.open_opened_chests();
@@ -1386,6 +1391,9 @@ impl<'a> World<'a> {
             return Ok(Some(step));
         }
         if let Some(step) = self.burn_frame()? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.landing_frame()? {
             return Ok(Some(step));
         }
         if let Some(step) = self.resurrection_frame(presses) {
@@ -2576,6 +2584,7 @@ mod tests {
             down: None,
             pending_life: 0,
             burn: None,
+            landing: None,
             second: None,
             second_patched: Vec::new(),
             ark_immune: 0,

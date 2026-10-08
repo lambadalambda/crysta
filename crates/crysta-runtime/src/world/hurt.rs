@@ -117,6 +117,7 @@ impl World<'_> {
         self.hurt.is_some_and(|hurt| hurt.frame % 2 == 0)
             || self.globals.ark_flags & 0x8000 != 0
             || self.fall.is_some_and(super::fall::Fall::landed)
+            || self.landing.is_some_and(super::landing::Landing::hidden)
     }
 
     /// The enemies' hit scan on Ark (`$85:D30C`): an attack box touching

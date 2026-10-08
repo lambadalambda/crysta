@@ -187,7 +187,7 @@ impl World<'_> {
     }
 
     /// The cell attribute at `(column, row)` of the room as it stands.
-    fn attribute(&self, (column, row): (u16, u16)) -> Option<u16> {
+    pub(super) fn attribute(&self, (column, row): (u16, u16)) -> Option<u16> {
         let at = self.base.index(column, row)?;
         Some((self.base.room.cells()[at] >> 9) & 0x1F)
     }

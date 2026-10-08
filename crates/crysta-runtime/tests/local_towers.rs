@@ -657,6 +657,28 @@ fn the_crumbling_row_drops_ark_a_floor_down() {
 }
 
 #[test]
+fn ark_drops_onto_the_floor_below_and_walks_on() {
+    // `docs/tower-three.md` §2: the `FD` record at (15,9) hides Ark, drops
+    // him 256 pixels in resource 0's `$13`, lands him in `$14`, then frees
+    // the pad.
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0114, 248, 144, after_the_intro()).unwrap();
+        let (mut dropped, mut landed) = (false, false);
+        for _ in 0..120 {
+            world.update(None, Presses::default()).unwrap();
+            let list = world.ark_pose().map(|pose| pose.list);
+            dropped |= world.ark_lift() < 0 && list == Some(0x13);
+            landed |= world.ark_lift() == 0 && list == Some(0x14);
+        }
+        assert!(dropped && landed, "{:?}", rom.revision());
+        assert!(!world.ark_blinks(), "{:?}", rom.revision());
+        assert!(!world.pad_locked(), "{:?}", rom.revision());
+        assert_eq!(world.ark_pose(), None, "{:?}", rom.revision());
+    }
+}
+
+#[test]
 fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
     // Rows 39+ of `$10F` have no exit: damage, then the last safe spot.
     for rom in roms() {

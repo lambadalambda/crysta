@@ -252,13 +252,13 @@ impl PandoraSprites {
         }
         // Ark's resources (`$80:A24F`) and the lists the runtime shows:
         // the carry, the stairs and the lift, the fall (`$18`), the drop
-        // (`$13`, `$15`), the level up (`$1D`, then 2's `$20`), the rope's
-        // lean (1's 6, 7; its walk and stand hold the spear,
+        // (`$13`, `$15`; the landing's `$14`), the level up (`$1D`, then
+        // 2's `$20`), the rope's lean (1's 6, 7; its walk and stand hold the spear,
         // [`Mode4Art::with_weapon`]), the Magirock and the chest's lifts
         // (3's `$18`..`$1A`, `$39`, `$3A`), the burn (5's 4, 5) and the sleep
         // (5's 7, 8).
         for (resource, selectors) in [
-            (0, &[3, 4, 5, 0x13, 0x15, 0x18, 0x1D][..]),
+            (0, &[3, 4, 5, 0x13, 0x14, 0x15, 0x18, 0x1D][..]),
             (1, &[6, 7, 9, 10, 11][..]),
             (2, &[0x20][..]),
             (
