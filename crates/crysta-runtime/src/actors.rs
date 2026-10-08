@@ -3034,10 +3034,10 @@ impl Actor {
             self.pc = operands + 2;
             return true;
         }
+        // `$0868` bit 7, a world map, probes the plane (`$80:C164`) instead;
+        // the room's cells stand in (`meta/issues/partial-cop-services.md`).
         // Blocked every way, a wall-follower would test round and round
-        // without a yield (`$11A`'s ring, `$97:B445`; natively `$0868` bit 7
-        // tests another map, not modelled): it waits a frame instead
-        // (`meta/issues/partial-cop-services.md`).
+        // without a yield, which hangs the game natively: it waits a frame.
         self.blocked_tests += 1;
         self.blocked_tests <= 4 && self.jump(bank, target)
     }
@@ -3072,34 +3072,21 @@ impl Actor {
             .collect()
     }
 
-    /// Whether the cells just beyond the actor's box toward `direction` (0
-    /// Up, 1 Down, 2 Left, 3 Right) stop it: a wall for enemies, or a body.
+    /// Whether the cells beyond the actor's box toward `direction` (0 Up,
+    /// 1 Down, 2 Left, 3 Right) stop a blocked test ([`walls::beyond`],
+    /// [`walls::stops_a_test`]): off the map, or a body on them, the bit-15
+    /// mark the runtime keeps as occupied cells.
     fn blocked_beyond(&self, direction: u8, around: &Surroundings<'_>) -> bool {
-        let [bx, bw, by, bh] = self.box_shape().map(i32::from);
-        let (x, y) = (i32::from(self.position.0), i32::from(self.position.1));
-        let (left, top, right, bottom) = (x + bx, y + by, x + bx + bw - 1, y + by + bh - 1);
-        let cells: Vec<(i32, i32)> = match direction {
-            0 => (left >> 4..=right >> 4)
-                .map(|c| (c, (top - 1) >> 4))
-                .collect(),
-            1 => (left >> 4..=right >> 4)
-                .map(|c| (c, (bottom + 1) >> 4))
-                .collect(),
-            2 => (top >> 4..=bottom >> 4)
-                .map(|r| ((left - 1) >> 4, r))
-                .collect(),
-            _ => (top >> 4..=bottom >> 4)
-                .map(|r| ((right + 1) >> 4, r))
-                .collect(),
-        };
         let layer = around.layer();
-        cells.into_iter().any(|(column, row)| {
-            layer.blocks(column, row)
-                || around
-                    .occupied
-                    .iter()
-                    .any(|&(c, r)| (i32::from(c), i32::from(r)) == (column, row))
-        })
+        walls::beyond(direction, self.position, self.box_shape())
+            .into_iter()
+            .any(|(column, row)| {
+                layer.cell(column, row).is_none_or(walls::stops_a_test)
+                    || around
+                        .occupied
+                        .iter()
+                        .any(|&(c, r)| (i32::from(c), i32::from(r)) == (column, row))
+            })
     }
 
     /// `COP 42` and `COP 44`, on cells offset from the actor's own. Returns

@@ -39,6 +39,32 @@ impl Layer<'_> {
     }
 }
 
+/// The cells a blocked test (`COP C2`..`C5`, `$80:AB2E`) probes, Up, Down,
+/// Left, Right, for the box (x offset, width, y offset, height) at `at`: a
+/// cell beyond the box's edge, from its top or left, one per 16 pixels of
+/// its width or height rounded up (`$80:C092`, `C0AD`, `C0FB`, `C116`).
+pub(super) fn beyond(direction: u8, at: (u16, u16), [ox, w, oy, h]: [i8; 4]) -> Vec<(i32, i32)> {
+    let [ox, w, oy, h] = [ox, w, oy, h].map(i32::from);
+    let (left, top) = (i32::from(at.0) + ox, i32::from(at.1) + oy);
+    let (across, down) = ((w + 15) >> 4, (h + 15) >> 4);
+    match direction {
+        0 | 1 => {
+            let row = (if direction == 0 { top - 16 } else { top + h }) >> 4;
+            (0..across).map(|n| ((left >> 4) + n, row)).collect()
+        }
+        _ => {
+            let column = (if direction == 2 { left - 16 } else { left + w }) >> 4;
+            (0..down).map(|n| (column, (top >> 4) + n)).collect()
+        }
+    }
+}
+
+/// Whether a cell word stops a blocked test (`$80:C0E2`): its high byte
+/// halved, the mark of bit 15 with it, passes below 2 and at 22.
+pub(super) const fn stops_a_test(word: u16) -> bool {
+    !matches!(word >> 9, 0 | 1 | 22)
+}
+
 /// One frame's move of `delta` from `at` for the box (x offset, width,
 /// y offset, height): x first, then y from the new x. Returns the new
 /// position and which axes were blocked (their streams stop).
@@ -156,6 +182,37 @@ mod tests {
                 gaps: true,
             };
             assert_eq!(step((24, 32), (-9, 0), BOX, &layer).1, (false, false));
+        }
+    }
+
+    #[test]
+    fn the_blocked_test_probes_a_cell_beyond_the_box_from_its_edge() {
+        // Box (-8, 16, -16, 16) at (28, 40): left 20, top 24, 16 across.
+        // Up: y 24 - 16 = 8, one cell from x 20 (`$80:C092`).
+        assert_eq!(beyond(0, (28, 40), BOX), vec![(1, 0)]);
+        // Down: y 24 + 16 = 40 (`$80:C0AD`).
+        assert_eq!(beyond(1, (28, 40), BOX), vec![(1, 2)]);
+        // Left: x 20 - 16 = 4, one cell down from y 24 (`$80:C0FB`).
+        assert_eq!(beyond(2, (28, 40), BOX), vec![(0, 1)]);
+        // Right: x 20 + 16 = 36 (`$80:C116`).
+        assert_eq!(beyond(3, (28, 40), BOX), vec![(2, 1)]);
+        // A 32-pixel box takes two cells, a 17-pixel one two as well.
+        assert_eq!(beyond(0, (28, 40), [-8, 32, -16, 16]).len(), 2);
+        assert_eq!(beyond(2, (28, 40), [-8, 16, -16, 17]).len(), 2);
+    }
+
+    #[test]
+    fn the_blocked_test_passes_only_attributes_0_1_and_22() {
+        // `$80:C0E2`: the word's high byte halved, below 2 or 22.
+        for (word, solid) in [
+            (0, false),
+            (1 << 9, false),
+            (22 << 9, false),
+            (2 << 9, true),
+            (17 << 9, true),
+            (0x8000, true),
+        ] {
+            assert_eq!(stops_a_test(word), solid, "{word:#06x}");
         }
     }
 
