@@ -196,7 +196,7 @@ the ball wave, the High Cadet). Open:
 - the Guardner's grab (`$97:C5A9`: `COP DF` on Ark, `TSB $097E`, Ark's
   `+$04` through `LDY $0DEA`) freezes at `$97:C5E5` / `$99:909B`;
 - the landing's drop on `$114` (`$90:FA4E`) and the falling pose;
-- the darts' damage; the teeter at a pit's edge.
+- the darts' damage (now modelled, `docs/darts-and-burn.md`); the teeter at a pit's edge is the rope state of `docs/tower-four.md` §2 (`$84:9C95`), modelled in `world/fall.rs`.
 
 ## 5. Proposed runtime model
 

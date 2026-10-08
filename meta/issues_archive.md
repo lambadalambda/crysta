@@ -162,3 +162,4 @@
 - [x] [Flip movement streams on the vertical axis](issues/vertical-flip-motion.md)
 - [x] [Run the per-frame life upkeep](issues/life-upkeep.md)
 - [x] [Use the rope's native collision tables](issues/rope-collision-tables.md)
+- [x] [Confirm the fall damage and the pit-edge teeter](issues/fall-damage-teeter.md)

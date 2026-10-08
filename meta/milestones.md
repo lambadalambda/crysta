@@ -200,7 +200,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
 - [Model the lips' jumps](issues/lip-jumps.md)
 - [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
-- [Confirm the fall damage and the pit-edge teeter](issues/fall-damage-teeter.md)
 - [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
 - [Run the frozen display scripts on `$03`](issues/map-03-frozen-scripts.md)
 - [Close the runtime's review edge cases](issues/runtime-review-edges.md)
