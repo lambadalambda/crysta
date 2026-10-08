@@ -433,6 +433,12 @@ impl Session {
             });
             return (ark, None);
         }
+        // A state's own pose of Ark: a fall, a drop, the rope, the burn, a
+        // level up, a lift, his script's list (`World::ark_pose`).
+        if let Some(pose) = self.world.ark_pose() {
+            let art = (pose.art(), pose.list, pose.hflip);
+            return (self.carry_frame(art, u64::from(pose.age), pose.once), None);
+        }
         // The spear's thrust plays its list once (`docs/combat-graphics.md`).
         if let Some((list, age, hflip)) = self.world.attack_pose() {
             let thrust = (crysta_runtime::art::THRUST, list, hflip);
@@ -538,8 +544,9 @@ impl Session {
         order.sort_unstable();
         for (_, _, index) in order {
             if index == usize::MAX {
-                // A push after a hit blinks him every second frame.
-                if !world.ark_blinks() && !world.falling() {
+                // A push after a hit blinks him every second frame; the
+                // fall's end hides him (`World::ark_blinks`).
+                if !world.ark_blinks() {
                     frame::draw_sprite(frame, background, camera, player, position);
                 }
                 continue;
