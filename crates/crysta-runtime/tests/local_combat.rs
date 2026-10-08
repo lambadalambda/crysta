@@ -207,6 +207,16 @@ fn killing_the_floors_blobs_opens_its_stairs() {
             .patched_cells()
             .iter()
             .any(|&(column, row, _)| (column, row) == (7, 4)));
+        // The second layer's door (`$C5`/`$C6`, `$BD`/`$BE`) slides up and
+        // its lower rows are empty.
+        let second = world.second_patched_cells();
+        for cell in [(7, 3), (8, 3), (7, 4), (8, 4)] {
+            assert!(
+                second.contains(&(cell.0, cell.1, 0)),
+                "{:?} {cell:?}: {second:?}",
+                rom.revision()
+            );
+        }
         assert!(!world.pad_locked());
     }
 }

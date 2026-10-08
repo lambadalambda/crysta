@@ -41,6 +41,7 @@ mod magirock;
 mod pots;
 mod progress;
 mod resurrection;
+mod second;
 mod shadowkeeper;
 mod status;
 mod transition;
@@ -69,6 +70,9 @@ pub struct World<'a> {
     pending_life: u16,
     /// The burn's script holding Ark ([`status`]).
     burn: Option<status::Burn>,
+    /// The second layer and the cells scripts patched in it ([`second`]).
+    second: Option<second::Layer>,
+    second_patched: Vec<(u16, u16, u16)>,
     /// Frames before an enemy can hurt Ark again.
     ark_immune: u16,
     /// The thrust lists' records and boxes.
@@ -351,6 +355,8 @@ impl<'a> World<'a> {
             down: None,
             pending_life: 0,
             burn: None,
+            second: None,
+            second_patched: Vec::new(),
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::from_rom(image),
             walking: WalkingState::new(x, y),
@@ -1037,6 +1043,7 @@ impl<'a> World<'a> {
     /// Writes the tile patches and the collision attributes scripts queued
     /// into the base room, and the walkable room over it.
     fn apply_patches(&mut self) -> Result<(), WorldError> {
+        self.apply_second();
         if self.globals.patches.is_empty() && self.globals.attributes.is_empty() {
             return Ok(());
         }
@@ -1086,6 +1093,7 @@ impl<'a> World<'a> {
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.clear_statuses();
         self.start_shadowkeeper();
+        self.load_second();
         self.apply_load_patches()?;
         self.open_opened_chests();
         self.apply_patches()?;
@@ -1108,15 +1116,18 @@ impl<'a> World<'a> {
 
     /// Applies the load's flag-gated patches on the first layer, in order: a
     /// block copy reads the grid as the entries before it left it, word by
-    /// word. The second layer's are left out: only the first layer's
-    /// collision is modelled.
+    /// word. The second layer's change its picture ([`second`]).
     fn apply_load_patches(&mut self) -> Result<(), WorldError> {
         let events = &self.globals.events;
         let flag = |flag: u16| EventFlags::Bitmap(events).get(flag) == Some(true);
         let patches = flag_patches::for_map(self.image, self.map, flag)
             .ok_or(WorldError::LoadPatches { map: self.map })?;
         let (width, height) = (self.base.width, self.base.height);
-        for patch in patches.iter().filter(|patch| !patch.second_layer) {
+        for patch in &patches {
+            if patch.second_layer {
+                self.apply_second_load_patch(&patch.patch);
+                continue;
+            }
             match patch.patch {
                 Patch::Tile { cell, tile } => {
                     self.globals
@@ -2217,6 +2228,7 @@ impl<'a> World<'a> {
         // load's own patches go on top.
         if entered.base.layer_source == self.base.layer_source {
             entered.globals.patches.clone_from(&self.patched);
+            entered.second_patched.clone_from(&self.second_patched);
             entered.apply_patches()?;
         }
         entered.finish_load()?;
@@ -2534,6 +2546,8 @@ mod tests {
             down: None,
             pending_life: 0,
             burn: None,
+            second: None,
+            second_patched: Vec::new(),
             ark_immune: 0,
             thrust_records: attack::ThrustRecords::default(),
             walking: WalkingState::new(56, 64),

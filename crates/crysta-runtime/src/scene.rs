@@ -93,6 +93,9 @@ pub struct Globals {
     /// Tile patches (`COP 44`) not yet written into the map: column, row,
     /// tile.
     pub patches: Vec<(u16, u16, u16)>,
+    /// Second-layer copies (`COP 46`, layers 1 to `$7F`) not yet made:
+    /// from cell, to cell, in order.
+    pub second_copies: Vec<((u16, u16), (u16, u16))>,
     /// Collision attributes (`COP 3F`) not yet written into the map:
     /// column, row, attribute.
     pub attributes: Vec<(u16, u16, u16)>,
@@ -255,6 +258,7 @@ impl Globals {
             presentation: None,
             counters: vec![0; 0x80],
             patches: Vec::new(),
+            second_copies: Vec::new(),
             attributes: Vec::new(),
             spawns: Vec::new(),
             next_id: 0x4000,

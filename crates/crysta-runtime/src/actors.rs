@@ -3134,9 +3134,8 @@ impl Actor {
     /// `$7F:201A`) is at most `lim`, copies row `r / 16` of the `n + 1` cells
     /// from (sx, sy) to (dx, dy), adds 16 and yields; then sleeps `wait` at
     /// the next yield and goes on. Layer 0 (own `$7F:201B`) is the first,
-    /// with its collision; the second layer's copies change only the
-    /// picture and are not modelled (`meta/issues/partial-cop-services.md`).
-    /// Returns whether execution continues.
+    /// with its collision; layers 1 to `$7F`, the second, whose copies the
+    /// world resolves (picture only). Returns whether execution continues.
     fn block_service(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
         let Some(&[n, limit, sx, sy, dx, dy, wait]) = around.image.get(operands..operands + 7)
         else {
@@ -3149,7 +3148,20 @@ impl Actor {
             self.pc = operands + 7;
             return true;
         }
-        if self.own.get(&0x201B).copied().unwrap_or(0) == 0 && around.width > 0 {
+        let layer = self.own.get(&0x201B).copied().unwrap_or(0);
+        if (1..0x80).contains(&layer) {
+            let line = u16::from(row / 16);
+            around
+                .globals
+                .second_copies
+                .extend((0..=u16::from(n)).map(|i| {
+                    (
+                        (u16::from(sx) + i, u16::from(sy) + line),
+                        (u16::from(dx) + i, u16::from(dy) + line),
+                    )
+                }));
+        }
+        if layer == 0 && around.width > 0 {
             let width = around.width;
             for i in 0..=u16::from(n) {
                 let from = (
@@ -5385,6 +5397,38 @@ mod script_service_tests {
         tick(&mut actor, &image);
         assert_eq!(actor.position.0, 56 + 6);
         assert!(actor.frozen_at().is_none());
+    }
+
+    #[test]
+    fn cop_46_on_the_second_layer_records_its_copies() {
+        // Layer 2 (own `$7F:201B`): `COP 46 1 $10 7 5 7 4 8` copies row 0
+        // of two cells, (7,5)-(8,5) to (7,4)-(8,4), then row 1 next frame.
+        let code = [2, 0x46, 1, 0x10, 7, 5, 7, 4, 8, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        actor.own.insert(0x201B, 2);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        for _ in 0..2 {
+            actor.tick(&mut Surroundings {
+                image: &image,
+                globals: &mut globals,
+                cells: &[],
+                width: 0,
+                height: 0,
+                occupied: &[],
+                player: (0, 0),
+                facing: Direction::Down,
+            });
+        }
+        assert_eq!(
+            globals.second_copies,
+            [
+                ((7, 5), (7, 4)),
+                ((8, 5), (8, 4)),
+                ((7, 6), (7, 5)),
+                ((8, 6), (8, 5))
+            ]
+        );
+        assert!(globals.patches.is_empty(), "the first layer is untouched");
     }
 
     #[test]
