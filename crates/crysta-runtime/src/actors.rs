@@ -3169,7 +3169,10 @@ impl Actor {
         }
         self.own.insert(0x201A, row.wrapping_add(16));
         self.pc = operands - 2;
-        self.state = State::Waiting(std::mem::take(&mut self.sleep));
+        // A row a frame: the step path leaves the sleep (`E+$0E`) alone.
+        if self.sleep > 0 {
+            self.state = State::Waiting(std::mem::take(&mut self.sleep));
+        }
         false
     }
 
