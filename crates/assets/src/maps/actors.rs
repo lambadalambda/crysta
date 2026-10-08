@@ -136,6 +136,38 @@ impl SpawnRecord {
     }
 }
 
+/// A map's spawn list: its bank (a normalized offset) and its address.
+fn list_entry(image: &[u8], map_id: u16) -> Result<(usize, u16), ActorError> {
+    if map_id >= SUPPORTED_MAP_COUNT {
+        return Err(ActorError::MapIndex { index: map_id });
+    }
+    for table in TABLES {
+        let at = table + usize::from(map_id) * 2;
+        let head = image
+            .get(at..at + 2)
+            .ok_or(ActorError::Truncated { offset: at })?;
+        let entry = u16::from_le_bytes([head[0], head[1]]);
+        if entry != 0 {
+            return Ok((table & 0xFF_0000, entry));
+        }
+    }
+    Err(ActorError::Absent { index: map_id })
+}
+
+/// A map's spawn-list header, without decoding the records: see
+/// [`SpawnList::header`].
+///
+/// # Errors
+/// Rejects an out-of-range ID, an absent list and truncation.
+pub fn list_header(image: &[u8], map_id: u16) -> Result<[u8; 2], ActorError> {
+    let (bank, entry) = list_entry(image, map_id)?;
+    let base = bank | usize::from(entry);
+    let header = image
+        .get(base..base + 2)
+        .ok_or(ActorError::Truncated { offset: base })?;
+    Ok([header[0], header[1]])
+}
+
 /// Every positioned record in one map's spawn stream.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpawnList {
@@ -143,6 +175,7 @@ pub struct SpawnList {
     /// The list's bank, as a normalized offset.
     bank: usize,
     entry: u16,
+    header: [u8; 2],
     records: Vec<SpawnRecord>,
     world_layer: Option<WorldLayerRecord>,
 }
@@ -166,24 +199,10 @@ impl SpawnList {
     /// Rejects out-of-range IDs, absent lists, truncation, an unaccounted
     /// opcode, and budget exhaustion.
     pub fn from_rom(image: &[u8], map_id: u16) -> Result<Self, ActorError> {
-        if map_id >= SUPPORTED_MAP_COUNT {
-            return Err(ActorError::MapIndex { index: map_id });
-        }
-        let mut found = None;
-        for table in TABLES {
-            let at = table + usize::from(map_id) * 2;
-            let head = image
-                .get(at..at + 2)
-                .ok_or(ActorError::Truncated { offset: at })?;
-            let entry = u16::from_le_bytes([head[0], head[1]]);
-            if entry != 0 {
-                found = Some((table & 0xFF_0000, entry));
-                break;
-            }
-        }
-        let (bank, entry) = found.ok_or(ActorError::Absent { index: map_id })?;
+        let (bank, entry) = list_entry(image, map_id)?;
         let base = bank | usize::from(entry);
         // Two-byte list header, skipped by the loader's own INC A / INC A.
+        let header = list_header(image, map_id)?;
         let mut cursor = base + 2;
         let mut records = Vec::new();
         let mut world_layer = None;
@@ -234,6 +253,7 @@ impl SpawnList {
                     map_id,
                     bank,
                     entry,
+                    header,
                     records,
                     world_layer,
                 });
@@ -377,6 +397,14 @@ impl SpawnList {
     #[must_use]
     pub const fn entry(&self) -> u16 {
         self.entry
+    }
+    /// The list's two header bytes, which the map's load reads
+    /// (`$86:955C`): the first is `$048A`'s high byte unless `$FF` (bit 7:
+    /// a tower floor, where Ark fights; bit 6 also clears the counter at
+    /// `$0646`), the second goes to `$86:8C61`.
+    #[must_use]
+    pub const fn header(&self) -> [u8; 2] {
+        self.header
     }
     /// Every positioned record, in stream order.
     #[must_use]
@@ -563,6 +591,16 @@ mod tests {
             bytes,
             offset,
         }
+    }
+
+    #[test]
+    fn the_list_header_is_kept() {
+        // Map 1's list at `$82:9000`: header `80 07`, then the end.
+        let mut image = vec![0; 0x03_0000];
+        image[0x02_8002..0x02_8004].copy_from_slice(&[0x00, 0x90]);
+        image[0x02_9000..0x02_9004].copy_from_slice(&[0x80, 0x07, 0xFF, 0x00]);
+        let list = SpawnList::from_rom(&image, 1).unwrap();
+        assert_eq!(list.header(), [0x80, 0x07]);
     }
 
     #[test]

@@ -313,7 +313,7 @@ box's first pixel, right and down its last pixel (`$80:E7A4`, `E796`: −1).
 Blocking: `t = $80:E11C[(word >> 9) & $1F]` (word bit 15, the dynamic bit,
 is masked out, so body stamps of `COP 3B` do not block enemies).
 `t = $FFFF` blocks; `t = $8000` (attribute 2, door gaps) blocks only when
-`$048A & $8000` (set in `$101`, measured). Passable: attributes 0, 1, 17,
+`$048A & $8000` (a tower floor: the spawn list's first header byte, `$86:957B`). Passable: attributes 0, 1, 17,
 22 (2). Everything else blocks, also slopes 6/7, stairs 29, and 12-16.
 
 Blocked axis (any cell blocks): clamp, return carry.

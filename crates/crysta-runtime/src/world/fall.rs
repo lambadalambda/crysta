@@ -252,12 +252,14 @@ impl World<'_> {
             }
         }
         // `$84:D4F4`: a thirty-second of the most life, at least 4; Ark keeps
-        // 1 (guesses). Natively only while `$048A` bit 15 is set (always here).
-        let stats = self.globals.slot.stats();
-        let lost = (stats.max_life / 32).max(4);
-        self.globals
-            .slot
-            .set_life(stats.life.saturating_sub(lost).max(1));
+        // 1 (guesses). Only on a tower floor (`$048A` bit 15).
+        if self.globals.tower_floor() {
+            let stats = self.globals.slot.stats();
+            let lost = (stats.max_life / 32).max(4);
+            self.globals
+                .slot
+                .set_life(stats.life.saturating_sub(lost).max(1));
+        }
         if let Some((safe, facing)) = self.safe {
             let settled = settle(safe, facing);
             let under = samples(settled).map(|cell| self.attribute(cell));

@@ -312,6 +312,15 @@ impl Globals {
         write_flag(&mut self.events, word);
     }
 
+    /// Whether the map is a tower floor: `$048A & $8000`, from the spawn
+    /// list's header ([`crate::residents::map_mode`]).
+    #[must_use]
+    pub fn tower_floor(&self) -> bool {
+        self.scratch
+            .get(&crate::actors::MAP_MODE)
+            .is_some_and(|mode| mode & 0x8000 != 0)
+    }
+
     /// Takes one `item` (`$8D:96A0`); `false` when none is held. When its
     /// last one goes and it is the item in use, nothing is in use any more
     /// (`$8D:96CB`).

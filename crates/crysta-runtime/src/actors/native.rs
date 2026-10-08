@@ -207,9 +207,9 @@ const SCRATCH: [(u16, u16); 13] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
-    // An engine word the runtime does not read: the spear's grant sets and
-    // clears its bit 8 (`$89:DA96`, `$89:DA31`); bit 15 places windows.
-    (0x048A, 0x048B),
+    // The map's mode, which a map's load sets ([`crate::residents::map_mode`]);
+    // the spear's grant sets and clears its bit 8 (`$89:DA96`, `$89:DA31`).
+    (MAP_MODE, MAP_MODE + 1),
     // The pending map (`$90:8B0F`), which the world takes after the run,
     // and the tower's index (`$04CC`, `$90:8B31`).
     (PENDING_MAP, PENDING_MAP + 1),
@@ -238,6 +238,8 @@ const SCRATCH: [(u16, u16); 13] = [
     (0x045A, 0x045B),
 ];
 
+/// `$048A`, the map's mode: bit 15 a tower floor.
+pub const MAP_MODE: u16 = 0x048A;
 /// `$097E`, Ark's state gates.
 pub const ARK_GATES: u16 = 0x097E;
 /// `$047C`, the map a script asks for next (`$90:8B0C`).

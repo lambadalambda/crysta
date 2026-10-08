@@ -66,5 +66,5 @@ unsupported**, from 22 / 42 / 15 / 9. The one left is map `$1D`'s native
 code address. The seven house sources and the Pandora requests decode as
 before.
 
-Not modelled: `$85964D` also reads a signed word at `$048A`, not identified,
-before comparing the player's row against the camera.
+`$85964D` also reads `$048A`, the map's mode: negative on a tower floor,
+where the window stays at the bottom (the app's `content_origin`).

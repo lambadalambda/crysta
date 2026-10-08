@@ -26,8 +26,8 @@ mod walls;
 pub(crate) use foe::helper;
 pub use native::{
     Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, CURRENT_MAP,
-    ENEMIES, FRAMES, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE,
-    WINDOW_BUSY,
+    ENEMIES, FRAMES, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP,
+    PRIME_BLUE, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -661,6 +661,18 @@ pub struct Surroundings<'a> {
     pub facing: Direction,
 }
 
+impl Surroundings<'_> {
+    /// The map's first layer as the wall tests see it.
+    fn layer(&self) -> walls::Layer<'_> {
+        walls::Layer {
+            cells: self.cells,
+            width: self.width,
+            height: self.height,
+            gaps: self.globals.tower_floor(),
+        }
+    }
+}
+
 /// One resident's running script and where it has put them.
 #[allow(clippy::struct_excessive_bools)] // independent actor bits, not a state
 #[derive(Debug, Clone)]
@@ -1096,11 +1108,7 @@ impl Actor {
         if !self.foe_frame(around.image, &mut around.globals.random) {
             self.frame(around);
         }
-        self.settle(&walls::Layer {
-            cells: around.cells,
-            width: around.width,
-            height: around.height,
-        });
+        self.settle(&around.layer());
         self.walked |= self.walking || self.position != start;
     }
 
@@ -2950,10 +2958,10 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                // Bit 0 asks `$048A & $8000` too (`$80:902D`), not modelled
-                // (`meta/issues/partial-cop-services.md`).
+                // Bit 0 asks for a tower floor instead (`$80:902D`).
+                let floor = mask & 1 == 0 || around.globals.tower_floor();
                 let mask = mask & !1;
-                if around.globals.pad & mask == mask {
+                if floor && around.globals.pad & mask == mask {
                     return self.jump(bank, target);
                 }
                 self.pc = operands + 4;
@@ -3084,11 +3092,7 @@ impl Actor {
                 .map(|r| ((right + 1) >> 4, r))
                 .collect(),
         };
-        let layer = walls::Layer {
-            cells: around.cells,
-            width: around.width,
-            height: around.height,
-        };
+        let layer = around.layer();
         cells.into_iter().any(|(column, row)| {
             layer.blocks(column, row)
                 || around
@@ -4984,6 +4988,31 @@ mod script_service_tests {
             let (image, mut actor) = actor_running(&code_with_gap);
             tick_held(&mut actor, &image, pad);
             assert_eq!(actor.selector, selector, "pad {pad:#06x}");
+        }
+    }
+
+    #[test]
+    fn cop_2b_with_bit_0_jumps_only_on_a_tower_floor() {
+        // COP 2B $0081 (A and bit 0) to $8020; pose 7; ...; $8020: pose 9.
+        let mut code = vec![2, 0x2B, 0x81, 0x00, 0x20, 0x80, 2, 0x80, 7, 2, 0xBD];
+        code.resize(0x20, 0);
+        code.extend_from_slice(&[2, 0x80, 9, 2, 0xBD]);
+        for (mode, selector) in [(0, 7), (0x8000, 9)] {
+            let (image, mut actor) = actor_running(&code);
+            let mut globals = Globals::with_events(vec![0; 512]);
+            globals.pad = 0x0080;
+            globals.scratch.insert(MAP_MODE, mode);
+            actor.tick(&mut Surroundings {
+                image: &image,
+                globals: &mut globals,
+                cells: &[],
+                width: 0,
+                height: 0,
+                occupied: &[],
+                player: (0, 0),
+                facing: Direction::Down,
+            });
+            assert_eq!(actor.selector, selector, "mode {mode:#06x}");
         }
     }
 

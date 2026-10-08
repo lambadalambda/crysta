@@ -238,6 +238,25 @@ fn every_tower_floor_loads() {
 }
 
 #[test]
+fn the_spawn_lists_mark_the_tower_floors() {
+    // `$048A` bit 15, from each list's header (`$86:957B`): the floors, not
+    // the entrances, the light room or the Hole's rim.
+    for rom in roms() {
+        for (map, floor) in [
+            (0x100, false),
+            (0x101, true),
+            (0x106, false),
+            (0x123, true),
+            (0x127, false),
+        ] {
+            let world = World::enter_with_events(rom.image(), map, 128, 128, after_the_intro())
+                .unwrap_or_else(|error| panic!("{:?} {map:#x}: {error}", rom.revision()));
+            assert_eq!(world.tower_floor(), floor, "{:?} {map:#x}", rom.revision());
+        }
+    }
+}
+
+#[test]
 fn the_tower_door_leads_to_the_first_floor() {
     // `$81:C2EE`: cell (15,54) 2x2, selector `$62` -> `$101`, natively
     // arriving at (128,623) (`tools/tower-approach-qualification/TOWER.md`).

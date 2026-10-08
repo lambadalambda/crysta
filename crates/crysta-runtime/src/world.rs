@@ -1056,10 +1056,26 @@ impl<'a> World<'a> {
         Ok(())
     }
 
+    /// Whether the map is a tower floor (`$048A & $8000`), where Ark
+    /// fights.
+    #[must_use]
+    pub fn tower_floor(&self) -> bool {
+        self.globals.tower_floor()
+    }
+
     /// The end of a map load (`$8D:8C0C`): the flag-gated tile patches
     /// ([`assets::maps::flag_patches`]) go on the grid as it stands, the
     /// loading script's music is selected, then the pots are found.
     fn finish_load(&mut self) -> Result<(), WorldError> {
+        let events = EventFlags::Bitmap(&self.globals.events);
+        let previous = self.globals.scratch.get(&crate::actors::MAP_MODE);
+        let mode = crate::residents::map_mode(
+            self.image,
+            self.map,
+            events,
+            previous.copied().unwrap_or(0),
+        );
+        self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.start_shadowkeeper();
         self.apply_load_patches()?;
         self.open_opened_chests();

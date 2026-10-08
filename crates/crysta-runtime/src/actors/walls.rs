@@ -9,24 +9,33 @@ pub(super) struct Layer<'a> {
     pub(super) cells: &'a [u16],
     pub(super) width: u16,
     pub(super) height: u16,
+    /// Whether the door gaps block: `$048A & $8000`, a tower floor.
+    pub(super) gaps: bool,
 }
 
 impl Layer<'_> {
     /// Whether the cell at (column, row) stops an enemy: every attribute
     /// but 0, 1, 17 and 22 (`$80:E11C`). Attribute 2, the door gaps, blocks
-    /// only with `$048A & $8000`, which the towers set; it blocks here.
-    /// Cells off the map block.
+    /// only with `$048A & $8000`, which the tower floors set. Cells off the
+    /// map block.
     pub(super) fn blocks(&self, column: i32, row: i32) -> bool {
-        let (Ok(column), Ok(row)) = (u16::try_from(column), u16::try_from(row)) else {
-            return true;
-        };
+        self.cell(column, row)
+            .is_none_or(|word| match (word >> 9) & 0x1F {
+                0 | 1 | 17 | 22 => false,
+                2 => self.gaps,
+                _ => true,
+            })
+    }
+
+    /// The word of the cell at (column, row); `None` off the map.
+    pub(super) fn cell(&self, column: i32, row: i32) -> Option<u16> {
+        let (column, row) = (u16::try_from(column).ok()?, u16::try_from(row).ok()?);
         if column >= self.width || row >= self.height {
-            return true;
+            return None;
         }
-        let at = usize::from(row) * usize::from(self.width) + usize::from(column);
         self.cells
-            .get(at)
-            .is_none_or(|&word| !matches!((word >> 9) & 0x1F, 0 | 1 | 17 | 22))
+            .get(usize::from(row) * usize::from(self.width) + usize::from(column))
+            .copied()
     }
 }
 
@@ -102,6 +111,7 @@ mod tests {
             cells: &cells,
             width: 4,
             height: 4,
+            gaps: true,
         };
         // The box spans x 16..32, y 16..32 at (24, 32): free inside.
         assert_eq!(
@@ -143,8 +153,24 @@ mod tests {
                 cells: &cells,
                 width: 4,
                 height: 4,
+                gaps: true,
             };
             assert_eq!(step((24, 32), (-9, 0), BOX, &layer).1, (false, false));
+        }
+    }
+
+    #[test]
+    fn door_gaps_block_only_on_a_tower_floor() {
+        // Attribute 2 (`$80:E11C`: `$8000`) blocks with `$048A & $8000`.
+        let cells = vec![2 << 9; 16];
+        for gaps in [false, true] {
+            let layer = Layer {
+                cells: &cells,
+                width: 4,
+                height: 4,
+                gaps,
+            };
+            assert_eq!(step((24, 32), (-9, 0), BOX, &layer).1, (gaps, false));
         }
     }
 }

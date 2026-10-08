@@ -18,16 +18,18 @@ const EUROPEAN_BOTTOM: (usize, usize) = (2, 19);
 const TOP: (usize, usize) = (2, 4);
 
 /// Where a page's content starts on the canvas, in `image`'s revision.
+/// `$DA`'s window (`$85:964D`) goes to the top when the player is in the
+/// screen's lower half, except on a tower floor (`$048A` negative).
 #[must_use]
 pub fn content_origin(
     image: &[u8],
     placement: Placement,
-    player_screen_y: usize,
+    (player_screen_y, tower_floor): (usize, bool),
     view_width: usize,
 ) -> (i32, i32) {
     let (column, row) = match placement {
         Placement::Top => TOP,
-        Placement::AwayFromPlayer if player_screen_y >= VIEW_HEIGHT / 2 => TOP,
+        Placement::AwayFromPlayer if !tower_floor && player_screen_y >= VIEW_HEIGHT / 2 => TOP,
         Placement::Bottom | Placement::AwayFromPlayer => {
             assets::layout::per_revision(image, BOTTOM, EUROPEAN_BOTTOM)
         }
@@ -193,7 +195,7 @@ mod tests {
                         .is_some_and(|glyph| glyph.palette == 1)
             })
             .expect("a named page that waits");
-        let origin = content_origin(image, page.placement(), 0, CLASSIC_WIDTH);
+        let origin = content_origin(image, page.placement(), (0, false), CLASSIC_WIDTH);
         let draw = |shown: usize| {
             let mut canvas = Canvas::new(CLASSIC_WIDTH);
             let typed = page.typed(image, shown);
@@ -245,19 +247,29 @@ mod tests {
     fn the_standard_window_starts_on_line_159_or_above_a_low_player() {
         let japan = [0; 16];
         assert_eq!(
-            content_origin(&japan, Placement::Bottom, 100, 256),
+            content_origin(&japan, Placement::Bottom, (100, false), 256),
             (16, 159)
         );
         assert_eq!(
-            content_origin(&japan, Placement::AwayFromPlayer, 150, 256),
+            content_origin(&japan, Placement::AwayFromPlayer, (150, false), 256),
             (16, 31)
         );
         assert_eq!(
-            content_origin(&japan, Placement::AwayFromPlayer, 50, 256),
+            content_origin(&japan, Placement::AwayFromPlayer, (50, false), 256),
+            (16, 159)
+        );
+        // On a tower floor (`$048A` negative) it stays at the bottom.
+        assert_eq!(
+            content_origin(&japan, Placement::AwayFromPlayer, (150, true), 256),
             (16, 159)
         );
         assert_eq!(
-            content_origin(&japan, Placement::Tile { column: 2, row: 23 }, 0, 400),
+            content_origin(
+                &japan,
+                Placement::Tile { column: 2, row: 23 },
+                (0, false),
+                400
+            ),
             (72 + 16, 183)
         );
     }
@@ -268,11 +280,11 @@ mod tests {
         europe[0xFFC0..0xFFCC].copy_from_slice(b"TERRANIGMA P");
         // `$C1` at base `$04C4`: row 19; `$DA` at `$0104`: row 4.
         assert_eq!(
-            content_origin(&europe, Placement::Bottom, 100, 256),
+            content_origin(&europe, Placement::Bottom, (100, false), 256),
             (16, 151)
         );
         assert_eq!(
-            content_origin(&europe, Placement::AwayFromPlayer, 150, 256),
+            content_origin(&europe, Placement::AwayFromPlayer, (150, false), 256),
             (16, 31)
         );
     }

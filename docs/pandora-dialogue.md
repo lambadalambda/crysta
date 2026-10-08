@@ -96,7 +96,7 @@ residents use them. Unknown controls, geometry and calls fail closed.
 
 | Addition | Source behavior and finite compiler interpretation |
 | --- | --- |
-| `$DA → $85964D` | Chooses bottom `$0DB6=$0504/$0DB4=$6A80` if signed `$048A` is negative or `$0954-$0822-$70` is negative; otherwise top `$0104/$6880`. Both use 28×6 tiles. Content is compiled page-relative; the page's `Placement::AwayFromPlayer` tells the host which anchor applies. |
+| `$DA → $85964D` | Chooses bottom `$0DB6=$0504/$0DB4=$6A80` if signed `$048A` (the map's mode: a tower floor) is negative or `$0954-$0822-$70` is negative; otherwise top `$0104/$6880`. Both use 28×6 tiles. Content is compiled page-relative; the page's `Placement::AwayFromPlayer` tells the host which anchor applies. |
 | `$C2 → $85982D` | Four operands are tile column, row, width, height. The Pandora tuple `(6,6,24,6)` produces 192×48 content at native `$0DB6=$018C/$0DB4=$68C0`. Any on-screen tuple with a glyph row is admitted since the Crysta slice needed `(3,3,25,6)`; the page records `Placement::Tile`. |
 | `$C4 00 → $8598B7` | Sets `$0DA4` bit4; `$C4 01` clears it. `$85947F..95BC` transforms each planar pair `a,b` to `a^(a&b), b^(a&b)`: index3 becomes0, indices0/1/2 remain unchanged. This is **not scaling**. Odd-half-tile packing fills with zero; `$8595BD` clears to tile0. `$859EB1` preserves bit4 through page resets. |
 | `$CC → $859A13` | Little-endian long text call; `$859ECA` stores the banked return after three operand bytes. Nested `$D4` returns to that address, not a page boundary. Depth remains bounded at eight. |

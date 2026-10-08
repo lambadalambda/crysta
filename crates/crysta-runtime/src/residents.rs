@@ -7,7 +7,7 @@
 
 use assets::layout;
 use assets::maps::actor_script::{self, ScriptEffects};
-use assets::maps::actors::{descriptor_owner, ResolveError, SpawnList};
+use assets::maps::actors::{descriptor_owner, list_header, ResolveError, SpawnList};
 use assets::maps::scripts::EventFlags;
 use assets::sprites::{HouseActor, ResidentPose};
 use assets::text::{DialoguePage, HouseDialogue};
@@ -171,6 +171,35 @@ pub fn residents(
         .collect())
 }
 
+/// `$048A` after `map` loads, from the word before: the spawn list's first
+/// header byte becomes its high byte and clears the low one unless it is
+/// `$FF` (`$86:957B`), then the player's record ORs in its byte 3
+/// (`$80:F614`, `$80:F8E1`). Bit 15 marks a tower floor. Without a list
+/// the word stays (`$86:9575`); a list whose records do not resolve adds
+/// no player's byte.
+#[must_use]
+pub fn map_mode(image: &[u8], map: u16, events: EventFlags<'_>, previous: u16) -> u16 {
+    let Ok(header) = list_header(image, map) else {
+        return previous;
+    };
+    let player = SpawnList::resolve(image, map, events)
+        .ok()
+        .and_then(|records| {
+            let player = records.iter().find(|record| record.opcode() == 0xFD)?;
+            player.bytes().get(3).copied()
+        });
+    next_mode(previous, header[0], player.unwrap_or(0))
+}
+
+fn next_mode(previous: u16, high: u8, player: u8) -> u16 {
+    let loaded = if high == 0xFF {
+        previous
+    } else {
+        u16::from(high) << 8
+    };
+    loaded | u16::from(player)
+}
+
 /// Whether the resident's entry script removes them under these flags.
 ///
 /// A script the walker cannot follow is kept: a refusal is not evidence of
@@ -242,4 +271,18 @@ fn collect(image: &[u8], bank: u32, effects: &[ScriptEffects]) -> Conversation {
         }
     }
     Conversation::Silent
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_map_mode_takes_the_header_and_the_players_byte() {
+        // A tower floor: `$80`, the old low byte cleared, the player's 1.
+        assert_eq!(next_mode(0x0021, 0x80, 1), 0x8001);
+        // `$FF` keeps the word, and the player's byte goes on top.
+        assert_eq!(next_mode(0x8020, 0xFF, 1), 0x8021);
+        assert_eq!(next_mode(0x8001, 0x00, 0), 0);
+    }
 }

@@ -2,7 +2,7 @@
 
 ## Summary
 
-A fall without a floor below costs a thirty-second of the most life, at least 4, and keeps Ark at 1 (guesses); the `$048A` bit 15 gate is taken as always set. The teeter at a pit's edge is not modelled.
+A fall without a floor below costs a thirty-second of the most life, at least 4, and keeps Ark at 1 (guesses); the `$048A` bit 15 gate is modelled (a tower floor, from the spawn list's header). The teeter at a pit's edge is not modelled.
 
 ## Dependencies
 
