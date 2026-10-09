@@ -147,11 +147,31 @@ fn start_player(cartridge: &rom::Rom) -> Result<music::Player, String> {
     .map_err(|error| error.to_string())
 }
 
+/// `at:D:200:700`: re-enters map `$000D` at (200,700).
+fn enter_at(session: &mut Session, image: &'static [u8], place: &str) {
+    let mut parts = place.split(':');
+    let parsed = (
+        parts.next().and_then(|v| u16::from_str_radix(v, 16).ok()),
+        parts.next().and_then(|v| v.parse::<u16>().ok()),
+        parts.next().and_then(|v| v.parse::<u16>().ok()),
+    );
+    let (Some(map), Some(x), Some(y)) = parsed else {
+        eprintln!("bad placement in {place:?}");
+        std::process::exit(2);
+    };
+    session.world = World::enter(image, map, x, y).unwrap_or_else(|error| {
+        eprintln!("cannot enter {map:#06x}: {error}");
+        std::process::exit(1);
+    });
+    session.background_clock = background::VisitClock::new(map);
+}
+
 /// Runs a step script and writes the composed view as a PPM.
 ///
 /// The script is comma-separated: `down:400` walks 400 frames down, `wait:5`
 /// stands for 5, `talk` presses the interact button once, and `at:D:200:700`
-/// re-enters map `$000D` at (200,700) to look at a room directly.
+/// re-enters map `$000D` at (200,700) to look at a room directly, and
+/// `life:999` sets Ark's life.
 fn screenshot(
     cartridge: &rom::Rom,
     image: &'static [u8],
@@ -161,21 +181,14 @@ fn screenshot(
     let mut session = Session::new(image);
     for step in script.split(',').filter(|step| !step.is_empty()) {
         if let Some(rest) = step.strip_prefix("at:") {
-            let mut parts = rest.split(':');
-            let parsed = (
-                parts.next().and_then(|v| u16::from_str_radix(v, 16).ok()),
-                parts.next().and_then(|v| v.parse::<u16>().ok()),
-                parts.next().and_then(|v| v.parse::<u16>().ok()),
-            );
-            let (Some(map), Some(x), Some(y)) = parsed else {
-                eprintln!("bad placement in {step:?}");
-                std::process::exit(2);
-            };
-            session.world = World::enter(image, map, x, y).unwrap_or_else(|error| {
-                eprintln!("cannot enter {map:#06x}: {error}");
-                std::process::exit(1);
-            });
-            session.background_clock = background::VisitClock::new(map);
+            enter_at(&mut session, image, rest);
+            continue;
+        }
+        if let Some(life) = step
+            .strip_prefix("life:")
+            .and_then(|v| v.parse::<u16>().ok())
+        {
+            session.world.set_life(life);
             continue;
         }
         let (what, count) = step.split_once(':').unwrap_or((step, "1"));

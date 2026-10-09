@@ -723,8 +723,9 @@ fn draw_dialogue(
 /// palette field, or a list of the helper art drawn over it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpriteKey {
-    /// A body's sequence.
-    Body(usize, u8, bool, u8),
+    /// A body's sequence: its record and descriptor (spawns share record
+    /// 0), selector, mirror and palette.
+    Body(usize, Option<usize>, u8, bool, u8),
     /// The helper art's list: an explosion, a dropped gem.
     Overlay(u32, u8),
 }
@@ -765,7 +766,13 @@ fn resident_animation<'s>(
     }
     let (selector, hflip, palette) = (resident.selector, resident.hflip, resident.palette);
     sprites
-        .entry(SpriteKey::Body(resident.record, selector, hflip, palette))
+        .entry(SpriteKey::Body(
+            resident.record,
+            resident.descriptor,
+            selector,
+            hflip,
+            palette,
+        ))
         .or_insert_with(|| {
             body.shown(image, (selector, hflip), palette)
                 .or_else(|_| body.shown(image, (body.initial(), hflip), palette))
