@@ -22,3 +22,4 @@ Towers 2 and 3: the gate rule, floor switches, jewel statues, moving blocks, til
 - Tower 3 plays from `$10E` to the resurrection: pits and falls, `COP 3F` floors, pedestals, the ball wave, the High Cadet (`docs/tower-three.md`).
 - The Guardners (drawn, hit, sleep and vacuum, transfer back down the tower).
 - Open: the landing's drop on `$114`, the darts' damage.
+- Done (2026-10-09): the landing on `$114` (`world/landing.rs`) and the darts' hits (traced) close the last items.

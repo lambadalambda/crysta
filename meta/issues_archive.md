@@ -168,3 +168,6 @@
 - [x] [Model the lips' jumps](issues/lip-jumps.md)
 - [x] [Give the darts their damage and Ark the burn status](issues/darts-and-burn.md)
 - [x] [Run Shadowkeeper's scripts natively](issues/shadowkeeper-scripts.md)
+- [x] [Play towers 2 and 3](issues/towers-two-three.md)
+- [x] [Play tower 4](issues/tower-four.md)
+- [x] [Weave the cape and play tower 5](issues/tower-five.md)
