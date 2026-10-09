@@ -516,8 +516,10 @@ impl Session {
 
     /// Composes the view: background, depth-sorted sprites, then dialogue.
     ///
-    /// Depth is world Y, ties broken by spawn order with later records first
-    /// and the player last, which is what every frozen tie rank encodes. The
+    /// Depth is world Y as `+$06`'s depth bits move it
+    /// (`Resident::draw_depth`), ties broken by spawn order with later
+    /// records first and the player last, which is what every frozen tie
+    /// rank encodes. The
     /// count includes residents that draw nothing, which keeps the relative
     /// order and only inflates the player's rank. Whatever lies outside the
     /// map's region is blanked before the dialogue goes on top.
@@ -557,12 +559,12 @@ impl Session {
         let clouds = background;
         let background = &background.frame;
         let count = residents.len();
-        let mut order: Vec<(u16, usize, usize)> = residents
+        let mut order: Vec<(i32, usize, usize)> = residents
             .iter()
             .enumerate()
-            .map(|(index, resident)| (resident.position.1, count - 1 - index, index))
+            .map(|(index, resident)| (resident.draw_depth(), count - 1 - index, index))
             .collect();
-        order.push((position.1, count, usize::MAX));
+        order.push((i32::from(position.1), count, usize::MAX));
         order.sort_unstable();
         for (_, _, index) in order {
             if index == usize::MAX {
