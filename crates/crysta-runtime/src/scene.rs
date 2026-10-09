@@ -123,6 +123,8 @@ pub struct Globals {
     pub enemy_hold: u16,
     /// Tower 5's top's darkness, set up by its intro (`COP AA $8F:8182`).
     pub torch_darkness: bool,
+    /// The OBJ colours scripts loaded (`COP 5A`).
+    pub obj_colours: crate::colours::ObjColours,
     /// Group roots whose groups go (`COP EB`), not yet gone, each with the
     /// spawns of this frame made before it: later ones stay.
     pub group_deletions: Vec<(u16, usize)>,
@@ -278,6 +280,7 @@ impl Globals {
             ark_push: (0, 0),
             enemy_hold: 0,
             torch_darkness: false,
+            obj_colours: crate::colours::ObjColours::default(),
             group_deletions: Vec::new(),
             marks: Vec::new(),
             audio: crate::audio::Audio::default(),

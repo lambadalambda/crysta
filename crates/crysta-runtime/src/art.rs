@@ -6,6 +6,7 @@
 //! mirrored raster is composed here from the ROM's alternate anchors rather
 //! than flipped again by a renderer.
 
+use crate::colours::ObjColours;
 use crate::residents::Resident;
 use assets::graphics::{Bgr555, Tile4bpp};
 use assets::maps::actors::SpawnList;
@@ -118,6 +119,27 @@ pub fn raster(
     palette_base: u8,
     mirror: bool,
 ) -> Result<Raster, ArtError> {
+    raster_by(frame, tiles, mirror, &|index| {
+        own_colour(palette, palette_base, index).map(|colour| (colour, index))
+    })
+}
+
+/// The colour of CGRAM `index` in a palette that starts at `base`.
+fn own_colour(palette: &[Bgr555], base: u8, index: u8) -> Option<Bgr555> {
+    index
+        .checked_sub(base)
+        .and_then(|index| palette.get(usize::from(index)))
+        .copied()
+}
+
+/// [`raster`] with each pixel's colour, and the CGRAM index it shows as,
+/// from `colour`.
+fn raster_by(
+    frame: &SpriteFrame,
+    tiles: &[Tile4bpp],
+    mirror: bool,
+    colour: &dyn Fn(u8) -> Option<(Bgr555, u8)>,
+) -> Result<Raster, ArtError> {
     let (left, top, right, bottom) = frame.bounds(mirror, false);
     // A composition without components folds to inverted bounds.
     let (Some(width), Some(height)) = (
@@ -145,14 +167,11 @@ pub fn raster(
                     if priority != ORDINARY_PRIORITY {
                         return Err(ArtError::Priority { priority });
                     }
-                    let colour = palette_index
-                        .checked_sub(palette_base)
-                        .and_then(|index| palette.get(usize::from(index)))
-                        .ok_or(ArtError::Palette {
-                            index: palette_index,
-                        })?;
+                    let (colour, shown) = colour(palette_index).ok_or(ArtError::Palette {
+                        index: palette_index,
+                    })?;
                     let [r, g, b] = colour.rgb8();
-                    let alpha = if palette_index >= MATH_PALETTES {
+                    let alpha = if shown >= MATH_PALETTES {
                         MATH_ALPHA
                     } else {
                         0xFF
@@ -498,11 +517,13 @@ impl Body {
     }
 
     /// The OBJ palette slot the body shows under a `COP BB` field: its own
-    /// plus the field, modulo 8. `None` for a list body, which keeps its own.
+    /// XOR the field, as the OAM builder writes it (`$80:EE8E`). `None` for
+    /// a list body, which keeps its own, and a mode-4 one, whose pieces
+    /// each have theirs.
     #[must_use]
     pub const fn shown_slot(&self, field: u8) -> Option<u8> {
         match &self.art {
-            BodyArt::House(actor) => Some((actor.palette_base() / 16 + field) & 7),
+            BodyArt::House(actor) => Some(((actor.palette_base() / 16) ^ field) & 7),
             BodyArt::List(..) | BodyArt::Mode4(..) => None,
         }
     }
@@ -529,7 +550,9 @@ impl Body {
 
     /// [`Self::animation`] as a `COP BB` field shows it: in the frozen
     /// palette when the field moves the body to [`FROZEN_SLOT`], in its own
-    /// otherwise (other shifted slots are not known).
+    /// otherwise (a house body's other shifted slots are not known). A mode-4 body's
+    /// pieces each show their slot XOR the field, in the colours scripts
+    /// loaded there (`colours`) or else the art's own.
     ///
     /// # Errors
     /// As [`Self::animation`].
@@ -538,15 +561,16 @@ impl Body {
         image: &[u8],
         (selector, hflip): (u8, bool),
         field: u8,
+        colours: &ObjColours,
     ) -> Result<Animation, ArtError> {
         let frozen = (field != 0 && self.shown_slot(field) == Some(FROZEN_SLOT))
             .then(|| frozen_palette(image))
             .flatten();
         let shown = match (&self.art, frozen) {
-            // Another list of the descriptor: Shadowkeeper's shots and
-            // wisps are its own spawns' poses.
-            (BodyArt::Mode4(descriptor, list, _), _) if selector != *list => {
-                Self::mode4(image, *descriptor, selector)?.animation(selector, hflip)?
+            // Every list of the descriptor: Shadowkeeper's shots and wisps
+            // are its own spawns' poses.
+            (BodyArt::Mode4(descriptor, ..), _) => {
+                Self::mode4_shown(image, *descriptor, (selector, hflip), field, colours)?
             }
             (_, Some(palette)) => self.recoloured(selector, hflip, &palette)?,
             (_, None) => self.animation(selector, hflip)?,
@@ -578,6 +602,29 @@ impl Body {
     /// The list `selector` of the object sheet at `base`.
     fn object(image: &[u8], (base, selector): (u32, u8)) -> Result<Self, ArtError> {
         Self::list(&PandoraArt::object(image, base, selector)?, selector)
+    }
+
+    /// A mode-4 list with each piece's slot XOR `field`, its colours the
+    /// loaded ones there, else the art's own there, else (a guess: CGRAM
+    /// holds the map's there) the art's own at the piece's slot.
+    fn mode4_shown(
+        image: &[u8],
+        descriptor: usize,
+        (selector, hflip): (u8, bool),
+        field: u8,
+        colours: &ObjColours,
+    ) -> Result<Animation, ArtError> {
+        let art = Mode4Art::from_rom(image, descriptor, selector)?;
+        let (palette, base) = (art.palette(), art.palette_base());
+        let colour = |index: u8| {
+            let shown = index ^ ((field & 7) << 4);
+            colours
+                .get(shown)
+                .or_else(|| own_colour(palette, base, shown))
+                .or_else(|| own_colour(palette, base, index))
+                .map(|colour| (colour, shown))
+        };
+        animate_by(art.list().frames(), art.graphics(), hflip, &colour)
     }
 
     fn mode4(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, ArtError> {
@@ -668,10 +715,22 @@ fn animate(
     (graphics, palette, base): (&[Tile4bpp], &[Bgr555], u8),
     hflip: bool,
 ) -> Result<Animation, ArtError> {
+    animate_by(frames, graphics, hflip, &|index| {
+        own_colour(palette, base, index).map(|colour| (colour, index))
+    })
+}
+
+/// [`animate`] with the colours of [`raster_by`].
+fn animate_by(
+    frames: &[HouseFrame],
+    graphics: &[Tile4bpp],
+    hflip: bool,
+    colour: &dyn Fn(u8) -> Option<(Bgr555, u8)>,
+) -> Result<Animation, ArtError> {
     Ok(Animation {
         frames: frames
             .iter()
-            .map(|frame| raster(frame.composition(), graphics, palette, base, hflip))
+            .map(|frame| raster_by(frame.composition(), graphics, hflip, colour))
             .collect::<Result<_, _>>()?,
         durations: frames.iter().map(HouseFrame::duration).collect(),
     })

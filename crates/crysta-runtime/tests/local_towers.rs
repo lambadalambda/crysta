@@ -1,6 +1,8 @@
 //! The towers on the underworld map (`docs/tower-entry.md`,
 //! `docs/world-map-mode7.md`), on both ROMs.
 
+use assets::maps::scripts::EventFlags;
+use crysta_runtime::art::residents_art;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use rom::{Revision, Rom};
@@ -1576,6 +1578,55 @@ fn shadowkeeper_falls_in_its_native_stages_and_the_tower_ends() {
             );
         }
         assert_eq!(world.map(), 0x0106, "{:?}", rom.revision());
+    }
+}
+
+#[test]
+fn shadowkeepers_shots_show_the_green_its_body_loaded() {
+    // `$93:D895`: `COP 5A` loads 12 greens to OBJ colours `$82..$8D`; a
+    // shot's pieces are in palette 7 and its field 7 (`COP BB $0E`): the
+    // OAM builder XORs them (`$80:EE8E`) to palette 0.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x101..=0x107).chain([0x19B]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 128, 300, events).unwrap();
+        world.set_life(999);
+        let mut shot = None;
+        for frame in 0..1500 {
+            let up = (frame < 30).then_some(Direction::Up);
+            world.update(up, Presses::default()).unwrap();
+            shot = world
+                .residents()
+                .iter()
+                .position(|resident| resident.palette == 7 && resident.selector == 5);
+            if shot.is_some() {
+                break;
+            }
+        }
+        let shot = shot.unwrap_or_else(|| panic!("{:?}: no shot", rom.revision()));
+        let events = EventFlags::Bitmap(world.events());
+        let spawned = EventFlags::Bitmap(world.spawn_events());
+        let bodies = residents_art(rom.image(), 0x0123, world.residents(), spawned, events);
+        let resident = &world.residents()[shot];
+        let shown = bodies[shot]
+            .as_ref()
+            .unwrap()
+            .shown(rom.image(), (5, resident.hflip), 7, world.obj_colours())
+            .unwrap();
+        let greens: Vec<u32> = (0x82..=0x8D)
+            .map(|index| {
+                let [r, g, b] = world.obj_colours().get(index).unwrap().rgb8();
+                0xFF00_0000 | u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
+            })
+            .collect();
+        let pixels = &shown.frames[0].pixels;
+        assert!(
+            pixels.iter().any(|pixel| greens.contains(pixel)),
+            "{:?}",
+            rom.revision()
+        );
     }
 }
 

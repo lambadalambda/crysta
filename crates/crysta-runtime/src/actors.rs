@@ -548,6 +548,9 @@ const MOVE_Y: u8 = 0xB2;
 const OBJ_PRIORITY: u8 = 0xBA;
 /// The palette field.
 const PALETTE: u8 = 0xBB;
+/// Colours from the ROM into CGRAM (`$80:9AEB`): bank, word, index,
+/// count; the OBJ ones go to [`crate::colours::ObjColours`].
+const LOAD_COLOURS: u8 = 0x5A;
 /// Player tests against Ark's probe (x, y - 8) (`docs/enemy-scripts.md`):
 /// jump when it is within a distance on both axes (`$80:B474`).
 const PLAYER_NEAR: u8 = 0xD6;
@@ -1854,6 +1857,7 @@ impl Actor {
             CHAINED_BRANCH | CHAINED_DESPAWN => {
                 return self.branch_on_chain(service, operands, bank, around)
             }
+            LOAD_COLOURS => return self.load_colours(operands, around),
             // Anything else is stepped over by its derived length. That
             // includes text and flag writes: the loop's ambient effects
             // are not the runtime's to apply from here.
@@ -1870,6 +1874,18 @@ impl Actor {
                 self.pc = operands + length;
             }
         }
+        true
+    }
+
+    /// `COP 5A`: the OBJ colours into [`crate::colours::ObjColours`].
+    /// Returns whether execution continues.
+    fn load_colours(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
+        self.cadence = None;
+        if !around.globals.obj_colours.load(around.image, operands) {
+            self.state = State::Frozen;
+            return false;
+        }
+        self.pc = operands + 5;
         true
     }
 
@@ -5631,6 +5647,19 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&[2, 0xBB, 0x0E, 2, 0xBD]);
         tick(&mut actor, &image);
         assert_eq!((actor.palette, actor.priority), (7, 2));
+        assert!(actor.frozen_at().is_none());
+    }
+
+    #[test]
+    fn cop_5a_loads_obj_colours() {
+        // COP 5A $88 $8009 $90 1 (`$80:9AEB`): one colour to CGRAM `$90`;
+        // yield; the colour.
+        let code = [2, 0x5A, 0x88, 0x09, 0x80, 0x90, 1, 2, 0xBD, 0x34, 0x12];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        let colour = assets::graphics::Bgr555::new(0x1234);
+        assert_eq!(globals.obj_colours.get(0x90), Some(colour));
         assert!(actor.frozen_at().is_none());
     }
 

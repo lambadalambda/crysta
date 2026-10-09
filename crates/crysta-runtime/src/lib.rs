@@ -19,6 +19,7 @@ use std::fmt;
 pub mod actors;
 pub mod art;
 pub mod audio;
+pub mod colours;
 pub mod combat;
 pub mod display;
 pub mod inventory;

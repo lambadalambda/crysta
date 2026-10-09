@@ -1132,6 +1132,7 @@ impl<'a> World<'a> {
         self.clear_statuses();
         (self.globals.camera_target, self.globals.enemy_hold) = (None, 0);
         self.globals.torch_darkness = false;
+        self.globals.obj_colours = crate::colours::ObjColours::default();
         self.start_landing();
         self.load_second();
         self.apply_load_patches()?;
@@ -1604,6 +1605,12 @@ impl<'a> World<'a> {
     #[must_use]
     pub const fn money(&self) -> u32 {
         self.globals.inventory.money()
+    }
+
+    /// The OBJ colours scripts loaded since the map did (`COP 5A`).
+    #[must_use]
+    pub const fn obj_colours(&self) -> &crate::colours::ObjColours {
+        &self.globals.obj_colours
     }
 
     /// Sets an event flag as `COP 07` would; for hosts and tests.

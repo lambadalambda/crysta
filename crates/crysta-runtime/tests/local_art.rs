@@ -3,6 +3,7 @@
 use assets::maps::actors::SpawnList;
 use assets::maps::scripts::EventFlags;
 use crysta_runtime::art::{residents_art, ArkAtlas, Placeholder, Raster};
+use crysta_runtime::colours::ObjColours;
 use crysta_runtime::residents::{residents, Resident};
 use crysta_runtime::world::World;
 use crysta_runtime::MAPS;
@@ -598,7 +599,12 @@ fn the_frozen_townsfolk_draw_in_obj_palette_3() {
         // As the hosts show it: in palette 3, which colour math does not
         // take (alpha `$FF`).
         let raster = body
-            .shown(image, (resident.selector, resident.hflip), resident.palette)
+            .shown(
+                image,
+                (resident.selector, resident.hflip),
+                resident.palette,
+                &ObjColours::default(),
+            )
             .unwrap()
             .frame_at(0)
             .clone();
