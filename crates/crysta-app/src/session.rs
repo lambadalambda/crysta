@@ -7,6 +7,7 @@ use assets::text::window::WindowArt;
 use crysta_runtime::art::{
     residents_art, Animation, ArkAtlas, Body, CarryArt, Placeholder, Raster,
 };
+use crysta_runtime::colours::ObjColours;
 use crysta_runtime::records::View;
 use crysta_runtime::restart::{Outcome, Restart};
 use crysta_runtime::scene::Presses;
@@ -62,6 +63,9 @@ pub struct Session {
     /// Rasterized sequences by record, selector, mirror and palette field;
     /// `None` when the packet has no such sequence.
     pub sprites: HashMap<SpriteKey, Option<Animation>>,
+    /// The OBJ colours `sprites` were rasterized in; a `COP 5A` load
+    /// clears them.
+    pub sprite_colours: ObjColours,
     /// Ark's carry poses and the pots; `None` when the decoder refused them,
     /// and then Ark carries in his ordinary frames and no pot is drawn.
     pub carry_art: Option<CarryArt>,
@@ -116,6 +120,7 @@ impl Session {
             background_clock: background::VisitClock::new(START.0),
             art: None,
             sprites: HashMap::new(),
+            sprite_colours: ObjColours::default(),
             carry_art: CarryArt::from_rom(image)
                 .inspect_err(|error| eprintln!("carry poses unavailable: {error}"))
                 .ok(),
@@ -380,6 +385,14 @@ impl Session {
         }
     }
 
+    /// Drops the sprites rasterized in other OBJ colours than the world's.
+    fn ensure_sprite_colours(&mut self) {
+        if self.world.obj_colours() != &self.sprite_colours {
+            self.sprite_colours = self.world.obj_colours().clone();
+            self.sprites.clear();
+        }
+    }
+
     /// Bodies for the current roster, aligned with the world's residents.
     pub fn resident_art(&mut self) -> &[Result<Body, Placeholder>] {
         self.ensure_art();
@@ -514,6 +527,7 @@ impl Session {
         }
         self.ensure_background(cartridge);
         self.ensure_art();
+        self.ensure_sprite_colours();
         let (carried, pot) = self.carry_sprites();
         let Session {
             world,
@@ -529,7 +543,7 @@ impl Session {
         let player = carried
             .as_ref()
             .unwrap_or_else(|| atlas.frame(world.animation()));
-        let residents = world.residents();
+        let (residents, obj) = (world.residents(), world.obj_colours());
         let bodies: &[Result<Body, Placeholder>] =
             art.as_ref().map_or(&[], |(_, _, _, art)| art.as_slice());
         let Some(background) = backgrounds.get(&world.map()) else {
@@ -572,7 +586,7 @@ impl Session {
                 frame::fill(frame, (x - 8, y - 16), (16, 16), PLACEHOLDER);
             };
             match bodies.get(index) {
-                Some(Ok(body)) => match resident_animation(sprites, image, body, resident) {
+                Some(Ok(body)) => match resident_animation(sprites, image, body, resident, obj) {
                     Some(animation) => {
                         let raster = animation.frame_at(u64::from(resident.pose_age));
                         let draw = if resident.priority >= 3 {
@@ -757,6 +771,7 @@ fn resident_animation<'s>(
     image: &[u8],
     body: &Body,
     resident: &crysta_runtime::residents::Resident,
+    colours: &ObjColours,
 ) -> Option<&'s Animation> {
     if let Some((base, selector)) = resident.overlay {
         return sprites
@@ -776,8 +791,8 @@ fn resident_animation<'s>(
         ))
         .or_insert_with(|| {
             let shown = body
-                .shown(image, (selector, hflip), palette)
-                .or_else(|_| body.shown(image, (body.initial(), hflip), palette))
+                .shown(image, (selector, hflip), palette, colours)
+                .or_else(|_| body.shown(image, (body.initial(), hflip), palette, colours))
                 .ok()?;
             Some(if resident.vflip {
                 shown.flipped_vertically()
