@@ -370,6 +370,25 @@ fn tower_ones_second_layer_is_its_fixed_night_sky() {
 }
 
 #[test]
+fn shadowkeepers_mask_has_its_own_tiles_from_0x200() {
+    // `docs/tower-five.md`: `$123` and `$11B` load `$2000` bytes of tiles
+    // to VRAM `$2000` (subscript `$A5`, `$C6:57B5`): tile `$200` is solid
+    // colour 15, the fill's and the mask's outside the light pools.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    for map in [0x123u16, 0x11B] {
+        let mask = assets::maps::visual::SecondLayer::from_rom(rom.image(), map).unwrap();
+        assert_eq!(mask.tiles().len(), 256, "{map:#x}");
+        assert!(mask.tiles()[0].pixels().iter().all(|&pixel| pixel == 15));
+        // `$86:92AC`'s adjustment: the definitions name tiles from `$200`.
+        assert_eq!(mask.metatiles()[0][0].raw(), 0x1E00, "{map:#x}");
+    }
+    let rays = assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x0B).unwrap();
+    assert!(rays.tiles().is_empty());
+}
+
+#[test]
 fn every_map_s_animation_services_decode_and_the_town_s_match_its_qualified_model() {
     use assets::graphics::Bgr555;
     use assets::maps::actors::SpawnList;

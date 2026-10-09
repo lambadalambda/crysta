@@ -112,6 +112,7 @@ pub fn first_background(image: &[u8], map_id: u16) -> Result<StaticBackground, V
 pub struct SecondLayer {
     layer: StaticLayer,
     metatiles: Vec<[BgTileWord; 4]>,
+    tiles: Vec<Tile4bpp>,
     drifts: bool,
     presentation: profile::Presentation,
 }
@@ -168,18 +169,39 @@ impl SecondLayer {
             0x1000,
             true,
         )?;
+        // `$11B` and `$123` (subscript `$A5`): `$2000` bytes of their own
+        // to VRAM `$2000`, tiles `$200` on; the packet holds `$4000`.
+        let tiles = match only(ResourceKind::Graphics, &[0x00, 0x10, 0x02]) {
+            Ok(offset) => {
+                let graphics = resource(image, offset, ResourceKind::Graphics, 0x4000, true)?;
+                graphics::decode_tiles_4bpp(&graphics.decoded()[..0x2000])
+                    .map_err(VisualMapError::Graphics)?
+            }
+            Err(_) => Vec::new(),
+        };
+        // `$86:92AC` clears each word's bit 9 and ORs the layer's graphics
+        // adjustment (`$0846,X`): `$0200` where the layer has its own
+        // tiles (VRAM `$3C00` holds `$1E00` for the definitions' `$1C00`).
+        let adjustment = if tiles.is_empty() { 0 } else { 0x0200 };
         let metatiles = definitions
             .decoded()
             .chunks_exact(8)
             .map(|record| {
                 std::array::from_fn(|i| {
-                    BgTileWord::new(u16::from_le_bytes([record[i * 2], record[i * 2 + 1]]))
+                    let word = u16::from_le_bytes([record[i * 2], record[i * 2 + 1]]);
+                    let word = if adjustment == 0 {
+                        word
+                    } else {
+                        word & !0x0200 | adjustment
+                    };
+                    BgTileWord::new(word)
                 })
             })
             .collect();
         Ok(Self {
             layer,
             metatiles,
+            tiles,
             drifts: map_id == 0x000A,
             presentation: profile::presentation(&profile::display_profile(image, map_id)?),
         })
@@ -216,6 +238,13 @@ impl SecondLayer {
     #[must_use]
     pub fn metatiles(&self) -> &[[BgTileWord; 4]] {
         &self.metatiles
+    }
+
+    /// Its own tiles, from tile `$200`; empty where it uses the first
+    /// layer's alone.
+    #[must_use]
+    pub fn tiles(&self) -> &[Tile4bpp] {
+        &self.tiles
     }
 }
 
