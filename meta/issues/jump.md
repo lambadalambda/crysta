@@ -20,3 +20,8 @@ Ark's jump (B) is not modelled: `Presses` has no jump, and Ark is never in the a
 ## Notes
 
 - The first draft said the jump starts at `$84:9252` and clears `+$04` bit `$10`; both were wrong (the thrust, and "not attacking").
+
+## Progress
+
+- Done (`world/jump.rs`, `b_jumps_ark_over_a_two_cell_pit`): the frames, heights, poses, steering, sounds and the pit of the native trace `p_24` match on both ROMs. Hits pass under him while h <= -16; a hit ends the jump.
+- Left to [jump-variants](jump-variants.md): the dash, carry and rope jumps, the shadow (`$84:A917`), the jump attack. B pressed again in the air re-jumps at the landing even when released (`Presses` has no held B).

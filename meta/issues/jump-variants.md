@@ -13,6 +13,8 @@ The dash jump, the carry jump and the rope jump differ from the ground jump (`do
 - The dash jump: stream `$3A`, the dash's speed, lists `$0D`/`$0E`, the slide.
 - The carry jump: no crouch, lists `$1B`..`$22`, the pot's height.
 - The rope jump and the landing on a rope: the lean by `$0042` parity.
+- The shadow under a jump (`$84:A917`, its list by `|h|`).
+- A re-jump only while B is still held at the landing (`$0454`).
 
 ## Acceptance Criteria
 

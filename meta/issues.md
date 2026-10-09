@@ -82,7 +82,6 @@
 - [ ] [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
 - [ ] [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
 - [ ] [Draw the world map's horizon band](issues/world-map-horizon-band.md)
-- [ ] [Jump with B](issues/jump.md)
 - [ ] [Jump from a dash, with a pot and on a rope](issues/jump-variants.md)
 - [ ] [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [ ] [Spend the map loads' own frames](issues/map-load-frames.md)
