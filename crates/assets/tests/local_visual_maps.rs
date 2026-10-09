@@ -384,6 +384,27 @@ fn shadowkeepers_mask_has_its_own_tiles_from_0x200() {
         // `$86:92AC`'s adjustment: the definitions name tiles from `$200`.
         assert_eq!(mask.metatiles()[0][0].raw(), 0x1E00, "{map:#x}");
     }
+    // `COP 8A $22` (`$8F:817B`): palette 7's colours 0-14 cycle in 8 steps
+    // of 2 frames, A B C D E D C B (`$9A:96DA`).
+    let light =
+        assets::maps::visual::scene_animation::SceneAnimation::palette_service(rom.image(), 0x22)
+            .unwrap();
+    assert_eq!(
+        light.colors().collect::<Vec<_>>(),
+        (0x70..0x7F).collect::<Vec<_>>()
+    );
+    let colour = |age| {
+        let mut palette = [assets::graphics::Bgr555::new(0); 128];
+        light.apply(age, &mut [], &mut palette);
+        palette[0x71].raw()
+    };
+    assert_eq!(
+        (0..16).map(colour).collect::<Vec<_>>(),
+        [
+            0x1063, 0x1063, 0x0C42, 0x0C42, 0x0C42, 0x0C42, 0x0821, 0x0821, 0x0400, 0x0400, 0x0821,
+            0x0821, 0x0C42, 0x0C42, 0x0C42, 0x0C42
+        ]
+    );
     let rays = assets::maps::visual::SecondLayer::from_rom(rom.image(), 0x0B).unwrap();
     assert!(rays.tiles().is_empty());
 }

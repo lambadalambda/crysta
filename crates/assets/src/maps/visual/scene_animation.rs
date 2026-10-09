@@ -105,6 +105,17 @@ impl SceneAnimation {
         Ok(animation)
     }
 
+    /// The palette service's table `selector` alone, as a script runs it
+    /// (`COP 8A`, `$80:A2E3`): tower 5's top's light, `$22`.
+    ///
+    /// # Errors
+    /// As [`Self::from_records`].
+    pub fn palette_service(image: &[u8], selector: u8) -> Result<Self, VisualMapError> {
+        let mut animation = Self::default();
+        animation.palette(image, selector)?;
+        Ok(animation)
+    }
+
     fn graphics(&mut self, image: &[u8], selector: u8) -> Result<(), VisualMapError> {
         let lookup = layout::offset(image, GRAPHICS_LOOKUP).ok_or(BAD)?;
         let banks = layout::offset(image, GRAPHICS_BANKS).ok_or(BAD)?;
