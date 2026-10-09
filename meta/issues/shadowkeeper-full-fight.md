@@ -33,4 +33,5 @@
 ## Progress
 
 - The scripts run (`shadowkeeper-scripts`, archived); the stand-in is gone. The text shows; vertically flipped actors are drawn; a mode-4 body draws its other lists (the claws, the wisps, the shots).
-- Open: the darkness and window (`shadowkeeper-intro`), the OBJ palettes the parts take from `COP 5A`/`COP BB`, the depth order of `+$06` bits 11-14.
+- The OBJ palettes: `COP 5A` loads OBJ colours (`colours.rs`), `COP BB` XORs each piece's slot; the shots are green. The depth order of `+$06` bits 11-14 sorts the sprites. The wisps draw the helper art.
+- Open: the window (`shadowkeeper-intro`).
