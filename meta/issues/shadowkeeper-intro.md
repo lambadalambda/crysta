@@ -22,5 +22,6 @@
 - The intro runs (`actors/routines.rs`): the torch bits by camera band, the hold at 272, the camera's climb (`$0DEC`), flag `$001`, music 5 (`the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper`).
 - The darkness (`world/darkness.rs`): `COP AA $8182` sets it; per band of lines the app subtracts the map's mask (torch lit) or the fill, in the colour `$8F:8279` gives for the lit torches.
 - The masks' own tiles from `$200` and the graphics adjustment `$0200` (`SecondLayer::tiles`): outside the light pools the view is black, as natively.
-- Open: the head's circle window (`COP 63`, `$0474`, HDMA channels 2-3 on `$2126/7`); BG palette 7's colours 1-14 cycle (`COP 8A $22` from `$8F:816D`, table `$9A:96DA`, 8 steps of 2 frames).
+- The circle window (`world/circle.rs`: `COP 63`, `$0474`, the midpoint loop `$87:A5B3`), and BG palette 7's cycle (`COP 8A $22`, `Darkness::light`).
+- Open: a frame-by-frame check against the native trace (it has lag frames).
 

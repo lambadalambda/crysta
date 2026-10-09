@@ -279,8 +279,24 @@ The scheduler side: actors run in list order, spawns join it by kind, COP
 04 and COP 22 on `+$26`, `+$06` bit 6 keeps streams, spawned attackers take
 the parent's profile, deaths jump to `7F:1012`, writes into other actors
 (`Poke`). Both ROMs reach `$106` (`shadowkeeper_falls_in_its_native_stages_and_the_tower_ends`).
-Open: the window (HDMA), the depth bits, frame-exact timing (the native
-trace runs with lag frames).
+The hosts draw the darkness (`world/darkness.rs`), the circle window
+(`world/circle.rs`), the parts' OBJ colours (`colours.rs`) and the depth
+bits. Open: frame-exact timing (the native trace runs with lag frames).
+
+### The circle window, natively
+
+`COP 63 a r` (`$80:9CA5`): an actor with the caller as parent (`$0476`),
+`$0474 = r`. Operand `a` bit 1 picks `$87:A45B`/`$A47D` or `$A657`/`$A679`,
+bit 0 the second of each; `$A45B` first writes `CGWSEL $20`, `WOBJSEL $20`,
+`CGADSUB $B3`, `COLDATA $E7`, the head's `$A47D` (EU `$87:A43A`) nothing.
+Each frame (`$87:A4D0`, EU `$A48D`): `r = $0474 & $7E`, none at 0; the
+centre is the parent's place 16 above it; the half-widths come from a
+midpoint loop (`$87:A5B3..A647`, 16-bit error, close to but not
+`sqrt(r² - d²)`). Rows `cy - r .. cy - 1` take `d = cy - y`, rows `cy ..
+cy + r - 1` take `d = y - cy + 1`; `WH0 = max(0, cx - W)`, `WH1 = min(cx +
+W, 255) - 1`. The head's child `$93:D916` raises `$0474` by 1 a step to 70
+(a step every 2 frames), waits for `$04A6 = 2`, lowers it by 2 a step, then
+clears it (`$93:D987`).
 
 ### The darkness, natively
 
