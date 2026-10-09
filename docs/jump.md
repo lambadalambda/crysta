@@ -62,8 +62,9 @@ his place does not change with h.
   drop `$84:9EBC` at J+27.
 - Enemy hits skip Ark while h <= -16 (`$85:F856`, EU `$85:F8EE`; source
   only), J+6..J+22.
-- The shadow (`$84:A917`) stays on the ground, its list by |h| (`$84:A9F1`):
-  48 or more list 0, 24 or more list 1, else 2.
+- `$0F` comes at J+28 with no direction held, at J+29 with one held (the
+  walk starts at J+27: still, still, then a pixel at J+29).
+- The shadow: see below.
 - With a weapon, A in the loop's passes 8..18 (J+10..J+20) is the jump
   attack (`docs/combat.md`).
 
