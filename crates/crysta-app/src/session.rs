@@ -742,8 +742,9 @@ pub enum SpriteKey {
     /// A body's sequence: its record and descriptor (spawns share record
     /// 0), selector, mirror, vertical flip and palette.
     Body(usize, Option<usize>, u8, bool, bool, u8),
-    /// The helper art's list: an explosion, a dropped gem.
-    Overlay(u32, u8),
+    /// The helper art's list: an explosion, a dropped gem, a wisp; mirror
+    /// and vertical flip.
+    Overlay(u32, u8, bool, bool),
 }
 
 /// Ark at his place, or above it over the high tiles while a landing drops
@@ -776,9 +777,21 @@ fn resident_animation<'s>(
     colours: &ObjColours,
 ) -> Option<&'s Animation> {
     if let Some((base, selector)) = resident.overlay {
+        let (hflip, vflip) = (resident.hflip, resident.vflip);
         return sprites
-            .entry(SpriteKey::Overlay(base, selector))
-            .or_insert_with(|| crysta_runtime::art::overlay_animation(image, base, selector).ok())
+            .entry(SpriteKey::Overlay(base, selector, hflip, vflip))
+            .or_insert_with(|| {
+                let shown = crysta_runtime::art::overlay_animation(image, base, selector, hflip);
+                shown
+                    .map(|shown| {
+                        if vflip {
+                            shown.flipped_vertically()
+                        } else {
+                            shown
+                        }
+                    })
+                    .ok()
+            })
             .as_ref();
     }
     let (selector, hflip, palette) = (resident.selector, resident.hflip, resident.palette);
