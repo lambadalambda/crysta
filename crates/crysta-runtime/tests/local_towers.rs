@@ -1495,6 +1495,10 @@ fn the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper() {
         );
         assert_eq!(world.position(), (128, 272), "{:?}", rom.revision());
         assert_eq!(world.camera_focus().1, 192, "{:?}", rom.revision());
+        // `COP AA $8182`: the darkness, lifted where the torches burn.
+        let darkness = world.darkness().expect("the intro's darkness");
+        assert!(darkness.lit(-0x100) && darkness.lit(0x33F));
+        assert!(!darkness.lit(0x340), "{:?}", rom.revision());
         let held = held.unwrap();
         assert!(music.is_some(), "{:?}", rom.revision());
         assert_eq!(

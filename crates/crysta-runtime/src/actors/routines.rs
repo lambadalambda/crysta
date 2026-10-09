@@ -32,6 +32,9 @@ const WISP_FLIP_END: usize = 0x0F_80E7;
 const WISP_STREAM: (usize, [u8; 4]) = (0x0F_80E9, [0xAD, 0x08, 0x04, 0xDA]);
 const WISP_STREAM_END: usize = 0x0F_80FD;
 const WISP_STREAMS: usize = 0x0F_8109;
+/// `COP AA $8182` at `$8F:8011`: the darkness's child, which the hosts draw
+/// ([`crate::world::Darkness`]).
+const DARKNESS: (usize, [u8; 5]) = (0x0F_8011, [0x02, 0xAA, 0x82, 0x81, 0x8F]);
 /// `$04A4`, the lit torches.
 pub(crate) const TORCHES: u16 = 0x04A4;
 /// The body's code in the Japanese image, and how far the European one
@@ -65,6 +68,11 @@ impl Actor {
         let code = |bytes: &[u8]| image.get(at..at + bytes.len()) == Some(bytes);
         if at == CLEAR_BG3.0 && code(&CLEAR_BG3.1) {
             self.pc = at + 3;
+            return true;
+        }
+        if at == DARKNESS.0 && code(&DARKNESS.1) {
+            around.globals.torch_darkness = true;
+            self.pc = at + DARKNESS.1.len();
             return true;
         }
         if at == TORCH_BAND.0 && code(&TORCH_BAND.1) {

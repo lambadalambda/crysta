@@ -121,6 +121,8 @@ pub struct Globals {
     /// What scripts added to `$0498` themselves (`INC $0498`, Shadowkeeper's
     /// second stage), on top of the counted enemies; `STZ $0498` clears it.
     pub enemy_hold: u16,
+    /// Tower 5's top's darkness, set up by its intro (`COP AA $8F:8182`).
+    pub torch_darkness: bool,
     /// Group roots whose groups go (`COP EB`), not yet gone, each with the
     /// spawns of this frame made before it: later ones stay.
     pub group_deletions: Vec<(u16, usize)>,
@@ -275,6 +277,7 @@ impl Globals {
             ark_flags: 0,
             ark_push: (0, 0),
             enemy_hold: 0,
+            torch_darkness: false,
             group_deletions: Vec::new(),
             marks: Vec::new(),
             audio: crate::audio::Audio::default(),
