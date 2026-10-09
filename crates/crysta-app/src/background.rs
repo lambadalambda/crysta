@@ -148,10 +148,19 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
                 Presentation::Added | Presentation::Sky | Presentation::Subtracted
             )
         })
-        .map(|layer| Second {
-            layer,
-            tiles: scene.tiles().to_vec(),
-            palette: *scene.palette(),
+        .map(|layer| {
+            // The first layer's 512 tiles (a tower's sheet), then the
+            // layer's own from `$200`.
+            let mut tiles = scene.tiles().to_vec();
+            if !layer.tiles().is_empty() {
+                tiles.truncate(0x200);
+                tiles.extend_from_slice(layer.tiles());
+            }
+            Second {
+                layer,
+                tiles,
+                palette: *scene.palette(),
+            }
         });
     let sky = second
         .as_ref()
