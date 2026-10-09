@@ -79,7 +79,6 @@
 - [ ] [Play the resurrection scenes in full](issues/resurrection-scenes.md)
 - [ ] [Play Shadowkeeper's full fight](issues/shadowkeeper-full-fight.md)
 - [ ] [Run `$123`'s intro natively](issues/shadowkeeper-intro.md)
-- [ ] [Run Shadowkeeper's scripts natively](issues/shadowkeeper-scripts.md)
 - [ ] [Equip the cape through the armor door](issues/cape-through-armor-door.md)
 - [ ] [Draw the vortex and the Chapter 2 title card](issues/chapter-end-vortex-card.md)
 - [ ] [Draw the continents' door parchment](issues/continent-door-parchment.md)

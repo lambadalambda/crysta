@@ -17,3 +17,7 @@ The body (`$93:D876`) freezes at `$93:E767` (`STA $04AA`); the stand-in holds it
 ## Acceptance Criteria
 
 - The fight's phases, attacks and deaths match the native trace; no script freezes on `$123`.
+
+## Progress
+
+- Done (2026-10-09): the scripts run with Rust models of their native code (`docs/tower-five.md`, "Shadowkeeper's fight in the runtime"); the stand-in is gone. The phases (`$B`, `$C`, `$E`, `$11`), the shots' 20 damage, the claws' and the body's lives follow the native trace; frame-exact timing is not comparable (the trace has lag frames).

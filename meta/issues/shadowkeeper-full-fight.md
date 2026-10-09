@@ -2,7 +2,7 @@
 
 ## Summary
 
-`$123`'s Shadowkeeper is a reduced fight in Rust (`world/shadowkeeper.rs`): the native intro (`$8F:8005`) and body script (`$93:D876`) are replaced; the body has two lives and hurts only by its own attack box.
+`$123`'s Shadowkeeper runs its native scripts (`docs/tower-five.md`); its drawing is partial.
 
 ## Dependencies
 

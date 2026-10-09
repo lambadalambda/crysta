@@ -266,6 +266,22 @@ door). `$11D` lets the cape through (flag `$19B`) and throws Ark back to
 `$11C` without it. Open: `$122`, `$123` and Shadowkeeper, the bodies of
 the plain-pointer descriptors, the second `$120` Guardner.
 
+### Shadowkeeper's fight in the runtime (2026-10-09)
+
+The intro, the body and its parts run their ROM scripts. The native code
+the interpreter cannot follow has Rust models keyed by image offset
+(`actors/routines.rs`: the intro's VRAM fill and torch bands, `$0DEC`, the
+wisps, the Ark clamp, the parts following their parent, `JSR $E703`;
+`actors/shadowkeeper.rs`: the tail's arc `$E53B`/`$E76E`, the head's
+circle `$E854` and sway `$DF56`, the tail's phase walks along `+$2E`, the
+claw holder's phases, the body's carry tests and torch rows, `$0498`).
+The scheduler side: actors run in list order, spawns join it by kind, COP
+04 and COP 22 on `+$26`, `+$06` bit 6 keeps streams, spawned attackers take
+the parent's profile, deaths jump to `7F:1012`, writes into other actors
+(`Poke`). Both ROMs reach `$106` (`shadowkeeper_falls_in_its_native_stages_and_the_tower_ends`).
+Open: the darkness and the window (HDMA), drawing `+$08` vflip and the
+depth bits, frame-exact timing (the native trace runs with lag frames).
+
 ## 5. Proposed runtime model (blockers first)
 
 1. **The `$11D` check.** Without it the tower cannot be entered.

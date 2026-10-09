@@ -16,3 +16,9 @@
 ## Acceptance Criteria
 
 - From Ark's arrival to the pad's release the frames match the native trace.
+
+## Progress
+
+- The intro runs (`actors/routines.rs`): the torch bits by camera band, the hold at 272, the camera's climb (`$0DEC`), flag `$001`, music 5 (`the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper`).
+- Open: the hosts draw no darkness, light pools (`COP AA $8182`'s HDMA) or the head's circle window (`COP 63`, `$0474`).
+
