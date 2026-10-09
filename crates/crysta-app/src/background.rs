@@ -8,6 +8,9 @@ use assets::maps::visual::{
     StaticBackground,
 };
 
+/// The palette entry the darkness of tower 5's top rewrites (`$7F:06FE`).
+const DARKNESS_COLOUR: u8 = 0x7F;
+
 /// Presentation age since entry, advanced by host simulation updates, not redraws.
 pub struct VisitClock {
     map: u16,
@@ -378,7 +381,12 @@ impl CachedBackground {
     /// pixels colour math takes (the first layer, the backdrop and OBJ
     /// palettes 4 to 7), in full; where it is clear nothing changes. It
     /// scrolls with the camera.
-    pub fn subtract_second_layer(&self, canvas: &mut crate::frame::Canvas, camera: (i32, i32)) {
+    pub fn subtract_second_layer(
+        &self,
+        canvas: &mut crate::frame::Canvas,
+        camera: (i32, i32),
+        darkness: Option<&crysta_runtime::world::Darkness>,
+    ) {
         let Some(second) = self
             .second
             .as_ref()
@@ -399,6 +407,13 @@ impl CachedBackground {
             ) else {
                 continue;
             };
+            // Tower 5's top: a band whose torch is out shows the fill, the
+            // darkness's colour, on every pixel (`$8F:8182`).
+            let dark = darkness.map(|darkness| Bgr555::new(darkness.colour));
+            if let Some(darkness) = darkness.filter(|darkness| !darkness.lit(camera.1 + row)) {
+                *pixel = subtract(*pixel, rgb(Bgr555::new(darkness.colour)));
+                continue;
+            }
             if x >= width || y >= height {
                 continue;
             }
@@ -409,7 +424,11 @@ impl CachedBackground {
                 x % 16,
                 y % 16,
             ) {
-                *pixel = subtract(*pixel, rgb(second.palette[usize::from(palette_index)]));
+                let colour = match dark {
+                    Some(dark) if palette_index == DARKNESS_COLOUR => dark,
+                    _ => second.palette[usize::from(palette_index)],
+                };
+                *pixel = subtract(*pixel, rgb(colour));
             }
         }
     }
