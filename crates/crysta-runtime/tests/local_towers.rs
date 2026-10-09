@@ -1507,10 +1507,11 @@ fn the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper() {
 }
 
 #[test]
-fn shadowkeeper_falls_after_two_lives_and_the_tower_ends() {
-    // `docs/tower-five.md` §1: Ark walks up to the boss (y < 272: the
-    // fight, flag `$001`); two lives; at none the end controller sends Ark
-    // to the light room `$106`.
+fn shadowkeeper_falls_in_its_native_stages_and_the_tower_ends() {
+    // `docs/tower-five.md` (the native trace): its two claws die first;
+    // then the second stage (phase `$B`) makes the body a target; two
+    // lives (58, then 100); at its last death (phase `$11`) the hits stop
+    // and the end controller sends Ark to the light room `$106`.
     let a = Presses {
         confirm: true,
         ..Presses::default()
@@ -1520,32 +1521,57 @@ fn shadowkeeper_falls_after_two_lives_and_the_tower_ends() {
         for flag in (0x101..=0x107).chain([0x19B]) {
             events[flag / 8] |= 1 << (flag % 8);
         }
-        let mut world = World::enter_with_events(rom.image(), 0x0123, 136, 300, events).unwrap();
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 128, 300, events).unwrap();
         world.set_life(999);
-        let boss = world
+        let body = world
             .residents()
             .iter()
             .find(|resident| matches!(resident.script, Some(0x93_D876 | 0x99_9B5E)))
             .map(|resident| resident.record)
             .unwrap();
-        let mut began = false;
-        for frame in 0..3000 {
+        let (mut claws, mut phases) = (0, vec![]);
+        for frame in 0..4000 {
             let reading = world.dialogue().is_some() && !world.typing();
             let up = (frame < 30).then_some(Direction::Up);
             world
-                .update(up, if reading { a } else { Presses::default() })
+                .update(
+                    up,
+                    if reading && frame % 2 == 0 {
+                        a
+                    } else {
+                        Presses::default()
+                    },
+                )
                 .unwrap();
-            began |= world.map() == 0x0123 && world.events()[0] & 2 != 0;
-            if began && frame % 20 == 0 && world.foe_life(boss).is_some_and(|life| life > 0) {
-                world.kill_foe(boss);
+            let phase = world.script_word(0x04A6).unwrap_or(0);
+            if phase != 0 && phases.last() != Some(&phase) {
+                phases.push(phase);
+            }
+            if frame % 40 == 0 && frame > 300 {
+                if world.hit_spawned(30).is_some() {
+                    claws += 1;
+                } else {
+                    world.hit_foe(body, 60);
+                }
             }
             if world.map() != 0x0123 {
                 break;
             }
+            assert!(
+                world.frozen_scripts().is_empty(),
+                "{:?}: {frame}",
+                rom.revision()
+            );
         }
-        assert!(began, "{:?}: the fight began", rom.revision());
+        assert!(claws >= 4, "{:?}: {claws}", rom.revision());
+        for phase in [0x0B, 0x0C, 0x0E, 0x11] {
+            assert!(
+                phases.contains(&phase),
+                "{:?}: {phases:02X?}",
+                rom.revision()
+            );
+        }
         assert_eq!(world.map(), 0x0106, "{:?}", rom.revision());
-        assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
     }
 }
 

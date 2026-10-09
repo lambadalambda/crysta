@@ -171,7 +171,7 @@ impl World<'_> {
     /// his body costs life and pushes him away. Runs on game frames only.
     pub(super) fn hurt_ark(&mut self) {
         self.ark_immune = self.ark_immune.saturating_sub(1);
-        if self.ark_immune > 0 || self.hurt.is_some() || self.down.is_some() {
+        if self.ark_immune > 0 || self.hurt.is_some() || self.down.is_some() || self.hits_off() {
             return;
         }
         let body = boxes::place(ARK_BODY, self.position(), false);
@@ -235,6 +235,14 @@ impl World<'_> {
             away(self.position(), from),
         ));
         self.ark_immune = ARK_IMMUNE;
+    }
+
+    /// Whether a script turned the hit scans off (`$049A`).
+    pub(super) fn hits_off(&self) -> bool {
+        self.globals
+            .scratch
+            .get(&crate::actors::HITS_OFF)
+            .is_some_and(|&off| off != 0)
     }
 
     /// Ark as an enemy's hit reads him: his stats, his types and his

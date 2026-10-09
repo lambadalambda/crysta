@@ -139,6 +139,21 @@ impl World<'_> {
         resident.script
     }
 
+    /// Hits a record's enemy as Ark's thrust would with `damage`, if a hit
+    /// may land on it now, for tests. Returns whether it did.
+    #[doc(hidden)]
+    pub fn hit_foe(&mut self, record: usize, damage: u16) -> bool {
+        let Some(index) = self.actor_of(record) else {
+            return false;
+        };
+        let actor = &mut self.actors[index];
+        if actor.body_box().is_none() || actor.unharmed() {
+            return false;
+        }
+        actor.take_hit(damage, room_core::Direction::Down, self.image);
+        true
+    }
+
     /// Places an enemy and sets its life, for tests. Returns whether the
     /// record is an enemy here.
     #[doc(hidden)]

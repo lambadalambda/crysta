@@ -46,7 +46,6 @@ mod pots;
 mod progress;
 mod resurrection;
 mod second;
-mod shadowkeeper;
 mod status;
 mod transition;
 pub use fade::{Screen, Tint};
@@ -127,8 +126,6 @@ pub struct World<'a> {
     fall: Option<fall::Fall>,
     /// The end of Chapter 1, once Ark jumps into the Hole.
     chapter: Option<chapter::ChapterEnd>,
-    /// Shadowkeeper's fight on `$123`.
-    shadowkeeper: Option<shadowkeeper::Fight>,
     rope: Option<fall::Rope>,
     /// Ark jumping from the Hole's rim.
     jump: Option<fall::Jump>,
@@ -388,7 +385,6 @@ impl<'a> World<'a> {
             resurrection: None,
             level_up: None,
             fall: None,
-            shadowkeeper: None,
             chapter: None,
             rope: None,
             jump: None,
@@ -675,7 +671,8 @@ impl<'a> World<'a> {
             .insert(crate::actors::ARK_LIFE, stats.life);
         // The player's action word as runs read it: only a forced action
         // (`$0810`) is modelled; Ark never attacks or jumps here.
-        let enemies = self.actors.iter().filter(|actor| actor.counts()).count();
+        let enemies = self.actors.iter().filter(|actor| actor.counts()).count()
+            + usize::from(self.globals.enemy_hold);
         self.globals.scratch.insert(
             crate::actors::ENEMIES,
             u16::try_from(enemies).unwrap_or(u16::MAX),
@@ -709,6 +706,17 @@ impl<'a> World<'a> {
         self.globals
             .scratch
             .insert(crate::actors::PLAYER_Y, y.wrapping_sub(16));
+        if let Some((left, top, ..)) = self.globals.view {
+            for (address, value) in crate::actors::CAMERA
+                .into_iter()
+                .zip([left, top, left, top])
+            {
+                self.globals.scratch.insert(address, value);
+            }
+        }
+        let (safe_x, safe_y) = self.safe.map_or((x, y), |(at, _)| at);
+        self.globals.scratch.insert(crate::actors::SAFE_X, safe_x);
+        self.globals.scratch.insert(crate::actors::SAFE_Y, safe_y);
     }
 
     /// The deletions the runs asked for: actors by id (`DA BB 02 A7 FA`),
@@ -793,7 +801,12 @@ impl<'a> World<'a> {
     fn apply_pokes(&mut self) {
         use crate::actors::Poke;
         for poke in std::mem::take(&mut self.globals.pokes) {
-            let (Poke::Word { id, .. } | Poke::Flags { id, .. }) = poke else {
+            let (Poke::Word { id, .. }
+            | Poke::Flags { id, .. }
+            | Poke::Priority { id, .. }
+            | Poke::Place { id, .. }
+            | Poke::Script { id, .. }) = poke
+            else {
                 // Ark's: only the blink is his own here; the rest is
                 // published (`ARK_FLAGS`).
                 match poke {
@@ -850,7 +863,7 @@ impl<'a> World<'a> {
             .iter()
             .map(|actor| (actor.id, actor.view()))
             .collect();
-        for index in 0..self.actors.len() {
+        for index in list_order(&self.actors) {
             if nested && !self.actors[index].runs_nested() {
                 continue;
             }
@@ -875,7 +888,6 @@ impl<'a> World<'a> {
         }
         self.make_deletions();
         self.push_ark();
-        self.shadowkeeper_frame();
         // A run's write to Ark's life (`STA $065D`, the bed, `$88:8AE1`).
         let stats = self.globals.slot.stats();
         if let Some(&life) = self.globals.scratch.get(&crate::actors::ARK_LIFE) {
@@ -1115,8 +1127,7 @@ impl<'a> World<'a> {
         );
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.clear_statuses();
-        self.globals.camera_target = None;
-        self.start_shadowkeeper();
+        (self.globals.camera_target, self.globals.enemy_hold) = (None, 0);
         self.start_landing();
         self.load_second();
         self.apply_load_patches()?;
@@ -1184,17 +1195,50 @@ impl<'a> World<'a> {
     }
 
     /// Adds the actors scripts spawned (`COP A2`); they run from next frame.
+    /// Links a spawn into the list (`+$2C`): after its parent
+    /// (`$80:BC7C`), before it (`$80:BC54`), at the head (`COP 99`) or at
+    /// the end (`COP A0`); the entity it went before follows it.
+    fn join_list(&mut self, actor: &mut Actor) {
+        use crate::actors::ListPlace;
+        let parent = actor.parent_id();
+        let parent_previous = || {
+            self.actors
+                .iter()
+                .find(|other| Some(other.id) == parent)
+                .and_then(|other| other.previous)
+        };
+        let last = || {
+            self.actors
+                .iter()
+                .map(|other| other.id)
+                .find(|&id| !self.actors.iter().any(|other| other.previous == Some(id)))
+        };
+        actor.previous = match actor.place {
+            ListPlace::After => parent,
+            ListPlace::Before => parent_previous(),
+            ListPlace::Head => None,
+            ListPlace::Last => last(),
+        };
+        let follower = match actor.place {
+            ListPlace::Before => parent,
+            ListPlace::Last => None,
+            _ => self
+                .actors
+                .iter()
+                .find(|other| other.previous == actor.previous)
+                .map(|other| other.id),
+        };
+        if let Some(follower) = follower {
+            if let Some(other) = self.actors.iter_mut().find(|other| other.id == follower) {
+                other.previous = Some(actor.id);
+            }
+        }
+    }
+
     fn spawn_actors(&mut self) {
         for (script, mut actor) in std::mem::take(&mut self.globals.spawns) {
             actor.set_map(self.map);
-            // A child goes after its parent in the list, or at its head
-            // without one (`$80:BC7C`, `COP 99`): the next one follows it.
-            actor.previous = actor.parent_id();
-            for other in &mut self.actors {
-                if other.previous == actor.previous {
-                    other.previous = Some(actor.id);
-                }
-            }
+            self.join_list(&mut actor);
             let runtime = u32::try_from(script).map_or(0, |script| 0x80_0000 | script);
             self.residents.push(Resident {
                 position: actor.position,
@@ -1929,6 +1973,30 @@ impl<'a> World<'a> {
         (x.saturating_add_signed(dx), y.saturating_add_signed(dy))
     }
 
+    /// Each actor's id, list predecessor, script place (an image offset)
+    /// and place, for tests and traces.
+    #[must_use]
+    pub fn actor_states(&self) -> Vec<ActorState> {
+        self.actors
+            .iter()
+            .map(|actor| {
+                (
+                    actor.id,
+                    actor.previous,
+                    actor.script_place(),
+                    actor.position,
+                )
+            })
+            .collect()
+    }
+
+    /// A WRAM word the scripts keep (`$04A6`, Shadowkeeper's phase), for
+    /// tests and traces.
+    #[must_use]
+    pub fn script_word(&self, address: u16) -> Option<u16> {
+        self.globals.scratch.get(&address).copied()
+    }
+
     /// `$04A4`: the torches lit on tower 5's top, a bit each
     /// (`docs/tower-five.md`).
     #[must_use]
@@ -2449,6 +2517,32 @@ enum Scene {
     },
 }
 
+/// An actor's id, list predecessor, script place and place
+/// ([`World::actor_states`]).
+pub type ActorState = (u16, Option<u16>, usize, (u16, u16));
+
+/// The actors' indices in the list's order (`+$2C`, `$80:C8E1` runs it
+/// from `$0DFA`): from each head along its followers; any left out after.
+fn list_order(actors: &[Actor]) -> Vec<usize> {
+    let follower: std::collections::HashMap<u16, usize> = actors
+        .iter()
+        .enumerate()
+        .filter_map(|(index, actor)| Some((actor.previous?, index)))
+        .collect();
+    let mut seen = vec![false; actors.len()];
+    let mut order = Vec::with_capacity(actors.len());
+    for head in (0..actors.len()).filter(|&index| actors[index].previous.is_none()) {
+        let mut at = Some(head);
+        while let Some(index) = at.filter(|&index| !seen[index]) {
+            seen[index] = true;
+            order.push(index);
+            at = follower.get(&actors[index].id).copied();
+        }
+    }
+    order.extend((0..actors.len()).filter(|&index| !seen[index]));
+    order
+}
+
 /// Puts an actor's view as it is now among the views runs read.
 fn refresh_view(views: &mut Vec<(u16, crate::actors::View)>, actor: &Actor) {
     let view = actor.view();
@@ -2626,7 +2720,6 @@ mod tests {
             resurrection: None,
             level_up: None,
             fall: None,
-            shadowkeeper: None,
             chapter: None,
             rope: None,
             jump: None,

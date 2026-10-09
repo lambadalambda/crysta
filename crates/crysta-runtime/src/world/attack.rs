@@ -125,7 +125,7 @@ impl World<'_> {
     /// and pushes the enemy away from Ark (a 0 is only a strike); one that
     /// takes no damage (`+$06 & $0020`) is passed over.
     fn strike_foes(&mut self) {
-        let Some(attack) = self.attack_box() else {
+        let Some(attack) = self.attack_box().filter(|_| !self.hits_off()) else {
             return;
         };
         let stats = self.globals.slot.stats();

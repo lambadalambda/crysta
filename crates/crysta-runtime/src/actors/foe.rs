@@ -171,7 +171,7 @@ impl Actor {
         foe.immune = IMMUNE;
         if steady {
             if foe.life == 0 {
-                self.explode(&mut foe, image);
+                self.perish(&mut foe, image);
             } else {
                 self.struck = true;
             }
@@ -252,53 +252,12 @@ impl Actor {
         foe.knocked = false;
         self.motion = None;
         if foe.life == 0 {
-            self.explode(foe, image);
+            self.perish(foe, image);
         } else if matches!(self.state, State::Waiting(_)) {
             self.state = State::Waiting(0);
         }
         // `$85:E233`: alive after the push, the struck callback.
         self.struck |= foe.life > 0;
-    }
-
-    /// Held for a fight the world drives (Shadowkeeper): its script stops,
-    /// it becomes a counted enemy of its descriptor's profile with that
-    /// descriptor's boxes, and takes no knockback.
-    pub(crate) fn hold_as_boss(&mut self, image: &[u8], descriptor: Option<usize>) {
-        self.state = State::Held;
-        self.hidden = false;
-        self.guard.1 |= NO_KNOCKBACK;
-        let Some(descriptor) = descriptor else {
-            return;
-        };
-        let profile = image
-            .get(descriptor + 4)
-            .and_then(|&index| crate::combat::profile(image, index));
-        self.foe = profile.map(|profile| Foe::new(profile, true));
-        if self.boxes.is_none() {
-            self.boxes = super::cadence::pose_boxes(image, descriptor).map(Rc::new);
-        }
-    }
-
-    /// Whether hits may land on it (`+$04` bit `$0020` clear).
-    pub(crate) fn set_target(&mut self, target: bool) {
-        if target {
-            self.guard.0 &= !NOT_TARGET;
-        } else {
-            self.guard.0 |= NOT_TARGET;
-        }
-    }
-
-    /// Its life, while an enemy.
-    pub(crate) fn foe_life(&self) -> Option<u16> {
-        self.foe.as_ref().map(|foe| foe.life)
-    }
-
-    /// A new life, the explosion called off.
-    pub(crate) fn revive(&mut self, life: u16) {
-        if let Some(foe) = &mut self.foe {
-            (foe.life, foe.exploding, foe.dead, foe.knocked) = (life, None, false, false);
-        }
-        (self.died, self.overlay) = (false, None);
     }
 
     /// A jump to the death script (`$85:E27B`): an enemy explodes, as its
@@ -340,6 +299,23 @@ impl Actor {
         } else {
             self.go_up(image, true);
         }
+    }
+
+    /// The death (`$80:C9E9`): the script's own death callback
+    /// (`7F:1012`, bank `7F:1014`: Shadowkeeper's claws), or the explosion
+    /// (`$85:E27B`).
+    fn perish(&mut self, foe: &mut Foe, image: &[u8]) {
+        let callback = self.own_word(0x1012);
+        if callback == 0 {
+            self.explode(foe, image);
+            return;
+        }
+        // `$85:E25B`: a counted death leaves `$0498` first.
+        foe.counted = false;
+        let bank = usize::from(self.own_word(0x1014) & 0x3F) << 16;
+        self.pc = bank | usize::from(callback);
+        self.state = super::State::Running;
+        (self.subroutine, self.continuation, self.call) = (None, None, None);
     }
 
     /// The death script's start (`$85:E27B`): the explosion.

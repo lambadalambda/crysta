@@ -21,15 +21,16 @@ mod motion;
 mod native;
 mod push;
 mod routines;
+mod shadowkeeper;
 pub(crate) use routines::TORCHES;
 mod sense;
 mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, CURRENT_MAP,
-    ENEMIES, FRAMES, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X, PLAYER_Y, PREVIOUS_MAP,
-    PRIME_BLUE, WINDOW_BUSY,
+    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, CAMERA,
+    CURRENT_MAP, ENEMIES, FRAMES, HITS_OFF, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
+    PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, SAFE_X, SAFE_Y, WINDOW_BUSY,
 };
 use sense::probe;
 
@@ -252,9 +253,33 @@ const SPAWN_AFTER: u8 = 0xA1;
 /// [`SPAWN_AFTER`], [`SPAWN`] and [`SPAWN_OFFSET`] whose child joins the
 /// spawner's group (`$80:B99A`, `B9A5`, `B9B0`; `7F:102E` = the root,
 /// `$80:BB5A`).
-const GROUP_SPAWNS: [(u8, u8); 3] = [(0xE6, SPAWN_AFTER), (0xE7, SPAWN), (0xE8, SPAWN_OFFSET)];
+const GROUP_SPAWNS: [(u8, u8); 4] = [
+    (0xE6, SPAWN_AFTER),
+    (0xE7, SPAWN),
+    (0xE8, SPAWN_OFFSET),
+    (0xEA, SPAWN_BEFORE),
+];
 /// A group's root deletes every other entity of the group (`$80:B9D1`).
 const DELETE_GROUP: u8 = 0xEB;
+/// A script before its parent in the list, without a flags word
+/// (`$80:A50E`, `$80:BC54`); `9B` with one; `EA` the first in a group.
+const SPAWN_BEFORE: u8 = 0x9A;
+const SPAWN_BEFORE_FLAGS: u8 = 0x9B;
+/// A script with a flags word at the list's end (`$80:A693`).
+const SPAWN_LAST: u8 = 0xA0;
+
+/// Where a spawned entity joins the actor list.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ListPlace {
+    /// After its parent (`$80:BC7C`).
+    After,
+    /// Before its parent (`$80:BC54`).
+    Before,
+    /// At the list's head (`COP 99`).
+    Head,
+    /// At its end (`COP A0`).
+    Last,
+}
 /// The spawns, and the group's deletion, which [`Actor::spawn`] runs.
 const SPAWNS: &[u8] = &[
     SPAWN,
@@ -262,9 +287,13 @@ const SPAWNS: &[u8] = &[
     SPAWN_AT,
     SPAWN_OFFSET,
     SPAWN_AFTER,
+    SPAWN_BEFORE,
+    SPAWN_BEFORE_FLAGS,
+    SPAWN_LAST,
     0xE6,
     0xE7,
     0xE8,
+    0xEA,
     DELETE_GROUP,
 ];
 /// The continents' door's parchment set-up and where it goes on, Japanese
@@ -452,6 +481,13 @@ const WALLS_04: u16 = 0x0004;
 /// `+$06` bits: `$0010` the script handles knockback (none), `$0020` takes
 /// no damage.
 const GUARD_06: u16 = 0x0030;
+/// `+$06` bits 11, 12 and 14: the draw pass's depth key (`$80:E9FB`): 14
+/// in front of all, 12 one deeper than the y, 11 one shallower.
+const DEPTH_06: u16 = 0x5800;
+/// `+$06` bit 6: a pose's change keeps the movement streams (`$80:ED54`),
+/// and they run on every frame (`$80:D0CF`) until their own end:
+/// Shadowkeeper's shots fall on after their pose.
+const KEEP_STREAMS: u16 = 0x0040;
 /// `LDA $0016,Y; CMP $0016,X`, Y Ark's entity (`LDY $0DEA` before it, or
 /// left so by `COP 59`, `$97:B99A`): Ark on the actor's layer. The runtime
 /// keeps one layer for both, so the test always holds.
@@ -586,6 +622,9 @@ const LOOP_START: u8 = 0x02;
 /// Ends a pass of the counted loop; `$80:85F8`. Decrements the count; while
 /// it is nonzero, jumps to the loop start and yields one frame.
 const LOOP_END: u8 = 0x03;
+/// As [`LOOP_END`] without the yield (`$80:8613`): Shadowkeeper's tail
+/// spawns its segments in one frame.
+const LOOP_AGAIN: u8 = 0x04;
 /// Branches on the map; `$80:8720`. Operands: a word and a two-byte target.
 /// Taken when the word's low fifteen bits are the map; bit 15 inverts.
 const BRANCH_ON_MAP: u8 = 0x0A;
@@ -631,9 +670,6 @@ enum State {
     Frozen,
     /// Removed by a despawn.
     Gone,
-    /// Driven by the world in place of its script (Shadowkeeper,
-    /// `crate::world`).
-    Held,
 }
 
 /// What a blocking service waits for.
@@ -721,6 +757,12 @@ pub struct Actor {
     pub hidden: bool,
     /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
     pub priority: u8,
+    /// `+$06`'s depth bits ([`DEPTH_06`]).
+    pub depth: u16,
+    /// `+$06` bit 6 ([`KEEP_STREAMS`]).
+    keeps_streams: bool,
+    /// Whether this frame's streams moved it already.
+    streamed: bool,
     /// Palette field (entity `+$08` bits 9–11, `COP BB`): added to each
     /// frame's OBJ palette, modulo 8.
     pub palette: u8,
@@ -772,6 +814,8 @@ pub struct Actor {
     parent: Option<native::View>,
     /// The entity before it in the list (`+$2C`), which the world keeps.
     pub(crate) previous: Option<u16>,
+    /// Where a spawn joins the list ([`ListPlace`]).
+    pub(crate) place: ListPlace,
     /// The id other actors' runs know it by (`views`, `LDY $0026,X`).
     pub(crate) id: u16,
     /// It heads a group (`7F:001E = $FFFF`, `$80:BB60`).
@@ -881,6 +925,9 @@ impl Actor {
             nested: false,
             hidden: false,
             priority: 2,
+            depth: 0,
+            keeps_streams: false,
+            streamed: false,
             palette: 0,
             player_pose: None,
             own: native::Own::new(),
@@ -904,6 +951,7 @@ impl Actor {
             spawned: false,
             parent: None,
             previous: None,
+            place: ListPlace::After,
             id: 0,
             root: false,
             struck: false,
@@ -1159,6 +1207,7 @@ impl Actor {
     }
 
     fn frame(&mut self, around: &mut Surroundings<'_>) {
+        self.streamed = false;
         self.cooldown = self.cooldown.saturating_sub(1);
         self.pose_age = self.pose_age.saturating_add(1);
         self.wake_struck();
@@ -1168,7 +1217,7 @@ impl Actor {
         }
         match self.state {
             State::Ordinary { .. } => self.tick_ordinary(),
-            State::Frozen | State::Gone | State::Blocked(_) | State::Held => {}
+            State::Frozen | State::Gone | State::Blocked(_) => {}
             State::Waiting(frames) => {
                 self.apply_stream();
                 self.state = if frames <= 1 {
@@ -1201,6 +1250,9 @@ impl Actor {
             }
             State::Running => {
                 self.run(around);
+                if self.keeps_streams && self.state == State::Running && !self.streamed {
+                    self.apply_stream();
+                }
             }
         }
         if self.state == State::Frozen && self.frozen_at.is_none() {
@@ -1302,19 +1354,24 @@ impl Actor {
         // (`$88:D33D`).
         if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
             const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
-            // Bits 14 and 13, which the crystals, bullets and tower 4's
-            // traps set (`$88:B60F`, `$97:BAAC`, `$97:B43C`), are not
-            // modelled.
-            const ACCEPTED: u16 = INTERACTION | GUARD_06 | 0x6000;
+            // Bit 13, which the crystals, bullets and tower 4's traps set
+            // (`$88:B60F`, `$97:BAAC`, `$97:B43C`), is not modelled. Bits
+            // 11, 12 and 14 order the draw ([`DEPTH_06`]); bit 6 keeps the
+            // streams ([`KEEP_STREAMS`]).
+            const ACCEPTED: u16 = INTERACTION | GUARD_06 | DEPTH_06 | KEEP_STREAMS | 0x2000;
             let value = u16::from_le_bytes([low, high]);
             match op {
                 0x09 if value & !ACCEPTED == 0 => {
                     self.interaction |= value & INTERACTION;
                     self.guard.1 |= value & GUARD_06;
+                    self.depth |= value & DEPTH_06;
+                    self.keeps_streams |= value & KEEP_STREAMS != 0;
                 }
-                0x29 if !value & !(INTERACTION | GUARD_06) == 0 => {
+                0x29 if !value & !(INTERACTION | GUARD_06 | DEPTH_06 | KEEP_STREAMS) == 0 => {
                     self.interaction &= value;
                     self.guard.1 &= value;
+                    self.depth &= value;
+                    self.keeps_streams &= value & KEEP_STREAMS != 0;
                 }
                 _ => return None,
             }
@@ -1377,6 +1434,7 @@ impl Actor {
             x: player.0,
             y: player.1,
             facing: u16::from(sense::code(facing)),
+            previous: None,
         };
         // `+$14` reads as the facing of the record shown (`$97:B65A`).
         let facing = self.facing_code();
@@ -1778,6 +1836,10 @@ impl Actor {
             PAN | PAN_WAIT => return self.pan(service, operands, around),
             LOOP_START => return self.loop_start(operands, image),
             LOOP_END => return self.loop_end(operands),
+            LOOP_AGAIN => {
+                self.loop_end(operands);
+                return true;
+            }
             BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
             TIMED_WAIT => return self.timed_wait(operands, image),
             STOP_FOR_PLAYER => return self.stop_for_player(operands, None, bank, around),
@@ -2338,6 +2400,7 @@ impl Actor {
     /// One frame of a scripted leg or a pose's movement; cleared once the
     /// pose wait is over.
     fn apply_stream(&mut self) {
+        self.streamed = true;
         let (dx, dy) = if let Some(motion) = &mut self.motion {
             motion.step((self.hflip, self.vflip)).unwrap_or((0, 0))
         } else if let Some((direction, applied, speed)) = self.stream {
@@ -2354,12 +2417,13 @@ impl Actor {
         };
         self.displace((dx, dy));
         self.walking = self.stream.is_some() || (dx, dy) != (0, 0);
-        let ends = match self.state {
-            State::Waiting(frames) => frames <= 1,
-            _ => self
-                .pose_list(self.selector)
-                .is_some_and(|ticks| ticks <= 1),
-        };
+        let ends = !self.keeps_streams
+            && match self.state {
+                State::Waiting(frames) => frames <= 1,
+                _ => self
+                    .pose_list(self.selector)
+                    .is_some_and(|ticks| ticks <= 1),
+            };
         if ends {
             self.stream = None;
             self.motion = None;
@@ -2777,12 +2841,15 @@ impl Actor {
         let word = |at: usize| cadence::word(image, operands + at);
         let grouped = GROUP_SPAWNS.iter().find(|&&(group, _)| group == service);
         let copied = (self.flags_04() | 0x8000) & !0x1000;
-        let (script, flags, offset, length) = match grouped.map_or(service, |&(_, as_)| as_) {
-            SPAWN | SPAWN_LINKED => (script, word(3), Some((0, 0)), 5),
+        let kind = grouped.map_or(service, |&(_, as_)| as_);
+        let (script, flags, offset, length) = match kind {
+            SPAWN | SPAWN_LINKED | SPAWN_BEFORE_FLAGS | SPAWN_LAST => {
+                (script, word(3), Some((0, 0)), 5)
+            }
             // No flags word: the child keeps the parent's `+$04`, hidden
             // and out of the nested frame (`$80:BCD2`: `ORA #$8000`, `AND
             // #$EFFF`).
-            SPAWN_AFTER => (script, Some(copied), Some((0, 0)), 3),
+            SPAWN_AFTER | SPAWN_BEFORE => (script, Some(copied), Some((0, 0)), 3),
             SPAWN_AT => (script, Some(copied), word(3).zip(word(5)), 7),
             _ => (script, word(7), word(3).zip(word(5)), 9),
         };
@@ -2796,6 +2863,12 @@ impl Actor {
             self.position.1.wrapping_add(dy),
         );
         let mut child = self.child(script, flags, at);
+        child.place = match kind {
+            SPAWN_BEFORE | SPAWN_BEFORE_FLAGS => ListPlace::Before,
+            SPAWN_LINKED => ListPlace::Head,
+            SPAWN_LAST => ListPlace::Last,
+            _ => ListPlace::After,
+        };
         child.id = around.globals.next_id;
         around.globals.next_id = around.globals.next_id.wrapping_add(1).max(0x4000);
         if grouped.is_some() {
@@ -2806,6 +2879,12 @@ impl Actor {
             // descriptor's profile, as a record is: the High Cadet's copies.
             if flags & 0x0200 != 0 {
                 child.arm(image);
+            }
+        } else if flags & 0x0200 != 0 {
+            // An attacker of its parent's profile (`7F:1022`, `$80:BCC9`):
+            // Shadowkeeper's shots and head.
+            if let Some(foe) = &self.foe {
+                child.foe = Some(foe::Foe::new(foe.profile, false));
             }
         }
         // Y holds the child after the service (`$97:C6AD`).
@@ -2929,6 +3008,11 @@ impl Actor {
         self.parent.map(|parent| parent.id).filter(|&id| id != 0)
     }
 
+    /// Where its script is, an image offset.
+    pub(crate) const fn script_place(&self) -> usize {
+        self.pc
+    }
+
     /// Takes a write another actor's run made into it.
     pub(crate) fn take_poke(&mut self, poke: Poke) {
         match poke {
@@ -2937,6 +3021,19 @@ impl Actor {
                 self.sync_life();
             }
             Poke::Flags { set, cleared, .. } => self.write_04(set, cleared),
+            Poke::Priority { priority, .. } => self.priority = priority,
+            Poke::Place { at, .. } => self.position = at,
+            // `+$0A` alone: a sleep (`+$0E`, a timed wait) stays.
+            Poke::Script { pc, .. } => {
+                if matches!(self.state, State::Gone | State::Frozen) {
+                    return;
+                }
+                self.pc = pc;
+                if !matches!(self.state, State::Waiting(_)) {
+                    self.state = State::Running;
+                }
+                (self.subroutine, self.continuation, self.call) = (None, None, None);
+            }
             // The world keeps Ark's.
             Poke::Ark { .. } | Poke::ArkAt { .. } | Poke::ArkPush { .. } => {}
         }
@@ -2956,6 +3053,7 @@ impl Actor {
             x: self.position.0,
             y: self.position.1,
             facing: u16::from(self.facing_code()),
+            previous: self.previous,
         }
     }
 
@@ -3888,10 +3986,16 @@ impl Actor {
     /// Where `COP 22` goes: the table's target for the parameter, or past
     /// the table.
     fn switch_target(&self, operands: usize, bank: usize, image: &[u8]) -> Option<usize> {
-        let (&low, &high) = (image.get(operands)?, image.get(operands + 1)?);
+        let (low, high) = (
+            u16::from(*image.get(operands)?),
+            u16::from(*image.get(operands + 1)?),
+        );
         let table = operands + 2;
-        if (low..=high).contains(&self.parameter) {
-            let target = cadence::word(image, table + usize::from(self.parameter - low) * 2)?;
+        // `+$26`: the spawn parameter, or what the script stored there
+        // since (`$80:8CE9`; Shadowkeeper's phases, `$93:DD0F`).
+        let value = self.own_word(0x26);
+        if (low..=high).contains(&value) {
+            let target = cadence::word(image, table + usize::from(value - low) * 2)?;
             Some(bank | usize::from(target))
         } else {
             Some(table + (usize::from(high.saturating_sub(low)) + 1) * 2)
@@ -5678,6 +5782,16 @@ mod script_service_tests {
     }
 
     #[test]
+    fn cop_04_loops_back_within_the_frame() {
+        // COP 02 3 0; COP B1 1 0 (x + 1); COP 04; COP BD.
+        let code = [2, 0x02, 3, 0, 2, 0xB1, 1, 0, 2, 0x04, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        let x = actor.position.0;
+        tick(&mut actor, &image);
+        assert_eq!(actor.position.0, x + 3);
+    }
+
+    #[test]
     fn an_idle_foe_ages_its_pose_a_frame_a_frame() {
         // Pose 7, then yields in a loop: a foe's pose ages as anyone's.
         let code = [2, 0x80, 7, 2, 0xBD, 0x80, 0xFC];
@@ -6352,7 +6466,12 @@ mod scene_service_tests {
         let script: &[u8] = &[
             2, 0xB0, 0x02, 2, 0x22, 0x01, 0x02, 0x30, 0x80, 0x40, 0x80, 2, 0x8E,
         ];
-        for (parameter, expected) in [(1, AT + 0x30), (2, AT + 0x40), (0, AT + 11), (3, AT + 11)] {
+        for (parameter, expected) in [
+            (1u16, AT + 0x30),
+            (2, AT + 0x40),
+            (0, AT + 11),
+            (3, AT + 11),
+        ] {
             let mut image = vec![0; AT + 0x200];
             image[AT..AT + script.len()].copy_from_slice(script);
             for at in [0x30, 0x40] {
@@ -6360,7 +6479,7 @@ mod scene_service_tests {
             }
             let mut globals = Globals::with_events(vec![0; 512]);
             let mut actor = Actor::new((56, 64), Some(0x88_8000), 0, 1);
-            actor.parameter = parameter;
+            actor.set_own_word(0x26, parameter);
             actor.tick(&mut around(&image, &mut globals));
             assert_ne!(actor.state, State::Frozen, "parameter {parameter}");
             // Held on the `COP 8E` there, past its two bytes.

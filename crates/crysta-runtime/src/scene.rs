@@ -118,6 +118,9 @@ pub struct Globals {
     /// A push on Ark (`7F:0018/001A`), pixels for the next frame, while he
     /// sleeps.
     pub ark_push: (i16, i16),
+    /// What scripts added to `$0498` themselves (`INC $0498`, Shadowkeeper's
+    /// second stage), on top of the counted enemies; `STZ $0498` clears it.
+    pub enemy_hold: u16,
     /// Group roots whose groups go (`COP EB`), not yet gone, each with the
     /// spawns of this frame made before it: later ones stay.
     pub group_deletions: Vec<(u16, usize)>,
@@ -271,6 +274,7 @@ impl Globals {
             pokes: Vec::new(),
             ark_flags: 0,
             ark_push: (0, 0),
+            enemy_hold: 0,
             group_deletions: Vec::new(),
             marks: Vec::new(),
             audio: crate::audio::Audio::default(),

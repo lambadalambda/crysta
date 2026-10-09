@@ -97,6 +97,30 @@ pub enum Poke {
         /// The coordinate.
         value: u16,
     },
+    /// Its place (`STA $0000,Y`, `STA $0002,Y`): Shadowkeeper's parts follow
+    /// their parent (`$93:E715`).
+    Place {
+        /// The entity.
+        id: u16,
+        /// x and y.
+        at: (u16, u16),
+    },
+    /// Its script, from the next frame on (`STA $000A,Y; STZ $000E,Y`,
+    /// `$93:E703`): Shadowkeeper's parts are told what to do.
+    Script {
+        /// The entity.
+        id: u16,
+        /// Where its script goes on, an image offset.
+        pc: usize,
+    },
+    /// Its OBJ priority (`+$08` bits 12-13): Shadowkeeper's head and body
+    /// sink behind the high tiles (`$93:E6F9`).
+    Priority {
+        /// The entity.
+        id: u16,
+        /// The priority, 0 to 3.
+        priority: u8,
+    },
     /// A push on Ark (`PHX; LDX $0DEA; STA $7F:0018/001A,X; PLX`): the
     /// Guardner's vacuum (`$97:C447`).
     ArkPush {
@@ -138,6 +162,8 @@ pub struct View {
     pub y: u16,
     /// `+$14`, the facing code.
     pub facing: u16,
+    /// `+$2C`, the entity before it in the list.
+    pub previous: Option<u16>,
 }
 
 impl View {
@@ -205,7 +231,7 @@ const PPU: std::ops::RangeInclusive<u16> = 0x2100..=0x213F;
 
 /// Words runs may use: scripts' own variables, engine words the runtime
 /// does not read, and Ark's life, which it takes back. With the evidence.
-const SCRATCH: [(u16, u16); 13] = [
+const SCRATCH: [(u16, u16); 14] = [
     // `$89:D2B2` clears `$0440`, `$04BC`, `$04BE`, `$04C0`, `$04C2`.
     (0x0440, 0x0441),
     (0x04BC, 0x04C3),
@@ -231,6 +257,9 @@ const SCRATCH: [(u16, u16); 13] = [
     (0x066C, 0x066D),
     // The circle window's radius (`$90:A120`), not drawn.
     (0x0474, 0x0475),
+    // The hit scans off while nonzero (`$85:D310`): Shadowkeeper's last
+    // death (`$93:DB45`).
+    (HITS_OFF, HITS_OFF + 1),
     // Ark's life, which the world takes back after the runs.
     (ARK_LIFE, ARK_LIFE + 1),
     // Ark's state gates: `$8000` paralysed (`$97:C2B2`), `$0400` asleep
@@ -262,7 +291,7 @@ pub const PLAYER_ACTION: u16 = 0x097C;
 /// before and the frame counter, the player's action word,
 /// the Prime Blue count (`$07ED`, BCD, `$8D:95A8`), which a resident in
 /// the Prime Blue shop `$1D` tests (`$88:C7ED`), and the enemy count.
-const READABLE: [u16; 12] = [
+const READABLE: [u16; 18] = [
     CURRENT_MAP,
     ARK_ARMOR,
     ARK_MAX_LIFE,
@@ -275,6 +304,12 @@ const READABLE: [u16; 12] = [
     FRAMES,
     PLAYER_X,
     PLAYER_Y,
+    SAFE_X,
+    SAFE_Y,
+    CAMERA[0],
+    CAMERA[1],
+    CAMERA[2],
+    CAMERA[3],
 ];
 /// `$064C`: Ark's armor, which the `$11D` orb tests for the cape
 /// (`$90:A1F4`).
@@ -292,6 +327,17 @@ pub const WINDOW_BUSY: u16 = 0x0DC2;
 pub const PLAYER_X: u16 = 0x0952;
 /// `$0954`, Ark's y less 16, as the towers' gates read it (`$90:8F8F`).
 pub const PLAYER_Y: u16 = 0x0954;
+/// `$080E`/`$0812` and `$081E`/`$0822`: the camera's left and top, as the
+/// screen's two scroll pairs keep them (`docs/tower-second-layer.md`): the
+/// same here.
+pub const CAMERA: [u16; 4] = [0x080E, 0x0812, 0x081E, 0x0822];
+/// `$049A`: nonzero, the hit scans do nothing (`$85:D310`).
+pub const HITS_OFF: u16 = 0x049A;
+/// `$0958`/`$095A`: Ark's last safe place (`$80:CD0C`), which
+/// Shadowkeeper's claws and sting aim at (`$93:E0C9`, `$93:E617`).
+pub const SAFE_X: u16 = 0x0958;
+/// See [`SAFE_X`].
+pub const SAFE_Y: u16 = 0x095A;
 /// `$0498`, the enemies a room waits on (`docs/combat.md`), as the tower
 /// floors' controllers poll it.
 pub const ENEMIES: u16 = 0x0498;
@@ -563,6 +609,11 @@ impl<'a> Machine<'a> {
                 *memory.sleep = self.a?;
                 self.pc + 4
             }
+            // The same as a bank-relative write (`$93:E33F`).
+            0x9D if self.operand() == Some(0x0E) && self.x && !self.narrow => {
+                *memory.sleep = self.a?;
+                self.pc + 3
+            }
             0xBF | 0x9F => self.own(opcode, memory.own)?,
             // The palette buffer (`$7F:0600..07FF`): a room's colour effect,
             // not drawn here (`$90:A45C`); and the fixed colour after it
@@ -619,21 +670,23 @@ impl<'a> Machine<'a> {
         let next = self.poke(opcode, memory);
         next.or_else(|| self.resume_at(opcode))
             .or_else(|| self.script_bank(opcode, memory.bank))
-            .or_else(|| self.direct_page(opcode))
+            .or_else(|| self.direct_page(opcode, memory.words.get(&FRAMES).copied()))
     }
 
     /// `STA`, `LDA`, `ADC` on a direct-page word the run keeps for itself
-    /// (`$90:A137`, the `$11D` guardian's circle colour).
-    fn direct_page(&mut self, opcode: u8) -> Option<usize> {
+    /// (`$90:A137`, the `$11D` guardian's circle colour); `LDA $42`, the
+    /// frame counter (`$93:D968`).
+    fn direct_page(&mut self, opcode: u8, frames: Option<u16>) -> Option<usize> {
         if self.narrow || !matches!(opcode, 0x85 | 0xA5 | 0x65) {
             return None;
         }
         let at = *self.image.get(self.pc + 1)?;
+        let frames = frames.filter(|_| u16::from(at) == FRAMES && !self.direct.contains_key(&at));
         match opcode {
             0x85 => {
                 self.direct.insert(at, self.a?);
             }
-            0xA5 => self.set(*self.direct.get(&at)?),
+            0xA5 => self.set(frames.or_else(|| self.direct.get(&at).copied())?),
             _ => {
                 let (a, value) = (u32::from(self.a?), u32::from(*self.direct.get(&at)?));
                 let sum = a + value + u32::from(self.carry?);
@@ -1807,6 +1860,7 @@ mod tests {
                 x: 0x100,
                 y: 0x88,
                 facing: 3,
+                previous: None,
             },
             parent: Some(View {
                 x: 0x80,
