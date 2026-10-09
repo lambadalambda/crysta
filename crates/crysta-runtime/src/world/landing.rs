@@ -118,7 +118,7 @@ impl World<'_> {
     /// How far above his place Ark is drawn: a landing's drop.
     #[must_use]
     pub fn ark_lift(&self) -> i16 {
-        self.landing.map_or(0, Landing::lift)
+        self.landing.map_or(0, Landing::lift) + self.jump_height()
     }
 
     /// Whether Ark is drawn over the high tiles (`+$08 |= $3000`): a

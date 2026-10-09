@@ -700,6 +700,70 @@ fn ark_drops_onto_the_floor_below_and_walks_on() {
 }
 
 #[test]
+fn b_jumps_ark_over_a_two_cell_pit() {
+    // `docs/jump.md`, the native trace `p_24` (frame n is 60527 + n): on
+    // `$10F` at (136,736) Ark walks right, B at frame 24; the crouch from
+    // 25, the air from 28 (x 170, h -5), x 204 at 51, a pixel on at 54;
+    // `$0E` at 29, `$0F` at 54 (a frame late with a direction held). He
+    // clears the pit (columns 11-12); without the jump he falls.
+    use crysta_runtime::audio::Cue;
+    let b = Presses {
+        cancel: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        for jumps in [true, false] {
+            let mut world =
+                World::enter_with_events(rom.image(), 0x010F, 136, 736, after_the_intro()).unwrap();
+            let (life, _) = world.life();
+            let mut rows = vec![];
+            for frame in 0..80 {
+                let press = if jumps && frame == 24 {
+                    b
+                } else {
+                    Presses::default()
+                };
+                world.update(Some(Direction::Right), press).unwrap();
+                let sounds: Vec<u16> = world
+                    .take_cues()
+                    .into_iter()
+                    .filter_map(|cue| match cue {
+                        Cue::Sound(sound) if [0x0E00, 0x0F00].contains(&sound) => Some(sound),
+                        _ => None,
+                    })
+                    .collect();
+                let pose = world.ark_pose().map(|pose| pose.list);
+                rows.push((world.position().0, world.ark_lift(), pose, sounds));
+            }
+            let fell = world.life().0 < life || world.position().0 < 200;
+            assert_eq!(fell, !jumps, "{:?}: {:?}", rom.revision(), world.position());
+            if !jumps {
+                continue;
+            }
+            let row = |frame: usize| (rows[frame].0, rows[frame].1, rows[frame].2);
+            let expected = [
+                (24, (170, 0, None)),
+                (25, (170, 0, Some(6))),
+                (28, (170, -5, Some(7))),
+                (30, (173, -13, Some(7))),
+                (51, (204, 0, Some(8))),
+                (53, (204, 0, None)),
+                (54, (205, 0, None)),
+            ];
+            for (frame, values) in expected {
+                assert_eq!(row(frame), values, "{:?}: {frame}", rom.revision());
+            }
+            let sounds: Vec<(usize, u16)> = rows
+                .iter()
+                .enumerate()
+                .flat_map(|(frame, row)| row.3.iter().map(move |&sound| (frame, sound)))
+                .collect();
+            assert_eq!(sounds, [(29, 0x0E00), (54, 0x0F00)], "{:?}", rom.revision());
+        }
+    }
+}
+
+#[test]
 fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
     // Rows 39+ of `$10F` have no exit: damage, then the last safe spot.
     for rom in roms() {

@@ -171,7 +171,12 @@ impl World<'_> {
     /// his body costs life and pushes him away. Runs on game frames only.
     pub(super) fn hurt_ark(&mut self) {
         self.ark_immune = self.ark_immune.saturating_sub(1);
-        if self.ark_immune > 0 || self.hurt.is_some() || self.down.is_some() || self.hits_off() {
+        if self.ark_immune > 0
+            || self.hurt.is_some()
+            || self.down.is_some()
+            || self.hits_off()
+            || self.over_hits()
+        {
             return;
         }
         let body = boxes::place(ARK_BODY, self.position(), false);

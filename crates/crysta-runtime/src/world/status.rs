@@ -127,7 +127,8 @@ impl World<'_> {
         if statuses & BURN == 0 || self.down.is_some() {
             return;
         }
-        if self.fall.is_some() || self.lip_drop.is_some() {
+        // `$097C & 4`: a jump too.
+        if self.fall.is_some() || self.lip_drop.is_some() || self.jump.is_some() {
             slot.set_word_at(STATUSES, statuses & !BURN);
             return;
         }

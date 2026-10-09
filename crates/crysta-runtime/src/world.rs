@@ -40,6 +40,7 @@ mod door;
 mod fade;
 mod fall;
 mod hurt;
+mod jump;
 mod landing;
 mod levelup;
 mod life;
@@ -133,6 +134,8 @@ pub struct World<'a> {
     rope: Option<fall::Rope>,
     /// Ark jumping from the Hole's rim.
     lip_drop: Option<fall::LipDrop>,
+    /// Ark's jump with B.
+    jump: Option<jump::Jump>,
     safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
@@ -392,6 +395,7 @@ impl<'a> World<'a> {
             chapter: None,
             rope: None,
             lip_drop: None,
+            jump: None,
             safe: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -1392,7 +1396,7 @@ impl<'a> World<'a> {
         }
         self.life_frame();
         self.status_frame();
-        if let Some(step) = self.holding_frame(presses)? {
+        if let Some(step) = self.holding_frame(direction, presses)? {
             // The pot's own entity flies on while Ark falls or drops.
             if self.fall.is_some() || self.lip_drop.is_some() {
                 self.fly_pot()?;
@@ -1436,7 +1440,11 @@ impl<'a> World<'a> {
 
     /// A frame something holds Ark through: a level gained, a fall, a
     /// tower's end, a Magirock or a chest; first a contact's callback.
-    fn holding_frame(&mut self, presses: Presses) -> Result<Option<Step>, WorldError> {
+    fn holding_frame(
+        &mut self,
+        direction: Option<Direction>,
+        presses: Presses,
+    ) -> Result<Option<Step>, WorldError> {
         self.contact_frame();
         if let Some(step) = self.level_up_frame(presses)? {
             return Ok(Some(step));
@@ -1445,6 +1453,9 @@ impl<'a> World<'a> {
             return Ok(Some(step));
         }
         if let Some(step) = self.lip_drop_frame()? {
+            return Ok(Some(step));
+        }
+        if let Some(step) = self.jump_frame(direction, presses.cancel)? {
             return Ok(Some(step));
         }
         if let Some(step) = self.burn_frame()? {
@@ -1500,6 +1511,9 @@ impl<'a> World<'a> {
         } else {
             None
         };
+        if presses.cancel && free && !locked {
+            self.start_jump();
+        }
         let entered =
             matches!(step, Step::Entered { .. }) || matches!(opened, Some(Step::Entered { .. }));
         if !entered && !self.in_transition() {
@@ -1552,7 +1566,7 @@ impl<'a> World<'a> {
         }
         self.pickup = None;
         (self.fall, self.lip_drop, self.rope) = (None, None, None);
-        (self.thrust, self.hurt) = (None, None);
+        (self.thrust, self.hurt, self.jump) = (None, None, None);
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
@@ -2742,6 +2756,7 @@ mod tests {
             chapter: None,
             rope: None,
             lip_drop: None,
+            jump: None,
             safe: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,

@@ -228,6 +228,7 @@ impl World<'_> {
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
         if lip(under, at.1) {
+            self.jump = None;
             self.lip_drop = Some(LipDrop {
                 frame: 0,
                 carrying: false,
@@ -237,7 +238,10 @@ impl World<'_> {
             return;
         }
         match ground(under, at.1) {
-            Ground::Fall => return self.start_fall(),
+            Ground::Fall => {
+                self.jump = None;
+                return self.start_fall();
+            }
             Ground::Rope => self.rope = Some(self.rope.unwrap_or_default()),
             Ground::Solid => self.rope = None,
         }
