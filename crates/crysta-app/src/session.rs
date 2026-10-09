@@ -724,8 +724,8 @@ fn draw_dialogue(
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SpriteKey {
     /// A body's sequence: its record and descriptor (spawns share record
-    /// 0), selector, mirror and palette.
-    Body(usize, Option<usize>, u8, bool, u8),
+    /// 0), selector, mirror, vertical flip and palette.
+    Body(usize, Option<usize>, u8, bool, bool, u8),
     /// The helper art's list: an explosion, a dropped gem.
     Overlay(u32, u8),
 }
@@ -771,12 +771,19 @@ fn resident_animation<'s>(
             resident.descriptor,
             selector,
             hflip,
+            resident.vflip,
             palette,
         ))
         .or_insert_with(|| {
-            body.shown(image, (selector, hflip), palette)
+            let shown = body
+                .shown(image, (selector, hflip), palette)
                 .or_else(|_| body.shown(image, (body.initial(), hflip), palette))
-                .ok()
+                .ok()?;
+            Some(if resident.vflip {
+                shown.flipped_vertically()
+            } else {
+                shown
+            })
         })
         .as_ref()
 }
