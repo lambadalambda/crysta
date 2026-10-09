@@ -688,13 +688,18 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
     )
 }
 
-/// A list of the helper art (`$A2:C000`) as rasters: an enemy's explosion,
-/// a dropped gem.
+/// A list of the helper art (`$A2:C000`) as rasters, mirrored or not: an
+/// enemy's explosion, a dropped gem, Shadowkeeper's wisps.
 ///
 /// # Errors
 /// Refuses a list outside the qualified shapes.
-pub fn overlay_animation(image: &[u8], base: u32, selector: u8) -> Result<Animation, ArtError> {
-    list_animation(&PandoraArt::object(image, base, selector)?, selector, false)
+pub fn overlay_animation(
+    image: &[u8],
+    base: u32,
+    selector: u8,
+    hflip: bool,
+) -> Result<Animation, ArtError> {
+    list_animation(&PandoraArt::object(image, base, selector)?, selector, hflip)
 }
 
 /// A Pandora art's list as rasters.

@@ -928,7 +928,7 @@ impl<'a> World<'a> {
             resident.hidden = actor.hidden;
             resident.priority = actor.priority;
             resident.palette = actor.palette;
-            resident.overlay = actor.overlay;
+            resident.overlay = actor.shown_overlay();
             resident.depth = actor.depth;
         }
         for index in gone.into_iter().rev() {

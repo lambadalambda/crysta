@@ -787,6 +787,9 @@ pub struct Actor {
     pub(crate) died: bool,
     /// The helper art's list drawn instead of the body.
     pub(crate) overlay: Option<(u32, u8)>,
+    /// A spawn's art turned to the helper art's (`COP D8`, Shadowkeeper's
+    /// wisps `$8F:80C5`): its lists are drawn in place of its parent's.
+    helper_art: Option<u32>,
     /// A sleep `COP 46` or a native store leaves for the next yield
     /// (`E+$0E`).
     sleep: u16,
@@ -941,6 +944,7 @@ impl Actor {
             boxes: None,
             died: false,
             overlay: None,
+            helper_art: None,
             sleep: 0,
             walked: false,
             contact: None,
@@ -1509,6 +1513,13 @@ impl Actor {
     /// The descriptor its art and boxes come from, its parent's for a
     /// spawned child.
     #[must_use]
+    /// The helper art's list drawn in place of the body: an explosion, a
+    /// gem, or a spawn's own pose in the helper art.
+    pub(crate) fn shown_overlay(&self) -> Option<(u32, u8)> {
+        self.overlay
+            .or_else(|| self.helper_art.map(|helper| (helper, self.selector)))
+    }
+
     pub(crate) const fn descriptor(&self) -> Option<usize> {
         self.descriptor
     }
@@ -1992,6 +2003,9 @@ impl Actor {
                 if self.foe.is_some() || self.boxes.is_some() || self.spawned {
                     self.boxes = cadence::packet_boxes(image, pointer).map(std::rc::Rc::new);
                 }
+                let art = u32::from_le_bytes([pointer[0], pointer[1], pointer[2], 0]);
+                let helper = foe::helper(image);
+                self.helper_art = (self.spawned && art == helper).then_some(helper);
                 self.pc = operands + 3;
             }
             OBJ_PRIORITY => {

@@ -1582,6 +1582,38 @@ fn shadowkeeper_falls_in_its_native_stages_and_the_tower_ends() {
 }
 
 #[test]
+fn shadowkeepers_wisps_show_the_helper_arts_list() {
+    // `$8F:80C5`: a wisp spawned from the head's descriptor turns to the
+    // helper art (`COP D8 $A2:C000`), list 8.
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x101..=0x107).chain([0x19B]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 128, 976, events).unwrap();
+        let helper = if rom.revision() == Revision::Japan {
+            0xA2_C000
+        } else {
+            0xA4_C000
+        };
+        let mut wisps = 0;
+        for _ in 0..1200 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+            wisps = wisps.max(
+                world
+                    .residents()
+                    .iter()
+                    .filter(|resident| resident.overlay == Some((helper, 8)))
+                    .count(),
+            );
+        }
+        assert!(wisps > 4, "{:?}: {wisps}", rom.revision());
+    }
+}
+
+#[test]
 fn shadowkeepers_shots_show_the_green_its_body_loaded() {
     // `$93:D895`: `COP 5A` loads 12 greens to OBJ colours `$82..$8D`; a
     // shot's pieces are in palette 7 and its field 7 (`COP BB $0E`): the
