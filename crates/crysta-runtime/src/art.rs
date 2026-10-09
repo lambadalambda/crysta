@@ -415,6 +415,9 @@ enum BodyArt {
     /// One list of a Pandora art (Pandora's Box, an object sheet's list),
     /// rasterized unmirrored and mirrored.
     List(u8, [Animation; 2]),
+    /// A mode-4 descriptor's list (`docs/mode4-descriptors.md`), and the
+    /// descriptor, whose other lists are decoded as they are shown.
+    Mode4(usize, u8, [Animation; 2]),
 }
 
 /// The OBJ palette the frozen townsfolk show (`docs/scene-effects.md`).
@@ -455,10 +458,14 @@ impl Body {
                 (actor.graphics(), actor.palette(), actor.palette_base()),
                 hflip,
             ),
-            BodyArt::List(list, animations) if selector == *list => {
+            BodyArt::List(list, animations) | BodyArt::Mode4(_, list, animations)
+                if selector == *list =>
+            {
                 Ok(animations[usize::from(hflip)].clone())
             }
-            BodyArt::List(..) => Err(SpriteError::Invalid("no such list").into()),
+            BodyArt::List(..) | BodyArt::Mode4(..) => {
+                Err(SpriteError::Invalid("no such list").into())
+            }
         }
     }
 
@@ -468,7 +475,7 @@ impl Body {
     pub const fn shown_slot(&self, field: u8) -> Option<u8> {
         match &self.art {
             BodyArt::House(actor) => Some((actor.palette_base() / 16 + field) & 7),
-            BodyArt::List(..) => None,
+            BodyArt::List(..) | BodyArt::Mode4(..) => None,
         }
     }
 
@@ -488,7 +495,7 @@ impl Body {
                 (actor.graphics(), palette, actor.palette_base()),
                 hflip,
             ),
-            BodyArt::List(..) => self.animation(selector, hflip),
+            BodyArt::List(..) | BodyArt::Mode4(..) => self.animation(selector, hflip),
         }
     }
 
@@ -507,9 +514,14 @@ impl Body {
         let frozen = (field != 0 && self.shown_slot(field) == Some(FROZEN_SLOT))
             .then(|| frozen_palette(image))
             .flatten();
-        let shown = match frozen {
-            Some(palette) => self.recoloured(selector, hflip, &palette)?,
-            None => self.animation(selector, hflip)?,
+        let shown = match (&self.art, frozen) {
+            // Another list of the descriptor: Shadowkeeper's shots and
+            // wisps are its own spawns' poses.
+            (BodyArt::Mode4(descriptor, list, _), _) if selector != *list => {
+                Self::mode4(image, *descriptor, selector)?.animation(selector, hflip)?
+            }
+            (_, Some(palette)) => self.recoloured(selector, hflip, &palette)?,
+            (_, None) => self.animation(selector, hflip)?,
         };
         // Colour math follows the slot shown, not the one decoded.
         Ok(match self.shown_slot(field) {
@@ -523,7 +535,7 @@ impl Body {
     pub const fn initial(&self) -> u8 {
         match &self.art {
             BodyArt::House(actor) => actor.initial(),
-            BodyArt::List(list, _) => *list,
+            BodyArt::List(list, _) | BodyArt::Mode4(_, list, _) => *list,
         }
     }
 
@@ -550,7 +562,7 @@ impl Body {
             )
         };
         Ok(Self {
-            art: BodyArt::List(selector, [animate(false)?, animate(true)?]),
+            art: BodyArt::Mode4(descriptor, selector, [animate(false)?, animate(true)?]),
         })
     }
 
@@ -572,8 +584,7 @@ impl Body {
 /// the script) of that art (`docs/mode4-descriptors.md`), as tower 1's
 /// statues and plaque.
 fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placeholder>> {
-    // A spawned child has no header of its own: it draws as its parent.
-    let descriptor = resident.descriptor.filter(|_| resident.record != 0)?;
+    let descriptor = resident.descriptor?;
     // Mode `$04` with the plain palette forms (`$40`, or 0 as the hooded
     // guardians, whose byte 4 names their profile); the table forms are the
     // house decoder's.
@@ -583,10 +594,16 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
     {
         return None;
     }
-    let header = usize::try_from(resident.script? & 0x3F_FFFF)
-        .ok()?
-        .checked_sub(5)?;
-    let list = *image.get(header)?;
+    // A spawned child has no header of its own: its pose is its parent's
+    // list, its lists the parent's descriptor's.
+    let list = if resident.record == 0 {
+        resident.selector
+    } else {
+        let header = usize::try_from(resident.script? & 0x3F_FFFF)
+            .ok()?
+            .checked_sub(5)?;
+        *image.get(header)?
+    };
     // A header byte past the packet's lists (the light room's orb, `$1F`)
     // is not a list: the pose the record starts in is.
     Some(
