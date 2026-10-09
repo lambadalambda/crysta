@@ -920,6 +920,7 @@ impl<'a> World<'a> {
             resident.position = actor.position;
             resident.selector = actor.selector;
             resident.hflip = actor.hflip;
+            resident.vflip = actor.vflip;
             resident.pose_age = actor.pose_age;
             resident.walking = actor.walking;
             resident.hidden = actor.hidden;
@@ -1248,6 +1249,7 @@ impl<'a> World<'a> {
                 initial: 0,
                 selector: 0,
                 hflip: actor.hflip,
+                vflip: actor.vflip,
                 pose_age: 0,
                 walking: false,
                 descriptor: actor.descriptor(),
@@ -2661,6 +2663,7 @@ mod tests {
             initial: 0,
             selector: 0,
             hflip: false,
+            vflip: false,
             pose_age: 0,
             walking: false,
             descriptor: None,

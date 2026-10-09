@@ -32,6 +32,8 @@ pub struct Resident {
     pub selector: u8,
     /// Horizontal mirror in force.
     pub hflip: bool,
+    /// Vertical flip in force (`+$08` bit `$8000`).
+    pub vflip: bool,
     /// Frames since the pose changed or a qualified action restarted it.
     pub pose_age: u32,
     /// Whether a step is under way.
@@ -151,6 +153,7 @@ pub fn residents(
                 initial,
                 selector: initial,
                 hflip: false,
+                vflip: false,
                 pose_age: 0,
                 walking: false,
                 descriptor: descriptor_owner(&present, index)

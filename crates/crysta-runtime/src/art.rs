@@ -36,6 +36,25 @@ pub struct Raster {
 }
 
 impl Raster {
+    /// The raster mirrored top to bottom about the actor's origin, as an OBJ
+    /// with `+$08` bit `$8000` shows (`COP B4`).
+    #[must_use]
+    pub fn flipped_vertically(&self) -> Self {
+        let height = i16::try_from(self.height).unwrap_or(i16::MAX);
+        Self {
+            width: self.width,
+            height: self.height,
+            offset: (self.offset.0, -self.offset.1 - height),
+            pixels: self
+                .pixels
+                .chunks(self.width.max(1))
+                .rev()
+                .flatten()
+                .copied()
+                .collect(),
+        }
+    }
+
     /// Whether any pixel is opaque.
     #[must_use]
     pub fn is_visible(&self) -> bool {
@@ -246,6 +265,15 @@ pub struct Animation {
 }
 
 impl Animation {
+    /// The frames mirrored top to bottom ([`Raster::flipped_vertically`]).
+    #[must_use]
+    pub fn flipped_vertically(mut self) -> Self {
+        for frame in &mut self.frames {
+            *frame = frame.flipped_vertically();
+        }
+        self
+    }
+
     /// The same frames, every opaque pixel marked as colour math takes it
     /// or not ([`MATH_ALPHA`]).
     #[must_use]
@@ -808,6 +836,20 @@ fn own_art(image: &[u8], resident: &Resident) -> Option<(u32, u8)> {
 #[cfg(test)]
 mod timing_tests {
     use super::{Animation, Raster};
+
+    #[test]
+    fn a_vertical_flip_mirrors_the_rows_about_the_origin() {
+        // Rows at y -16 and -15 of a 1x2 raster: flipped, at 15 and 14.
+        let raster = Raster {
+            width: 1,
+            height: 2,
+            offset: (-4, -16),
+            pixels: vec![0xFF00_0001, 0xFF00_0002],
+        };
+        let flipped = raster.flipped_vertically();
+        assert_eq!(flipped.offset, (-4, 14));
+        assert_eq!(flipped.pixels, [0xFF00_0002, 0xFF00_0001]);
+    }
 
     fn animation(durations: &[u8]) -> Animation {
         Animation {
