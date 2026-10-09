@@ -19,3 +19,7 @@ The dash jump, the carry jump and the rope jump differ from the ground jump (`do
 ## Acceptance Criteria
 
 - Each matches `docs/jump.md` on both ROMs.
+
+## Progress
+
+- The dash jump runs, frame for frame with the native trace on both ROMs (`b_in_a_dash_jumps_on_with_the_dash`). A new dash jump in the grace takes B alone (natively B with the dash's way).
