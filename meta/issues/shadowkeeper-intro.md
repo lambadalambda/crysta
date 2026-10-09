@@ -20,5 +20,6 @@
 ## Progress
 
 - The intro runs (`actors/routines.rs`): the torch bits by camera band, the hold at 272, the camera's climb (`$0DEC`), flag `$001`, music 5 (`the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper`).
-- Open: the hosts draw no darkness, light pools (`COP AA $8182`'s HDMA) or the head's circle window (`COP 63`, `$0474`).
+- The darkness (`world/darkness.rs`): `COP AA $8182` sets it; per band of lines the app subtracts the map's mask (torch lit) or the fill, in the colour `$8F:8279` gives for the lit torches.
+- Open: the head's circle window (`COP 63`, `$0474`).
 
