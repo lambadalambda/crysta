@@ -765,7 +765,7 @@ pub struct Actor {
     pub hidden: bool,
     /// OBJ priority (entity `+$08` bits 12–13): 2 unless `COP BA` set it.
     pub priority: u8,
-    /// `+$06`'s depth bits ([`DEPTH_06`]).
+    /// `+$06`'s depth bits, 11 to 14 (`DEPTH_06`).
     pub depth: u16,
     /// `+$06` bit 6 ([`KEEP_STREAMS`]).
     keeps_streams: bool,
