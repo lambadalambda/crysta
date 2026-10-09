@@ -1619,7 +1619,11 @@ fn shadowkeepers_wisps_show_the_helper_arts_list_in_its_window() {
             );
         }
         assert!(wisps > 4, "{:?}: {wisps}", rom.revision());
-        assert!(circle.contains(&(58, 198)), "{:?}: {circle:?}", rom.revision());
+        assert!(
+            circle.contains(&(58, 198)),
+            "{:?}: {circle:?}",
+            rom.revision()
+        );
     }
 }
 

@@ -1871,16 +1871,7 @@ impl Actor {
             CHAINED_BRANCH | CHAINED_DESPAWN => {
                 return self.branch_on_chain(service, operands, bank, around)
             }
-            LOAD_COLOURS => return self.load_colours(operands, around),
-            CIRCLE => {
-                let Some(&radius) = around.image.get(operands + 1) else {
-                    self.state = State::Frozen;
-                    return false;
-                };
-                around.globals.circle = Some(self.id);
-                around.globals.scratch.insert(CIRCLE_RADIUS, u16::from(radius));
-                self.pc = operands + 2;
-            }
+            LOAD_COLOURS | CIRCLE => return self.display_service(service, operands, around),
             // Anything else is stepped over by its derived length. That
             // includes text and flag writes: the loop's ambient effects
             // are not the runtime's to apply from here.
@@ -1900,15 +1891,31 @@ impl Actor {
         true
     }
 
-    /// `COP 5A`: the OBJ colours into [`crate::colours::ObjColours`].
+    /// `COP 5A`, the OBJ colours into [`crate::colours::ObjColours`], and
+    /// `COP 63`, the circle window around this actor with its radius.
     /// Returns whether execution continues.
-    fn load_colours(&mut self, operands: usize, around: &mut Surroundings<'_>) -> bool {
+    fn display_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
         self.cadence = None;
-        if !around.globals.obj_colours.load(around.image, operands) {
+        let (done, length) = if service == LOAD_COLOURS {
+            (around.globals.obj_colours.load(around.image, operands), 5)
+        } else if let Some(&radius) = around.image.get(operands + 1) {
+            around.globals.circle = Some(self.id);
+            let words = &mut around.globals.scratch;
+            words.insert(CIRCLE_RADIUS, u16::from(radius));
+            (true, 2)
+        } else {
+            (false, 2)
+        };
+        if !done {
             self.state = State::Frozen;
             return false;
         }
-        self.pc = operands + 5;
+        self.pc = operands + length;
         true
     }
 
