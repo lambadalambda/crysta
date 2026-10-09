@@ -363,7 +363,8 @@ impl Session {
         );
     }
 
-    /// Decodes bodies for the current roster, recomputed when it changes.
+    /// Decodes bodies for the current roster, recomputed when it changes,
+    /// and drops sprites rasterized in other OBJ colours.
     pub fn ensure_art(&mut self) {
         let map = self.world.map();
         let records: Vec<usize> = self
@@ -383,6 +384,7 @@ impl Session {
             let art = residents_art(self.image, map, self.world.residents(), spawned, events);
             self.art = Some((map, records, self.world.events().to_vec(), art));
         }
+        self.ensure_sprite_colours();
     }
 
     /// Drops the sprites rasterized in other OBJ colours than the world's.
@@ -529,7 +531,6 @@ impl Session {
         }
         self.ensure_background(cartridge);
         self.ensure_art();
-        self.ensure_sprite_colours();
         let (carried, pot) = self.carry_sprites();
         let Session {
             world,
@@ -553,6 +554,7 @@ impl Session {
         };
         let camera = background.camera(world.camera_focus(), frame.width);
         background.draw(frame, camera, position);
+        frame::hide_in_window(frame, camera, world.circle().as_ref());
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
         let backdrop = frame::Backdrop::keep(frame, world.display().darkening());

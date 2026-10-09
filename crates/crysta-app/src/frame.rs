@@ -48,6 +48,26 @@ impl Canvas {
 }
 
 /// A colour as the canvas keeps it, `0x00RRGGBB`.
+/// Takes the first layer off the main screen inside the circle window
+/// (`World::circle`, `W12SEL $02` with `TMW`): the backdrop, black on
+/// `$123`, shows there; the sprites are drawn later.
+pub fn hide_in_window(
+    canvas: &mut Canvas,
+    camera: (i32, i32),
+    circle: Option<&crysta_runtime::world::Circle>,
+) {
+    let Some(circle) = circle else {
+        return;
+    };
+    for row in 0..signed(VIEW_HEIGHT) {
+        if let Some((first, end)) = circle.span(camera.1 + row) {
+            for x in (first - camera.0).max(0)..end - camera.0 {
+                canvas.set((x, row), 0);
+            }
+        }
+    }
+}
+
 pub(crate) fn rgb(colour: Bgr555) -> u32 {
     let [r, g, b] = colour.rgb8();
     u32::from(r) << 16 | u32::from(g) << 8 | u32::from(b)
