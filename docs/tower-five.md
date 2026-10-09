@@ -279,8 +279,31 @@ The scheduler side: actors run in list order, spawns join it by kind, COP
 04 and COP 22 on `+$26`, `+$06` bit 6 keeps streams, spawned attackers take
 the parent's profile, deaths jump to `7F:1012`, writes into other actors
 (`Poke`). Both ROMs reach `$106` (`shadowkeeper_falls_in_its_native_stages_and_the_tower_ends`).
-Open: the darkness and the window (HDMA), drawing `+$08` vflip and the
-depth bits, frame-exact timing (the native trace runs with lag frames).
+Open: the window (HDMA), the depth bits, frame-exact timing (the native
+trace runs with lag frames).
+
+### The darkness, natively
+
+PPU registers read at frames 61001..61857 do not change: `TM $15`, `TS
+$02`, `TMW $15`, `TSW $02`, `CGWSEL $82`, `CGADSUB $B1`, `W12SEL $02`,
+`WOBJSEL $00` (no colour window: the clip of `CGWSEL` never applies). Each
+pixel of BG1, OBJ palettes 4-7 and the backdrop is `max(0, it - BG2)` per
+5-bit channel.
+
+- HDMA channel 1 writes `$2108` (BG2SC) from `$7E:5000`/`$5100` (two
+  buffers): `$3C` (the mask) or `$6C` (the fill) per band. Channels 2 and 3
+  write window 1 (`$2126`/`$2127`) from `$7E:6000..$63FF`, enabled
+  (`$420C = $0E`) only while the head's circle is open; inside it BG1 is
+  off the main screen, so the backdrop minus the mask is black.
+- The fill (`$8F:828F`) is all `$1E00`: tile `$200`, palette 7. Tile `$200`
+  is all colour 15 (CGRAM `$7F`, the darkness colour). The mask uses it
+  outside its light pools (tiles `$250..$2BA`, colours 1-15 of palette 7).
+  The walls' colours are below `$7F`'s, so outside the pools the view is
+  black.
+- The char sheets hold 512 tiles: tiles `$200` and up come from another
+  load. BG palette 7's colours 1-14 change during the fight.
+- The oracle's frames use ares's deep-black boost (5-bit 1 -> 1, 2 -> 3,
+  ... out of 255): compare 5-bit values, not 8-bit pixels.
 
 ## 5. Proposed runtime model (blockers first)
 
