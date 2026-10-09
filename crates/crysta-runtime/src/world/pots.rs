@@ -158,11 +158,11 @@ impl World<'_> {
             });
         }
         let state = self.pots.as_ref()?.state?;
-        if let Some(jump) = self.jump.filter(|jump| jump.carrying()) {
+        if let Some(drop) = self.lip_drop.filter(|drop| drop.carrying()) {
             return Some(Carry {
                 motion: PandoraCarryMotion::Dropping,
                 facing: state.facing() as u8,
-                tick: u8::try_from(jump.frame()).unwrap_or(u8::MAX),
+                tick: u8::try_from(drop.frame()).unwrap_or(u8::MAX),
             });
         }
         let motion = match state.phase() {
@@ -328,8 +328,8 @@ impl World<'_> {
         if !held {
             return;
         }
-        if let Some(jump) = &mut self.jump {
-            jump.hold_pot();
+        if let Some(drop) = &mut self.lip_drop {
+            drop.hold_pot();
         } else if self.fall.is_some() {
             self.fly_carried(pots);
         } else if self.rope.is_some() {

@@ -15,7 +15,7 @@
 //! the end, 4 frames of wobble (`$84:9BD9`) and the fall.
 //!
 //! The fall's, the drop's and the rope's poses are [`Fall::pose`],
-//! [`Jump::pose`] and [`Rope::pose`]; a drop with a pot in hand is a carry
+//! [`LipDrop::pose`] and [`Rope::pose`]; a drop with a pot in hand is a carry
 //! pose (`World::carry`). Not modelled: the rope after a jump (B), which
 //! wobbles Ark off in the air or leans him on landing (`$0986 & $3C00`,
 //! `$84:9BF8`; `meta/issues/jump.md`).
@@ -84,12 +84,12 @@ impl Fall {
 
 /// Ark dropping from a lip: frames into it, and whether he holds a pot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) struct Jump {
+pub(super) struct LipDrop {
     frame: u16,
     carrying: bool,
 }
 
-impl Jump {
+impl LipDrop {
     /// Resource 0's `$13`, or `$15` facing Up, looped (`$84:A873`,
     /// `$84:A899`), from the frame after the test; none with a pot, a carry
     /// pose.
@@ -222,13 +222,13 @@ impl World<'_> {
     /// The ground test after Ark's step: a fall, the rope, or solid ground;
     /// a place without `$13` under it is kept as the last safe one.
     pub(super) fn ground_test(&mut self) {
-        if self.fall.is_some() || self.jump.is_some() || self.in_transition() {
+        if self.fall.is_some() || self.lip_drop.is_some() || self.in_transition() {
             return;
         }
         let at = self.position();
         let under = samples(at).map(|cell| self.attribute(cell));
         if lip(under, at.1) {
-            self.jump = Some(Jump {
+            self.lip_drop = Some(LipDrop {
                 frame: 0,
                 carrying: false,
             });
@@ -260,19 +260,19 @@ impl World<'_> {
     /// A frame of a drop from a lip: Ark sinks, an exit under him is
     /// taken, and once every sample is floor, `$13` or a pit he lands, or
     /// with only pits under him falls (`$80:CDA2`, `$80:CE01`).
-    pub(super) fn jump_frame(&mut self) -> Result<Option<Step>, WorldError> {
-        let Some(jump) = &mut self.jump else {
+    pub(super) fn lip_drop_frame(&mut self) -> Result<Option<Step>, WorldError> {
+        let Some(drop) = &mut self.lip_drop else {
             return Ok(None);
         };
-        jump.frame += 1;
-        let carrying = jump.carrying;
-        if jump.frame == 1 {
+        drop.frame += 1;
+        let carrying = drop.carrying;
+        if drop.frame == 1 {
             self.globals.audio.sound_port3(JUMP_SOUND);
         }
         let (x, y) = self.position();
         self.walking = room_core::WalkingState::new(x, y + DROP);
         if let Some(step) = self.take_exit()? {
-            self.jump = None;
+            self.lip_drop = None;
             return Ok(Some(step));
         }
         let at = self.position();
@@ -293,7 +293,7 @@ impl World<'_> {
             if falls {
                 self.start_fall();
             }
-            self.jump = None;
+            self.lip_drop = None;
         }
         self.run_actors()?;
         Ok(Some(Step::Walked))

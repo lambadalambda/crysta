@@ -149,7 +149,7 @@ impl World<'_> {
     /// a hit's push, a map change.
     fn holds_life(&self) -> bool {
         self.fall.is_some()
-            || self.jump.is_some()
+            || self.lip_drop.is_some()
             || self.rope.is_some()
             || self.hurt.is_some()
             || self.in_transition()

@@ -67,7 +67,7 @@ impl World<'_> {
             .and_then(crate::actors::Actor::ark_shown)
             .or_else(|| self.landing.and_then(super::landing::Landing::pose))
             .or_else(|| self.fall.and_then(super::fall::Fall::pose))
-            .or_else(|| self.jump.and_then(|jump| jump.pose(self.facing)))
+            .or_else(|| self.lip_drop.and_then(|drop| drop.pose(self.facing)))
             .or_else(|| self.burn.and_then(super::status::Burn::pose))
             .or_else(|| self.hurt.and_then(super::hurt::Hurt::pose))
             .or_else(|| {

@@ -132,7 +132,7 @@ pub struct World<'a> {
     chapter: Option<chapter::ChapterEnd>,
     rope: Option<fall::Rope>,
     /// Ark jumping from the Hole's rim.
-    jump: Option<fall::Jump>,
+    lip_drop: Option<fall::LipDrop>,
     safe: Option<((u16, u16), Direction)>,
     /// Last direction the player moved in, which is the way they face.
     facing: Direction,
@@ -391,7 +391,7 @@ impl<'a> World<'a> {
             fall: None,
             chapter: None,
             rope: None,
-            jump: None,
+            lip_drop: None,
             safe: None,
             facing: Direction::Down,
             animation: AnimationState::standing(Direction::Down),
@@ -1394,7 +1394,7 @@ impl<'a> World<'a> {
         self.status_frame();
         if let Some(step) = self.holding_frame(presses)? {
             // The pot's own entity flies on while Ark falls or drops.
-            if self.fall.is_some() || self.jump.is_some() {
+            if self.fall.is_some() || self.lip_drop.is_some() {
                 self.fly_pot()?;
             }
             self.apply_patches()?;
@@ -1444,7 +1444,7 @@ impl<'a> World<'a> {
         if let Some(step) = self.fall_frame()? {
             return Ok(Some(step));
         }
-        if let Some(step) = self.jump_frame()? {
+        if let Some(step) = self.lip_drop_frame()? {
             return Ok(Some(step));
         }
         if let Some(step) = self.burn_frame()? {
@@ -1551,7 +1551,7 @@ impl<'a> World<'a> {
             self.globals.presentation = None;
         }
         self.pickup = None;
-        (self.fall, self.jump, self.rope) = (None, None, None);
+        (self.fall, self.lip_drop, self.rope) = (None, None, None);
         (self.thrust, self.hurt) = (None, None);
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
@@ -2741,7 +2741,7 @@ mod tests {
             fall: None,
             chapter: None,
             rope: None,
-            jump: None,
+            lip_drop: None,
             safe: None,
             spawn_events: new_game_flags(),
             facing: Direction::Down,
