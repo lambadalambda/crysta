@@ -764,6 +764,52 @@ fn b_jumps_ark_over_a_two_cell_pit() {
 }
 
 #[test]
+fn b_in_a_dash_jumps_on_with_the_dash() {
+    // `docs/jump.md`, the native trace `d_jp_right_held` (its row n is
+    // frame n - 1 here): on `$101` a double tap dashes right from x 40; B
+    // at 14; the air from 15 (x 68, h -4), `$0E` at 16, lists `$0D` then
+    // `$0E`, h 0 from 37; the grace's `$28` from 40 (x 127) to 46; the
+    // dash on from 47 (x 143).
+    use crysta_runtime::audio::Cue;
+    let right = Some(Direction::Right);
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0101, 40, 448, after_the_intro()).unwrap();
+        play(&mut world, 30, false);
+        let mut inputs = vec![right, None, None];
+        inputs.extend([right; 46]);
+        let mut rows = vec![];
+        for (frame, direction) in inputs.into_iter().enumerate() {
+            let press = Presses {
+                cancel: frame == 14,
+                ..Presses::default()
+            };
+            world.update(direction, press).unwrap();
+            let leap = world
+                .take_cues()
+                .into_iter()
+                .any(|cue| matches!(cue, Cue::Sound(0x0E00)));
+            let pose = world.ark_pose().map(|pose| (pose.resource, pose.list));
+            rows.push((world.position().0, world.ark_lift(), pose, leap));
+        }
+        let expected = [
+            (14, (66, 0, None, false)),
+            (15, (68, -4, Some((3, 0x0D)), false)),
+            (16, (71, -8, Some((3, 0x0D)), true)),
+            (27, (96, -23, Some((3, 0x0E)), false)),
+            (37, (120, 0, Some((3, 0x0E)), false)),
+            (40, (127, 0, Some((1, 0x28)), false)),
+            (46, (141, 0, Some((1, 0x28)), false)),
+            (47, (143, 0, None, false)),
+        ];
+        for (frame, row) in expected {
+            assert_eq!(rows[frame], row, "{:?}: {frame}", rom.revision());
+        }
+        assert!(world.run_pose().is_some(), "{:?}", rom.revision());
+    }
+}
+
+#[test]
 fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
     // Rows 39+ of `$10F` have no exit: damage, then the last safe spot.
     for rom in roms() {
