@@ -147,7 +147,7 @@ fn start_player(cartridge: &rom::Rom) -> Result<music::Player, String> {
     .map_err(|error| error.to_string())
 }
 
-/// `at:D:200:700`: re-enters map `$000D` at (200,700).
+/// `at:D:200:700`: re-enters map `$000D` at (200,700), keeping the flags.
 fn enter_at(session: &mut Session, image: &'static [u8], place: &str) {
     let mut parts = place.split(':');
     let parsed = (
@@ -159,7 +159,8 @@ fn enter_at(session: &mut Session, image: &'static [u8], place: &str) {
         eprintln!("bad placement in {place:?}");
         std::process::exit(2);
     };
-    session.world = World::enter(image, map, x, y).unwrap_or_else(|error| {
+    let events = session.world.events().to_vec();
+    session.world = World::enter_with_events(image, map, x, y, events).unwrap_or_else(|error| {
         eprintln!("cannot enter {map:#06x}: {error}");
         std::process::exit(1);
     });
@@ -170,8 +171,9 @@ fn enter_at(session: &mut Session, image: &'static [u8], place: &str) {
 ///
 /// The script is comma-separated: `down:400` walks 400 frames down, `wait:5`
 /// stands for 5, `talk` presses the interact button once, and `at:D:200:700`
-/// re-enters map `$000D` at (200,700) to look at a room directly, and
-/// `life:999` sets Ark's life.
+/// re-enters map `$000D` at (200,700) to look at a room directly,
+/// `flag:19B` sets event flag `$19B` for the next `at:`, and `life:999`
+/// sets Ark's life.
 fn screenshot(
     cartridge: &rom::Rom,
     image: &'static [u8],
@@ -182,6 +184,13 @@ fn screenshot(
     for step in script.split(',').filter(|step| !step.is_empty()) {
         if let Some(rest) = step.strip_prefix("at:") {
             enter_at(&mut session, image, rest);
+            continue;
+        }
+        if let Some(flag) = step
+            .strip_prefix("flag:")
+            .and_then(|v| u16::from_str_radix(v, 16).ok())
+        {
+            session.world.set_flag(flag);
             continue;
         }
         if let Some(life) = step
