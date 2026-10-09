@@ -74,6 +74,8 @@ pub struct Globals {
     /// WRAM words scripts keep as their own variables (see
     /// `actors::native`); they outlive map loads, as WRAM does.
     pub scratch: crate::actors::Scratch,
+    /// `$0DEC`: the actor the camera follows instead of Ark.
+    pub camera_target: Option<u16>,
     /// Money, Prime Blue and the items scripts have given.
     pub inventory: crate::inventory::Inventory,
     /// The native save slot the world was loaded from or began with: the
@@ -251,6 +253,7 @@ impl Globals {
             player_script_source: None,
             transfer: None,
             scratch: crate::actors::Scratch::new(),
+            camera_target: None,
             inventory: crate::inventory::Inventory::default(),
             slot: crate::save::SaveSlot::default(),
             sram: crate::sram::Sram::default(),

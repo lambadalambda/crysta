@@ -1,31 +1,28 @@
 //! Shadowkeeper, tower 5's guardian on `$123` (`docs/tower-five.md` §1,
-//! §5.5), as a reduced fight in Rust: its native scripts take phase words,
-//! list walks and writes into other actors' script pointers that no other
-//! script needs. The intro (`$8F:8005`) and the body's script
-//! (`$93:D876`) are replaced; the end controller (`$90:A3AE`) runs as it is.
+//! §5.5), as a reduced fight in Rust: the body's script (`$93:D876`) is
+//! replaced. The intro (`$8F:8005`, its native code modelled in
+//! `actors/routines.rs`) and the end controller (`$90:A3AE`) run as they
+//! are.
 //!
-//! - Ark walks up the corridor; at y < 272 (`$8F:804A`) the fight begins:
-//!   flag `$001`, music 5.
+//! - At Ark's y < 272 (`$8F:804A`) the intro holds him, the camera climbs
+//!   to the body, the torches light up; then flag `$001`, music 5: the
+//!   fight begins.
 //! - The body is an enemy of its descriptor's profile (`$3C`): it takes no
 //!   hits before the fight. At its first life's end it takes a second of
 //!   100 (`docs/tower-five.md` §5.5), then explodes; the enemies' count
 //!   falls to 0 and the end controller goes on.
 //!
-//! Not modelled: the darkness and the torches, the camera's pan, the
-//! claws, the tail and the shots (the body hurts by its own attack box
-//! only), the "Defeated Shadowkeeper!!" text.
-//! Tracked: `meta/issues/shadowkeeper-full-fight.md`.
+//! Not modelled: the darkness, the head's window and wisps, the claws, the
+//! tail and the shots (the body hurts by its own attack box only).
+//! Tracked: `meta/issues/shadowkeeper-scripts.md`.
 
 use super::World;
 
-/// The body's script and the intro's, Japanese and European.
+/// The body's script, Japanese and European.
 const BODY: [u32; 2] = [0x93_D876, 0x99_9B5E];
-const INTRO: u32 = 0x8F_8005;
-/// The map, where the fight begins, its music and its flag.
+/// The map, and the flag the intro sets as the fight begins.
 const MAP: u16 = 0x0123;
-const BEGINS: u16 = 272;
-const MUSIC: u8 = 5;
-const FIGHT_FLAG: u16 = 0x8001;
+const FIGHT_FLAG: u16 = 0x001;
 /// The second life.
 const SECOND_LIFE: u16 = 100;
 
@@ -39,17 +36,12 @@ pub(super) struct Fight {
 }
 
 impl World<'_> {
-    /// At `$123`'s load: the body held for the fight, the intro gone.
+    /// At `$123`'s load: the body held for the fight.
     pub(super) fn start_shadowkeeper(&mut self) {
         if self.map != MAP {
             return;
         }
         let script = |resident: &crate::residents::Resident| resident.script;
-        for (resident, actor) in self.residents.iter().zip(&mut self.actors) {
-            if script(resident) == Some(INTRO) {
-                actor.remove();
-            }
-        }
         let Some(body) = self
             .residents
             .iter()
@@ -71,11 +63,8 @@ impl World<'_> {
         let Some(mut fight) = self.shadowkeeper else {
             return;
         };
-        if !fight.began && self.position().1 < BEGINS {
-            fight.began = true;
-            self.globals.write_flag(FIGHT_FLAG);
-            self.globals.audio.play(MUSIC, false);
-        }
+        fight.began |=
+            self.globals.events[usize::from(FIGHT_FLAG / 8)] & 1 << (FIGHT_FLAG % 8) != 0;
         let Some(body) = self.actors.iter_mut().find(|actor| actor.id == fight.body) else {
             self.shadowkeeper = None;
             return;

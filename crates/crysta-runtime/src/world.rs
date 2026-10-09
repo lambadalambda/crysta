@@ -1115,6 +1115,7 @@ impl<'a> World<'a> {
         );
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.clear_statuses();
+        self.globals.camera_target = None;
         self.start_shadowkeeper();
         self.start_landing();
         self.load_second();
@@ -1918,8 +1919,25 @@ impl<'a> World<'a> {
     /// move.
     #[must_use]
     pub fn camera_focus(&self) -> (u16, u16) {
-        let ((x, y), (dx, dy)) = (self.position(), self.camera_offset());
+        // `$0DEC`: an actor instead of Ark (`$8F:8060`).
+        let target = self.globals.camera_target.and_then(|id| {
+            let actor = self.actors.iter().find(|actor| actor.id == id)?;
+            (!actor.is_gone()).then_some(actor.position)
+        });
+        let at = target.unwrap_or_else(|| self.position());
+        let ((x, y), (dx, dy)) = (at, self.camera_offset());
         (x.saturating_add_signed(dx), y.saturating_add_signed(dy))
+    }
+
+    /// `$04A4`: the torches lit on tower 5's top, a bit each
+    /// (`docs/tower-five.md`).
+    #[must_use]
+    pub fn lit_torches(&self) -> u16 {
+        self.globals
+            .scratch
+            .get(&crate::actors::TORCHES)
+            .copied()
+            .unwrap_or(0)
     }
 
     /// The colour math scripts set ([`crate::display`]).

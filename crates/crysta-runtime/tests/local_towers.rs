@@ -1452,6 +1452,61 @@ fn the_orb_check_lets_the_cape_through_and_throws_ark_out_without_it() {
 }
 
 #[test]
+fn the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper() {
+    // `$8F:8005` (`docs/tower-five.md`): a torch for each camera band; at
+    // y < 272 Ark is held there and the camera follows the intro up a pixel
+    // a frame to y 192; then all torches, flag `$001` and music 5.
+    use crysta_runtime::audio::Cue;
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x101..=0x107).chain([0x19B]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 128, 976, events).unwrap();
+        let mut torches = vec![];
+        let mut held = None;
+        let mut music = None;
+        for frame in 0..1200 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+            if world
+                .take_cues()
+                .iter()
+                .any(|cue| matches!(cue, Cue::Track { track: 5, .. }))
+            {
+                music.get_or_insert(frame);
+            }
+            if torches.last() != Some(&world.lit_torches()) {
+                torches.push(world.lit_torches());
+            }
+            if held.is_none() && world.pad_locked() {
+                held = Some(frame);
+            }
+            if world.events()[0] & 2 != 0 {
+                break;
+            }
+        }
+        assert_eq!(
+            torches,
+            [0, 0x40, 0x60, 0x70, 0x78, 0x7C, 0x7E, 0x7F],
+            "{:?}",
+            rom.revision()
+        );
+        assert_eq!(world.position(), (128, 272), "{:?}", rom.revision());
+        assert_eq!(world.camera_focus().1, 192, "{:?}", rom.revision());
+        let held = held.unwrap();
+        assert!(music.is_some(), "{:?}", rom.revision());
+        assert_eq!(
+            world.events()[0] & 2,
+            2,
+            "{:?}: held at {held}",
+            rom.revision()
+        );
+    }
+}
+
+#[test]
 fn shadowkeeper_falls_after_two_lives_and_the_tower_ends() {
     // `docs/tower-five.md` §1: Ark walks up to the boss (y < 272: the
     // fight, flag `$001`); two lives; at none the end controller sends Ark

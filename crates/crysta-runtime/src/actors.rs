@@ -20,6 +20,8 @@ mod line;
 mod motion;
 mod native;
 mod push;
+mod routines;
+pub(crate) use routines::TORCHES;
 mod sense;
 mod walls;
 
@@ -1612,6 +1614,9 @@ impl Actor {
                 self.state = State::Frozen;
                 return Run::Yielded;
             };
+            if self.model_routine(around) {
+                continue;
+            }
             match window[0] {
                 // COP 91 plays the pose and ends the frame through `PLA; PLA;
                 // RTL` without writing `+$0A` (`$80:A395`): like an RTL, it

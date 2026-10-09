@@ -223,8 +223,9 @@ const SCRATCH: [(u16, u16); 13] = [
     // (`$97:BC2B`), here the whole wait.
     (0x04FA, 0x04FB),
     // A guardian's word for Ark's recoil (`$93:D7E0`, set; Ark's own
-    // script clears it), and tower 5's top's (`$04A4`).
-    (0x04A4, 0x04A5),
+    // script clears it), and tower 5's top's (`$04A4`); Shadowkeeper's
+    // phase, done and stage words (`$04A6`, `$04A8`, `$04AA`).
+    (0x04A4, 0x04AB),
     // Ark's statuses (`$066C`), which the end of tower 5 clears
     // (`$90:A3BD`); not kept.
     (0x066C, 0x066D),
