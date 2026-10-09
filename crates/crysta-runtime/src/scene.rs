@@ -76,6 +76,8 @@ pub struct Globals {
     pub scratch: crate::actors::Scratch,
     /// `$0DEC`: the actor the camera follows instead of Ark.
     pub camera_target: Option<u16>,
+    /// `$0476`: the actor the circle window (`COP 63`) is drawn around.
+    pub circle: Option<u16>,
     /// Money, Prime Blue and the items scripts have given.
     pub inventory: crate::inventory::Inventory,
     /// The native save slot the world was loaded from or began with: the
@@ -262,6 +264,7 @@ impl Globals {
             transfer: None,
             scratch: crate::actors::Scratch::new(),
             camera_target: None,
+            circle: None,
             inventory: crate::inventory::Inventory::default(),
             slot: crate::save::SaveSlot::default(),
             sram: crate::sram::Sram::default(),

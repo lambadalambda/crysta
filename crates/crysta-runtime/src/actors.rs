@@ -548,6 +548,11 @@ const MOVE_Y: u8 = 0xB2;
 const OBJ_PRIORITY: u8 = 0xBA;
 /// The palette field.
 const PALETTE: u8 = 0xBB;
+/// The circle window around the caller (`$80:9CA5`): the shape, then
+/// `$0474`, the radius ([`crate::world::Circle`]).
+const CIRCLE: u8 = 0x63;
+/// `$0474`: the circle window's radius.
+pub(crate) const CIRCLE_RADIUS: u16 = 0x0474;
 /// Colours from the ROM into CGRAM (`$80:9AEB`): bank, word, index,
 /// count; the OBJ ones go to [`crate::colours::ObjColours`].
 const LOAD_COLOURS: u8 = 0x5A;
@@ -1867,6 +1872,15 @@ impl Actor {
                 return self.branch_on_chain(service, operands, bank, around)
             }
             LOAD_COLOURS => return self.load_colours(operands, around),
+            CIRCLE => {
+                let Some(&radius) = around.image.get(operands + 1) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.circle = Some(self.id);
+                around.globals.scratch.insert(CIRCLE_RADIUS, u16::from(radius));
+                self.pc = operands + 2;
+            }
             // Anything else is stepped over by its derived length. That
             // includes text and flag writes: the loop's ambient effects
             // are not the runtime's to apply from here.
@@ -5659,6 +5673,17 @@ mod script_service_tests {
         let (image, mut actor) = actor_running(&[2, 0xBB, 0x0E, 2, 0xBD]);
         tick(&mut actor, &image);
         assert_eq!((actor.palette, actor.priority), (7, 2));
+        assert!(actor.frozen_at().is_none());
+    }
+
+    #[test]
+    fn cop_63_draws_the_circle_around_its_caller() {
+        // COP 63 01 05 (`$80:9CA5`): `$0476` = the caller, `$0474` = 5.
+        let (image, mut actor) = actor_running(&[2, 0x63, 1, 5, 2, 0xBD]);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(globals.circle, Some(actor.id));
+        assert_eq!(globals.scratch.get(&CIRCLE_RADIUS), Some(&5));
         assert!(actor.frozen_at().is_none());
     }
 

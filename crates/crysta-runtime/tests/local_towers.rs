@@ -1584,7 +1584,7 @@ fn shadowkeeper_falls_in_its_native_stages_and_the_tower_ends() {
 }
 
 #[test]
-fn shadowkeepers_wisps_show_the_helper_arts_list() {
+fn shadowkeepers_wisps_show_the_helper_arts_list_in_its_window() {
     // `$8F:80C5`: a wisp spawned from the head's descriptor turns to the
     // helper art (`COP D8 $A2:C000`), list 8.
     for rom in roms() {
@@ -1598,11 +1598,18 @@ fn shadowkeepers_wisps_show_the_helper_arts_list() {
         } else {
             0xA4_C000
         };
-        let mut wisps = 0;
+        let (mut wisps, mut circle) = (0, vec![]);
         for _ in 0..1200 {
             world
                 .update(Some(Direction::Up), Presses::default())
                 .unwrap();
+            // `COP 63` (`$93:D88A`): the head's window around (128, 176),
+            // its radius `$0474` 70 at most.
+            if let Some(span) = world.circle().and_then(|window| window.span(176)) {
+                if circle.last() != Some(&span) {
+                    circle.push(span);
+                }
+            }
             wisps = wisps.max(
                 world
                     .residents()
@@ -1612,6 +1619,7 @@ fn shadowkeepers_wisps_show_the_helper_arts_list() {
             );
         }
         assert!(wisps > 4, "{:?}: {wisps}", rom.revision());
+        assert!(circle.contains(&(58, 198)), "{:?}: {circle:?}", rom.revision());
     }
 }
 
