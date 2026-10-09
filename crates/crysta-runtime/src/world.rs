@@ -929,6 +929,7 @@ impl<'a> World<'a> {
             resident.priority = actor.priority;
             resident.palette = actor.palette;
             resident.overlay = actor.overlay;
+            resident.depth = actor.depth;
         }
         for index in gone.into_iter().rev() {
             self.residents.remove(index);
@@ -1261,6 +1262,7 @@ impl<'a> World<'a> {
                 priority: actor.priority,
                 palette: actor.palette,
                 overlay: None,
+                depth: actor.depth,
             });
             self.actors.push(actor);
         }
@@ -2681,6 +2683,7 @@ mod tests {
             priority: 2,
             palette: 0,
             overlay: None,
+            depth: 0,
         }
     }
 

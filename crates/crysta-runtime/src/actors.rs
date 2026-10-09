@@ -481,9 +481,9 @@ const WALLS_04: u16 = 0x0004;
 /// `+$06` bits: `$0010` the script handles knockback (none), `$0020` takes
 /// no damage.
 const GUARD_06: u16 = 0x0030;
-/// `+$06` bits 11, 12 and 14: the draw pass's depth key (`$80:E9FB`): 14
-/// in front of all, 12 one deeper than the y, 11 one shallower.
-const DEPTH_06: u16 = 0x5800;
+/// `+$06` bits 11 to 14: the draw pass's depth key (`$80:E9FB`,
+/// [`crate::residents::Resident::draw_depth`]).
+const DEPTH_06: u16 = 0x7800;
 /// `+$06` bit 6: a pose's change keeps the movement streams (`$80:ED54`),
 /// and they run on every frame (`$80:D0CF`) until their own end:
 /// Shadowkeeper's shots fall on after their pose.
@@ -1357,11 +1357,9 @@ impl Actor {
         // (`$88:D33D`).
         if let Some(&[0xBD, 0x06, 0x00, op, low, high, 0x9D, 0x06, 0x00]) = image.get(at..at + 9) {
             const INTERACTION: u16 = INTERACT_ANY_SIDE | INTERACT_FACING;
-            // Bit 13, which the crystals, bullets and tower 4's traps set
-            // (`$88:B60F`, `$97:BAAC`, `$97:B43C`), is not modelled. Bits
-            // 11, 12 and 14 order the draw ([`DEPTH_06`]); bit 6 keeps the
+            // Bits 11 to 14 order the draw ([`DEPTH_06`]); bit 6 keeps the
             // streams ([`KEEP_STREAMS`]).
-            const ACCEPTED: u16 = INTERACTION | GUARD_06 | DEPTH_06 | KEEP_STREAMS | 0x2000;
+            const ACCEPTED: u16 = INTERACTION | GUARD_06 | DEPTH_06 | KEEP_STREAMS;
             let value = u16::from_le_bytes([low, high]);
             match op {
                 0x09 if value & !ACCEPTED == 0 => {

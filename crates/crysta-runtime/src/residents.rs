@@ -50,9 +50,31 @@ pub struct Resident {
     /// A list of the helper art (`$A2:C000`) drawn instead of the body:
     /// an enemy's explosion or the gem it dropped.
     pub overlay: Option<(u32, u8)>,
+    /// `+$06`'s depth bits 11 to 14 ([`Self::draw_depth`]).
+    pub depth: u16,
 }
 
 impl Resident {
+    /// Where the draw pass sorts it (`$80:E9FB`): its y, one less with
+    /// `+$06` bit 11, one more with bit 12, over all others with bit 14
+    /// and under all others with bit 13 alone. A deeper value is drawn
+    /// over a shallower one.
+    #[must_use]
+    pub const fn draw_depth(&self) -> i32 {
+        let y = self.position.1 as i32;
+        if self.depth & 0x4000 != 0 {
+            i32::MAX
+        } else if self.depth & 0x1000 != 0 {
+            y + 1
+        } else if self.depth & 0x0800 != 0 {
+            y - 1
+        } else if self.depth & 0x2000 != 0 {
+            i32::MIN
+        } else {
+            y
+        }
+    }
+
     /// Cell the resident stands in, as a reader of the map would name it.
     #[must_use]
     pub const fn cell(&self) -> (u16, u16) {
@@ -162,6 +184,7 @@ pub fn residents(
                 priority: 2,
                 palette: 0,
                 overlay: None,
+                depth: 0,
             }
         })
         .filter(|resident| {
@@ -281,6 +304,36 @@ fn collect(image: &[u8], bank: u32, effects: &[ScriptEffects]) -> Conversation {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_depth_bits_move_the_draw_order() {
+        let at = |depth| {
+            Resident {
+                position: (0, 100),
+                record: 0,
+                script: None,
+                body: true,
+                initial: 0,
+                selector: 0,
+                hflip: false,
+                vflip: false,
+                pose_age: 0,
+                walking: false,
+                descriptor: None,
+                hidden: false,
+                priority: 2,
+                palette: 0,
+                overlay: None,
+                depth,
+            }
+            .draw_depth()
+        };
+        assert_eq!([at(0), at(0x0800), at(0x1000)], [100, 99, 101]);
+        assert_eq!(
+            [at(0x4800), at(0x2000), at(0x3000)],
+            [i32::MAX, i32::MIN, 101]
+        );
+    }
 
     #[test]
     fn the_map_mode_takes_the_header_and_the_players_byte() {

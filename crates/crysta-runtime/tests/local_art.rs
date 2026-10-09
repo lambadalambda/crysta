@@ -211,6 +211,7 @@ fn a_reuse_after_a_refused_record_is_a_placeholder_not_the_wrong_body() {
             priority: 2,
             palette: 0,
             overlay: None,
+            depth: 0,
         })
         .collect();
     let art = residents_art(
@@ -672,6 +673,7 @@ fn the_freezes_crystals_draw_pose_9_of_the_helper_art() {
         priority: 2,
         palette: 0,
         overlay: None,
+        depth: 0,
     };
     let art = residents_art(
         image,
