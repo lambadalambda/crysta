@@ -121,8 +121,9 @@ pub struct Globals {
     /// What scripts added to `$0498` themselves (`INC $0498`, Shadowkeeper's
     /// second stage), on top of the counted enemies; `STZ $0498` clears it.
     pub enemy_hold: u16,
-    /// Tower 5's top's darkness, set up by its intro (`COP AA $8F:8182`).
-    pub torch_darkness: bool,
+    /// Tower 5's top's darkness, set up by its intro (`COP AA $8F:8182`),
+    /// and the frame it started on.
+    pub torch_darkness: Option<u16>,
     /// The OBJ colours scripts loaded (`COP 5A`).
     pub obj_colours: crate::colours::ObjColours,
     /// Group roots whose groups go (`COP EB`), not yet gone, each with the
@@ -279,7 +280,7 @@ impl Globals {
             ark_flags: 0,
             ark_push: (0, 0),
             enemy_hold: 0,
-            torch_darkness: false,
+            torch_darkness: None,
             obj_colours: crate::colours::ObjColours::default(),
             group_deletions: Vec::new(),
             marks: Vec::new(),

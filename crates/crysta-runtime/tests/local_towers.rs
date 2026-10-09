@@ -1501,6 +1501,8 @@ fn the_intro_lights_the_torches_holds_ark_and_climbs_to_shadowkeeper() {
         let darkness = world.darkness().expect("the intro's darkness");
         assert!(darkness.lit(-0x100) && darkness.lit(0x33F));
         assert!(!darkness.lit(0x340), "{:?}", rom.revision());
+        // `COP 8A $22`: palette 7's colours 0-14 cycle.
+        assert_eq!(darkness.light.len(), 15, "{:?}", rom.revision());
         let held = held.unwrap();
         assert!(music.is_some(), "{:?}", rom.revision());
         assert_eq!(

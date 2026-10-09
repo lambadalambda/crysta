@@ -1132,7 +1132,7 @@ impl<'a> World<'a> {
         self.globals.scratch.insert(crate::actors::MAP_MODE, mode);
         self.clear_statuses();
         (self.globals.camera_target, self.globals.enemy_hold) = (None, 0);
-        self.globals.torch_darkness = false;
+        self.globals.torch_darkness = None;
         self.globals.obj_colours = crate::colours::ObjColours::default();
         self.start_landing();
         self.load_second();

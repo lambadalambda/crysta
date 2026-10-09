@@ -71,7 +71,7 @@ impl Actor {
             return true;
         }
         if at == DARKNESS.0 && code(&DARKNESS.1) {
-            around.globals.torch_darkness = true;
+            around.globals.torch_darkness = Some(around.globals.frames);
             self.pc = at + DARKNESS.1.len();
             return true;
         }

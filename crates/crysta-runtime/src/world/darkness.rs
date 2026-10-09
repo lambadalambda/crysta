@@ -2,9 +2,12 @@
 //! `docs/tower-five.md`): `$123`'s second layer is a mask subtracted from
 //! the first; an HDMA table switches it per band of lines between the map's
 //! mask (`$3C00`, the band's torch lit) and the intro's fill (`$6C00`), and
-//! the darkness's colour (`$7F:06FE`) falls as more torches burn.
+//! the darkness's colour (`$7F:06FE`) falls as more torches burn. The
+//! mask's other colours cycle (`COP 8A $22`, `$8F:816D`).
 
 use super::World;
+use assets::graphics::Bgr555;
+use assets::maps::visual::scene_animation::SceneAnimation;
 
 /// The bands' heights from 256 above the map's top (`$8F:826B`), and the
 /// darkness's colour by the torches lit (`$8F:8279`); the same in both
@@ -16,6 +19,8 @@ const COLOURS: usize = 0x0F_8279;
 const BANDS: usize = 8;
 /// Where the first band starts: 256 above the map.
 const TOP: i32 = -0x100;
+/// The palette service's table the darkness's child plays on palette 7.
+const LIGHT: u8 = 0x22;
 
 /// The darkness as the hosts draw it.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -25,6 +30,9 @@ pub struct Darkness {
     /// The darkness's colour, a BGR555 word: the mask's colour 127 and the
     /// fill's.
     pub colour: u16,
+    /// The mask's colours now (CGRAM index and colour), as `COP 8A $22`
+    /// cycles colours 112 to 126; empty when its table does not decode.
+    pub light: Vec<(u8, u16)>,
 }
 
 impl Darkness {
@@ -59,16 +67,31 @@ pub(super) fn darkness(image: &[u8], torches: u16) -> Darkness {
     Darkness {
         bands,
         colour: word(COLOURS + 2 * lit),
+        light: Vec::new(),
     }
+}
+
+/// Palette 7's colours 0 to 14 `age` frames into the cycle.
+fn light(image: &[u8], age: u16) -> Vec<(u8, u16)> {
+    let Ok(animation) = SceneAnimation::palette_service(image, LIGHT) else {
+        return Vec::new();
+    };
+    let mut palette = [Bgr555::new(0); 128];
+    animation.apply(u64::from(age), &mut [], &mut palette);
+    animation
+        .colors()
+        .filter_map(|index| Some((u8::try_from(index).ok()?, palette.get(index)?.raw())))
+        .collect()
 }
 
 impl World<'_> {
     /// The darkness of tower 5's top, once its intro set it up.
     #[must_use]
     pub fn darkness(&self) -> Option<Darkness> {
-        self.globals
-            .torch_darkness
-            .then(|| darkness(self.image, self.lit_torches()))
+        self.globals.torch_darkness.map(|start| Darkness {
+            light: light(self.image, self.globals.frames.wrapping_sub(start)),
+            ..darkness(self.image, self.lit_torches())
+        })
     }
 }
 
