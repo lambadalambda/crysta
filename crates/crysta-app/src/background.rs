@@ -405,6 +405,13 @@ impl CachedBackground {
         };
         let layer = second.layer.layer();
         let (width, height) = (layer.width() * 16, layer.height() * 16);
+        // Tower 5's top: the mask's colours cycle (`COP 8A $22`).
+        let mut palette = second.palette;
+        for &(index, colour) in darkness.map_or(&[][..], |darkness| &darkness.light) {
+            if let Some(slot) = palette.get_mut(usize::from(index)) {
+                *slot = Bgr555::new(colour);
+            }
+        }
         for (at, pixel) in canvas.pixels.iter_mut().enumerate() {
             if !canvas.math[at] {
                 continue;
@@ -435,7 +442,7 @@ impl CachedBackground {
             ) {
                 let colour = match dark {
                     Some(dark) if palette_index == DARKNESS_COLOUR => dark,
-                    _ => second.palette[usize::from(palette_index)],
+                    _ => palette[usize::from(palette_index)],
                 };
                 *pixel = subtract(*pixel, rgb(colour));
             }
