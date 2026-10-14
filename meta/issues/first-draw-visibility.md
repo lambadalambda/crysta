@@ -18,3 +18,8 @@ A record header's `+$04` can set bit 14 (off screen; the Guardner `$97:C345`: `$
 
 - On `$117` the Guardner first shows selector 5 at frame 31 for Ark at 570, 576, 590 and 600, and never for Ark at 604 (native traces in the job's `tmp/guardner2/`).
 - The two tests the change touched in a trial (`qualified_wanderer_actions_match_native_cadence_without_gap_ticks`, `european_single_world_replays_bedroom_to_underworld`) are checked against native traces and pass.
+
+## Progress
+
+- Enemies keep the header's bit until the draw pass after the actors sees them on the screen (`Actor::drawn`); `COP 59` and the off-screen test read it. The Guardner wakes at frame 31, 7 at 93, 4 at 125 on both ROMs (`the_guardner_sleeps_its_first_thirty_frames`); the full suite passes. Only enemies take the bit: other records' header words are not `+$04` (a trial on all records broke the Crysta wanderer).
+- Open: the sprite box (the Guardner wakes natively with Ark at 600, not here).
