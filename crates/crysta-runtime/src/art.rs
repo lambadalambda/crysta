@@ -690,11 +690,13 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
 
 /// The world map's horizon band (`$83:8909`, descriptor `$83:F92E`, EU
 /// `$83:F8D6`; `docs/world-map-mode7.md`): 40 grey OBJ fixed on the screen
-/// at (128,53), whose colours, not the fog's, lines 52-67 subtract.
+/// at (128,53), whose colours, not the fog's, lines 52-67 subtract. In
+/// `colours` (OBJ palette 5) when given, else in the descriptor's: natively
+/// the palette moves a step darker after the arrival (not traced).
 ///
 /// # Errors
 /// Refuses a descriptor or list the decoder does not take.
-pub fn horizon_band(image: &[u8]) -> Result<Raster, ArtError> {
+pub fn horizon_band(image: &[u8], colours: Option<&[Bgr555; 16]>) -> Result<Raster, ArtError> {
     let descriptor = assets::layout::per_revision(image, 0x03_F92E, 0x03_F8D6);
     let art = Mode4Art::from_rom(image, descriptor, 0)?;
     let frame = art
@@ -702,8 +704,9 @@ pub fn horizon_band(image: &[u8]) -> Result<Raster, ArtError> {
         .frames()
         .first()
         .ok_or(SpriteError::Invalid("no horizon band frame"))?;
+    let base = art.palette_base();
+    let palette: &[Bgr555] = colours.map_or(art.palette(), |colours| colours);
     // Priority 3: they sit under the plane's BG1 on the main screen.
-    let (palette, base) = (art.palette(), art.palette_base());
     raster_by(
         frame.composition(),
         art.graphics(),

@@ -719,7 +719,7 @@ fn the_horizon_band_is_40_grey_pieces_over_the_classic_columns() {
             continue;
         };
         let rom = rom::Rom::load(&bytes).unwrap();
-        let band = crysta_runtime::art::horizon_band(rom.image()).unwrap();
+        let band = crysta_runtime::art::horizon_band(rom.image(), None).unwrap();
         let opaque: Vec<(i32, i32)> = band
             .pixels
             .iter()
