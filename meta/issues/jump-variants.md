@@ -24,3 +24,4 @@ The dash jump, the carry jump and the rope jump differ from the ground jump (`do
 
 - The dash jump runs, frame for frame with the native trace on both ROMs (`b_in_a_dash_jumps_on_with_the_dash`). A new dash jump in the grace takes B alone (natively B with the dash's way).
 - The carry jump runs, frame for frame with the native traces (Right, Left) on both ROMs (`b_jumps_with_the_pot_as_natively`). An exit in the air puts the pot down. Open: the jump-throw (A in the air, [pot-extras](pot-extras.md)), the rope jump, the shadow, the held-B re-jump.
+- The shadow is drawn (`world/shadow.rs`): its lists match the native traces of the ground jump. Open: its row move over lips (`$84:A957`, hidden here instead).
