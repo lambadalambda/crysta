@@ -234,4 +234,14 @@ fn carry_selection_is_explicit_and_separate_from_physics() {
     );
     assert!(!up.ark_hflip && !up.pot_hflip);
     assert!(PandoraSprites::carry_pose(PandoraCarryMotion::Standing, 4).is_none());
+    // The carry jump (`$84:AEA4`, `AF14`): resource 3 `$21` then `$22`, the
+    // pot's `$27`, Left mirrored.
+    let rising = PandoraSprites::carry_pose(PandoraCarryMotion::JumpRising, 2).unwrap();
+    assert_eq!(
+        (rising.ark_art, rising.ark_selector, rising.pot_selector),
+        (0x80_a261, 0x21, 0x27)
+    );
+    assert!(rising.ark_hflip && rising.pot_hflip);
+    let falling = PandoraSprites::carry_pose(PandoraCarryMotion::JumpFalling, 1).unwrap();
+    assert_eq!((falling.ark_selector, falling.pot_selector), (0x1F, 0x26));
 }

@@ -880,6 +880,10 @@ pub enum PandoraCarryMotion {
     Throwing,
     /// A drop from a lip with the pot in hand (`$84:9F13`, `$84:9F33`).
     Dropping,
+    /// A jump with the pot in hand, rising (`$84:AE94`..`AF14`).
+    JumpRising,
+    /// The same jump, falling.
+    JumpFalling,
 }
 /// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
 /// the brake that ends it.
@@ -951,6 +955,10 @@ impl PandoraSprites {
             // (`$84:C3F6`, `C3FF`), Up apart, unmirrored (`COP B6`).
             PandoraCarryMotion::Dropping if facing == 1 => (0x80_a261, 0x20, 0x26),
             PandoraCarryMotion::Dropping => (0x80_a261, 0x1D, 0x25),
+            // Resource 3 `$1B`/`$1E`/`$21`, then `$1C`/`$1F`/`$22`; the
+            // pot's `$25`/`$26`/`$27` (`$84:C3F6`..`C411`).
+            PandoraCarryMotion::JumpRising => (0x80_a261, 0x1B + 3 * axis, 0x25 + axis),
+            PandoraCarryMotion::JumpFalling => (0x80_a261, 0x1C + 3 * axis, 0x25 + axis),
         };
         let hflip = facing == 2 && motion != PandoraCarryMotion::Dropping;
         Some(PandoraCarryPose {
