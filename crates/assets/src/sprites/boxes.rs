@@ -1,7 +1,8 @@
 //! Pose records' lengths and their compositions' boxes (`docs/combat.md`):
-//! what combat reads of a pose, without the art. A composition is a 4-byte
-//! anchor, then three boxes (sprite, attack, body), each (dx, w, dy, h) as
-//! signed bytes.
+//! what combat reads of a pose, without the art. A composition starts with
+//! its draw box (left and right signed, up and down unsigned; `$80:EDA9`),
+//! then three boxes (sprite, attack, body), each (dx, w, dy, h) as signed
+//! bytes.
 
 use super::SpriteError;
 
@@ -12,7 +13,11 @@ pub struct Record {
     pub duration: u8,
     /// The record's facing byte.
     pub facing: u8,
-    /// The sprite box.
+    /// The draw box: how far the pose reaches left, right, up and down of
+    /// its place (`E+$18..$1E`, `$80:EDA9`), which the draw pass tests
+    /// against the screen.
+    pub draw: [i16; 4],
+    /// The sprite box (`7F:0028..002E`), which pushes and blocks.
     pub sprite: [i8; 4],
     /// The attack box, which hits other bodies.
     pub attack: [i8; 4],
@@ -101,11 +106,18 @@ fn records(bytes: &[u8], base: usize, selector: u8) -> Result<Vec<Record>, Sprit
             return Ok(records);
         }
         let anchor = base + word(list + index * 4 + 2)?;
+        let draw = bytes.get(anchor..anchor + 4).ok_or_else(truncated)?;
         let boxes = bytes.get(anchor + 4..anchor + 16).ok_or_else(truncated)?;
         let signed = |at: usize| std::array::from_fn(|i| boxes[at + i].cast_signed());
         records.push(Record {
             duration: record[0],
             facing: record[1],
+            draw: [
+                i16::from(draw[0].cast_signed()),
+                i16::from(draw[1].cast_signed()),
+                i16::from(draw[2]),
+                i16::from(draw[3]),
+            ],
             sprite: signed(0),
             attack: signed(4),
             body: signed(8),
