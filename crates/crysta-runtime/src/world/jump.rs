@@ -9,6 +9,7 @@
 
 use super::pose::{by_facing, ArkPose};
 use super::{facing_delta, Step, World, WorldError};
+use crate::scene::Presses;
 use assets::sprites::PandoraCarryMotion;
 use room_core::run::Run;
 use room_core::{Direction, FrameInput};
@@ -96,6 +97,10 @@ const CARRY_LANDED: u16 = 22;
 /// Down, `$27` Up, `$28` Right) from `J + 25` to `J + 31`.
 const GRACE_LISTS: [u8; 3] = [0x26, 0x27, 0x28];
 const GRACE_POSE: u16 = 25;
+/// The throw from the air's lists (`$2A` Down, `$2B` Up, `$2C` Right).
+const THROWN_LISTS: [u8; 3] = [0x2A, 0x2B, 0x2C];
+/// The frames A throws in (`$84:AF84`: `+$24` 8 to `$15`).
+const THROW_WINDOW: std::ops::RangeInclusive<u16> = 6..=18;
 const GRACE_END: u16 = 32;
 
 /// A kind of jump.
@@ -133,6 +138,8 @@ pub(super) struct Jump {
     again: bool,
     /// Landed on the rope: its stand, before the lean.
     leaning: bool,
+    /// With a pot: the frame A threw it from the air (`$84:AF84`).
+    thrown: Option<u16>,
 }
 
 impl Jump {
@@ -144,6 +151,7 @@ impl Jump {
             steer: None,
             again: false,
             leaning: false,
+            thrown: None,
         }
     }
 
@@ -154,7 +162,10 @@ impl Jump {
 
     /// The frame he lands on.
     const fn landed(self) -> u16 {
-        if matches!(self.kind, Kind::Carry) && !matches!(self.facing, Direction::Left) {
+        if matches!(self.kind, Kind::Carry)
+            && self.thrown.is_none()
+            && !matches!(self.facing, Direction::Left)
+        {
             CARRY_LANDED
         } else {
             self.kind.profile().crouch + AIR
@@ -178,6 +189,15 @@ impl Jump {
         }
     }
 
+    /// How high he was the frame before.
+    const fn height_before(self) -> i16 {
+        Self {
+            frame: self.frame.saturating_sub(1),
+            ..self
+        }
+        .height()
+    }
+
     /// Whether the enemies' hits pass under him.
     pub(super) const fn over_hits(self) -> bool {
         self.height() <= OVER_HITS
@@ -189,6 +209,14 @@ impl Jump {
         let Some(since) = self.since() else {
             return None;
         };
+        if let (Kind::Carry, Some(at)) = (self.kind, self.thrown) {
+            // The throw from the air (`COP 83 2A/2B/2C 03`) to the landing.
+            return if since > at && since < self.landed() {
+                Some(by_facing(3, THROWN_LISTS, self.facing, since - at - 1))
+            } else {
+                None
+            };
+        }
         if matches!(self.kind, Kind::Carry) {
             return None;
         }
@@ -227,7 +255,7 @@ impl Jump {
         let Some(since) = self.since() else {
             return None;
         };
-        if !matches!(self.kind, Kind::Carry) {
+        if !matches!(self.kind, Kind::Carry) || matches!(self.thrown, Some(at) if since > at) {
             None
         } else if since < RISE {
             Some((PandoraCarryMotion::JumpRising, since))
@@ -311,7 +339,7 @@ impl World<'_> {
     pub(super) fn jump_frame(
         &mut self,
         held: Option<Direction>,
-        again: bool,
+        presses: Presses,
     ) -> Result<Option<Step>, WorldError> {
         let Some(mut jump) = self.jump.take() else {
             return Ok(None);
@@ -323,7 +351,8 @@ impl World<'_> {
         }
         // B pressed in the air; natively it must still be held at the
         // landing (`$0454`), which a press alone cannot tell.
-        jump.again |= again && jump.in_air() && jump.kind == Kind::Ground;
+        jump.again |= presses.cancel && jump.in_air() && jump.kind == Kind::Ground;
+        self.throw_from_air(&mut jump, since, presses.confirm);
         if Some(since) == jump.kind.profile().leap {
             self.globals.audio.sound_port3(LEAP_SOUND);
         }
@@ -393,6 +422,13 @@ impl World<'_> {
             self.run_actors()?;
             return Ok(Some(Step::Stayed));
         }
+        // After a throw from the air control returns a frame after the
+        // stand (`$84:AFC7`).
+        if jump.thrown.is_some() && since == jump.landed() {
+            self.jump = Some(jump);
+            self.run_actors()?;
+            return Ok(Some(Step::Stayed));
+        }
         match jump.kind.profile().landing {
             AfterLanding::Grace => {
                 // The grace's pose lasts while the dash runs on its way.
@@ -453,6 +489,32 @@ impl World<'_> {
         Ok(Some(Step::Stayed))
     }
 
+    /// With a pot, A in the air from `J + 6` to `J + 18` (`$84:AF84`)
+    /// throws it the frame after, from the height Ark had at the A
+    /// (`$0999`); sound `$12`.
+    fn throw_from_air(&mut self, jump: &mut Jump, since: u16, a: bool) {
+        if jump.kind != Kind::Carry {
+            return;
+        }
+        if jump.thrown.is_none() && a && THROW_WINDOW.contains(&since) && self.holds_pot() {
+            jump.thrown = Some(since);
+        }
+        if jump.thrown == Some(since.wrapping_sub(1)) {
+            if self.throw_pot_from_air(jump.height_before()) {
+                self.globals.audio.sound_port3(super::pots::RELEASE_SOUND);
+            } else {
+                jump.thrown = None;
+            }
+        }
+    }
+
+    /// Whether a pot thrown from the air flies on this frame: not on its
+    /// release's, which takes its first step.
+    pub(super) fn pot_flies_on(&self) -> bool {
+        self.jump
+            .is_some_and(|jump| jump.thrown.is_none_or(|at| at + 2 != jump.frame))
+    }
+
     /// A carry jump's pose ([`Jump::carry_pose`]).
     pub(super) fn jump_carry_pose(&self) -> Option<(PandoraCarryMotion, u16)> {
         self.jump.and_then(Jump::carry_pose)
@@ -465,13 +527,7 @@ impl World<'_> {
 
     /// How high Ark was the frame before, which the shadow reads.
     pub(super) fn jump_height_before(&self) -> i16 {
-        self.jump.map_or(0, |jump| {
-            Jump {
-                frame: jump.frame.saturating_sub(1),
-                ..jump
-            }
-            .height()
-        })
+        self.jump.map_or(0, Jump::height_before)
     }
 
     /// Whether the enemies' hits pass under Ark.

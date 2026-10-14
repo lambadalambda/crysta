@@ -10,15 +10,11 @@ use room_core::Direction;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// Not modelled yet: the dash-throw and jump-throw (measured once), and
+/// Not modelled yet: the dash-throw (measured once), and
 /// the fall the pot shows as an exit drops it (`$84:C5CB`, stream `$6A`);
 /// the drop itself is [`carrying_onto_an_exit_drops_the_pot`]. Tracked:
 /// `meta/issues/pot-extras.md`.
-const LATER: [&str; 3] = [
-    "exit-while-carrying",
-    "throw-right-dashing",
-    "throw-left-jumping",
-];
+const LATER: [&str; 2] = ["exit-while-carrying", "throw-right-dashing"];
 
 /// The pot's break sound.
 const BREAK: u8 = 0x13;
@@ -42,6 +38,7 @@ fn frame(world: &mut World<'_>, buttons: &[&str], held_a: &mut bool) -> Vec<u8> 
     let a = buttons.contains(&"A");
     let presses = Presses {
         confirm: a && !*held_a,
+        cancel: buttons.contains(&"B"),
         ..Presses::NONE
     };
     *held_a = a;
@@ -344,5 +341,50 @@ fn b_jumps_with_the_pot_as_natively() {
             }
             assert_eq!(&rows, expected, "{:?} {way:?}", rom.revision());
         }
+    }
+}
+
+#[test]
+fn a_throw_from_the_air_shows_its_pose_until_the_landing() {
+    // `docs/jump.md`: A at J + 8 of a carry jump; from F + 1 resource 3's
+    // `$2C` (Right), the pot gone from Ark's hands; h 0 at J + 23, the
+    // stand at J + 24, control at J + 25.
+    for rom in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Ok(bytes) = std::fs::read(local().join(rom)) else {
+            continue;
+        };
+        let rom = Rom::load(&bytes).unwrap();
+        let mut events = new_game_flags();
+        for set in [0x26, 0x27, 0x28, 0x2E] {
+            events[set / 8] |= 1 << (set % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x000C, 104, 352, events).unwrap();
+        world.face(Direction::Left);
+        let press = |confirm, cancel| Presses {
+            confirm,
+            cancel,
+            ..Presses::NONE
+        };
+        world.update(None, press(true, false)).unwrap();
+        for _ in 0..40 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(Some(Direction::Right), Presses::NONE).unwrap();
+        for _ in 0..12 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        // B, then J is the next frame; A at J + 8.
+        world.update(None, press(false, true)).unwrap();
+        let mut rows = vec![];
+        for since in 0..27 {
+            world.update(None, press(since == 8, false)).unwrap();
+            let pose = world.ark_pose().map(|pose| (pose.resource, pose.list));
+            rows.push((world.ark_lift(), pose, world.carry().is_some()));
+        }
+        let revision = rom.revision();
+        assert!(rows[8].2 && !rows[9].2, "{revision:?}");
+        assert_eq!(rows[9].1, Some((3, 0x2C)), "{revision:?}");
+        assert_eq!(rows[23], (0, Some((3, 0x2C)), false), "{revision:?}");
+        assert_eq!(rows[24], (0, None, false), "{revision:?}");
     }
 }

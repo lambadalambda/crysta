@@ -1399,7 +1399,7 @@ impl<'a> World<'a> {
         self.status_frame();
         if let Some(step) = self.holding_frame(direction, presses)? {
             // The pot's own entity flies on while Ark falls or drops.
-            if self.fall.is_some() || self.lip_drop.is_some() {
+            if self.fall.is_some() || self.lip_drop.is_some() || self.pot_flies_on() {
                 self.fly_pot()?;
             }
             self.apply_patches()?;
@@ -1460,7 +1460,7 @@ impl<'a> World<'a> {
         if let Some(step) = self.lip_drop_frame()? {
             return Ok(Some(step));
         }
-        if let Some(step) = self.jump_frame(direction, presses.cancel)? {
+        if let Some(step) = self.jump_frame(direction, presses)? {
             return Ok(Some(step));
         }
         if let Some(step) = self.burn_frame()? {

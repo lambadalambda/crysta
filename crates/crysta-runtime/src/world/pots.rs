@@ -23,7 +23,7 @@ const FA_SLOT: u16 = 0x098A;
 /// Port 3's sounds: the lift (`$84:BE6D`), the release (`$84:C6E5`) and
 /// the break (`$84:C7A9`).
 const LIFT_SOUND: u8 = 0x11;
-const RELEASE_SOUND: u8 = 0x12;
+pub(super) const RELEASE_SOUND: u8 = 0x12;
 const BREAK_SOUND: u8 = 0x13;
 /// A flight strikes an actor whose box (x±8, y±8) overlaps its own,
 /// edges included (`$85:D281`, `$85:F835`).
@@ -196,6 +196,23 @@ impl World<'_> {
             .as_ref()
             .and_then(|pots| pots.state)
             .is_some_and(|state| state.phase() == Phase::Held && state.flight().is_none())
+    }
+
+    /// Throws the pot Ark holds from the air, `height` up
+    /// ([`PotState::throw_in_air`]). Returns whether he held one.
+    pub(super) fn throw_pot_from_air(&mut self, height: i16) -> bool {
+        let Some(mut pots) = self.pots.take() else {
+            return false;
+        };
+        let thrown = match (&mut pots.state, &pots.collision) {
+            (Some(state), Some((_, ground))) => state.throw_in_air(height, ground),
+            _ => false,
+        };
+        if thrown {
+            pots.throw_room = pots.collision.as_ref().map(|(_, room)| room.clone());
+        }
+        self.pots = Some(pots);
+        thrown
     }
 
     /// An exit Ark jumped onto with the pot: he puts it down as he leaves.
