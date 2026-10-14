@@ -815,6 +815,78 @@ fn b_in_a_dash_jumps_on_with_the_dash() {
 }
 
 #[test]
+fn b_on_the_rope_jumps_and_leans_on_landing() {
+    // `docs/jump.md`, the native traces `rope2` and `rope3` on `$11A`: B on
+    // the rope (532,554) jumps in the horizontal poses, `$0E`, no `$0F`; at
+    // J + 27 the fall's last pose, then 17 frames of the rope's `$10` and
+    // the lean (6 or 7 by `$0042`). A jump from the platform (496,554)
+    // lands on the rope with `$0F` and leans the same way.
+    use crysta_runtime::audio::Cue;
+    let b = Presses {
+        cancel: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        for (x, walk) in [(532, 0), (496, 4)] {
+            let mut world =
+                World::enter_with_events(rom.image(), 0x011A, x, 554, after_the_intro()).unwrap();
+            play(&mut world, 30, false);
+            let right = (walk > 0).then_some(Direction::Right);
+            for _ in 0..walk {
+                world.update(right, Presses::default()).unwrap();
+            }
+            let mut rows = vec![];
+            for frame in 0..50 {
+                let press = if frame == 0 { b } else { Presses::default() };
+                world.update(right.filter(|_| frame < 29), press).unwrap();
+                let sounds: Vec<u16> = world
+                    .take_cues()
+                    .into_iter()
+                    .filter_map(|cue| match cue {
+                        Cue::Sound(sound) if [0x0E00, 0x0F00].contains(&sound) => Some(sound),
+                        _ => None,
+                    })
+                    .collect();
+                let pose = world.ark_pose().map(|pose| (pose.resource, pose.list));
+                rows.push((world.ark_lift(), pose, sounds));
+            }
+            let from_rope = walk == 0;
+            assert_eq!(rows[1].1, Some((3, 6)), "{:?} {x}", rom.revision());
+            assert_eq!(rows[5].2, [0x0E00], "{:?} {x}", rom.revision());
+            assert_eq!(rows[27].0, 0, "{:?} {x}", rom.revision());
+            if from_rope {
+                assert_eq!(rows[28].1, Some((3, 8)), "{:?}", rom.revision());
+            }
+            let stand: Vec<usize> = (1..50)
+                .filter(|&frame| rows[frame].1 == Some((1, 0x10)))
+                .collect();
+            // From the platform natively J + 27 is the ordinary stand; here
+            // the rope's, as the walk puts him on it that frame.
+            let first = if from_rope { 29 } else { 28 };
+            assert_eq!(
+                stand,
+                (first..=45).collect::<Vec<_>>(),
+                "{:?} {x}",
+                rom.revision()
+            );
+            assert!(
+                matches!(rows[46].1, Some((1, 6 | 7))),
+                "{:?} {x}: {:?}",
+                rom.revision(),
+                rows[46]
+            );
+            let landed: Vec<u16> = rows.iter().flat_map(|row| row.2.clone()).collect();
+            let expected: &[u16] = if from_rope {
+                &[0x0E00]
+            } else {
+                &[0x0E00, 0x0F00]
+            };
+            assert_eq!(landed, expected, "{:?} {x}", rom.revision());
+        }
+    }
+}
+
+#[test]
 fn a_fall_elsewhere_costs_life_and_puts_ark_back() {
     // Rows 39+ of `$10F` have no exit: damage, then the last safe spot.
     for rom in roms() {

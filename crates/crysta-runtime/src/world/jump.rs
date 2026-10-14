@@ -104,12 +104,15 @@ enum Kind {
     Ground,
     Dash,
     Carry,
+    /// From the rope (`$84:9E41`): the ground jump's frames, back onto the
+    /// rope with no sound.
+    Rope,
 }
 
 impl Kind {
     const fn profile(self) -> &'static Profile {
         match self {
-            Self::Ground => &GROUND,
+            Self::Ground | Self::Rope => &GROUND,
             Self::Dash => &DASH,
             Self::Carry => &CARRY,
         }
@@ -128,6 +131,8 @@ pub(super) struct Jump {
     steer: Option<(Direction, bool)>,
     /// B pressed again in the air: the next jump at the landing.
     again: bool,
+    /// Landed on the rope: its stand, before the lean.
+    leaning: bool,
 }
 
 impl Jump {
@@ -138,6 +143,7 @@ impl Jump {
             kind,
             steer: None,
             again: false,
+            leaning: false,
         }
     }
 
@@ -186,6 +192,16 @@ impl Jump {
         if matches!(self.kind, Kind::Carry) {
             return None;
         }
+        if self.leaning {
+            // Resource 1's `$10` (`$84:A8FB`).
+            return Some(ArkPose::new(
+                1,
+                0x10,
+                matches!(self.facing, Direction::Left),
+                0,
+                false,
+            ));
+        }
         let profile = self.kind.profile();
         let crouch = profile.crouch;
         let (lists, age) = if since < crouch {
@@ -193,6 +209,7 @@ impl Jump {
         } else if since < crouch + RISE {
             (profile.lists[1], since - crouch)
         } else if since < self.landed()
+            || (matches!(self.kind, Kind::Rope) && since == self.landed())
             || (matches!(profile.landing, AfterLanding::Grace) && since < GRACE_POSE)
         {
             (profile.lists[2], since - crouch - RISE)
@@ -265,6 +282,8 @@ impl World<'_> {
     pub(super) fn start_jump(&mut self) {
         let carrying = self.carry().is_some();
         let kind = match self.run {
+            None if self.rope.is_some_and(|rope| !rope.leaning()) => Kind::Rope,
+            None if self.rope.is_some() => return,
             None if carrying && self.holds_pot() => Kind::Carry,
             None if !carrying => Kind::Ground,
             Some(Run::Dash { .. }) if !carrying => Kind::Dash,
@@ -274,11 +293,16 @@ impl World<'_> {
         if self.jump.is_none_or(free)
             && self.plane.is_none()
             && self.arrival.is_none()
-            && self.rope.is_none()
             && self.thrust.is_none()
             && self.hurt.is_none()
         {
-            self.jump = Some(Jump::new(self.facing, kind));
+            // On the rope he faces across (the horizontal poses).
+            let facing = match (kind, self.facing) {
+                (Kind::Rope, Direction::Left) => Direction::Left,
+                (Kind::Rope, _) => Direction::Right,
+                (_, facing) => facing,
+            };
+            self.jump = Some(Jump::new(facing, kind));
         }
     }
 
@@ -382,13 +406,51 @@ impl World<'_> {
             }
             AfterLanding::Aloud => {}
         }
+        // From the rope: the landing's ground test (the walk runs none).
+        if since == jump.landed() && jump.kind == Kind::Rope {
+            self.ground_test();
+            if self.fall.is_some() || self.lip_drop.is_some() {
+                self.run_actors()?;
+                return Ok(Some(Step::Stayed));
+            }
+        }
+        // Only the ground jump sounds; a frame later with a direction held.
         let sound = jump.landed() + if held.is_some() { 2 } else { 1 };
-        if since >= sound {
+        if jump.kind == Kind::Ground && since == sound {
             self.globals.audio.sound_port3(LAND_SOUND);
+        }
+        if self.rope.is_some() {
+            return self.land_on_rope(jump);
+        }
+        self.jump = (since < sound).then_some(jump);
+        Ok(None)
+    }
+
+    /// The landing on the rope (`$0986 & $3C00`, `$84:9BF8`): from the
+    /// rope the jump's last pose holds at `J + 27`; at `J + 28` the rope's
+    /// stand; at `J + 29` the lean, Up on an even `$0042`, else Down.
+    fn land_on_rope(&mut self, mut jump: Jump) -> Result<Option<Step>, WorldError> {
+        let since = jump.frame - 1;
+        if since == jump.landed() && jump.kind == Kind::Ground {
+            // He walks onto it this frame.
+            self.jump = Some(jump);
+            return Ok(None);
+        }
+        if since > jump.landed() + 1 {
+            let way = if self.globals.frames.is_multiple_of(2) {
+                Direction::Up
+            } else {
+                Direction::Down
+            };
+            if let Some(rope) = &mut self.rope {
+                rope.lean(way);
+            }
         } else {
+            jump.leaning = since > jump.landed();
             self.jump = Some(jump);
         }
-        Ok(None)
+        self.run_actors()?;
+        Ok(Some(Step::Stayed))
     }
 
     /// A carry jump's pose ([`Jump::carry_pose`]).

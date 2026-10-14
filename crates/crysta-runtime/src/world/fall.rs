@@ -16,9 +16,8 @@
 //!
 //! The fall's, the drop's and the rope's poses are [`Fall::pose`],
 //! [`LipDrop::pose`] and [`Rope::pose`]; a drop with a pot in hand is a carry
-//! pose (`World::carry`). Not modelled: the rope after a jump (B), which
-//! wobbles Ark off in the air or leans him on landing (`$0986 & $3C00`,
-//! `$84:9BF8`; `meta/issues/jump.md`).
+//! pose (`World::carry`). A jump that lands on the rope leans him there
+//! (`world/jump.rs`).
 
 use super::pose::ArkPose;
 use super::{Step, World, WorldError};
@@ -127,6 +126,16 @@ pub(super) struct Rope {
 }
 
 impl Rope {
+    /// Whether Ark leans.
+    pub(super) const fn leaning(self) -> bool {
+        self.lean.is_some()
+    }
+
+    /// Leans `way` from its first frame, as a landing on the rope does.
+    pub(super) const fn lean(&mut self, way: Direction) {
+        self.lean = Some((way, 0));
+    }
+
     /// Resource 1's lists (`$84:A8E1`..`A8F6`, `$84:A3B0`, `$84:9BE6`): the
     /// walk `$0F`, mirrored going Left; the stand `$10`, mirrored facing
     /// Left; a lean's `$10`, then 6 (Down) or 7 (Up); its wobble 6 or 7.
