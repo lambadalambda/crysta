@@ -92,7 +92,8 @@ No scaling. Nothing on the map is a sprite except:
 - Ark, OAM 0-2 (16x16 + two 8x8, tiles `$00..$04`, palette 0), at a fixed
   screen box around (120..136, 137..161). This is the world-map pose, not
   the town sprite (its source was not traced).
-- 40 static OBJ (OAM 3-42, tiles `$101..$11F`, palette 5, y 27..63). These
+- 40 static OBJ (OAM 3-42, tiles `$101..$11F`, palette 5, OAM y 27..63;
+  opaque on screen rows 32..62). These
   are the same in every frame. Because of TM/TS they only darken the
   horizon band (lines 52-67); none reaches line 68. Their writer is the
   type-01 record `$83:8909` on `$03` (script `$84:E3E6`, EU `$84:E3AB`;

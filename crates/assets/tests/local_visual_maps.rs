@@ -509,3 +509,27 @@ fn the_tower_maps_show_their_second_layer_by_their_profile() {
         assert!(assets::maps::visual::SecondLayer::from_rom(rom.image(), map).is_err());
     }
 }
+
+#[test]
+fn the_world_maps_horizon_band_decodes_as_a_short_mode_4_descriptor() {
+    // `$83:F92E` (`docs/world-map-mode7.md`): byte 3 `$24` reads no second
+    // packet, so the palette field starts at byte 5; one grey OBJ palette
+    // to CGRAM 208 (palette 5), list 0 one frame.
+    let Some(rom) = local_rom() else {
+        return;
+    };
+    let band = assets::sprites::Mode4Art::from_rom(rom.image(), 0x03_F92E, 0).unwrap();
+    assert_eq!(band.palette_base(), 208);
+    let colours: Vec<u16> = band.palette()[..16]
+        .iter()
+        .map(|colour| colour.raw())
+        .collect();
+    assert_eq!(
+        colours,
+        [
+            0x0842, 0x0421, 0x0842, 0x1084, 0x18C6, 0x2108, 0x294A, 0x318C, 0x39CE, 0x4210, 0x4A52,
+            0x5294, 0x5EF7, 0x6739, 0x6F7B, 0x7BDE
+        ]
+    );
+    assert_eq!(band.list().frames().len(), 1);
+}

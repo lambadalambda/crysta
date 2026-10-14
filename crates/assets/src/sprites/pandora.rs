@@ -483,12 +483,21 @@ impl Mode4Art {
     /// outside the qualified shapes.
     pub fn from_rom(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, SpriteError> {
         let mut loader = Loader::new(image);
-        let d = loader.read(descriptor, 21)?.to_vec();
+        // Byte 3's bits 4-6 `$20`: no second packet (`$80:FB5A`), so the
+        // fields from the palette on start 3 bytes early (the world map's
+        // horizon band `$83:F92E`); laid out here as the long form.
+        let mut d = loader.read(descriptor, 5)?.to_vec();
+        if d[3] & 0x70 == 0x20 {
+            d.extend_from_slice(&[0; 3]);
+            d.extend_from_slice(loader.read(descriptor + 5, 13)?);
+        } else {
+            d = loader.read(descriptor, 21)?.to_vec();
+        }
         // `d15` is the sheet's offset in 64-byte units and `d16` the OBJ
         // tiles' in 32 words, both two tiles: the frames name OBJ tiles, the
         // sheet's moved by `2 * (d16 - d15)` (the doors `$82:F5B2`, `$10
         // $10`; tower 2's statues `$82:F4BE`, `$00 $60`).
-        if d[3] != 4
+        if d[3] & 0x8F != 4
             || ![0x00, 0x40].contains(&d[8])
             || ![2, 4].contains(&d[13])
             || d[14] & 1 != 0

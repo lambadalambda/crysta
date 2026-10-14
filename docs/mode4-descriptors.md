@@ -27,6 +27,11 @@ reuses the previous actor's packet (`$BF`), second table (`$48`), idle class
 The next 3 bytes (`d4 36 fb`) start the next descriptor (`$82:F66F`). They
 are not part of this one.
 
+When bits 4-6 of byte 3 are `$20` (no second packet, `$80:FB5A`), bytes 5-7
+are absent: the fields from the palette flags on start at byte 5, and the
+descriptor has 18 bytes (the world map's horizon band `$83:F92E`, EU
+`$83:F8D6`: byte 3 `$24`).
+
 | Bytes | Value | Reader | Meaning |
 |---|---|---|---|
 | 0-2 | `$F7:0000` | `FA87` | Pose packet. `$86:83BE` decompresses it to `$7E:7000+$BD`. `$FFFF` = keep the previous one. |
