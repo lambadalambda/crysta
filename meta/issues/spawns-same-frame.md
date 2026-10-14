@@ -16,3 +16,7 @@
 
 - The Guardner's bolt is at (384,483) on its spawn frame.
 - `the_high_cadet_falls_after_three_real_hits`, which failed in a trial, is checked against a native trace and passes.
+
+## Progress
+
+- Done: after each actor its spawns join the list and the walk goes on from it (`World::walk_actors`); a group deletion before them applies first. The bolt is at (384,483) on frame 107 on both ROMs (`the_guardners_bolt_moves_on_the_frame_it_spawns`); the full suite passes, the high Cadet's test with it.

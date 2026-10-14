@@ -172,3 +172,4 @@
 - [x] [Play tower 4](issues/tower-four.md)
 - [x] [Weave the cape and play tower 5](issues/tower-five.md)
 - [x] [Jump with B](issues/jump.md)
+- [x] [Run a spawn linked after its parent in the same frame](issues/spawns-same-frame.md)
