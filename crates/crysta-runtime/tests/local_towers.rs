@@ -1531,6 +1531,14 @@ fn a_guardners_bolt_puts_ark_to_sleep_and_its_vacuum_draws_him_in() {
             "{:?}",
             rom.revision()
         );
+        // The native frames (runtime frame f is native 60504 + f, the job's
+        // `tmp/guardner2/`): the hit, the sleep and the first pull.
+        assert_eq!(
+            (hit, sleep, moves[0]),
+            (130, 132, 144),
+            "{:?}",
+            rom.revision()
+        );
         let path: Vec<(u16, u16)> = moves.iter().map(|&i| rows[i].1).collect();
         assert_eq!(path.first(), Some(&(377, 577)), "{:?}", rom.revision());
         assert!(path.contains(&(382, 577)), "{:?}", rom.revision());
