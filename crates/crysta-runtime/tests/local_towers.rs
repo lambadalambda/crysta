@@ -1584,6 +1584,29 @@ fn the_guardner_sleeps_its_first_thirty_frames() {
     }
 }
 
+#[test]
+fn the_guardners_bolt_moves_on_the_frame_it_spawns() {
+    // `COP A2` links the bolt after the Guardner (`$80:BC7C`) and the list
+    // walk runs it the same frame: at (384,483) on frame 107 (native
+    // 60611, the job's `tmp/guardner2/`).
+    for rom in roms() {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0117, 376, 590, after_the_intro()).unwrap();
+        let mut first = None;
+        for frame in 0..140 {
+            world.update(None, Presses::default()).unwrap();
+            let bolt = world
+                .residents()
+                .iter()
+                .find(|resident| matches!(resident.script, Some(0x97_C50A | 0x99_8FC0)));
+            if let (None, Some(bolt)) = (first, bolt) {
+                first = Some((frame, bolt.position));
+            }
+        }
+        assert_eq!(first, Some((107, (384, 483))), "{:?}", rom.revision());
+    }
+}
+
 /// Frames of a scene, A on each read page, and A every second when `talk`.
 fn play(world: &mut World, frames: usize, talk: bool) {
     let a = Presses {

@@ -750,6 +750,12 @@ impl<'a> World<'a> {
                 actor.go_with_root(self.image);
             }
         }
+        self.delete_groups();
+    }
+
+    /// The groups `COP EB` deleted: their members now, and
+    /// their spawns of this frame made before it; later ones stay.
+    fn delete_groups(&mut self) {
         for (root, before) in std::mem::take(&mut self.globals.group_deletions) {
             let mut index = 0;
             self.globals.spawns.retain(|(_, actor)| {
@@ -861,20 +867,13 @@ impl<'a> World<'a> {
         self.run_some_actors(false)
     }
 
-    /// Runs the actors; `nested`, only those of the nested frame (`+$04`
-    /// bit 12, `$80:C85E`), as a transfer's fade does.
-    fn run_some_actors(&mut self, nested: bool) -> Result<(), WorldError> {
-        let (x, y) = self.position();
-        self.publish_engine_words((x, y));
-        self.globals.marks.clone_from(&self.blocked);
-        self.globals.views = self
-            .actors
-            .iter()
-            .map(|actor| (actor.id, actor.view()))
-            .collect();
-        // Ark's turn reads the last frame's push (`$80:D0F0`).
-        self.push_ark();
-        for index in list_order(&self.actors) {
+    /// One walk of the actor list (`$80:C871`), in its order; a window a
+    /// script opens stops it.
+    fn walk_actors(&mut self, nested: bool, (x, y): (u16, u16)) {
+        let mut order = list_order(&self.actors);
+        let mut next = 0;
+        while let Some(&index) = order.get(next) {
+            next += 1;
             if nested && !self.actors[index].runs_nested() {
                 continue;
             }
@@ -891,12 +890,41 @@ impl<'a> World<'a> {
             // Runs after this one see it as it is now.
             refresh_view(&mut self.globals.views, &self.actors[index]);
             self.apply_pokes();
+            // Its spawns join the list now: those linked after it, or last,
+            // run in this walk (`$80:BC7C`, `COP A0`), the others from the
+            // next frame.
+            if !self.globals.spawns.is_empty() {
+                self.delete_groups();
+                let id = self.actors[index].id;
+                self.spawn_actors();
+                order = list_order(&self.actors);
+                next = order
+                    .iter()
+                    .position(|&at| self.actors[at].id == id)
+                    .map_or(order.len(), |at| at + 1);
+            }
             if self.actors[index].blocked().is_some() {
                 // `$80:8C4A`/`8B85` wait inside the handler: nobody after
                 // this actor runs until the window is answered.
                 break;
             }
         }
+    }
+
+    /// Runs the actors; `nested`, only those of the nested frame (`+$04`
+    /// bit 12, `$80:C85E`), as a transfer's fade does.
+    fn run_some_actors(&mut self, nested: bool) -> Result<(), WorldError> {
+        let (x, y) = self.position();
+        self.publish_engine_words((x, y));
+        self.globals.marks.clone_from(&self.blocked);
+        self.globals.views = self
+            .actors
+            .iter()
+            .map(|actor| (actor.id, actor.view()))
+            .collect();
+        // Ark's turn reads the last frame's push (`$80:D0F0`).
+        self.push_ark();
+        self.walk_actors(nested, (x, y));
         // The draw pass sees the actors where they are now.
         let view = self.globals.view;
         for actor in &mut self.actors {
