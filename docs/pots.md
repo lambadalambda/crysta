@@ -123,12 +123,24 @@ Break point: landing → (x, y+8). Tile hit → (x, y+h+8), for example
 (x−8, y+h−16) in world space (OAM measurement). The flight frame is
 `$A2:E631` in all facings.
 
-Dash-throw (A while carry-dashing): release at F+1 with no windup, first
-sample x+22, **6 px per frame**, the same height stream. Ark's control
-returns at F+18 (dash state `$0010`). The source path is a guess (`$84:C649`, offset ±16).
+Dash-throw (A while carry-dashing, `COP 2B $0080` at `$84:B117`/`B14B`/
+`B17F`/`B1B3`; JP = EU): release at F+1 with no windup, from ±16 (pot
+script `$84:C52F`), first sample x+22, **6 px per frame**, stream `$2D`
+(`$7F:65D2`): -33 -34 -35 -35 -35 -35 -35 -34 -33 -32 -30 -28 -26 -23 -20
+-17 -13 -9 -5 0. Ark stops: resource 3 `$12`/`$13`/`$14` (records 4+4+9)
+from F+1, then the plain dash at F+18 (`$84:9051`..): on with the way held
+from F+19, else the grace F+18..F+25 and the brake from F+26 (`$0D`). Not
+modelled.
 
-Jump-throw (A in the air): release at F+1, height = jump height + stream
-(first sample −59). Measured once, not modeled.
+Jump-throw (A in the air, `$84:AF84`, J+6..J+18 of a carry jump; JP =
+EU): release at F+1 from ±16 (pot script `$84:C4E1`), 3 px a frame, height
+= Ark's height at F + stream `$2C` (`$7F:65AE`): -33 -34 -35 -35 -35 -35
+-34 -33 -32 -30 -28 -26 -23 -20 -17 -13 -9 -5 +1 +7 +13 +21 +29 +37, to
+the first sample at or below 0; it breaks the frame after at (x, y+h+8).
+Ark keeps the jump's heights and steering, shows resource 3 `$2A`/`$2B`/
+`$2C` (record 1 for 4 frames, then 2) from F+1, stands at J+24, has
+control at J+25. Sound `$12` at F+1 or F+2 by `$0042`'s parity. Modelled:
+`PotState::throw_in_air`, `world/jump.rs`.
 
 ## What ends the flight
 
