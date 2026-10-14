@@ -59,8 +59,12 @@ every frame.
 
 `E+$04` bit 14 (`$4000`) = off screen. The draw pass sets it when the
 sprite box (`E+$18`..`E+$1E`, from the composition) is outside the
-256×224 screen at camera (`$081E`, `$0822`), and clears it otherwise.
-Hidden entities (bit 15) also get it cleared. Measured: the blob at
+256×224 screen at camera (`$081E`, `$0822`), and clears it otherwise: on
+each axis the box counts when its first edge is on screen, or that edge
+is before it and the far edge on it. A record header's `+$04` can set the
+bit (the Guardner `$97:C345`: `$C220`), so the first `COP 59` sleeps
+until the first draw. Hidden entities (bit 15) keep it (measured: the
+Guardner hidden at Ark y 604, 2026-10-14). Measured: the blob at
 (72,352) lost bit 14 at frame 66009 when Ark (at y 462) walked up; the
 blob at (120,160) kept it the whole run.
 
