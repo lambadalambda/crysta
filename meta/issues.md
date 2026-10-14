@@ -81,7 +81,6 @@
 - [ ] [Draw the continents' door parchment](issues/continent-door-parchment.md)
 - [ ] [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
 - [ ] [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
-- [ ] [Match the flyers' pose 7](issues/flyer-pose-seven.md)
 - [ ] [Draw the world map's horizon band](issues/world-map-horizon-band.md)
 - [ ] [Jump from a dash, with a pot and on a rope](issues/jump-variants.md)
 - [ ] [Show the player's poses at a wooden door](issues/door-player-poses.md)

@@ -174,3 +174,4 @@
 - [x] [Jump with B](issues/jump.md)
 - [x] [Run a spawn linked after its parent in the same frame](issues/spawns-same-frame.md)
 - [x] [Keep the header's off-screen bit until the first draw](issues/first-draw-visibility.md)
+- [x] [Match the flyers' pose 7](issues/flyer-pose-seven.md)
