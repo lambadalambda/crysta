@@ -51,6 +51,7 @@ mod pots;
 mod progress;
 mod resurrection;
 mod second;
+mod shadow;
 mod status;
 mod transition;
 pub use fade::{Screen, Tint};

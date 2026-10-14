@@ -716,7 +716,7 @@ fn b_jumps_ark_over_a_two_cell_pit() {
             let mut world =
                 World::enter_with_events(rom.image(), 0x010F, 136, 736, after_the_intro()).unwrap();
             let (life, _) = world.life();
-            let mut rows = vec![];
+            let (mut rows, mut shadows) = (vec![], vec![]);
             for frame in 0..80 {
                 let press = if jumps && frame == 24 {
                     b
@@ -733,6 +733,7 @@ fn b_jumps_ark_over_a_two_cell_pit() {
                     })
                     .collect();
                 let pose = world.ark_pose().map(|pose| pose.list);
+                shadows.push(world.shadow().map(|shadow| shadow.2));
                 rows.push((world.position().0, world.ark_lift(), pose, sounds));
             }
             let fell = world.life().0 < life || world.position().0 < 200;
@@ -759,6 +760,10 @@ fn b_jumps_ark_over_a_two_cell_pit() {
                 .flat_map(|(frame, row)| row.3.iter().map(move |&sound| (frame, sound)))
                 .collect();
             assert_eq!(sounds, [(29, 0x0E00), (54, 0x0F00)], "{:?}", rom.revision());
+            // The shadow's small list from J + 11 to J + 19 (`$84:A9F1`).
+            let small: Vec<usize> = (0..80).filter(|&f| shadows[f] == Some(1)).collect();
+            assert_eq!(small, (36..=44).collect::<Vec<_>>(), "{:?}", rom.revision());
+            assert_eq!(shadows[35], Some(2), "{:?}", rom.revision());
         }
     }
 }

@@ -401,6 +401,17 @@ impl World<'_> {
         self.jump.map_or(0, Jump::height)
     }
 
+    /// How high Ark was the frame before, which the shadow reads.
+    pub(super) fn jump_height_before(&self) -> i16 {
+        self.jump.map_or(0, |jump| {
+            Jump {
+                frame: jump.frame.saturating_sub(1),
+                ..jump
+            }
+            .height()
+        })
+    }
+
     /// Whether the enemies' hits pass under Ark.
     pub(super) fn over_hits(&self) -> bool {
         self.jump.is_some_and(Jump::over_hits)
