@@ -2738,12 +2738,28 @@ impl Actor {
         self.unseen &= self.off_screen(view);
     }
 
-    /// Whether the actor is off the screen `view` (`$80:E9A2`, by the
-    /// sprite box; here a 32x32 box standing on the actor's place).
+    /// Whether the actor is off the screen `view` (`$80:EAE6`): the draw
+    /// box of the record shown, mirrored with the actor, against it; without
+    /// boxes a 32x32 box standing on the actor's place.
     fn off_screen(&self, view: Option<(u16, u16, u16, u16)>) -> bool {
         let Some((left, top, right, bottom)) = view else {
             return false;
         };
+        if let Some(record) = self.record() {
+            let [mut near_x, mut far_x, mut near_y, mut far_y] = record.draw;
+            if self.hflip {
+                (near_x, far_x) = (far_x, near_x);
+            }
+            if self.vflip {
+                (near_y, far_y) = (far_y, near_y);
+            }
+            let (x, y) = (
+                i32::from(self.position.0) - i32::from(left),
+                i32::from(self.position.1) - i32::from(top),
+            );
+            let (width, height) = (i32::from(right - left), i32::from(bottom - top));
+            return !(on_axis(x, (near_x, far_x), width) && on_axis(y, (near_y, far_y), height));
+        }
         let (x, y) = self.position;
         x.saturating_add(16) < left
             || x.saturating_sub(16) >= right
@@ -4543,6 +4559,17 @@ const fn delta(direction: Direction) -> (i16, i16) {
     }
 }
 
+/// One axis of the draw pass's test (`$80:EAE6`): a box reaching `near`
+/// before and `far` past a place `at` on a screen `span` long shows when its
+/// near edge is on it, or that edge is before it and the far one on it.
+fn on_axis(at: i32, (near, far): (i16, i16), span: i32) -> bool {
+    let first = at - i32::from(near);
+    if first >= 0 {
+        return first < span;
+    }
+    (0..span).contains(&(at + i32::from(far)))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -5693,6 +5720,17 @@ mod script_service_tests {
         tick(&mut actor, &image);
         assert_eq!((actor.palette, actor.priority), (7, 2));
         assert!(actor.frozen_at().is_none());
+    }
+
+    #[test]
+    fn an_axis_shows_by_its_near_edge_or_else_its_far_one() {
+        // The Guardner's draw box reaches 40 up and 8 down: at y 488 on a
+        // screen from 488 its bottom is on the first line; from 492 not.
+        assert!(on_axis(480 - 488, (40, 8), 224));
+        assert!(!on_axis(480 - 492, (40, 8), 224));
+        assert!(on_axis(100, (16, 15), 256) && !on_axis(256 + 16, (16, 15), 256));
+        // A box over the whole screen is off it.
+        assert!(!on_axis(10, (20, 300), 256));
     }
 
     #[test]

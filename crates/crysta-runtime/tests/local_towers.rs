@@ -1550,10 +1550,10 @@ fn the_guardner_sleeps_its_first_thirty_frames() {
     // Native (`docs/enemy-scripts.md`, the job's `tmp/guardner2/`): its
     // header's `+$04` has bit 14, so the first `COP 59 1E` sleeps until the
     // draw pass has seen it: pose 5 at frame 31, 7 at 93, 4 at 125, with Ark
-    // at 576 or 590; at 604 it stays off the screen. (At 600 it wakes
-    // natively; its sprite box here is too small: first-draw-visibility.)
+    // at 576, 590 or 600 (its draw box's bottom on the screen's first
+    // line); at 604 it stays off the screen.
     for rom in roms() {
-        for (y, wakes) in [(576, true), (590, true), (604, false)] {
+        for (y, wakes) in [(576, true), (590, true), (600, true), (604, false)] {
             let mut world =
                 World::enter_with_events(rom.image(), 0x0117, 376, y, after_the_intro()).unwrap();
             let mut poses = vec![];

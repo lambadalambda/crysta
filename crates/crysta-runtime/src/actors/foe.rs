@@ -92,7 +92,7 @@ impl Foe {
 
 impl Actor {
     /// The record the pose shows now, if its boxes are known.
-    fn record(&self) -> Option<&Record> {
+    pub(super) fn record(&self) -> Option<&Record> {
         let records = self.boxes.as_ref()?.get(usize::from(self.selector))?;
         let total: u32 = records
             .iter()
