@@ -426,6 +426,21 @@ impl Session {
             })
     }
 
+    /// Ark's ground shadow (`World::shadow`): the helper art's list at his
+    /// ground place, under him.
+    pub fn shadow_sprite(&mut self) -> Option<Placed> {
+        let (place, art, list) = self.world.shadow()?;
+        let image = self.image;
+        let raster = self
+            .sprites
+            .entry(SpriteKey::Overlay(art, list, false, false))
+            .or_insert_with(|| crysta_runtime::art::overlay_animation(image, art, list, false).ok())
+            .as_ref()?
+            .frame_at(0)
+            .clone();
+        Some((place, raster))
+    }
+
     /// Ark's carry pose while he lifts, holds or throws a pot, and the pot:
     /// in hand at Ark's origin (its frames carry the height), then along its
     /// flight.
@@ -537,7 +552,7 @@ impl Session {
         }
         self.ensure_background(cartridge);
         self.ensure_art();
-        let (carried, pot) = self.carry_sprites();
+        let ((carried, pot), shadow) = (self.carry_sprites(), self.shadow_sprite());
         let Session {
             world,
             backgrounds,
@@ -580,7 +595,7 @@ impl Session {
                 // fall's end hides him (`World::ark_blinks`). A landing
                 // draws him above his place, over the high tiles.
                 if !world.ark_blinks() {
-                    draw_ark(frame, background, camera, player, world);
+                    draw_ark(frame, background, camera, (player, shadow.as_ref()), world);
                 }
                 continue;
             }
@@ -756,14 +771,17 @@ pub enum SpriteKey {
 }
 
 /// Ark at his place, or above it over the high tiles while a landing drops
-/// him (`World::ark_lift`, `World::ark_over`).
+/// him (`World::ark_lift`, `World::ark_over`), over his shadow.
 fn draw_ark(
     canvas: &mut Canvas,
     background: &frame::Background,
     camera: (i32, i32),
-    raster: &Raster,
+    (raster, shadow): (&Raster, Option<&Placed>),
     world: &World<'_>,
 ) {
+    if let Some((place, shadow)) = shadow {
+        frame::draw_sprite(canvas, background, camera, shadow, *place);
+    }
     let draw = if world.ark_over() {
         frame::draw_sprite_over
     } else {
