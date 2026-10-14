@@ -184,7 +184,7 @@ All spawns copy `E+$00..$17`, `7F:0022/24/26` and `7F:1022` from the parent
 | COP | Handler | Operands | Semantics | Used by | Status |
 |---|---|---|---|---|---|
 | `D9 n` | `B501` | byte | `7F:1022` = profile `$8D:BDFA[n & $7F]`; without bit 7 also life `7F:102A` = profile+9 | flyer bullets, `B847`, Cadet | skip (no profile) |
-| `DA w` | `B530` | word | `7F:1002 = 1004 = 1006 = 1008 = w` (handlers for wake bits 5-1, §5) | knight, `B635`, `B847`, Cadet | missing |
+| `DA w` | `B530` | word | `7F:1002 = 1004 = 1006 = 1008 = w` (handlers for wake bits 5-1, §5) | knight, `B635`, `B847`, Cadet, flyers `BD3E` | ok (the side wakes) |
 | `65`/`66` | `9D25`/`9D5A` | | hit target / return (doors) | – | ok |
 
 Bosses only (not read in full): `5A bank addr idx n` (`9AEB`, copy n
@@ -244,10 +244,11 @@ there in the same frame (if `E+$0E` allows; the setters clear `E+$0E`).
 | 9 `$0200` | my attack box hit (`$85:D4EA`); only when `7F:1010` ≠ 0 | `7F:1010` | |
 | 8, 7, 6 | the wall probe (`$80:E1B0`, `E1A2`, `E194`) for some tile classes, only when the field ≠ 0; that axis's stream stops | `7F:100C`, `7F:1000`, `7F:100A` | |
 | 5 `$0020` | tile collision path `$80:D27D` (streams stop) | `7F:1002` (then cleared) | `$85:E53F` if `E+$04 & 2`, else a debug write |
-| 4-1 | (not traced) | `7F:1002`, `1004`, `1006`, `1008` (`COP DA`) | |
+| 4-1 | the wall probe (`$80:E15C..E18C`) when a moving axis is blocked, only when the side's field ≠ 0 and not busy (`$80:E1D2`): Left `$0010`, Right `$0008`, Up `$0004`, Down `$0002` | `7F:1002`, `1004`, `1006`, `1008` (`COP DA`); each handler clears its field (`$80:CB16`..`CB56`) | |
 
-Which tile classes raise bits 6-8 is not traced (guess: holes, ledges,
-water). The knight and the Hiballs point them back at their own loop
+Tile classes 6 and 7 raise bit 7, 9 bit 8, 12 and 13 bit 6 (the table
+`$80:D642`) and not the side's bit; the runtime runs the side's callback
+for every blocking class. The knight and the Hiballs point them back at their own loop
 start, so a bump restarts the decision.
 
 ### Knockback script (`$85:E03D`)
