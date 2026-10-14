@@ -10,6 +10,7 @@ use crate::frame::{rgb, signed, Canvas, CLASSIC_WIDTH, VIEW_HEIGHT};
 use assets::graphics::Bgr555;
 use assets::maps::visual::mode7::Mode7View;
 use assets::maps::visual::world::WorldMap;
+use crysta_runtime::art::Raster;
 
 /// Ark's point on the screen: M7HOFS = x − 128, M7VOFS = y − 160.
 const CENTRE: (i32, i32) = (128, 160);
@@ -24,6 +25,30 @@ pub struct Mode7 {
     pub map: WorldMap,
     /// The per-line tables.
     pub view: Mode7View,
+    /// `$03`'s horizon band ([`crysta_runtime::art::horizon_band`]), fixed
+    /// on the classic screen at (128,53).
+    pub band: Option<Raster>,
+}
+
+/// The band's anchor on the classic screen: OAM y + 1 is the line, so a
+/// row up.
+const BAND: (i32, i32) = (128, 52);
+/// Lines the band's colours replace the fog's on.
+const BAND_LINES: std::ops::Range<usize> = 52..68;
+
+/// The band's colour at a classic screen pixel, where it is opaque.
+fn band_colour(band: &Raster, (x, y): (i32, i32)) -> Option<Bgr555> {
+    let (bx, by) = (
+        usize::try_from(x - BAND.0 - i32::from(band.offset.0)).ok()?,
+        usize::try_from(y - BAND.1 - i32::from(band.offset.1)).ok()?,
+    );
+    if bx >= band.width {
+        return None;
+    }
+    let pixel = *band.pixels.get(by * band.width + bx)?;
+    // Back to 5 bits a channel: the raster's 8 keep them in the top bits.
+    let channel = |shift: u32| u16::try_from((pixel >> (shift + 3)) & 31).unwrap_or(0);
+    (pixel >> 24 != 0).then(|| Bgr555::new(channel(16) | channel(8) << 5 | channel(0) << 10))
 }
 
 /// The 13-bit signed difference ares keeps of the origin's offset.
@@ -96,7 +121,18 @@ pub fn draw(canvas: &mut Canvas, mode7: &Mode7, player: (u16, u16)) {
                 (true, 0) => subtract(view.backdrop[row], fixed(view.fade[row])),
                 (true, _) => subtract(view.backdrop[row], mode7.map.color(index)),
                 (false, 0) => view.backdrop[row],
-                (false, _) => subtract(mode7.map.color(index), fixed(view.fade[row])),
+                (false, _) => {
+                    // The horizon band's grey, where it is, instead of the fog.
+                    let band = mode7
+                        .band
+                        .as_ref()
+                        .filter(|_| BAND_LINES.contains(&row))
+                        .and_then(|band| band_colour(band, (screen_x, signed(row))));
+                    subtract(
+                        mode7.map.color(index),
+                        band.unwrap_or(fixed(view.fade[row])),
+                    )
+                }
             };
             canvas.pixels[row * canvas.width + column] = rgb(colour);
         }

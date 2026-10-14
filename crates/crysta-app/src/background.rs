@@ -71,7 +71,16 @@ fn load_world(cartridge: &rom::Rom, map: u16) -> Result<CachedBackground, String
         mode7: assets::maps::visual::mode7::Mode7View::from_rom(cartridge.image())
             .inspect_err(|error| eprintln!("world map drawn flat: {error}"))
             .ok()
-            .map(|view| Box::new(crate::mode7::Mode7 { map: world, view })),
+            .map(|view| {
+                let band = (map == 0x03)
+                    .then(|| crysta_runtime::art::horizon_band(cartridge.image(), None).ok())
+                    .flatten();
+                Box::new(crate::mode7::Mode7 {
+                    map: world,
+                    view,
+                    band,
+                })
+            }),
     })
 }
 

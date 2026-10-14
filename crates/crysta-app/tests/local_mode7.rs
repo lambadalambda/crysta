@@ -42,6 +42,7 @@ fn the_view_matches_native_frames_on_both_roms() {
         let mode7 = Mode7 {
             map: WorldMap::from_rom(rom.image(), 0x0003).unwrap(),
             view: Mode7View::from_rom(rom.image()).unwrap(),
+            band: None,
         };
         for (frame, player) in frames {
             let native = local(&format!("mode7/{revision}/{frame}/native.rgb"))
@@ -52,16 +53,20 @@ fn the_view_matches_native_frames_on_both_roms() {
             let mut mode7 = Mode7 {
                 map: mode7.map.clone(),
                 view: mode7.view.clone(),
+                band: None,
             };
-            mode7.map.set_palette(std::array::from_fn(|i| {
-                Bgr555::new(u16::from_le_bytes([cgram[2 * i], cgram[2 * i + 1]]))
-            }));
+            let colour =
+                |i: usize| Bgr555::new(u16::from_le_bytes([cgram[2 * i], cgram[2 * i + 1]]));
+            mode7.map.set_palette(std::array::from_fn(colour));
+            // The band in OBJ palette 5 as the frame had it.
+            let band: [Bgr555; 16] = std::array::from_fn(|i| colour(208 + i));
+            mode7.band = Some(crysta_runtime::art::horizon_band(rom.image(), Some(&band)).unwrap());
             let mut canvas = Canvas::new(CLASSIC_WIDTH);
             mode7::draw(&mut canvas, &mode7, player);
-            // Left out: the sprites (Ark, the horizon's band), by their
-            // boxes in the frame's OAM: 8x8, or 16x16 when large (OBSEL 2).
+            // Left out: Ark (OAM 0-2), by his boxes in the frame's OAM: 8x8,
+            // or 16x16 when large (OBSEL 2). The horizon's band is drawn.
             let oam = local(&format!("mode7/{revision}/{frame}/prev.oam")).unwrap();
-            let boxes: Vec<(usize, usize, usize)> = (0..128)
+            let boxes: Vec<(usize, usize, usize)> = (0..3)
                 .filter_map(|n| {
                     let high = oam[512 + n / 4] >> (2 * (n % 4));
                     let size = if high & 2 != 0 { 16 } else { 8 };
