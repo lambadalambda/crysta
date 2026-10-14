@@ -604,3 +604,33 @@ fn a_held_pot_goes_where_ark_is_put() {
     s.carry_to(WalkingState::new(40, 400));
     assert_eq!((s.position(), s.phase()), ((40, 400), Phase::Held));
 }
+
+#[test]
+fn a_throw_in_the_air_flies_from_the_jumps_height() {
+    // `docs/jump.md`, the jump-throw: from 16 pixels ahead, 3 a frame, at
+    // Ark's height plus the stream `$2C`, until a sample at or below the
+    // ground (+3 here); it breaks the frame after.
+    let r = room();
+    let a = admission(&r);
+    let mut s = state(&r, 104, 352, Direction::Left);
+    lift(&mut s, &r);
+    assert!(s.throw_in_air(-26, &r));
+    assert_eq!(s.phase(), Phase::Empty);
+    assert_eq!(s.flight().map(|f| (f.x, f.y)), Some((85, 352)));
+    let mut heights = vec![s.flight_height().unwrap()];
+    let snapshot = PotState::decode_snapshot(&a, &s.encode_snapshot()).unwrap();
+    assert_eq!(snapshot, s);
+    let mut broke = None;
+    for _ in 0..30 {
+        let out = s.step(&a, Input::default()).unwrap();
+        broke = broke.or(out.broke);
+        if broke.is_none() {
+            heights.push(s.flight_height().unwrap());
+        }
+    }
+    assert_eq!(&heights[..4], [-59, -60, -61, -61]);
+    assert_eq!(heights.last(), Some(&3));
+    assert_eq!(heights.len(), 23);
+    assert!(broke.is_some());
+    assert!(!s.throw_in_air(-26, &r));
+}

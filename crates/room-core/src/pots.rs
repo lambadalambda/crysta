@@ -145,6 +145,49 @@ pub const SNAPSHOT_SIZE: usize = 40;
 const HEIGHTS: [i8; 19] = [
     -33, -34, -35, -35, -35, -35, -34, -33, -32, -30, -28, -26, -23, -20, -17, -13, -9, -5, 0,
 ];
+/// A throw in the air (stream `$2C`, `$7F:65AE`; `docs/jump.md`), above
+/// Ark's height when it left: it ends at the first sample at or below the
+/// ground. Its first 18 samples are the standing throw's.
+const JUMP_HEIGHTS: [i8; 24] = [
+    -33, -34, -35, -35, -35, -35, -34, -33, -32, -30, -28, -26, -23, -20, -17, -13, -9, -5, 1, 7,
+    13, 21, 29, 37,
+];
+
+/// How a pot flies: thrown standing or dropped (the stream `$2A`), or
+/// thrown in the air from a height.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Arc {
+    Thrown,
+    /// Thrown in the air, `base` above the ground (`$0999` at the A).
+    Aloft {
+        base: i8,
+    },
+}
+
+impl Arc {
+    fn heights(self) -> &'static [i8] {
+        match self {
+            Self::Thrown => &HEIGHTS,
+            Self::Aloft { .. } => &JUMP_HEIGHTS,
+        }
+    }
+
+    /// The height at a sample from 1.
+    fn height(self, sample: u8) -> i16 {
+        let base = match self {
+            Self::Thrown => 0,
+            Self::Aloft { base } => i16::from(base),
+        };
+        let at = usize::from(sample.max(1) - 1);
+        base + self.heights().get(at).map_or(0, |&h| i16::from(h))
+    }
+
+    /// Whether a sample is the flight's last: at or below the ground, or
+    /// the stream's end.
+    fn last(self, sample: u8) -> bool {
+        usize::from(sample) >= self.heights().len() || (sample > 0 && self.height(sample) >= 0)
+    }
+}
 /// Frames of the lift presentation, of the throw until the release, and of
 /// the throw until Ark's control returns (`$84:BE9D`, `$84:B558`).
 const LIFT: u8 = 23;
@@ -166,7 +209,8 @@ struct Flying {
     x: u16,
     y: u16,
     facing: Direction,
-    /// Samples shown, 1..=19.
+    arc: Arc,
+    /// Samples shown, from 1 to its stream's length.
     sample: u8,
     /// A tile stopped it at this sample; it breaks next frame.
     stopped: bool,
@@ -331,19 +375,7 @@ impl PotState {
     /// from 16 pixels toward his facing, on the throw's stream. Returns
     /// whether he held one.
     pub fn drop_into_flight(&mut self, ground: &Room) -> bool {
-        if self.phase != Phase::Held {
-            return false;
-        }
-        let (x, y) = self.position();
-        let at = match self.facing {
-            Direction::Down => (x, y + DROP_LAUNCH),
-            Direction::Up => (x, y.saturating_sub(DROP_LAUNCH)),
-            Direction::Left => (x.saturating_sub(DROP_LAUNCH), y),
-            Direction::Right => (x + DROP_LAUNCH, y),
-        };
-        (self.phase, self.queued) = (Phase::Empty, None);
-        self.launch(at, ground);
-        true
+        self.launch_ahead(ground, Arc::Thrown)
     }
     /// Moves Ark with the pot in hand to `walking`, as a drop from a lip
     /// does; without one, nothing.
@@ -379,8 +411,7 @@ impl PotState {
     /// The flying pot's height above its ground point (`$0999`, negative up).
     #[must_use]
     pub fn flight_height(&self) -> Option<i16> {
-        self.flight
-            .map(|flight| i16::from(HEIGHTS[usize::from(flight.sample - 1)]))
+        self.flight.map(|flight| flight.arc.height(flight.sample))
     }
     /// The enclosing pot snapshot, not this walker alone, owns the carry cadence.
     #[must_use]
@@ -576,7 +607,7 @@ impl PotState {
         // A tile's stop sounds at its sample, a landing at the last one.
         if next
             .flight
-            .is_some_and(|after| after.stopped || usize::from(after.sample) == HEIGHTS.len())
+            .is_some_and(|after| after.stopped || after.arc.last(after.sample))
         {
             out.sound = Some(Sound::Break);
         }
@@ -597,15 +628,43 @@ impl PotState {
         };
         out.held_changed = Some(None);
         out.sound = Some(Sound::Release);
-        self.launch(at, ground);
+        self.launch(at, ground, Arc::Thrown);
+    }
+
+    /// Throws the pot in hand from the air, `height` above the ground (a
+    /// jump's A, `$84:AF84`): from 16 pixels toward the facing, 3 a frame,
+    /// at once; Ark keeps his jump. Returns whether he held one.
+    pub fn throw_in_air(&mut self, height: i16, ground: &Room) -> bool {
+        // Snapshots keep up to 31 (the jump's peak is 28).
+        let base = i8::try_from(height.clamp(-31, 0)).unwrap_or(0);
+        self.launch_ahead(ground, Arc::Aloft { base })
+    }
+
+    /// The pot in hand leaves from 16 pixels toward the facing (`$84:C649`,
+    /// `$84:C4E1`). Returns whether Ark held one.
+    fn launch_ahead(&mut self, ground: &Room, arc: Arc) -> bool {
+        if self.phase != Phase::Held {
+            return false;
+        }
+        let (x, y) = self.position();
+        let at = match self.facing {
+            Direction::Down => (x, y + DROP_LAUNCH),
+            Direction::Up => (x, y.saturating_sub(DROP_LAUNCH)),
+            Direction::Left => (x.saturating_sub(DROP_LAUNCH), y),
+            Direction::Right => (x + DROP_LAUNCH, y),
+        };
+        (self.phase, self.queued) = (Phase::Empty, None);
+        self.launch(at, ground, arc);
+        true
     }
 
     /// The flight's start at `(x, y)` and its first step.
-    fn launch(&mut self, (x, y): (u16, u16), ground: &Room) {
+    fn launch(&mut self, (x, y): (u16, u16), ground: &Room, arc: Arc) {
         self.flight = Some(Flying {
             x,
             y,
             facing: self.facing,
+            arc,
             sample: 0,
             stopped: false,
             door: DoorContact::Clear,
@@ -623,7 +682,7 @@ impl PotState {
             out.door_hit = a.door_hit_enabled;
             self.counted |= out.door_hit;
         }
-        if flight.stopped || usize::from(flight.sample) == HEIGHTS.len() {
+        if flight.stopped || flight.arc.last(flight.sample) {
             self.flight = None;
             self.object = 0;
             out.broke = Some(Flight {
@@ -704,6 +763,10 @@ impl PotState {
             b[34..36].copy_from_slice(&flight.x.to_le_bytes());
             b[36..38].copy_from_slice(&flight.y.to_le_bytes());
             b[38] = flight.facing as u8;
+            if let Arc::Aloft { base } = flight.arc {
+                // Bit 2: in the air; bits 3-7 the base's height up.
+                b[38] |= 4 | base.unsigned_abs().min(31) << 3;
+            }
         }
         b[39] = u8::from(self.counted);
         b
@@ -736,28 +799,7 @@ impl PotState {
         if a.objects.len() < 64 && consumed >> a.objects.len() != 0 {
             return Err(Error::Snapshot);
         }
-        let sample = b[33] & 0x1F;
-        let flight = if sample == 0 {
-            if b[33..39].iter().any(|&v| v != 0) {
-                return Err(Error::Snapshot);
-            }
-            None
-        } else {
-            let door = match b[33] >> 5 & 3 {
-                0 => DoorContact::Clear,
-                1 => DoorContact::Struck,
-                2 => DoorContact::Counted,
-                _ => return Err(Error::Snapshot),
-            };
-            Some(Flying {
-                x: u16::from_le_bytes([b[34], b[35]]),
-                y: u16::from_le_bytes([b[36], b[37]]),
-                facing: facing(b[38])?,
-                sample,
-                stopped: b[33] & 0x80 != 0,
-                door,
-            })
-        };
+        let flight = decode_flight(&b[33..39], facing)?;
         let state = Self {
             walking: WalkingState::decode_snapshot(a.room, &b[4..20])?,
             consumed,
@@ -788,9 +830,9 @@ impl PotState {
                         || (state.object == 0 && state.age > RELEASE && state.flight.is_none()))
             }
         };
-        let flight_valid = state
-            .flight
-            .is_none_or(|flight| usize::from(flight.sample) <= HEIGHTS.len() && object_valid);
+        let flight_valid = state.flight.is_none_or(|flight| {
+            usize::from(flight.sample) <= flight.arc.heights().len() && object_valid
+        });
         let queued_valid = match state.queued {
             None => true,
             Some(0) => phase == Phase::Held,
@@ -815,6 +857,48 @@ impl PotState {
         }
         Ok(state)
     }
+}
+
+/// A snapshot's flight bytes (33..39): its sample (0 none) with bit 7
+/// stopped and bits 5-6 the door contact, x, y, and its facing with bit 2
+/// in the air and bits 3-7 the height it left from.
+fn decode_flight(
+    b: &[u8],
+    facing: impl Fn(u8) -> Result<Direction, Error>,
+) -> Result<Option<Flying>, Error> {
+    let sample = b[0] & 0x1F;
+    Ok(if sample == 0 {
+        if b[..6].iter().any(|&v| v != 0) {
+            return Err(Error::Snapshot);
+        }
+        None
+    } else {
+        let door = match b[0] >> 5 & 3 {
+            0 => DoorContact::Clear,
+            1 => DoorContact::Struck,
+            2 => DoorContact::Counted,
+            _ => return Err(Error::Snapshot),
+        };
+        let arc = if b[5] & 4 == 0 {
+            if b[5] >> 2 != 0 {
+                return Err(Error::Snapshot);
+            }
+            Arc::Thrown
+        } else {
+            Arc::Aloft {
+                base: -i8::try_from(b[5] >> 3).map_err(|_| Error::Snapshot)?,
+            }
+        };
+        Some(Flying {
+            x: u16::from_le_bytes([b[1], b[2]]),
+            y: u16::from_le_bytes([b[3], b[4]]),
+            facing: facing(b[5] & 3)?,
+            arc,
+            sample,
+            stopped: b[0] & 0x80 != 0,
+            door,
+        })
+    })
 }
 
 #[cfg(test)]
