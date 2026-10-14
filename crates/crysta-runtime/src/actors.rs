@@ -798,6 +798,9 @@ pub struct Actor {
     /// A sleep `COP 46` or a native store leaves for the next yield
     /// (`E+$0E`).
     sleep: u16,
+    /// `+$04` bit 14 from an enemy's header, off screen until the draw pass
+    /// first sees it (`$80:E9A2`): the Guardner's first `COP 59` sleeps.
+    unseen: bool,
     /// Whether the actor has ever moved.
     walked: bool,
     /// The contact callback (`$7F:1010`).
@@ -951,6 +954,7 @@ impl Actor {
             overlay: None,
             helper_art: None,
             sleep: 0,
+            unseen: false,
             walked: false,
             contact: None,
             ease: None,
@@ -1119,8 +1123,10 @@ impl Actor {
             }
         }
         if actor.foe.is_some() {
-            // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan.
+            // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan;
+            // off screen until drawn.
             actor.hidden |= header & 0x8000 != 0;
+            actor.unseen = header & 0x4000 != 0;
             actor.guard.0 = header & GUARD_04;
         }
         // Enemies' boxes for the hit scans; the towers' mode-`$04` objects'
@@ -1358,7 +1364,7 @@ impl Actor {
             return Some(at + 5);
         }
         if image.get(at..at + OFF_SCREEN_TEST.len()) == Some(&OFF_SCREEN_TEST) {
-            let on_screen = !self.off_screen(around.globals.view);
+            let on_screen = !self.unseen && !self.off_screen(around.globals.view);
             return tested_branch(image, at + OFF_SCREEN_TEST.len(), on_screen);
         }
         // `+$06`'s interaction bits (`$0200` any side, `$0100` facing), as
@@ -2717,13 +2723,19 @@ impl Actor {
             self.state = State::Frozen;
             return false;
         };
-        if self.off_screen(around.globals.view) {
+        if self.unseen || self.off_screen(around.globals.view) {
             self.pc = operands - 2;
             self.state = State::Waiting(u16::from(ticks));
             return false;
         }
         self.pc = operands + 1;
         true
+    }
+
+    /// The draw pass after the actors ran (`$80:E9A2`): on the screen
+    /// `view`, the header's off-screen bit goes.
+    pub(crate) fn drawn(&mut self, view: Option<(u16, u16, u16, u16)>) {
+        self.unseen &= self.off_screen(view);
     }
 
     /// Whether the actor is off the screen `view` (`$80:E9A2`, by the

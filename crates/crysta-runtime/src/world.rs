@@ -897,6 +897,11 @@ impl<'a> World<'a> {
                 break;
             }
         }
+        // The draw pass sees the actors where they are now.
+        let view = self.globals.view;
+        for actor in &mut self.actors {
+            actor.drawn(view);
+        }
         self.make_deletions();
         // A run's write to Ark's life (`STA $065D`, the bed, `$88:8AE1`).
         let stats = self.globals.slot.stats();
