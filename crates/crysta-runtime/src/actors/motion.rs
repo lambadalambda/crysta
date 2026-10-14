@@ -158,6 +158,19 @@ impl Motion {
         }
     }
 
+    /// `COP 80` under way (`$80:A18C`): the restart pointers cleared
+    /// (`7F:0014/0016 = 0`) and the new pose's list started, so the
+    /// streams run on to that list's end, then stop.
+    pub(super) fn repose(&mut self, list: Option<u16>) {
+        let stopped = Axis {
+            pointer: 0,
+            counter: 0,
+        };
+        self.start = (stopped, stopped);
+        self.list = list.filter(|&ticks| ticks > 0);
+        self.tick = 0;
+    }
+
     /// One frame's move, the axes negated by the actor's `(mirrored,
     /// flipped)`.
     pub(super) fn step(&mut self, (hflip, vflip): (bool, bool)) -> Option<(i16, i16)> {

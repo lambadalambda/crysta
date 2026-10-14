@@ -182,6 +182,13 @@ impl World<'_> {
         self.globals.inventory.count(item) > 0
     }
 
+    /// Sets the random generator's bytes (`$0408..$0417`), for tests that
+    /// follow a native trace.
+    #[doc(hidden)]
+    pub fn set_random(&mut self, bytes: [u8; 16]) {
+        self.globals.random = crate::random::Random::new(bytes);
+    }
+
     /// Sets Ark's life, for tests.
     #[doc(hidden)]
     pub fn set_life(&mut self, life: u16) {

@@ -322,6 +322,12 @@ const COSMETIC: [(u8, usize); 2] = [(SPIN, 2), (PPU_WRITE, 2)];
 /// Sets the combat profile (`$80:B501`): `$8D:BDFA[n & $7F]`, and without
 /// bit 7 the life too.
 const PROFILE: u8 = 0xD9;
+/// Sets the wall callbacks `7F:1002`, `1004`, `1006`, `1008` (Left, Right,
+/// Up, Down) to one word (`$80:B530`).
+const SIDE_CALLBACKS: u8 = 0xDA;
+/// The wall callback fields by side, Left, Right, Up, Down: wake bits 4-1
+/// (`$80:E15C..E1D1`).
+const SIDES: [u16; 4] = [0x1002, 0x1004, 0x1006, 0x1008];
 /// `COP 6A shape speed` (`$80:9DD6`).
 const SPIN: u8 = 0x6A;
 /// `COP 76 register value` (`$80:A127`): `$21rr = value` at the next NMI.
@@ -836,6 +842,8 @@ pub struct Actor {
     root: bool,
     /// A hit that did not kill wakes its struck callback next frame.
     pub(crate) struck: bool,
+    /// The wall callback field (`SIDES`) a blocked axis woke, run next frame.
+    bumped: Option<u16>,
     /// It headed a group and died: the group goes with it.
     root_died: bool,
     /// `COP C2`-`C5` that found a wall this frame.
@@ -971,6 +979,7 @@ impl Actor {
             id: 0,
             root: false,
             struck: false,
+            bumped: None,
             root_died: false,
             blocked_tests: 0,
             ark: false,
@@ -1228,7 +1237,7 @@ impl Actor {
         self.streamed = false;
         self.cooldown = self.cooldown.saturating_sub(1);
         self.pose_age = self.pose_age.saturating_add(1);
-        self.wake_struck();
+        self.wake();
         if matches!(self.state, State::Ordinary { ticks_left: 0, .. }) {
             self.walking = false;
             self.state = State::Running;
@@ -1840,7 +1849,8 @@ impl Actor {
             WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
             SELECT_POSE => return self.select_pose(operands, image),
             LINE_START | LINE_STEP => return self.line_service(service, operands, image),
-            PROFILE => return self.profile_service(operands, image),
+            // One arm for both keeps this dispatch inside clippy's length.
+            PROFILE | SIDE_CALLBACKS => return self.profile_service(service, operands, image),
             ARK_BUSY => return self.ark_busy(operands, bank, around),
             _ if FLIPS.contains(&service) => {
                 self.flip(service);
@@ -2307,8 +2317,12 @@ impl Actor {
         // `$80:A18C` restarts the list even for the same pose. Only where
         // its length is known, or a one-frame fallback wait would hold the
         // raster on its first frame.
-        if self.pose_list(selector).is_some() {
+        let list = self.pose_list(selector);
+        if list.is_some() {
             self.pose_age = 0;
+        }
+        if let Some(motion) = &mut self.motion {
+            motion.repose(list);
         }
         // `$80:A1A8` writes `+$0A`: an RTL comes back here.
         self.continuation = Some(operands + 1);
@@ -2339,8 +2353,12 @@ impl Actor {
     }
 
     /// `COP D9 n`: the profile, and without bit 7 the life too; a spawned
-    /// child (a bullet) becomes an enemy that counts for no room.
-    fn profile_service(&mut self, operands: usize, image: &[u8]) -> bool {
+    /// child (a bullet) becomes an enemy that counts for no room. `COP DA`
+    /// goes to [`Self::side_callbacks`].
+    fn profile_service(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        if service == SIDE_CALLBACKS {
+            return self.side_callbacks(operands, image);
+        }
         let Some(&index) = image.get(operands) else {
             self.state = State::Frozen;
             return false;
@@ -2359,6 +2377,20 @@ impl Actor {
             }
         }
         self.pc = operands + 1;
+        true
+    }
+
+    /// `COP DA w`: the four wall callbacks, run when a blocked axis wakes
+    /// the actor ([`Self::wake`]).
+    fn side_callbacks(&mut self, operands: usize, image: &[u8]) -> bool {
+        let Some(target) = cadence::word(image, operands) else {
+            self.state = State::Frozen;
+            return false;
+        };
+        for field in SIDES {
+            self.set_own_word(field, target);
+        }
+        self.pc = operands + 2;
         true
     }
 
@@ -2444,6 +2476,21 @@ impl Actor {
         };
         let (position, blocked) = walls::step(self.position, delta, shape, layer);
         self.position = position;
+        // The side's bit only with its callback set; the highest wins (x
+        // before y).
+        let sides = [
+            (blocked.0, delta.0, SIDES[0], SIDES[1]),
+            (blocked.1, delta.1, SIDES[2], SIDES[3]),
+        ];
+        let bumped = sides
+            .into_iter()
+            .filter(|&(blocked, ..)| blocked)
+            .map(|(_, delta, back, ahead)| if delta < 0 { back } else { ahead })
+            .find(|&field| self.own_word(field) != 0);
+        // Not while busy (`7F:201E` bit 15: a knockback, `$80:E1D2`).
+        if !self.foe.as_ref().is_some_and(|foe| foe.knocked) {
+            self.bumped = self.bumped.or(bumped);
+        }
         if let Some(motion) = &mut self.motion {
             motion.stop(blocked);
         }
@@ -3012,12 +3059,22 @@ impl Actor {
         }
     }
 
-    /// The struck wake (`7F:201E` bit `$0800`, `$80:C967`): the script goes
-    /// on from `7F:1016`, in the bank of `7F:2020`, or its own.
-    fn wake_struck(&mut self) {
-        let target = self.own_word(STRUCK);
+    /// The wake (`7F:201E`, `$80:C967`), the highest bit first: struck
+    /// (`$0800`, `7F:1016`) or a wall side (bits 4-1). The script goes on
+    /// from the field's word, in the bank of `7F:2020`, or its own.
+    fn wake(&mut self) {
+        let struck = std::mem::take(&mut self.struck)
+            .then_some(STRUCK)
+            .filter(|&field| self.own_word(field) != 0);
+        let field = struck.or(self.bumped.take());
+        let target = field.map_or(0, |field| self.own_word(field));
+        // A side's handler clears its field: it wakes once until set again
+        // (`$80:CB16`..`CB56`).
+        if let Some(side) = field.filter(|field| SIDES.contains(field)) {
+            self.set_own_word(side, 0);
+        }
         let idle = matches!(self.state, State::Frozen | State::Gone | State::Blocked(_));
-        if !std::mem::take(&mut self.struck) || target < 0x8000 || idle {
+        if target < 0x8000 || idle {
             return;
         }
         let bank = self

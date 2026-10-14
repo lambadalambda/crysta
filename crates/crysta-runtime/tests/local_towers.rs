@@ -27,6 +27,12 @@ fn roms() -> Vec<Rom> {
     .collect()
 }
 
+/// The generator (`$0408..$0417`) of the JP warp state for the native `$117`
+/// traces (`docs/native-warp.md`).
+const WARP_RANDOM: [u8; 16] = [
+    0x90, 0x39, 0x05, 0x9D, 0x9B, 0xE0, 0x80, 0x09, 0x6D, 0x5D, 0x69, 0xC0, 0xEA, 0xC3, 0x49, 0xCF,
+];
+
 /// The flags after the first tower's intro (`$100`, `$90:8F28`).
 fn after_the_intro() -> Vec<u8> {
     let mut events = fresh_game_flags();
@@ -1486,70 +1492,88 @@ fn guardners_have_bodies_and_can_be_hit() {
 
 #[test]
 fn a_guardners_bolt_puts_ark_to_sleep_and_its_vacuum_draws_him_in() {
-    // Native JP traces (2026-10-08) on `$117`, the Guardner at (384,480):
-    // the bolt hurts and its contact callback takes Ark at once (`$97:C5A9`):
-    // list 7 for 132 frames, 8 for 32; the vacuum pulls him a pixel every
-    // third frame, x to within 2 of the Guardner's, then y until his probe
-    // is 26 below it (y 514), through the sleep and after; then `$118`.
+    // Native JP trace (2026-10-14, the job's `tmp/flyer/`) on `$117`, Ark at
+    // (376,590), the generator as at the warp, the Guardner at (384,480):
+    // the bolt hurts at 135 and its contact callback takes Ark from 137
+    // (`$97:C5A9`): list 7 for 132 frames, 8 for 32; from 144 the vacuum
+    // pulls him a pixel every third frame, x to within 2 of the Guardner's,
+    // then y, to 519 at 375. The European ROM, with the same generator,
+    // takes the same frames.
     for rom in roms() {
         let mut world =
-            World::enter_with_events(rom.image(), 0x0117, 376, 576, after_the_intro()).unwrap();
+            World::enter_with_events(rom.image(), 0x0117, 376, 590, after_the_intro()).unwrap();
+        world.set_random(WARP_RANDOM);
         let mut rows = vec![];
-        for _ in 0..700 {
+        for _ in 0..=376 {
             world.update(None, Presses::default()).unwrap();
             let pose = world.ark_pose().map(|pose| (pose.resource, pose.list));
-            rows.push((world.map(), world.position(), pose, world.life().0));
+            rows.push((world.position(), pose, world.life().0));
         }
-        let hit = (1..rows.len())
-            .find(|&i| rows[i].3 < rows[i - 1].3)
-            .unwrap();
-        let sleep = (hit..rows.len())
-            .find(|&i| rows[i].2 == Some((5, 7)))
-            .unwrap();
-        // The hit's push takes H + 1; the callback's script runs from
-        // H + 2 (native `n_376_590`: 245, 246, 247).
-        assert_eq!(sleep - hit, 2, "{:?}: {hit} {sleep}", rom.revision());
-        assert_eq!(rows[hit + 1].1, (376, 577), "{:?}", rom.revision());
-        let lists: Vec<_> = rows[sleep..sleep + 165].iter().map(|row| row.2).collect();
-        assert!(
-            lists[..132].iter().all(|&list| list == Some((5, 7))),
-            "{:?}",
-            rom.revision()
-        );
-        assert!(
-            lists[132..164].iter().all(|&list| list == Some((5, 8))),
-            "{:?}",
-            rom.revision()
-        );
-        // The hit's first pixel, then the pull.
-        assert_eq!(rows[sleep].1, (376, 577), "{:?}", rom.revision());
-        let moves: Vec<usize> = (sleep + 1..rows.len())
-            .filter(|&i| rows[i].0 == 0x0117 && rows[i].1 != rows[i - 1].1)
+        let hit = (1..rows.len()).find(|&i| rows[i].2 < rows[i - 1].2);
+        let sleep = (1..rows.len()).find(|&i| rows[i].1 == Some((5, 7)));
+        // The hit's push takes H + 1; the callback's script runs from H + 2.
+        assert_eq!((hit, sleep), (Some(135), Some(137)));
+        assert_eq!(rows[136].0, (376, 591));
+        let lists: Vec<_> = rows[137..301].iter().map(|row| row.1).collect();
+        assert!(lists[..132].iter().all(|&list| list == Some((5, 7))));
+        assert!(lists[132..].iter().all(|&list| list == Some((5, 8))));
+        let moves: Vec<usize> = (138..rows.len())
+            .filter(|&i| rows[i].0 != rows[i - 1].0)
             .collect();
-        assert!(
-            moves.windows(2).all(|pair| pair[1] - pair[0] == 3),
-            "{:?}",
-            rom.revision()
-        );
-        // The native frames (runtime frame f is native 60504 + f, the job's
-        // `tmp/guardner2/`): the hit, the sleep and the first pull.
-        assert_eq!(
-            (hit, sleep, moves[0]),
-            (130, 132, 144),
-            "{:?}",
-            rom.revision()
-        );
-        let path: Vec<(u16, u16)> = moves.iter().map(|&i| rows[i].1).collect();
-        assert_eq!(path.first(), Some(&(377, 577)), "{:?}", rom.revision());
-        assert!(path.contains(&(382, 577)), "{:?}", rom.revision());
-        assert_eq!(path.last(), Some(&(382, 514)), "{:?}", rom.revision());
-        let last = rows.last().unwrap();
-        assert_eq!(
-            (last.0, last.1),
-            (0x0118, (384, 848)),
-            "{:?}",
-            rom.revision()
-        );
+        assert_eq!(moves.first(), Some(&144));
+        assert!(moves.windows(2).all(|pair| pair[1] - pair[0] == 3));
+        let path: Vec<(u16, u16)> = moves.iter().map(|&i| rows[i].0).collect();
+        assert_eq!(path.first(), Some(&(377, 591)));
+        assert!(path.contains(&(382, 591)));
+        assert_eq!(rows[375].0, (382, 519));
+    }
+}
+
+#[test]
+fn the_flyers_wall_wakes_end_their_pose_waits() {
+    // Native JP trace (2026-10-14, the job's `tmp/flyer/`): `$117`, Ark at
+    // (376,570), the generator as natively at the warp. The flyers
+    // `$97:BD3E` take pose 7 (`COP 81 07; COP 8E`) at frame 9 and fly up
+    // into the wall at y 432 by 40. The Up wake (bit 2, `7F:1006`, which
+    // `COP DA` set to `$97:BD41`) restarts them at 42: pose 6 for 50
+    // frames (its `COP 80` stops the old streams), then the line move at 92.
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0117, 376, 570, after_the_intro()).unwrap();
+        world.set_random(WARP_RANDOM);
+        world.update(None, Presses::default()).unwrap();
+        let flyers = [(296, 464), (456, 464)].map(|at| {
+            world
+                .residents()
+                .iter()
+                .position(|resident| resident.position == at)
+                .unwrap()
+        });
+        let mut rows = vec![flyers.map(|index| world.residents()[index].position)];
+        for _ in 1..=170 {
+            world.update(None, Presses::default()).unwrap();
+            let residents = world.residents();
+            rows.push(flyers.map(|index| residents[index].position));
+        }
+        let expected = [
+            (8, [(296, 464), (456, 464)]),
+            (9, [(296, 463), (456, 463)]),
+            (40, [(296, 432), (456, 432)]),
+            (59, [(296, 432), (456, 432)]),
+            (91, [(296, 432), (456, 432)]),
+            (93, [(297, 432), (456, 432)]),
+            (109, [(312, 447), (456, 432)]),
+            (110, [(312, 446), (456, 432)]),
+            (125, [(312, 432), (456, 432)]),
+            (139, [(312, 444), (456, 432)]),
+            (170, [(312, 475), (456, 434)]),
+        ];
+        for (frame, at) in expected {
+            assert_eq!(rows[frame], at, "frame {frame}");
+        }
     }
 }
 

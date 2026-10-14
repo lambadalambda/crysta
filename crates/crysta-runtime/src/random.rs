@@ -7,6 +7,12 @@
 pub struct Random([u8; 16]);
 
 impl Random {
+    /// The generator with these bytes.
+    #[must_use]
+    pub const fn new(bytes: [u8; 16]) -> Self {
+        Self(bytes)
+    }
+
     /// One step: each byte from the top down takes the sum of itself and
     /// the one above with the carry, then the last byte counts up.
     pub fn step(&mut self) {
