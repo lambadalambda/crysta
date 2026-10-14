@@ -475,10 +475,14 @@ impl Session {
         }
         let carry = self.world.carry().and_then(|carry| {
             let pose = PandoraSprites::carry_pose(carry.motion, carry.facing)?;
-            // The lift and the throw run once from their start; holding loops.
+            // The lift, the throw and a jump run once from their start; holding
+            // loops.
             let once = matches!(
                 carry.motion,
-                PandoraCarryMotion::Lifting | PandoraCarryMotion::Throwing
+                PandoraCarryMotion::Lifting
+                    | PandoraCarryMotion::Throwing
+                    | PandoraCarryMotion::JumpRising
+                    | PandoraCarryMotion::JumpFalling
             );
             let tick = if once {
                 u64::from(carry.tick)
@@ -497,8 +501,10 @@ impl Session {
         let pot = self.flying_pot().or_else(|| {
             let pot = self.world.pot()?;
             let (pose, tick, once) = carry?;
+            // In a jump the pot rises with Ark (`$0999`).
+            let (x, y) = self.world.position();
             Some((
-                self.world.position(),
+                (x, y.wrapping_add_signed(self.world.ark_lift())),
                 self.carry_frame((pot.art, pose.pot_selector, pose.pot_hflip), tick, once)?,
             ))
         });
