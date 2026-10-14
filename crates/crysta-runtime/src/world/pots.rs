@@ -158,6 +158,13 @@ impl World<'_> {
             });
         }
         let state = self.pots.as_ref()?.state?;
+        if let Some((motion, tick)) = self.jump_carry_pose() {
+            return Some(Carry {
+                motion,
+                facing: state.facing() as u8,
+                tick: u8::try_from(tick).unwrap_or(u8::MAX),
+            });
+        }
         if let Some(drop) = self.lip_drop.filter(|drop| drop.carrying()) {
             return Some(Carry {
                 motion: PandoraCarryMotion::Dropping,
@@ -181,6 +188,23 @@ impl World<'_> {
             facing: state.facing() as u8,
             tick: state.phase_tick(),
         })
+    }
+
+    /// Whether Ark holds a pot, still or walking with it, which B jumps.
+    pub(super) fn holds_pot(&self) -> bool {
+        self.pots
+            .as_ref()
+            .and_then(|pots| pots.state)
+            .is_some_and(|state| state.phase() == Phase::Held && state.flight().is_none())
+    }
+
+    /// An exit Ark jumped onto with the pot: he puts it down as he leaves.
+    pub(super) fn drop_carried_on_exit(&mut self) {
+        let Some(mut pots) = self.pots.take() else {
+            return;
+        };
+        self.drop_carried(&mut pots);
+        self.pots = Some(pots);
     }
 
     /// One frame of a pot action, when the component owns the player or `lift`

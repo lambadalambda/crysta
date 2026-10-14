@@ -280,3 +280,69 @@ fn carrying_onto_an_exit_drops_the_pot() {
         );
     }
 }
+
+#[test]
+fn b_jumps_with_the_pot_as_natively() {
+    // `docs/jump.md`, the native traces `c_{jp,eu}_{right,left}_steer`: the
+    // cellar's pot lifted, Ark turned, B, the way held. From the press: x,
+    // h and the carry's pose; Right lands at J+22 still 5 high, Left (a
+    // wall stops it at x 88) at J+24.
+    use assets::sprites::PandoraCarryMotion::{JumpFalling, JumpRising, Standing, Walking};
+    let rising = |x: [u16; 12]| {
+        let h = [-5, -10, -13, -16, -19, -21, -23, -25, -26, -27, -28, -28];
+        std::array::from_fn::<_, 12, _>(|i| (x[i], h[i], Some(JumpRising)))
+    };
+    let mut right = vec![(104, 0, Some(Standing))];
+    right.extend(rising([
+        104, 105, 107, 108, 110, 111, 113, 114, 116, 117, 119, 120,
+    ]));
+    let fall = [-28, -27, -26, -25, -23, -21, -19, -16, -13, -10];
+    let x = [122, 123, 125, 126, 128, 129, 131, 132, 134, 135];
+    right.extend((0..10).map(|i| (x[i], fall[i], Some(JumpFalling))));
+    right.extend([
+        (135, -5, Some(Standing)),
+        (135, 0, Some(Walking)),
+        (136, 0, Some(Walking)),
+    ]);
+    let mut left = vec![(104, 0, Some(Standing))];
+    left.extend(rising([104, 103, 101, 100, 98, 97, 95, 94, 92, 91, 89, 88]));
+    left.extend(fall.iter().map(|&h| (88, h, Some(JumpFalling))));
+    left.extend([(88, -5, Some(JumpFalling)), (88, 0, Some(JumpFalling))]);
+    left.extend([(88, 0, Some(Standing)), (88, 0, Some(Walking))]);
+    for rom in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Ok(bytes) = std::fs::read(local().join(rom)) else {
+            continue;
+        };
+        let rom = Rom::load(&bytes).unwrap();
+        for (way, expected) in [(Direction::Right, &right), (Direction::Left, &left)] {
+            let mut events = new_game_flags();
+            for set in [0x26, 0x27, 0x28, 0x2E] {
+                events[set / 8] |= 1 << (set % 8);
+            }
+            let mut world =
+                World::enter_with_events(rom.image(), 0x000C, 104, 352, events).unwrap();
+            world.face(Direction::Left);
+            let press = |confirm, cancel| Presses {
+                confirm,
+                cancel,
+                ..Presses::NONE
+            };
+            world.update(None, press(true, false)).unwrap();
+            for _ in 0..40 {
+                world.update(None, Presses::NONE).unwrap();
+            }
+            world.update(Some(way), Presses::NONE).unwrap();
+            for _ in 0..12 {
+                world.update(None, Presses::NONE).unwrap();
+            }
+            let mut rows = vec![];
+            for frame in 0..expected.len() {
+                let held = (frame > 0).then_some(way);
+                world.update(held, press(false, frame == 0)).unwrap();
+                let motion = world.carry().map(|carry| carry.motion);
+                rows.push((world.position().0, world.ark_lift(), motion));
+            }
+            assert_eq!(&rows, expected, "{:?} {way:?}", rom.revision());
+        }
+    }
+}

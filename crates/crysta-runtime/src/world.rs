@@ -1431,6 +1431,10 @@ impl<'a> World<'a> {
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
+        // B with a pot: the pot's frame runs on, the jump from the next.
+        if presses.cancel && !presses.confirm && !locked && !busy && self.holds_pot() {
+            self.start_jump();
+        }
         if let Some(step) = self.held_frame(direction, lift)? {
             self.apply_patches()?;
             return Ok((step, None));

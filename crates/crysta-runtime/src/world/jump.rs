@@ -3,11 +3,13 @@
 //! stream `$39`, steered a pixel then two after each pad read; from the
 //! landing he walks on, and the walk's ground test runs. From a dash
 //! (`$84:99B1`..): no crouch, the stream `$3A`, the dash runs on unsteered,
-//! and it lands in the dash's release grace. A pit or a lip under him in
-//! the air takes nothing.
+//! and it lands in the dash's release grace. With a pot (`$84:AE94`..):
+//! no crouch, no sounds, steered every frame, and it lands a frame early
+//! but for Left. A pit or a lip under him in the air takes nothing.
 
 use super::pose::{by_facing, ArkPose};
 use super::{facing_delta, Step, World, WorldError};
+use assets::sprites::PandoraCarryMotion;
 use room_core::run::Run;
 use room_core::{Direction, FrameInput};
 
@@ -18,7 +20,7 @@ const LAND_SOUND: u8 = 0x0F;
 const OVER_HITS: i16 = -16;
 /// Frames in the rising list (records 8 + 4, or 7 + 5).
 const RISE: u16 = 12;
-/// Frames in the air, both kinds.
+/// Frames of heights, every kind.
 const AIR: u16 = 24;
 
 /// What a kind of jump does, frame by frame from `J`.
@@ -30,11 +32,21 @@ struct Profile {
     /// Resource 3's crouch, rise and fall lists by facing (Down, Up,
     /// Right).
     lists: [[u8; 3]; 3],
-    /// The frame of the leap's sound.
-    leap: u16,
-    /// Whether it lands into the dash's release grace, with its pose and
-    /// no sound; else it sounds `$0F`.
-    graced: bool,
+    /// The frame of the leap's sound, if it sounds.
+    leap: Option<u16>,
+    /// What follows the landing.
+    landing: AfterLanding,
+}
+
+/// What follows a jump's landing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AfterLanding {
+    /// The landing sounds `$0F`.
+    Aloud,
+    /// The dash's release grace, with its pose and no sound.
+    Grace,
+    /// Nothing: the carry goes on.
+    Silent,
 }
 
 /// The ground jump (`$84:96DE`): `COP C1 02` and the frame after, then the
@@ -46,8 +58,8 @@ const GROUND: Profile = Profile {
         -19, -16, -13, -10, -5, 0,
     ],
     lists: [[0, 3, 6], [1, 4, 7], [2, 5, 8]],
-    leap: 4,
-    graced: false,
+    leap: Some(4),
+    landing: AfterLanding::Aloud,
 };
 
 /// The dash jump (`$84:99B1`): the stream `$3A`, then a frame at 0.
@@ -59,9 +71,26 @@ const DASH: Profile = Profile {
     ],
     // No crouch: the first row is not shown.
     lists: [[0x09, 0x0B, 0x0D], [0x09, 0x0B, 0x0D], [0x0A, 0x0C, 0x0E]],
-    leap: 1,
-    graced: true,
+    leap: Some(1),
+    landing: AfterLanding::Grace,
 };
+
+/// The carry jump (`$84:AE94`): the stream of the ground jump without its
+/// crouch, ended at -5 (Down, Up, Right land then) and 0 (Left lands a
+/// frame after, `COP 02 0D` at `$84:AF55`). Ark is drawn in the carry's
+/// poses ([`Jump::carry_pose`]).
+const CARRY: Profile = Profile {
+    crouch: 0,
+    heights: [
+        -5, -10, -13, -16, -19, -21, -23, -25, -26, -27, -28, -28, -28, -27, -26, -25, -23, -21,
+        -19, -16, -13, -10, -5, 0,
+    ],
+    lists: [[0x1B, 0x1E, 0x21], [0x1B, 0x1E, 0x21], [0x1C, 0x1F, 0x22]],
+    leap: None,
+    landing: AfterLanding::Silent,
+};
+/// The carry jump's landing but for Left (`COP 02 0B` at `$84:AEE5`).
+const CARRY_LANDED: u16 = 22;
 
 /// After a dash jump's landing, the grace shows resource 1's lists (`$26`
 /// Down, `$27` Up, `$28` Right) from `J + 25` to `J + 31`.
@@ -74,6 +103,7 @@ const GRACE_END: u16 = 32;
 enum Kind {
     Ground,
     Dash,
+    Carry,
 }
 
 impl Kind {
@@ -81,6 +111,7 @@ impl Kind {
         match self {
             Self::Ground => &GROUND,
             Self::Dash => &DASH,
+            Self::Carry => &CARRY,
         }
     }
 }
@@ -117,7 +148,11 @@ impl Jump {
 
     /// The frame he lands on.
     const fn landed(self) -> u16 {
-        self.kind.profile().crouch + AIR
+        if matches!(self.kind, Kind::Carry) && !matches!(self.facing, Direction::Left) {
+            CARRY_LANDED
+        } else {
+            self.kind.profile().crouch + AIR
+        }
     }
 
     /// Whether he is off the ground.
@@ -130,7 +165,9 @@ impl Jump {
     pub(super) const fn height(self) -> i16 {
         let profile = self.kind.profile();
         match self.since() {
-            Some(since) if self.in_air() => profile.heights[(since - profile.crouch) as usize],
+            Some(since) if since >= profile.crouch && since - profile.crouch < AIR => {
+                profile.heights[(since - profile.crouch) as usize]
+            }
             _ => 0,
         }
     }
@@ -146,15 +183,20 @@ impl Jump {
         let Some(since) = self.since() else {
             return None;
         };
+        if matches!(self.kind, Kind::Carry) {
+            return None;
+        }
         let profile = self.kind.profile();
         let crouch = profile.crouch;
         let (lists, age) = if since < crouch {
             (profile.lists[0], since)
         } else if since < crouch + RISE {
             (profile.lists[1], since - crouch)
-        } else if since < self.landed() || (profile.graced && since < GRACE_POSE) {
+        } else if since < self.landed()
+            || (matches!(profile.landing, AfterLanding::Grace) && since < GRACE_POSE)
+        {
             (profile.lists[2], since - crouch - RISE)
-        } else if profile.graced && since < GRACE_END {
+        } else if matches!(profile.landing, AfterLanding::Grace) && since < GRACE_END {
             return Some(by_facing(1, GRACE_LISTS, self.facing, since - GRACE_POSE));
         } else {
             return None;
@@ -162,12 +204,33 @@ impl Jump {
         Some(by_facing(3, lists, self.facing, age))
     }
 
-    /// Whether the pose still shows after the landing.
-    const fn showing(self) -> bool {
-        let end = if self.kind.profile().graced {
-            GRACE_END
+    /// A carry jump's pose and frames into it: rising, falling, then the
+    /// carry's stand on the landing frame (drawn still 5 high).
+    pub(super) const fn carry_pose(self) -> Option<(PandoraCarryMotion, u16)> {
+        let Some(since) = self.since() else {
+            return None;
+        };
+        if !matches!(self.kind, Kind::Carry) {
+            None
+        } else if since < RISE {
+            Some((PandoraCarryMotion::JumpRising, since))
+        } else if since < self.landed() {
+            Some((PandoraCarryMotion::JumpFalling, since - RISE))
+        } else if since == self.landed() {
+            Some((PandoraCarryMotion::Standing, 0))
         } else {
-            self.landed()
+            None
+        }
+    }
+
+    /// Whether the jump still shows after the landing: the dash's grace,
+    /// the carry's last heights.
+    const fn showing(self) -> bool {
+        let end = match self.kind.profile().landing {
+            AfterLanding::Grace => GRACE_END,
+            // The landing's stand.
+            AfterLanding::Silent => self.landed() + 1,
+            AfterLanding::Aloud => self.landed(),
         };
         matches!(self.since(), Some(since) if since < end)
     }
@@ -177,6 +240,13 @@ impl Jump {
     fn step(&mut self, held: Option<Direction>, read: bool) -> Option<(Direction, i16)> {
         if !self.in_air() {
             return None;
+        }
+        // With a pot every frame is a read: a pixel, then two (`COP 61`).
+        if matches!(self.kind, Kind::Carry) {
+            let since = self.frame - 1;
+            return held
+                .filter(|_| since > 0)
+                .map(|way| (way, if since % 2 == 1 { 1 } else { 2 }));
         }
         if read {
             self.steer = held.map(|way| (way, true));
@@ -193,17 +263,18 @@ impl World<'_> {
     /// rope, with a pot, in a thrust, a hit, an arrival or on a world map.
     /// A dash jump's grace takes a new one (natively B with the dash's way).
     pub(super) fn start_jump(&mut self) {
+        let carrying = self.carry().is_some();
         let kind = match self.run {
-            None => Kind::Ground,
-            Some(Run::Dash { .. }) => Kind::Dash,
-            Some(Run::Brake { .. }) => return,
+            None if carrying && self.holds_pot() => Kind::Carry,
+            None if !carrying => Kind::Ground,
+            Some(Run::Dash { .. }) if !carrying => Kind::Dash,
+            _ => return,
         };
         let free = |jump: Jump| jump.kind == Kind::Dash && !jump.in_air();
         if self.jump.is_none_or(free)
             && self.plane.is_none()
             && self.arrival.is_none()
             && self.rope.is_none()
-            && self.carry().is_none()
             && self.thrust.is_none()
             && self.hurt.is_none()
         {
@@ -229,20 +300,24 @@ impl World<'_> {
         // B pressed in the air; natively it must still be held at the
         // landing (`$0454`), which a press alone cannot tell.
         jump.again |= again && jump.in_air() && jump.kind == Kind::Ground;
-        if since == jump.kind.profile().leap {
+        if Some(since) == jump.kind.profile().leap {
             self.globals.audio.sound_port3(LEAP_SOUND);
         }
-        match jump.kind {
-            Kind::Ground => {
-                let read = self.globals.frames.is_multiple_of(2);
-                if let Some((way, pixels)) = jump.step(held, read) {
-                    let (dx, dy) = facing_delta(way);
-                    self.push_by((dx * pixels, dy * pixels));
-                }
+        if jump.kind == Kind::Dash {
+            self.dash_on();
+        } else {
+            let read = self.globals.frames.is_multiple_of(2);
+            if let Some((way, pixels)) = jump.step(held, read) {
+                let (dx, dy) = facing_delta(way);
+                self.push_by((dx * pixels, dy * pixels));
+                self.carry_to_landing(false);
             }
-            Kind::Dash => self.dash_on(),
         }
         if let Some(step) = self.take_exit()? {
+            // An exit puts the pot down, as a carry step's does.
+            if jump.kind == Kind::Carry {
+                self.drop_carried_on_exit();
+            }
             return Ok(Some(step));
         }
         self.jump = Some(jump);
@@ -294,12 +369,18 @@ impl World<'_> {
             self.run_actors()?;
             return Ok(Some(Step::Stayed));
         }
-        if jump.kind.profile().graced {
-            // The grace's pose lasts while the dash runs on its way.
-            let on =
-                matches!(self.run, Some(Run::Dash { direction, .. }) if direction == jump.facing);
-            self.jump = (on && jump.showing()).then_some(jump);
-            return Ok(None);
+        match jump.kind.profile().landing {
+            AfterLanding::Grace => {
+                // The grace's pose lasts while the dash runs on its way.
+                let on = matches!(self.run, Some(Run::Dash { direction, .. }) if direction == jump.facing);
+                self.jump = (on && jump.showing()).then_some(jump);
+                return Ok(None);
+            }
+            AfterLanding::Silent => {
+                self.jump = jump.showing().then_some(jump);
+                return Ok(None);
+            }
+            AfterLanding::Aloud => {}
         }
         let sound = jump.landed() + if held.is_some() { 2 } else { 1 };
         if since >= sound {
@@ -308,6 +389,11 @@ impl World<'_> {
             self.jump = Some(jump);
         }
         Ok(None)
+    }
+
+    /// A carry jump's pose ([`Jump::carry_pose`]).
+    pub(super) fn jump_carry_pose(&self) -> Option<(PandoraCarryMotion, u16)> {
+        self.jump.and_then(Jump::carry_pose)
     }
 
     /// How far above his place Ark is drawn while he jumps.
