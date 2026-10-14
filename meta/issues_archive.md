@@ -173,3 +173,4 @@
 - [x] [Weave the cape and play tower 5](issues/tower-five.md)
 - [x] [Jump with B](issues/jump.md)
 - [x] [Run a spawn linked after its parent in the same frame](issues/spawns-same-frame.md)
+- [x] [Keep the header's off-screen bit until the first draw](issues/first-draw-visibility.md)

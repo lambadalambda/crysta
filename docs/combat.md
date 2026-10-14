@@ -108,7 +108,10 @@ Without a weapon, A does nothing in the open.
 Pose records are resource lists (`$80:A24F` table, see
 [ark-poses](ark-poses.md)). Each record is duration+1 frames, a facing byte
 and a composition. **A composition starts with four boxes of 4 signed bytes
-(dx, w, dy, h): +0 sprite, +4 attack box, +8 body box.** The box is
+(dx, w, dy, h): +0 sprite, +4 attack box, +8 body box**, counted from
+`7F:000A`, which the pose step sets to the composition + 4: before them the
+composition holds its draw box (left, right signed, up, down unsigned;
+`E+$18..$1E`, `$80:EDA9`), which the draw pass tests against the screen. The box is
 x0=x+dx, x1=x0+w, y0=y+dy, y1=y0+h. When mirrored (`E+$08 & $4000`):
 x1=x−dx, x0=x1−w. Horizontal art faces Right. Left uses `COP B7` (mirror).
 

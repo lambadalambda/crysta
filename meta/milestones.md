@@ -197,7 +197,6 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw the continents' door parchment](issues/continent-door-parchment.md)
 - [Show Ark's poses in the underworld scenes](issues/ark-underworld-poses.md)
 - [Match the Guardner's sleep and vacuum](issues/guardner-fidelity.md)
-- [Keep the header's off-screen bit until the first draw](issues/first-draw-visibility.md)
 - [Match the flyers' pose 7](issues/flyer-pose-seven.md)
 - [Draw the world map's horizon band](issues/world-map-horizon-band.md)
 - [Jump from a dash, with a pot and on a rope](issues/jump-variants.md)

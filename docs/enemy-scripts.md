@@ -57,14 +57,19 @@ every frame.
 
 ### Visibility (`$80:E9A2`, draw pass, list from `$0DFC`)
 
-`E+$04` bit 14 (`$4000`) = off screen. The draw pass sets it when the
-sprite box (`E+$18`..`E+$1E`, from the composition) is outside the
-256×224 screen at camera (`$081E`, `$0822`), and clears it otherwise: on
-each axis the box counts when its first edge is on screen, or that edge
-is before it and the far edge on it. A record header's `+$04` can set the
-bit (the Guardner `$97:C345`: `$C220`), so the first `COP 59` sleeps
-until the first draw. Hidden entities (bit 15) keep it (measured: the
-Guardner hidden at Ark y 604, 2026-10-14). Measured: the blob at
+`E+$04` bit 14 (`$4000`) = off screen. The draw pass (`$80:EAE6` on the
+maps; `E9A2` and `EA4A` test the same) sets it when the draw box
+(`E+$18`..`E+$1E`: the composition's first 4 bytes, left and right signed,
+up and down unsigned, swapped by `+$08`'s mirror and flip; written by the
+pose step `$80:EDA9`) is outside the 256×224 screen at camera (`$081E`,
+`$0822`), and clears it otherwise: on each axis the box counts when its
+near edge is on the screen (low limit inclusive, high exclusive), or that
+edge is before it and the far edge on it. Hidden entities (bit 15) are
+tested too. A record header's `+$04` can set the bit (the Guardner
+`$97:C345`: `$C220`), so the first `COP 59` sleeps until the first draw.
+During the hurt blink, on odd `$42` frames, the bit clears without the test
+(not modelled). Verified on `$101`, `$102`, `$108`, `$117` (2026-10-14, 0
+mismatches). Measured: the blob at
 (72,352) lost bit 14 at frame 66009 when Ark (at y 462) walked up; the
 blob at (120,160) kept it the whole run.
 

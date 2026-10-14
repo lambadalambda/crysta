@@ -11,8 +11,8 @@ A record header's `+$04` can set bit 14 (off screen; the Guardner `$97:C345`: `$
 ## Requirements
 
 - Keep the bit per actor from the header; clear it as the draw pass does; let `COP 59` and the off-screen test read it.
-- The draw pass's rule: the sprite box `E+$18`..`$1E` against the 256x224 screen, an edge on it, or the first edge before it and the far one on it; hidden actors keep the bit.
-- The Guardner's sprite box: `foe::Boxes` gives (-8,16,-16,16) for its selectors 3, 5 and 7; natively it changes from (6,5,2,3) to (16,40,15,8) through pose 5.
+- The draw pass's rule: the draw box `E+$18`..`$1E` against the 256x224 screen, the near edge on it, or the near edge before it and the far one on it; hidden actors are tested too.
+- The Guardner's box: natively the draw box (the composition's first 4 bytes), not the box `foe::Boxes` called the sprite box.
 
 ## Acceptance Criteria
 
@@ -22,4 +22,4 @@ A record header's `+$04` can set bit 14 (off screen; the Guardner `$97:C345`: `$
 ## Progress
 
 - Enemies keep the header's bit until the draw pass after the actors sees them on the screen (`Actor::drawn`); `COP 59` and the off-screen test read it. The Guardner wakes at frame 31, 7 at 93, 4 at 125 on both ROMs (`the_guardner_sleeps_its_first_thirty_frames`); the full suite passes. Only enemies take the bit: other records' header words are not `+$04` (a trial on all records broke the Crysta wanderer).
-- Open: the sprite box (the Guardner wakes natively with Ark at 600, not here).
+- The draw box (`Record::draw`, the composition's first 4 bytes) of the record shown, mirrored, against the screen as `$80:EAE6` does (`on_axis`): the Guardner wakes with Ark at 600, not at 604, as natively. The full suite passes.
