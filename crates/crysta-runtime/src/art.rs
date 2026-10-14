@@ -119,7 +119,7 @@ pub fn raster(
     palette_base: u8,
     mirror: bool,
 ) -> Result<Raster, ArtError> {
-    raster_by(frame, tiles, mirror, &|index| {
+    raster_by(frame, tiles, (mirror, false), &|index| {
         own_colour(palette, palette_base, index).map(|colour| (colour, index))
     })
 }
@@ -133,11 +133,11 @@ fn own_colour(palette: &[Bgr555], base: u8, index: u8) -> Option<Bgr555> {
 }
 
 /// [`raster`] with each pixel's colour, and the CGRAM index it shows as,
-/// from `colour`.
+/// from `colour`; with `any_priority` an OBJ priority other than 2 is taken.
 fn raster_by(
     frame: &SpriteFrame,
     tiles: &[Tile4bpp],
-    mirror: bool,
+    (mirror, any_priority): (bool, bool),
     colour: &dyn Fn(u8) -> Option<(Bgr555, u8)>,
 ) -> Result<Raster, ArtError> {
     let (left, top, right, bottom) = frame.bounds(mirror, false);
@@ -164,7 +164,7 @@ fn raster_by(
                     priority,
                     ..
                 } => {
-                    if priority != ORDINARY_PRIORITY {
+                    if priority != ORDINARY_PRIORITY && !any_priority {
                         return Err(ArtError::Priority { priority });
                     }
                     let (colour, shown) = colour(palette_index).ok_or(ArtError::Palette {
@@ -688,6 +688,30 @@ fn mode4_body(image: &[u8], resident: &Resident) -> Option<Result<Body, Placehol
     )
 }
 
+/// The world map's horizon band (`$83:8909`, descriptor `$83:F92E`, EU
+/// `$83:F8D6`; `docs/world-map-mode7.md`): 40 grey OBJ fixed on the screen
+/// at (128,53), whose colours, not the fog's, lines 52-67 subtract.
+///
+/// # Errors
+/// Refuses a descriptor or list the decoder does not take.
+pub fn horizon_band(image: &[u8]) -> Result<Raster, ArtError> {
+    let descriptor = assets::layout::per_revision(image, 0x03_F92E, 0x03_F8D6);
+    let art = Mode4Art::from_rom(image, descriptor, 0)?;
+    let frame = art
+        .list()
+        .frames()
+        .first()
+        .ok_or(SpriteError::Invalid("no horizon band frame"))?;
+    // Priority 3: they sit under the plane's BG1 on the main screen.
+    let (palette, base) = (art.palette(), art.palette_base());
+    raster_by(
+        frame.composition(),
+        art.graphics(),
+        (false, true),
+        &|index| own_colour(palette, base, index).map(|colour| (colour, index)),
+    )
+}
+
 /// A list of the helper art (`$A2:C000`) as rasters, mirrored or not: an
 /// enemy's explosion, a dropped gem, Shadowkeeper's wisps.
 ///
@@ -735,7 +759,7 @@ fn animate_by(
     Ok(Animation {
         frames: frames
             .iter()
-            .map(|frame| raster_by(frame.composition(), graphics, hflip, colour))
+            .map(|frame| raster_by(frame.composition(), graphics, (hflip, false), colour))
             .collect::<Result<_, _>>()?,
         durations: frames.iter().map(HouseFrame::duration).collect(),
     })

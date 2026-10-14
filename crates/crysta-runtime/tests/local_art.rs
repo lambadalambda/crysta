@@ -704,3 +704,41 @@ fn every_thrust_pose_rasterizes_with_the_spear() {
         }
     }
 }
+
+#[test]
+fn the_horizon_band_is_40_grey_pieces_over_the_classic_columns() {
+    // `docs/world-map-mode7.md`: placed at (128,53), opaque on screen rows
+    // 32..62 and columns 8..247, 4404 pixels, the same in both ROMs.
+    let mut rasters = vec![];
+    for name in ["Tenchi Souzou (Japan).sfc", "Terranigma (E) [!].smc"] {
+        let Ok(bytes) = std::fs::read(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../local")
+                .join(name),
+        ) else {
+            continue;
+        };
+        let rom = rom::Rom::load(&bytes).unwrap();
+        let band = crysta_runtime::art::horizon_band(rom.image()).unwrap();
+        let opaque: Vec<(i32, i32)> = band
+            .pixels
+            .iter()
+            .enumerate()
+            .filter(|(_, pixel)| *pixel >> 24 != 0)
+            .map(|(at, _)| {
+                let (x, y) = (at % band.width, at / band.width);
+                (
+                    128 + i32::from(band.offset.0) + i32::try_from(x).unwrap(),
+                    52 + i32::from(band.offset.1) + i32::try_from(y).unwrap(),
+                )
+            })
+            .collect();
+        assert_eq!(opaque.len(), 4404);
+        assert_eq!(opaque.iter().map(|p| p.0).min(), Some(8));
+        assert_eq!(opaque.iter().map(|p| p.0).max(), Some(247));
+        assert_eq!(opaque.iter().map(|p| p.1).min(), Some(32));
+        assert_eq!(opaque.iter().map(|p| p.1).max(), Some(62));
+        rasters.push(band);
+    }
+    assert!(rasters.windows(2).all(|pair| pair[0] == pair[1]));
+}
