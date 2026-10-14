@@ -152,6 +152,9 @@ impl World<'_> {
         } else {
             self.face(hurt.toward);
         }
+        // The push is Ark's turn (`$84:80B9`): a script a contact installs
+        // now runs from the next frame.
+        self.player_turn = super::PlayerTurn::Ran;
         self.run_actors()?;
         Ok(Some(Step::Stayed))
     }

@@ -872,6 +872,8 @@ impl<'a> World<'a> {
             .iter()
             .map(|actor| (actor.id, actor.view()))
             .collect();
+        // Ark's turn reads the last frame's push (`$80:D0F0`).
+        self.push_ark();
         for index in list_order(&self.actors) {
             if nested && !self.actors[index].runs_nested() {
                 continue;
@@ -896,7 +898,6 @@ impl<'a> World<'a> {
             }
         }
         self.make_deletions();
-        self.push_ark();
         // A run's write to Ark's life (`STA $065D`, the bed, `$88:8AE1`).
         let stats = self.globals.slot.stats();
         if let Some(&life) = self.globals.scratch.get(&crate::actors::ARK_LIFE) {
@@ -1374,11 +1375,11 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        // A replacement script installed last frame runs in this one's
+        // turn, the world with it (`$97:C5A9` the frame after the bolt's
+        // callback).
         if self.player_turn == PlayerTurn::Deferred && self.scene.is_none() {
             self.player_turn = PlayerTurn::Ready;
-            self.run_player_actor();
-            self.apply_patches()?;
-            return Ok((Step::Stayed, None));
         }
         if self.records.is_some() {
             self.records_frame(direction, presses);

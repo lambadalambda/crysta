@@ -1506,7 +1506,10 @@ fn a_guardners_bolt_puts_ark_to_sleep_and_its_vacuum_draws_him_in() {
         let sleep = (hit..rows.len())
             .find(|&i| rows[i].2 == Some((5, 7)))
             .unwrap();
-        assert!(sleep - hit <= 2, "{:?}: {hit} {sleep}", rom.revision());
+        // The hit's push takes H + 1; the callback's script runs from
+        // H + 2 (native `n_376_590`: 245, 246, 247).
+        assert_eq!(sleep - hit, 2, "{:?}: {hit} {sleep}", rom.revision());
+        assert_eq!(rows[hit + 1].1, (376, 577), "{:?}", rom.revision());
         let lists: Vec<_> = rows[sleep..sleep + 165].iter().map(|row| row.2).collect();
         assert!(
             lists[..132].iter().all(|&list| list == Some((5, 7))),
