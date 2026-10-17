@@ -177,3 +177,6 @@
 - [x] [Match the flyers' pose 7](issues/flyer-pose-seven.md)
 - [x] [List the COP services the underworld scripts use](issues/cop-inventory.md)
 - [x] [Model COP E4 and E5](issues/cop-e4-e5.md)
+- [x] [Model COP 3C, 5F and 64](issues/cop-3c-5f-64.md)
+- [x] [Model COP AA and AF](issues/cop-aa-af.md)
+- [x] [Model the COP services the runtime steps over](issues/skipped-cop-services.md)

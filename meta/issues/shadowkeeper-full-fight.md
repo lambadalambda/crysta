@@ -40,3 +40,5 @@
   which keeps its streams past the list's end; the runtime now takes it
   from the header too. Not checked against a native trace (phase 3 did not
   come in it).
+- Check `COP AF 0` (the streams stopped, `$93:DA8C`, `DB04`, `DB93`)
+  against a native trace of phase 3.

@@ -26,3 +26,8 @@ and that the runtime steps over without effect: `3C`, `5F`, `64`, `AA`,
 
 - Sites are in `docs/cop-inventory.md`, section "Sites of the services not
   modelled".
+
+## Progress
+
+- Done: `docs/cop-inventory.md` lists no stepped-over service (114 of
+  114 modelled).

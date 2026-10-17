@@ -29,3 +29,5 @@ stepped over. `COP AA` starts an HDMA child (`docs/light-room.md`).
   blends OBJ colours (tower 1's head matches the native CGRAM at steps 1,
   30, 60), `AE` ends it, `93` waits on the palette cycle `8A` records.
   `$123`'s darkness keeps its own model.
+- `AF` runs only in Shadowkeeper's phases (`$93:DA8C`, `DB04`, `DB93`);
+  its native check moves to [Play Shadowkeeper's full fight](shadowkeeper-full-fight.md).

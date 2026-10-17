@@ -27,3 +27,8 @@
 - Done: `64`, the ring window (`world/circle.rs`, `World::ring`): the
   tables match the native ones on `$11D`, lagging one raise of `$0474`.
   Drawing it is with [Draw colour addition](colour-addition.md).
+- Checked: `3C` on `$118` (`$90:9E79`): natively the guardian's flicker
+  takes 122 frames, then `3C` leaves `$7E:A000` as it was (no mark); the
+  runtime's loop takes the same 122 frames and holds no mark. `5F` runs
+  only in the Magirock's callback (`$84:DDEE`), which `world/magirock.rs`
+  models (`ark_takes_the_magirock_on_the_second_floor`).
