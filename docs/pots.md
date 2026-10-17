@@ -86,7 +86,7 @@ then the cell (`$87:C7F1`, EU `$87:C7AE`). The lift (`$87:9683`, EU
 |---|---|
 | Walk | 1,2,1,2 px per frame in all four facings. Holding for n frames moves ⌊3(n−1)/2⌋ px. There is one frame of latency, and the move continues one frame after release. `$0980=$0020` while moving, else 0. |
 | Turn | A 1-frame tap turns in place |
-| Dash (double tap) | Works while carrying: 3,2,2 px per frame (script `$84:B5A7`) |
+| Dash (double tap) | Works while carrying: 3,2,2 px per frame (script `$84:B5A7`), timed as the plain dash; see below |
 | B | Jumps while holding (`$0999` = jump height, peak −28, about 24 frames) |
 | Y, X | Nothing seen (no weapon in this state) |
 | Put down | None. A always throws. |
@@ -122,6 +122,16 @@ Break point: landing → (x, y+8). Tile hit → (x, y+h+8), for example
 (136,333,h −32) → (136,309). Sprite: one 16×16 OBJ with its top-left at
 (x−8, y+h−16) in world space (OAM measurement). The flight frame is
 `$A2:E631` in all facings.
+
+Carry dash (native JP traces `c_*` on `$0C`, 2026-10-17, the job's
+`tmp/throws/`; modelled in `room_core::run`'s carry mode, the world's
+`Pots::run`): the double tap's frame and a setup frame stand, then
+**3,2,2** on the carry walk's collision, Ark's resource 1 `$1A`/`$1B`/`$1C`
+and the pot's `$22`/`$23`/`$24` (Left mirrored). Released at n, it runs n
+and n+1 (the walk pose), then stands; a direction held at n+1 walks on at
+once (1,2). The opposite way reverses it at n+1, from 3; a turn runs the
+old way two frames, then the new way from 3. A wall does not end it: Ark
+runs in place, and off the 16-pixel rows the walls nudge him 1 a frame.
 
 Dash-throw (A while carry-dashing, `COP 2B $0080` at `$84:B117`/`B14B`/
 `B17F`/`B1B3`; JP = EU): release at F+1 with no windup, from ±16 (pot
