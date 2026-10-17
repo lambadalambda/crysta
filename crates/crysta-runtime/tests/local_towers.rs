@@ -2081,3 +2081,53 @@ fn ark_jumps_into_the_hole_and_the_chapter_ends() {
         );
     }
 }
+
+#[test]
+fn the_high_cadets_copies_flicker_three_passes_before_they_move() {
+    // Native JP trace (2026-10-17, the job's `tmp/cadet/`): `$113`, Ark
+    // walks up into the room. A copy's `COP 85 03 06` loop (`$97:C77C`..
+    // `C7A1`) alternates hidden (from `C780`) and shown (from `C792`) each
+    // frame through two `COP E5`s that share one countdown, three passes of
+    // its 50-frame list, then starts its line move at `$97:C7C4` 150
+    // frames after the loop's first frame.
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        let mut events = after_the_intro();
+        events[0x103 / 8] |= 1 << (0x103 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0113, 392, 440, events).unwrap();
+        let (mut copy, mut flicker, mut moves) = (None, None, None);
+        for frame in 0..600 {
+            let up = (58..78).contains(&frame).then_some(Direction::Up);
+            let confirm = (frame + 92) % 16 == 0;
+            let presses = Presses {
+                confirm,
+                ..Presses::default()
+            };
+            world.update(up, presses).unwrap();
+            let states = world.actor_states();
+            copy = copy.or_else(|| {
+                states
+                    .iter()
+                    .find(|state| state.2 == 0x17_C792)
+                    .map(|state| state.0)
+            });
+            let Some(place) = states
+                .iter()
+                .find(|state| Some(state.0) == copy)
+                .map(|state| state.2)
+            else {
+                continue;
+            };
+            if place == 0x17_C792 {
+                flicker = flicker.or(Some(frame));
+            }
+            if place == 0x17_C7C4 {
+                moves = moves.or(Some(frame));
+            }
+        }
+        let flicker = flicker.expect("a copy flickers");
+        assert_eq!(moves, Some(flicker + 150));
+    }
+}

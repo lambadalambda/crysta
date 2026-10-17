@@ -69,6 +69,9 @@ const FLIPS: [u8; 6] = [
 ];
 /// Resolves the pose and yields until it is done.
 const WAIT: u8 = 0x8E;
+/// `COP 8E` and `8F` on the actor's own countdown ([`Actor::own_wait`]).
+const OWN_WAIT: u8 = 0xE4;
+const OWN_WAIT_STEP: u8 = 0xE5;
 /// Shows the published text and blocks the world until it is acknowledged;
 /// `$80:8C4A`.
 const TEXT_WAIT: u8 = 0x1F;
@@ -108,6 +111,7 @@ const SCRIPT_SERVICES: &[u8] = &[
     DELETE,
     WAIT_FOR_FLAG,
     OCCUPY,
+    VACATE,
 ];
 /// As [`REDIRECT_SCRIPT`], the script resting a word of frames first
 /// (`$80:AAC1`, `E+$0E`): the Guardner's vacuum, `$97:C492`.
@@ -150,6 +154,8 @@ const WALK_TO_COLUMN: u8 = 0x39;
 const DELETE: u8 = 0xA7;
 /// Marks the actor's cell occupied in the collision grid (`$80:BE8E`).
 const OCCUPY: u8 = 0x3B;
+/// Lifts the mark at the actor's place (`$80:9314`, `$80:BF0E`).
+const VACATE: u8 = 0x3C;
 /// Places the actor on a tile and faces it; `$80:89DA`. Operands: column
 /// and row (signed, read through `$80:BC2F`) and a facing, 0 down, 1 up,
 /// 2 left, 3 right; only left mirrors. It lifts the old cell's mark.
@@ -362,6 +368,8 @@ const REPEAT_POSE_MOVING: u8 = 0x86;
 /// Sets the next `COP 8F`'s repetitions, a pose, and another selector's
 /// movement streams (`$80:A1D4`).
 const REPEAT_MOVING: u8 = 0x87;
+/// Starts a selector's movement streams and keeps the pose (`$80:A965`).
+const START_STREAMS: u8 = 0xAF;
 /// The common movement resource, at `$7F:6000` from `$AB:F037` (European
 /// `$AE:8000`).
 const COMMON_SOURCE: usize = 0x2B_F037;
@@ -599,6 +607,8 @@ const LINE_START: u8 = 0xCC;
 const LINE_STEP: u8 = 0xCD;
 /// Ark's probe in the box in front, the facings admitted (`$80:B26E`).
 const PLAYER_FRONT: u8 = 0xD2;
+/// Jumps through four targets by Ark's facing (`$0956`).
+const FACING_SWITCH: u8 = 0x5F;
 /// While off screen (entity `+$04` bit 14, which the draw pass keeps), sleep
 /// n frames and try again (`$80:9AC7`, `docs/enemy-scripts.md`).
 const SLEEP_OFF_SCREEN: u8 = 0x59;
@@ -893,6 +903,11 @@ pub struct Actor {
     legs: bool,
     /// The repeat count `COP 85` set for the next `COP 8F`.
     repeats: Option<u16>,
+    /// The frames `COP E4`/`E5` still wait on their own countdown.
+    own_wait: Option<u16>,
+    /// Where this frame's run began: an `RTL` comes back there unless a
+    /// continuation was set since.
+    entry: usize,
     /// The cell `COP 3B` marked occupied; a scripted leg clears it
     /// (`$80:BF0E`). Nothing else does, as natively.
     stamp: Option<(u16, u16)>,
@@ -1011,6 +1026,8 @@ impl Actor {
             stream: None,
             legs: false,
             repeats: None,
+            own_wait: None,
+            entry: 0,
             stamp: None,
             frozen_at: None,
             stamps: Vec::new(),
@@ -1698,6 +1715,7 @@ impl Actor {
         // `+$0A` at entry: where an `RTL` comes back to next frame unless
         // `COP BC`/`C0` point it elsewhere first.
         let entry = self.pc;
+        self.entry = entry;
         self.continuation = None;
         self.blocked_tests = 0;
         for _ in 0..BUDGET {
@@ -1721,7 +1739,7 @@ impl Actor {
                     if self.outer.is_some() {
                         return Run::Ended;
                     }
-                    self.pc = self.continuation.take().unwrap_or(entry);
+                    self.end_frame();
                     return Run::Yielded;
                 }
                 // The towers' shared push routines, evaluated here.
@@ -1834,6 +1852,7 @@ impl Actor {
             }
             Route::Wait => return self.wait_for_pose(operands),
             Route::WaitStep => return self.wait_step(operands),
+            Route::OwnWait => return self.own_wait(service, operands),
             Route::RandomStep => return self.random_step_service(operands, around),
             Route::Player => return self.player_service(service, operands, bank, around),
             Route::BranchOnGlobal => self.pc = operands + 4,
@@ -1960,7 +1979,7 @@ impl Actor {
             .sum();
         self.ark_list = Some(ticks.max(1));
         self.ark_shown = Some((resource, list, repeat));
-        self.pose_age = 0;
+        self.restart_list();
         self.repeats = count.map(u16::from);
         self.pc = operands + length;
         true
@@ -2072,6 +2091,56 @@ impl Actor {
         false
     }
 
+    /// `COP E4` and `E5` (`$80:B929`, `B953`): `COP 8E` and `8F` on the
+    /// actor's own countdown (`7F:200A`) rather than a sleep, so the script
+    /// runs each frame up to here, back from its continuation, until the
+    /// list (that many times for `E5`) has played. The next command runs on
+    /// the frame `COP 8E` would resume. An unknown list is stepped over.
+    /// The count stands for `7F:200A`, which the scripts set to 0 before
+    /// they select the list; [`Self::restart_list`] resets it there.
+    fn own_wait(&mut self, service: u8, operands: usize) -> bool {
+        self.cadence = None;
+        let remaining = self.own_wait.or_else(|| {
+            let ticks = self.pose_list(self.selector)?;
+            if service == OWN_WAIT {
+                Some(ticks)
+            } else {
+                Some(ticks.saturating_mul(self.repeats.take()?))
+            }
+        });
+        let Some(remaining) = remaining else {
+            self.pc = operands;
+            return true;
+        };
+        if remaining == 0 {
+            self.own_wait = None;
+            self.pc = operands;
+            return true;
+        }
+        // The streams move through the wait's frames and end with its
+        // last, as through [`Self::hold`]'s.
+        self.apply_stream();
+        if remaining == 1 && !self.keeps_streams {
+            (self.stream, self.motion, self.walking) = (None, None, false);
+        }
+        self.own_wait = Some(remaining - 1);
+        self.end_frame();
+        false
+    }
+
+    /// The selected list starts over: its first record, and a fresh
+    /// countdown for `COP E4`/`E5`.
+    fn restart_list(&mut self) {
+        self.pose_age = 0;
+        self.own_wait = None;
+    }
+
+    /// Ends the frame as an `RTL` does: the script comes back at the
+    /// continuation set this frame, or where the frame began.
+    fn end_frame(&mut self) {
+        self.pc = self.continuation.take().unwrap_or(self.entry);
+    }
+
     /// Holds for `ticks` frames counting this one, the next command running
     /// in the last; a leg moves through them.
     fn hold(&mut self, operands: usize, ticks: u16) -> bool {
@@ -2146,7 +2215,7 @@ impl Actor {
         };
         self.set_pose(pose, hflip);
         self.player_pose = Some((resource, pose));
-        self.pose_age = 0;
+        self.restart_list();
         self.stream = None;
         self.motion = Some(motion);
         self.continuation = Some(operands + 3);
@@ -2158,6 +2227,20 @@ impl Actor {
     /// pose selector`: a pose that moves by its movement streams through
     /// the next wait. Returns whether execution continues this frame.
     fn moving_pose(&mut self, service: u8, operands: usize, image: &[u8]) -> bool {
+        if service == START_STREAMS {
+            // `$80:A965`: the streams alone, through `$80:BBDB`.
+            let Some(&selector) = image.get(operands) else {
+                self.state = State::Frozen;
+                return false;
+            };
+            self.stream = None;
+            let list = self.pose_list(self.selector);
+            self.motion = self.movement(image).and_then(|resource| {
+                motion::Motion::start(resource, selector, self.interaction & 0x80 != 0, list)
+            });
+            self.pc = operands + 1;
+            return true;
+        }
         let length = match service {
             POSE_MOVING => 1,
             REPEAT_MOVING => 3,
@@ -2181,7 +2264,7 @@ impl Actor {
         };
         let hflip = self.hflip;
         self.set_pose(pose, hflip);
-        self.pose_age = 0;
+        self.restart_list();
         self.stream = None;
         let list = self.pose_list(pose);
         self.motion = self.movement(image).and_then(|resource| {
@@ -2287,11 +2370,12 @@ impl Actor {
         self.set_pose(selector, hflip);
         // `$80:A18C` restarts the list even for the same pose. Only where
         // its length is known, or a one-frame fallback wait would hold the
-        // raster on its first frame.
+        // raster on its first frame; an `E4` countdown starts over anyway.
         let list = self.pose_list(selector);
         if list.is_some() {
             self.pose_age = 0;
         }
+        self.own_wait = None;
         if let Some(motion) = &mut self.motion {
             motion.repose(list);
         }
@@ -2401,7 +2485,7 @@ impl Actor {
         self.line = Some(line::Line::start(self.position, target, legs, speed, limit));
         let hflip = self.hflip;
         self.set_pose(pose, hflip);
-        self.pose_age = 0;
+        self.restart_list();
         (self.motion, self.stream) = (None, None);
         self.continuation = Some(operands + 5);
         self.pc = operands + 5;
@@ -2548,7 +2632,7 @@ impl Actor {
         }
         self.facing = direction;
         self.set_pose(pose & 0x7F, direction == Direction::Left);
-        self.pose_age = 0;
+        self.restart_list();
         self.stream = Some((direction, 0, speed));
         self.motion = None;
         self.stamp = None;
@@ -2828,6 +2912,8 @@ impl Actor {
                 }
                 Some(target)
             }
+            // A target per facing, Down, Up, Left, Right (`$80:9BEA`).
+            FACING_SWITCH => word(2 * usize::from(sense::code(around.facing))),
             PLAYER_AXIS => {
                 if dy.abs() >= dx.abs() {
                     word(2)
@@ -3517,7 +3603,7 @@ impl Actor {
                 };
                 let hflip = self.hflip;
                 self.set_pose(pose, hflip);
-                self.pose_age = 0;
+                self.restart_list();
                 self.stream = None;
                 self.motion = None;
                 self.repeats = Some(u16::from(count));
@@ -3625,6 +3711,10 @@ impl Actor {
             }
             OCCUPY => {
                 self.stamp = Some(self.collision_cell());
+                self.pc = operands;
+            }
+            VACATE => {
+                self.stamp = None;
                 self.pc = operands;
             }
             WAIT_FOR_FLAG => {
@@ -3925,7 +4015,7 @@ impl Actor {
         if let Some(cadence) = qualified {
             // COP8F resolves this very action; it is not an extra wait.
             self.pc += 2;
-            self.pose_age = 0;
+            self.restart_list();
             self.walking = moving;
             let ticks = if moving {
                 cadence.walk(self.facing)
@@ -5222,6 +5312,24 @@ mod cadence_tests {
     }
 
     #[test]
+    fn cop_af_starts_the_streams_and_keeps_the_pose() {
+        // `COP AF 0`: the streams of selector 0, moving down a pixel.
+        let image = [0];
+        let mut actor = Actor::new((40, 48), Some(0x80_8000), 0, 1);
+        actor.pose_ticks = Some(vec![Some(2); 4]);
+        actor.selector = 3;
+        let words: [u16; 7] = [0, 0x6004, 0, 0, 1, 0xFFFF, 0x6004];
+        actor.resources[0] = Some(motion::Resource::wram(
+            0x6000,
+            words.iter().flat_map(|word| word.to_le_bytes()).collect(),
+        ));
+        assert!(actor.moving_pose(START_STREAMS, 0, &image));
+        assert_eq!((actor.selector, actor.pc), (3, 1));
+        actor.apply_stream();
+        assert_eq!(actor.position, (40, 49));
+    }
+
+    #[test]
     fn a_skipped_service_that_could_change_movement_revokes_admission() {
         for (bytes, kept) in [
             ([2, 0xBB, 0x0C], true),
@@ -6148,6 +6256,43 @@ mod script_service_tests {
     }
 
     #[test]
+    fn cop_5f_jumps_by_arks_facing() {
+        // COP 5F →down →up →left →right; poses 1 to 4 there.
+        let site = |offset: u16| {
+            u16::try_from(AT & 0xFFFF)
+                .unwrap()
+                .wrapping_add(offset)
+                .to_le_bytes()
+        };
+        let mut code = vec![2, 0x5F];
+        for offset in [10u16, 15, 20, 25] {
+            code.extend(site(offset));
+        }
+        for pose in 1..=4 {
+            code.extend([2, 0x80, pose, 2, 0xBD]);
+        }
+        for (facing, pose) in [
+            (Direction::Down, 1),
+            (Direction::Up, 2),
+            (Direction::Left, 3),
+            (Direction::Right, 4),
+        ] {
+            let (image, mut actor) = actor_running(&code);
+            actor.tick(&mut Surroundings {
+                image: &image,
+                globals: &mut Globals::with_events(vec![0; 512]),
+                cells: &[],
+                width: 0,
+                height: 0,
+                occupied: &[],
+                player: (0, 0),
+                facing,
+            });
+            assert_eq!(actor.selector, pose, "{facing:?}");
+        }
+    }
+
+    #[test]
     fn cop_59_sleeps_off_screen_and_retries() {
         // COP 59 3; pose 1; COP BD. The actor stands at (56,64).
         let run = |view, frames| {
@@ -6242,6 +6387,32 @@ mod script_service_tests {
         tick(&mut actor, &image);
         assert_eq!(actor.state, State::Frozen);
         assert_eq!(actor.selector, 0);
+    }
+
+    #[test]
+    fn cop_e4_runs_the_script_each_frame_until_its_list_ends() {
+        // Pose 0, continuation, toggle the mirror, `COP E4`, then pose 5.
+        let (image, mut actor) =
+            actor_running(&[2, 0x80, 0, 2, 0xBC, 2, 0xB8, 2, 0xE4, 2, 0x80, 5, 2, 0x8E]);
+        actor.pose_ticks = Some(vec![Some(3); 6]);
+        let mut seen = Vec::new();
+        for _ in 0..4 {
+            tick(&mut actor, &image);
+            seen.push((actor.hflip, actor.selector));
+        }
+        assert_eq!(seen, [(true, 0), (false, 0), (true, 0), (false, 5)]);
+    }
+
+    #[test]
+    fn cop_e5_plays_its_list_the_repeat_count_times() {
+        // Two passes of pose 0, then pose 5.
+        let (image, mut actor) =
+            actor_running(&[2, 0x85, 2, 0, 2, 0xBC, 2, 0xE5, 2, 0x80, 5, 2, 0x8E]);
+        actor.pose_ticks = Some(vec![Some(3); 6]);
+        for tick_number in 1..=7 {
+            tick(&mut actor, &image);
+            assert_eq!(actor.selector == 5, tick_number == 7, "tick {tick_number}");
+        }
     }
 
     #[test]
@@ -6811,6 +6982,9 @@ mod scripted_leg_tests {
         assert_eq!(stamped.stamp(), Some((3, 3)));
         let walking = leg(&[2, 0x3B, 2, 0x3A, 3, 0x68, 6, 2, 0x8E], true);
         assert_eq!(walking.stamp(), None);
+        // `COP 3C` lifts it too.
+        let lifted = leg(&[2, 0x3B, 2, 0x3C, 2, 0xBC, 0x6B], true);
+        assert_eq!(lifted.stamp(), None);
     }
 
     #[test]

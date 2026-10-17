@@ -438,6 +438,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0x37, 1, &[]),
     (0x38, 2, &[]),
     (0x3B, 0, &[]),
+    (0x3C, 0, &[]),
     (0x3D, 3, &[]),
     (0x3E, 3, &[]),
     (0x3F, 3, &[]),
@@ -454,6 +455,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0x56, 3, &[1]),
     (0x59, 1, &[]),
     (0x5A, 5, &[]),
+    (0x5F, 8, &[0, 2, 4, 6]),
     (0x60, 4, &[]),
     (0x63, 2, &[]),
     (0x6A, 2, &[]),
@@ -467,6 +469,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0x87, 3, &[]),
     (0x8E, 0, &[]),
     (0x8F, 0, &[]),
+    (0xAF, 1, &[]),
     (0xB1, 2, &[]),
     (0xB2, 2, &[]),
     (0xB3, 4, &[]),
@@ -497,6 +500,8 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0xDD, 7, &[]),
     (0xDE, 1, &[]),
     (0xDF, 3, &[]),
+    (0xE4, 0, &[]),
+    (0xE5, 0, &[]),
     (0xEB, 0, &[]),
     (0xED, 5, &[]),
     (0xEE, 1, &[]),
@@ -525,8 +530,10 @@ fn modelled_shape(image: &[u8], service: u8, operands: usize) -> Option<Shape> {
         // A return, a frame's end without a continuation, a deletion.
         0x01 | 0x66 | 0x91 | 0xA7 => (Next::Never, vec![], &[]),
         // The spawns by their operand lengths; a call, which `COP 01`
-        // returns from, and the continuation.
-        0x00 | 0xC0 | 0x9A | 0xA1 | 0xE6 | 0xEA => (after(3), vec![], &[0]),
+        // returns from, and the continuation. `COP AA` starts an effect
+        // entity at a long script (`$80:A8EE`): the runtime steps over it,
+        // but its script is listed.
+        0x00 | 0xC0 | 0x9A | 0xA1 | 0xE6 | 0xEA | 0xAA => (after(3), vec![], &[0]),
         0x99 | 0x9B | 0xA0 | 0xA2 | 0xE7 => (after(5), vec![], &[0]),
         0x9C => (after(7), vec![], &[0]),
         0xA4 | 0xE8 => (after(9), vec![], &[0]),
@@ -709,8 +716,8 @@ mod tests {
 
     /// The runtime's fixed layouts agree with the native handlers, but for
     /// the services whose handlers the derivation misreads (`COP 46`: 3
-    /// bytes, where every site has 7) or reads more paths of than the
-    /// runtime models.
+    /// bytes, where every site has 7; `5F`'s indexed table) or reads more
+    /// paths of than the runtime models.
     #[test]
     fn the_fixed_layouts_agree_with_the_native_handlers() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -719,7 +726,7 @@ mod tests {
             return;
         };
         let rom = rom::Rom::load(&bytes).unwrap();
-        let differ = [0x46, 0xCD, 0xD9, 0xDD, 0xDE, 0xEE];
+        let differ = [0x46, 0x5F, 0xCD, 0xD9, 0xDD, 0xDE, 0xEE];
         for &(service, length, words) in FIXED {
             let Some(native) = actor_script::resumes(rom.image(), service) else {
                 assert!(differ.contains(&service), "COP {service:02X} unread");

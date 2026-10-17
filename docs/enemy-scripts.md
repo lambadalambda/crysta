@@ -128,7 +128,7 @@ derivable or wrong behaviour).
 | `BF`/`C0` | `AAE1`/`AAFB` | long | set `E+$0A/$0C`, `E+$0E = 0`; `BF` yields, `C0` goes on | bosses | ok |
 | `C1 n` | `AB17` | word | `E+$0E = n`, `E+$0A` = next, yield (resume n+1 frames later) | flyer launcher, controllers | ok |
 | `22` | `8CD8` | lo, hi, words | switch on `E+$26` | Shadowkeeper | ok |
-| `5F` | `9BEA` | 4 word targets | jump by the player's facing `$0956` (0-3); ≥4: go on past 8 bytes | Cadet | missing |
+| `5F` | `9BEA` | 4 word targets | jump by the player's facing `$0956` (0-3); ≥4: go on past 8 bytes | Cadet | ok |
 
 ### Poses and movement
 
@@ -142,8 +142,8 @@ derivable or wrong behaviour).
 | `87 c p s` | `A1D4` | count, pose, selector | `E+$22 = c`, then `82 p s` | `B847`, show | ok |
 | `8E` | `A32F` | – | `ED75`; list not ended: yield (re-run at `E+$0A`); ended: go on | all | ok |
 | `8F` | `A33E` | – | `ED75`; at list end `DEC E+$22`: not 0: restart list and streams (`7F:0010/12 = 0014/16`) in the same frame; 0: go on | blob, Hiballs | ok |
-| `E4` | `B929` | – | `8E` with its own record countdown in `7F:200A` (script runs every frame) | knockback `$85:E03D` | missing |
-| `E5` | `B953` | – | the same for `8F` | (not in these scripts) | – |
+| `E4` | `B929` | – | `8E` with its own record countdown in `7F:200A`: the script runs every frame up to it, back from its continuation (`PLA; PLA; RTL`), and goes on in the frame `8E` would; the High Cadet's copies flicker so, hidden and shown on alternate frames | knockback `$85:E03D`, the copies | ok |
+| `E5` | `B953` | – | the same for `8F`: the copies' 3 passes of a 50-frame list take 150 frames (native trace, `$113`) | the copies `$97:C77C` | ok |
 | `AF s` | `A965` | selector | start movement selector s only | Shadowkeeper | missing |
 | `B0 n` | `A975` | byte (`FF`: word + bank) | `7F:0022 = $4000 + n<<12`, `7F:0024 = 0`; `FF`: `7F:0022 = 7F:0026 = word`, `7F:0024 = bank` | flyers, `B847`, show | partial (`FF` form not modelled) |
 | `B1`/`B3` | `A9B9`/`A9EA` | word / 2 words | x += w (negated when mirrored) / and y | knight `EFA0`, Guardner, bosses | ok |
