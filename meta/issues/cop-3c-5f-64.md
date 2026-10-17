@@ -18,3 +18,9 @@
 ## Acceptance Criteria
 
 - A unit test per modelled service, checked against a native trace.
+
+## Progress
+
+- Done: `5F` (by Ark's facing, in `player_test`) and `3C` (drops the mark),
+  with unit tests. Open: `64`, the guardian's ring window (`$87:A26B`, its
+  HDMA tables from `$87:A91D`), display only.

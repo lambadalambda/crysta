@@ -26,6 +26,12 @@ inventory. None breaks a tested path.
 - The COP walk (`service_sites`): a choice table is taken as 3 entries; a
   switch entry that points into its own table would be read as code; an
   address is walked once, with the register widths of the first path.
+- `COP E4`/`E5` in a callback yield the actor instead of ending the
+  callback; a foe's wake does not reset their countdown, which the native
+  knockback rewrites; `E5` (as `8F`) does not restart the streams each pass.
+- `COP 3C` drops the actor's mark wherever it was set; natively it clears
+  the current cell (`$80:BF0E`), also a `COP 3D` mark there. `COP AF`'s
+  streams restart on their own list clock, not the running list's.
 
 ## Acceptance Criteria
 

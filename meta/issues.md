@@ -89,7 +89,6 @@
 - [ ] [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [ ] [Finish the partial COP services](issues/partial-cop-services.md)
 - [ ] [Model the COP services the runtime steps over](issues/skipped-cop-services.md)
-- [ ] [Model COP E4 and E5](issues/cop-e4-e5.md)
 - [ ] [Model COP AA and AF](issues/cop-aa-af.md)
 - [ ] [Model COP 3C, 5F and 64](issues/cop-3c-5f-64.md)
 - [ ] [Close the later review edge cases](issues/review-edges-two.md)

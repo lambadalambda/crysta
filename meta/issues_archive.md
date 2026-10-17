@@ -176,3 +176,4 @@
 - [x] [Keep the header's off-screen bit until the first draw](issues/first-draw-visibility.md)
 - [x] [Match the flyers' pose 7](issues/flyer-pose-seven.md)
 - [x] [List the COP services the underworld scripts use](issues/cop-inventory.md)
+- [x] [Model COP E4 and E5](issues/cop-e4-e5.md)

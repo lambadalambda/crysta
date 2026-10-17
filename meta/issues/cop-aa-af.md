@@ -18,3 +18,10 @@ stepped over. `COP AA` starts an HDMA child (`docs/light-room.md`).
 ## Acceptance Criteria
 
 - A unit test per modelled service, checked against a native trace.
+
+## Progress
+
+- Done: `AF` (the streams alone, in `moving_pose`), with a unit test.
+- Open: `AA` starts effect entities whose scripts use `8A`, `93`, `AE` and
+  `EC` (palette cycles and blends: `$90:8BA2` in the light room, `$90:8D0E`
+  and `8D29` at the tower doors); the inventory now walks them.

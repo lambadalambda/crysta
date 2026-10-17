@@ -20,3 +20,9 @@ knockback `$85:E03D` uses `7F:200A` for `COP E4`).
 
 - A unit test per service, and a local test that matches the native frames
   at one site.
+
+## Progress
+
+- Done: `Actor::own_wait` (the script runs each frame, back from its
+  continuation, until the list has played); the High Cadet's copies on
+  `$113` match the native trace (150 frames for 3 passes of 50).
