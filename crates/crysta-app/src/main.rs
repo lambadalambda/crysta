@@ -286,6 +286,8 @@ struct App {
     state: Option<Session>,
     pads: Option<Gilrs>,
     held: Option<Direction>,
+    /// The direction held across [`Self::held`]: a diagonal.
+    held_cross: Option<Direction>,
     keys: Vec<Direction>,
     /// Classic or wide; `V` switches between them.
     frame: Canvas,
@@ -335,6 +337,7 @@ impl App {
             state: None,
             pads: Gilrs::new().ok(),
             held: None,
+            held_cross: None,
             keys: Vec::new(),
             frame: Canvas::new(width),
             interaction: input::Interaction::default(),
@@ -617,34 +620,33 @@ impl ApplicationHandler for App {
 impl App {
     fn poll_pad(&mut self) {
         let (mut interact, mut cancel, mut describe) = (false, false, false);
-        let mut direction = self.keys.last().copied();
+        let (mut direction, mut cross) = input::held_axes(&self.keys);
         if let Some(pads) = &mut self.pads {
             while pads.next_event().is_some() {}
             for (_, pad) in pads.gamepads() {
-                if pad.is_pressed(Button::DPadUp) {
-                    direction = Some(Direction::Up);
-                } else if pad.is_pressed(Button::DPadDown) {
-                    direction = Some(Direction::Down);
-                } else if pad.is_pressed(Button::DPadLeft) {
-                    direction = Some(Direction::Left);
-                } else if pad.is_pressed(Button::DPadRight) {
-                    direction = Some(Direction::Right);
-                } else {
-                    // A stick past half deflection counts as a direction.
+                let dpad: Vec<Direction> = [
+                    (Button::DPadUp, Direction::Up),
+                    (Button::DPadDown, Direction::Down),
+                    (Button::DPadLeft, Direction::Left),
+                    (Button::DPadRight, Direction::Right),
+                ]
+                .into_iter()
+                .filter(|&(button, _)| pad.is_pressed(button))
+                .map(|(_, direction)| direction)
+                .collect();
+                if dpad.is_empty() {
+                    // A stick past half deflection on an axis counts as its
+                    // direction; on both, a diagonal.
                     let (x, y) = (pad.value(Axis::LeftStickX), pad.value(Axis::LeftStickY));
-                    if x.abs() > 0.5 || y.abs() > 0.5 {
-                        direction = Some(if x.abs() > y.abs() {
-                            if x > 0.0 {
-                                Direction::Right
-                            } else {
-                                Direction::Left
-                            }
-                        } else if y > 0.0 {
-                            Direction::Up
-                        } else {
-                            Direction::Down
-                        });
+                    let across = (x.abs() > 0.5)
+                        .then_some(if x > 0.0 { Direction::Right } else { Direction::Left });
+                    let along = (y.abs() > 0.5)
+                        .then_some(if y > 0.0 { Direction::Up } else { Direction::Down });
+                    if across.is_some() || along.is_some() {
+                        (direction, cross) = (along.or(across), along.and(across));
                     }
+                } else {
+                    (direction, cross) = input::held_axes(&dpad);
                 }
                 // SNES A confirms and B cancels: the pad's South and East.
                 interact |= pad.is_pressed(Button::South);
@@ -653,6 +655,7 @@ impl App {
             }
         }
         self.held = direction;
+        self.held_cross = cross;
         // Level-polled pad edges and keyboard events remain latched until a
         // simulation tick, even if several redraw/input wakeups happen first.
         self.interaction.gamepad(interact);
@@ -665,10 +668,12 @@ impl App {
         let interact = self.interaction.take();
         let cancel = self.cancel.take();
         let describe = self.describe.take();
+        let cross = self.held_cross;
         let session = self.session();
         if session.fault.is_some() {
             return;
         }
+        session.cross = cross;
         let before = (session.world.map(), session.world.position());
         session.advance_with(
             direction,

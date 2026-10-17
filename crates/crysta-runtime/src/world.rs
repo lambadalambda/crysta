@@ -26,7 +26,8 @@ pub use pose::ArkPose;
 use room_core::arrival::{Arrival, ReturnRoute};
 use room_core::run::Run;
 use room_core::{
-    AnimationFrame, AnimationState, Direction, FrameInput, Room, Unqualified, WalkingState,
+    AnimationFrame, AnimationState, Direction, FrameInput, PadInput, Room, Unqualified,
+    WalkingState,
 };
 use std::fmt;
 
@@ -90,6 +91,8 @@ pub struct World<'a> {
     /// The thrust lists' records and boxes.
     attack_records: attack::AttackRecords,
     walking: WalkingState,
+    /// The perpendicular direction held with this frame's, a diagonal.
+    cross: Option<Direction>,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
     /// Residents the spawn lists install for the current flags, where their
@@ -374,6 +377,7 @@ impl<'a> World<'a> {
             attack_records: attack::AttackRecords::from_rom(image),
             dash_attack: None,
             walking: WalkingState::new(x, y),
+            cross: None,
             residents: present,
             actors,
             player_actor: None,
@@ -547,6 +551,8 @@ impl<'a> World<'a> {
         // A direct stepping call also owns one frame; `update` resets this in
         // `frame` instead so its inner step cannot give Ark a second turn.
         if !self.animate {
+            // It holds one direction only: no diagonal from `update_with`.
+            self.cross = None;
             if self.player_turn == PlayerTurn::Deferred {
                 if self.scene.is_none() {
                     self.player_turn = PlayerTurn::Ready;
@@ -608,7 +614,11 @@ impl<'a> World<'a> {
         if let Some(direction) = direction {
             self.facing = direction;
         }
-        let input = FrameInput { direction };
+        // No cross without the lead: it must not walk alone.
+        let input = PadInput {
+            direction,
+            cross: direction.and(self.cross),
+        };
         if self.animate {
             // The frame API runs: a double tap dashes (`room_core::run`).
             match room_core::run::step(&mut self.walking, &mut self.run, &self.room.room, input) {
@@ -1367,6 +1377,27 @@ impl<'a> World<'a> {
         direction: Option<Direction>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
+        self.update_with(FrameInput { direction }, presses)
+    }
+
+    /// As [`Self::update`], with a diagonal: the walk's lead direction
+    /// (the one it already walks, else the vertical) drives the frame, the
+    /// other walks with it (`room_core::PadInput::lead`).
+    ///
+    /// # Errors
+    /// As [`Self::update`].
+    pub fn update_with(
+        &mut self,
+        input: impl Into<PadInput>,
+        presses: Presses,
+    ) -> Result<(Step, Option<Step>), WorldError> {
+        // A dash keeps its way: the walk under it starts over each frame.
+        let walking = match self.run {
+            Some(room_core::run::Run::Dash { direction, .. }) => Some(direction),
+            _ => self.walking.delayed_direction(),
+        };
+        let (direction, cross) = input.into().lead(walking);
+        self.cross = cross;
         self.animate = true;
         self.ran = false;
         let steps = self.frame(direction, presses);
@@ -1389,12 +1420,13 @@ impl<'a> World<'a> {
         direction: Option<Direction>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
-        self.globals.pad = direction.map_or(0, |direction| match direction {
+        let bit = |direction: Direction| match direction {
             Direction::Right => 0x0100,
             Direction::Left => 0x0200,
             Direction::Down => 0x0400,
             Direction::Up => 0x0800,
-        });
+        };
+        self.globals.pad = direction.into_iter().chain(self.cross).map(bit).sum();
         if self.player_turn == PlayerTurn::Ran {
             self.player_turn = PlayerTurn::Ready;
         }
@@ -1473,6 +1505,9 @@ impl<'a> World<'a> {
         }
         let locked = self.pad_locked();
         let direction = direction.filter(|_| !locked);
+        if locked {
+            self.cross = None;
+        }
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
@@ -1545,6 +1580,10 @@ impl<'a> World<'a> {
         (busy, locked): (bool, bool),
     ) -> Result<(Step, Option<Step>), WorldError> {
         let direction = self.rope_step(direction);
+        // The rope takes no diagonal: its directions lean or drop him.
+        if self.rope.is_some() {
+            self.cross = None;
+        }
         let step = self.step_interactive(direction)?;
         self.ground_test();
         // On the plane, not while arriving or mid-step.
@@ -2806,6 +2845,7 @@ mod tests {
             attack_records: attack::AttackRecords::default(),
             dash_attack: None,
             walking: WalkingState::new(56, 64),
+            cross: None,
             residents: vec![],
             actors: vec![],
             player_actor: None,
@@ -3227,6 +3267,43 @@ mod tests {
         world.residents = vec![resident()];
         world.actors = vec![Actor::new((24, 32), None, 0, 0).marked()];
         assert!(matches!(world.step_checked(None), Err(WorldError::Room(_))));
+    }
+
+    #[test]
+    fn a_locked_pad_takes_no_diagonal() {
+        // `COP 2A`'s mask holds the pad: the cross must not walk either.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let image: &'static [u8] = Box::leak(
+            rom::Rom::load(&bytes)
+                .unwrap()
+                .image()
+                .to_vec()
+                .into_boxed_slice(),
+        );
+        let mut events = fresh_game_flags();
+        events[0x100 / 8] |= 1 << (0x100 % 8);
+        let mut world = World::enter_with_events(image, 0x101, 128, 560, events).unwrap();
+        for _ in 0..30 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        let before = world.position();
+        let mut free = world.clone();
+        world.globals.input_mask = PAD_DIRECTIONS;
+        let up_right = PadInput {
+            direction: Some(Direction::Up),
+            cross: Some(Direction::Right),
+        };
+        for _ in 0..6 {
+            world.update_with(up_right, Presses::NONE).unwrap();
+            free.update_with(up_right, Presses::NONE).unwrap();
+        }
+        assert_eq!(world.position(), before);
+        assert_eq!(world.walking.delayed_direction(), None, "no input taken");
+        assert_ne!(free.position(), before, "the control walks");
     }
 
     // Right's first displacement probes an unknown column; Left remains open.

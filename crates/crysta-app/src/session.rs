@@ -85,6 +85,9 @@ pub struct Session {
     pub window_art: WindowArt,
     /// The direction held last frame, so a new one reads as a press.
     pub last_direction: Option<Direction>,
+    /// The direction held across the main one, a diagonal, for the next
+    /// frames.
+    pub cross: Option<Direction>,
     /// Frames simulated so far, which drives resident animation.
     pub tick: u64,
     /// The last frame's walking step.
@@ -132,6 +135,7 @@ impl Session {
             titles: crate::title::Titles::default(),
             window_art: WindowArt::from_rom(image).expect("the text window's art"),
             last_direction: None,
+            cross: None,
             tick: 0,
             last_step: None,
             last_interaction: None,
@@ -186,7 +190,11 @@ impl Session {
             }
             return;
         }
-        match self.world.update(direction, presses) {
+        let input = room_core::PadInput {
+            direction,
+            cross: self.cross,
+        };
+        match self.world.update_with(input, presses) {
             Ok((step, interaction)) => {
                 self.last_step = Some(step);
                 self.last_interaction = interaction;

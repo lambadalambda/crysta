@@ -2343,3 +2343,119 @@ fn a_in_the_dashs_grace_does_not_attack() {
         assert!(world.run_pose().is_some());
     }
 }
+
+#[test]
+fn ark_walks_diagonally_as_natively() {
+    // Native JP traces `k_*` (2026-10-17, the job's `tmp/jump/`) on `$101`:
+    // each frame's move, run-length (`count:dx,dy`), from the first input.
+    use Direction::{Down, Left, Right, Up};
+    type Plan = [(usize, Option<Direction>, Option<Direction>)];
+    let cases: [(&str, (u16, u16), &Plan, &str); 6] = [
+        (
+            "ur",
+            (128, 560),
+            &[(80, Some(Up), Some(Right)), (10, None, None)],
+            "2:0,0 64:1,-1 4:2,0 11:1,-1 4:0,0",
+        ),
+        (
+            "dl",
+            (128, 400),
+            &[(80, Some(Down), Some(Left)), (10, None, None)],
+            "2:0,0 64:-1,1 4:-2,0 11:-1,1 4:0,0",
+        ),
+        (
+            "r_ur",
+            (100, 600),
+            &[(20, Some(Right), None), (20, Some(Right), Some(Up)), (20, Some(Right), None), (5, None, None)],
+            "2:0,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 20:1,-1 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:0,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 4:0,0",
+        ),
+        (
+            "u_ur",
+            (100, 600),
+            &[(20, Some(Up), None), (20, Some(Up), Some(Right)), (20, Some(Up), None), (5, None, None)],
+            "2:0,0 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 20:1,-1 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 4:0,0",
+        ),
+        (
+            "gap",
+            (60, 620),
+            &[(40, Some(Right), None), (40, Some(Right), Some(Up)), (5, None, None)],
+            "2:0,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 14:1,-1 1:0,0 25:1,-1 4:0,0",
+        ),
+        (
+            "r_then_ur",
+            (128, 560),
+            &[(30, Some(Right), None), (30, Some(Right), Some(Up)), (30, Some(Up), None), (5, None, None)],
+            "2:0,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 9:0,-1 4:0,-2 11:1,-1 1:0,0 5:1,-1 1:0,0 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 12:0,0",
+        ),
+    ];
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        for (name, (x, y), plan, native) in cases {
+            let expected: Vec<(i32, i32)> = native
+                .split(' ')
+                .flat_map(|run| {
+                    let (count, delta) = run.split_once(':').unwrap();
+                    let (dx, dy) = delta.split_once(',').unwrap();
+                    let delta = (dx.parse().unwrap(), dy.parse().unwrap());
+                    std::iter::repeat_n(delta, count.parse().unwrap())
+                })
+                .collect();
+            let mut world =
+                World::enter_with_events(rom.image(), 0x0101, x, y, after_the_intro()).unwrap();
+            play(&mut world, 30, false);
+            let mut moves = Vec::new();
+            for &(frames, direction, cross) in plan {
+                for _ in 0..frames {
+                    let before = world.position();
+                    let input = room_core::PadInput { direction, cross };
+                    world.update_with(input, Presses::default()).unwrap();
+                    let after = world.position();
+                    moves.push((
+                        i32::from(after.0) - i32::from(before.0),
+                        i32::from(after.1) - i32::from(before.1),
+                    ));
+                }
+            }
+            moves.truncate(expected.len());
+            assert_eq!(moves, expected, "{name}");
+        }
+    }
+}
+
+#[test]
+fn a_diagonal_does_not_turn_a_dash() {
+    // The walk under a dash starts over each frame, so the dash's own way
+    // leads a diagonal held in it (the lock: `world::tests`).
+    use room_core::PadInput;
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        // A right dash held up-right runs on to the right.
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0101, 40, 448, after_the_intro()).unwrap();
+        play(&mut world, 30, false);
+        let right = Some(Direction::Right);
+        for direction in [right, None, None, right, right, right, right, right] {
+            world.update(direction, Presses::default()).unwrap();
+        }
+        let before = world.position();
+        for _ in 0..8 {
+            world
+                .update_with(
+                    PadInput {
+                        direction: right,
+                        cross: Some(Direction::Up),
+                    },
+                    Presses::default(),
+                )
+                .unwrap();
+        }
+        let after = world.position();
+        assert!(world.run_pose().is_some(), "still dashing");
+        assert_eq!(after.1, before.1, "straight");
+        assert!(after.0 > before.0 + 16);
+    }
+}
