@@ -25,3 +25,7 @@ stepped over. `COP AA` starts an HDMA child (`docs/light-room.md`).
 - Open: `AA` starts effect entities whose scripts use `8A`, `93`, `AE` and
   `EC` (palette cycles and blends: `$90:8BA2` in the light room, `$90:8D0E`
   and `8D29` at the tower doors); the inventory now walks them.
+- Done: `AA` starts a hidden effect entity after its parent; its `EC`
+  blends OBJ colours (tower 1's head matches the native CGRAM at steps 1,
+  30, 60), `AE` ends it, `93` waits on the palette cycle `8A` records.
+  `$123`'s darkness keeps its own model.

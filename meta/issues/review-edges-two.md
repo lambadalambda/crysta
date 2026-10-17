@@ -32,6 +32,12 @@ inventory. None breaks a tested path.
 - `COP 3C` drops the actor's mark wherever it was set; natively it clears
   the current cell (`$80:BF0E`), also a `COP 3D` mark there. `COP AF`'s
   streams restart on their own list clock, not the running list's.
+- Effects (`COP AA`): `7F:0100` (the parent) is not kept; a group deletion
+  can remove one, natively not; `COP EC` with a count of 0 runs once and a
+  total of 0 divides to `$FF` natively; on a non-effect actor `EC` never
+  ends. `COP 93` waits for good (the light room's cycle end is not
+  modelled). The ring: the `$24 == $06` and `$24 < $06` cases
+  (`$87:A340`, `A307`), and the stale row past the bottom table.
 
 ## Acceptance Criteria
 

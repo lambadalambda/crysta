@@ -35,7 +35,8 @@
 - The scripts run (`shadowkeeper-scripts`, archived); the stand-in is gone. The text shows; vertically flipped actors are drawn; a mode-4 body draws its other lists (the claws, the wisps, the shots).
 - The OBJ palettes: `COP 5A` loads OBJ colours (`colours.rs`), `COP BB` XORs each piece's slot; the shots are green. The depth order of `+$06` bits 11-14 sorts the sprites. The wisps draw the helper art.
 - The window is drawn. Open: the frame check against the longplay (`shadowkeeper-intro`).
-- The runtime steps an actor's streams only in its waits (or with
-  `+$06 & $40`); natively `$80:F251` steps them each frame. Phase 3's charge
-  (`$93:DB89`: `COP 82 00 09; COP 8E; COP C1 $70; COP AF 0`) so stops at the
-  end of the `8E` wait instead of running through the 112 frames.
+- Phase 3's charge (`$93:DB89`: `COP 82 00 09; COP 8E; COP C1 $70; COP AF
+  0`) runs through the 112 frames: the body's header sets `+$06 & $40`,
+  which keeps its streams past the list's end; the runtime now takes it
+  from the header too. Not checked against a native trace (phase 3 did not
+  come in it).

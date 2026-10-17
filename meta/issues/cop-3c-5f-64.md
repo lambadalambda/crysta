@@ -24,3 +24,6 @@
 - Done: `5F` (by Ark's facing, in `player_test`) and `3C` (drops the mark),
   with unit tests. Open: `64`, the guardian's ring window (`$87:A26B`, its
   HDMA tables from `$87:A91D`), display only.
+- Done: `64`, the ring window (`world/circle.rs`, `World::ring`): the
+  tables match the native ones on `$11D`, lagging one raise of `$0474`.
+  Drawing it is with [Draw colour addition](colour-addition.md).
