@@ -78,8 +78,12 @@ Guardian `$90:A0BA` / `$90:A3E7` (deleted by `$19B`): x - 8, `COP 2A $EF40`
 (`COP 76`: `$2123`, `$2127`, `$212C`, `$212D`, `$2130`, `$2131`), 30
 frames, the 6 ring orbs (`COP A2`, flags `$1010`: `COP D9 03`, `COP D0`
 orbit around `$0DEA`, Ark), sound `$37`, text "Immobilized!!" (`COP 1F`),
-`COP 64 01` (an effect actor at `$87:A26B`: the circle window, radius
-`$0474`, guess). 44 frames: `INC $0474`, and every other frame (`$0042 &
+`COP 64 01` (an effect actor at `$87:A26B`: the ring window, an ellipse
+`r` wide and `r/2` high, its centre row 14 above the guardian, tables a
+frame behind `$0474`; `world/circle.rs`). Inside it the main screen drops
+BG1 and the sub screen's BG1 is added to the backdrop (`TS $01`, `CGWSEL
+$82`, `CGADSUB $20`, `W12SEL $22`), so the floor there lights up as the
+backdrop rises. 44 frames: `INC $0474`, and every other frame (`$0042 &
 1`) a lighter backdrop (`$7F:0600 = n * $0421`, n up to `$1F`). 30 frames
 blink (`+$04` bit 15), poses 7 and `$0A`, the orb (`COP A4 $A1C6`, dy -16,
 flags `$8202`), then pose 4 until local flag 1.

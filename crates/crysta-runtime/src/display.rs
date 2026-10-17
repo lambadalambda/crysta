@@ -4,8 +4,14 @@
 //! registers directly, through `COP 76`, or in native code; a map load
 //! starts with none of it.
 
+use assets::graphics::Bgr555;
+
+/// `W12SEL`: the windows of BG1 and BG2.
+const WINDOWS_12: u16 = 0x2123;
 /// `TM`: the layers on the main screen.
 const MAIN_SCREEN: u16 = 0x212C;
+/// `TS`: the layers on the sub screen.
+const SUB_SCREEN: u16 = 0x212D;
 /// `WOBJSEL`: the colour window's windows.
 const WINDOW_SELECT: u16 = 0x2125;
 /// `CGWSEL`: where colour math is prevented.
@@ -22,6 +28,10 @@ const SQUARE: f64 = 48.0;
 pub struct Display {
     /// `TM`, once a script wrote it.
     main_screen: Option<u8>,
+    sub_screen: u8,
+    windows_12: u8,
+    /// The backdrop colour a script set (`$7F:0600`, CGRAM 0).
+    backdrop: Option<u16>,
     window_select: u8,
     math_select: u8,
     /// `CGADSUB`, once a script wrote it.
@@ -82,6 +92,8 @@ impl Display {
     pub fn write(&mut self, register: u16, value: u8) -> bool {
         match register {
             MAIN_SCREEN => self.main_screen = Some(value),
+            SUB_SCREEN => self.sub_screen = value,
+            WINDOWS_12 => self.windows_12 = value,
             WINDOW_SELECT => self.window_select = value,
             MATH_SELECT => self.math_select = value,
             MATH_LAYERS => self.math_layers = Some(value),
@@ -95,6 +107,34 @@ impl Display {
             _ => return false,
         }
         true
+    }
+
+    /// The backdrop colour a script wrote into the palette buffer
+    /// (`$7F:0600`, the `$11D` guardian's `$90:A14D`).
+    pub fn set_backdrop(&mut self, colour: u16) {
+        self.backdrop = Some(colour);
+    }
+
+    /// The backdrop colour a script set, a BGR555 word.
+    #[must_use]
+    pub const fn backdrop(&self) -> Option<u16> {
+        self.backdrop
+    }
+
+    /// The backdrop colour the sub screen's BG1 is added to inside BG1's
+    /// window 1, where the main screen drops BG1: the `$11D` guardian's
+    /// light (`$90:A0C6`; `TS` BG1, `CGWSEL` bit 1, `CGADSUB` addition on
+    /// the backdrop, `W12SEL` BG1 window 1). Its window is the ring
+    /// ([`crate::world::Ring`]).
+    #[must_use]
+    pub fn backdrop_addition(&self) -> Option<Bgr555> {
+        let adds = self.math_layers.is_some_and(|layers| layers & 0xA0 == 0x20);
+        let sub_bg1 = self.sub_screen & 1 != 0 && self.math_select & 2 != 0;
+        let windowed = self.windows_12 & 2 != 0;
+        (adds && sub_bg1 && windowed)
+            .then_some(self.backdrop)
+            .flatten()
+            .map(Bgr555::new)
     }
 
     /// Starts `COP 6A`'s square on `centre`.
@@ -198,6 +238,25 @@ mod tests {
         assert_eq!(spared.angle, 33);
         assert!(!spared.contains((136.0 + 47.0, 384.0 + 47.0)));
         assert!(spared.contains((136.0 + 64.0, 384.0)));
+    }
+
+    #[test]
+    fn the_guardian_adds_the_sub_screens_bg1_to_the_backdrop_in_window_1() {
+        // `$90:A0C6`: TM $15, TS $01, CGWSEL $82, CGADSUB $20, W12SEL $22;
+        // then the backdrop `$7F:0600 = n * $0421`.
+        let mut display = Display::default();
+        for (register, value) in [(0x2C, 0x15), (0x2D, 0x01), (0x30, 0x82), (0x31, 0x20)] {
+            display.write(0x2100 | register, value);
+        }
+        display.set_backdrop(0x0421);
+        assert_eq!(display.backdrop_addition(), None, "no window yet");
+        assert!(display.write(0x2123, 0x22));
+        assert_eq!(
+            display.backdrop_addition(),
+            Some(assets::graphics::Bgr555::new(0x0421))
+        );
+        display.write(MATH_LAYERS, 0xA0);
+        assert_eq!(display.backdrop_addition(), None, "subtraction");
     }
 
     #[test]

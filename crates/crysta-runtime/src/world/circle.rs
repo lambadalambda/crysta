@@ -72,50 +72,45 @@ pub(super) fn half_widths(radius: u16) -> Vec<u16> {
 }
 
 /// The ring window (`COP 64`, `$80:9CE6`; `$87:A26B`, `docs/tower-five.md`):
-/// an ellipse half as tall as it is wide around its caller, 16 above it,
-/// as `$87:A2C7..A44C` builds its tables each frame.
+/// an ellipse half as tall as it is wide around its caller, as
+/// `$87:A2C7..A44C` builds its tables each frame.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ring {
-    /// The centre: the caller's place, 16 above it.
+    /// The centre: the caller's x, and the row the top table ends on, 14
+    /// above the caller (measured on `$11D`'s native frames).
     centre: (i32, i32),
-    /// The rows shown above the centre row and from it down: the HDMA's
-    /// count, `(r & $FE) / 2` of the radius now.
-    rows: i32,
-    /// The top table (`$7E:6000`), from the top row: (left, right) from
-    /// the centre's x, both edges in.
+    /// The top table (`$7E:6000`), from the top row to the centre row:
+    /// (left, right) from the centre's x, both edges in.
     above: Rows,
-    /// The bottom one (`$7E:6100`), from the centre row.
+    /// The bottom one (`$7E:6100`), from the centre row down.
     below: Rows,
 }
 
 impl Ring {
-    /// The ring around `centre` whose tables were built from `built` (the
-    /// radius as the effect ran, before this frame's script raised it) and
-    /// whose rows count `radius`; `None` while the tables are not built.
+    /// The ring around a caller at `caller` whose tables were built from
+    /// `built`, the radius as the effect ran (before this frame's script
+    /// raised it); `None` while no tables are built.
     #[must_use]
-    pub(super) fn new(centre: (i32, i32), built: u16, radius: u16) -> Option<Self> {
+    pub fn new(caller: (i32, i32), built: u16) -> Option<Self> {
         let (above, below) = ring_rows(built)?;
         Some(Self {
-            centre,
-            rows: i32::from((radius & 0xFE) / 2),
+            centre: (caller.0, caller.1 - 14),
             above,
             below,
         })
     }
 
     /// The columns map row `y` shows inside the window, from the first to
-    /// past the last; `None` outside it. The rows above the centre row take
-    /// the top table from its first entry, the centre row and those below
-    /// the bottom one from its second (`$7E:6101`); a row past a table's
-    /// entries shows nothing.
+    /// past the last; `None` outside it. The top table's rows end on the
+    /// centre row; below it the bottom table shows from its third entry
+    /// (its second falls on the centre row, under the top one's last).
     #[must_use]
     pub fn span(&self, y: i32) -> Option<(i32, i32)> {
         let (cx, cy) = self.centre;
-        let (left, right) = if (cy - self.rows..cy).contains(&y) {
-            *self
-                .above
-                .get(usize::try_from(y - (cy - self.rows)).ok()?)?
-        } else if (cy..cy + self.rows).contains(&y) {
+        let half = i32::try_from(self.above.len()).ok()? - 1;
+        let (left, right) = if (cy - half..=cy).contains(&y) {
+            *self.above.get(usize::try_from(y - (cy - half)).ok()?)?
+        } else if y > cy {
             *self.below.get(usize::try_from(y - cy + 1).ok()?)?
         } else {
             return None;
@@ -185,13 +180,12 @@ impl World<'_> {
     #[must_use]
     pub fn ring(&self) -> Option<Ring> {
         let (caller, built) = self.globals.ring?;
-        let radius = self.script_word(CIRCLE_RADIUS)?;
         let actor = self
             .actors
             .iter()
             .find(|actor| actor.id == caller && !actor.is_gone())?;
         let (x, y) = actor.position;
-        Ring::new((i32::from(x), i32::from(y) - 16), built, radius)
+        Ring::new((i32::from(x), i32::from(y)), built)
     }
 
     /// The circle window, while its radius is not zero and its caller is
@@ -281,15 +275,16 @@ mod tests {
 
     #[test]
     fn the_ring_shows_its_tables_around_the_centre_row() {
-        // Built from 42, counted from 44: 22 rows each way (native `$11D`).
-        let ring = Ring::new((128, 112), 42, 44).unwrap();
-        assert_eq!(ring.span(89), None);
-        assert_eq!(ring.span(90), Some((117, 139)));
-        assert_eq!(ring.span(111), Some((86, 170)));
-        assert_eq!(ring.span(112), Some((86, 170)));
-        assert_eq!(ring.span(132), Some((117, 139)));
-        assert_eq!(ring.span(133), None, "past the table's entries");
-        assert_eq!(Ring::new((128, 112), 3, 4), None);
+        // Built from 43, the caller at (128,128): native `$11D`'s frame at
+        // `$0474` = 44 shows rows 93..134 (`tests/local_towers.rs`).
+        let ring = Ring::new((128, 128), 43).unwrap();
+        assert_eq!(ring.span(92), None);
+        assert_eq!(ring.span(93), Some((117, 139)));
+        assert_eq!(ring.span(114), Some((86, 170)), "the centre row");
+        assert_eq!(ring.span(115), Some((86, 170)));
+        assert_eq!(ring.span(134), Some((117, 139)));
+        assert_eq!(ring.span(135), None);
+        assert_eq!(Ring::new((128, 128), 3), None);
     }
 
     #[test]

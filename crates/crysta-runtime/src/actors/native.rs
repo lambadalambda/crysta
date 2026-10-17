@@ -637,11 +637,16 @@ impl<'a> Machine<'a> {
                 self.pc + 3
             }
             0xBF | 0x9F => self.own(opcode, memory.own, memory.effect)?,
-            // The palette buffer (`$7F:0600..07FF`): a room's colour effect,
-            // not drawn here (`$90:A45C`); and the fixed colour after it
-            // (`$7F:0800..0802`, Crysta's night, `$88:8014`).
+            // The palette buffer (`$7F:0600..07FF`): its first word, the
+            // backdrop, kept (the `$11D` guardian's light, `$90:A14D`);
+            // another room's colour effect, not drawn here (`$90:A45C`); and
+            // the fixed colour after it (`$7F:0800..0802`, Crysta's night,
+            // `$88:8014`).
             0x8F if (0x7F_0600..0x7F_0803).contains(&self.long()?) => {
-                self.a?;
+                let value = self.a?;
+                if self.long()? == 0x7F_0600 && !self.narrow {
+                    memory.display.set_backdrop(value);
+                }
                 self.pc + 4
             }
             0x8F => self.stop_spin(memory.display)?,
@@ -1920,11 +1925,11 @@ mod tests {
 
     #[test]
     fn palette_buffer_writes_and_a_subtraction_after_a_cop_go_by() {
-        // `$90:A459`: LDA #0; STA $7F:0640; `$97:C53E`: LDA $0968; SBC #$10;
-        // STA $7F:2006,X; COP.
+        // `$90:A14D`: the backdrop, kept; `$90:A459`: LDA #0; STA $7F:0640,
+        // gone by; `$97:C53E`: LDA $0968; SBC #$10; STA $7F:2006,X; COP.
         let code = [
-            0xA9, 0x00, 0x00, 0x8F, 0x40, 0x06, 0x7F, 0xAD, 0x68, 0x09, 0xE9, 0x10, 0x00, 0x9F,
-            0x06, 0x20, 0x7F, 0x02,
+            0xA9, 0x21, 0x04, 0x8F, 0x00, 0x06, 0x7F, 0xA9, 0x00, 0x00, 0x8F, 0x40, 0x06, 0x7F,
+            0xAD, 0x68, 0x09, 0xE9, 0x10, 0x00, 0x9F, 0x06, 0x20, 0x7F, 0x02,
         ];
         let run = image(&code);
         let (mut words, mut own, mut display) = (Scratch::new(), Own::new(), Display::default());
@@ -1947,8 +1952,9 @@ mod tests {
             bank: 0x97,
             effect: false,
         };
-        assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
+        assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 24));
         assert_eq!(own[&0x2006], 0x70);
+        assert_eq!(display.backdrop(), Some(0x0421));
     }
 
     #[test]

@@ -47,6 +47,39 @@ impl Canvas {
     }
 }
 
+/// The `$11D` guardian's light (`Display::backdrop_addition`): inside the
+/// ring window the main screen drops BG1, and the sub screen's BG1 is
+/// added to the backdrop there, each 5-bit channel clamped. Drawn on the
+/// background before the sprites.
+pub fn lighten_in_ring(
+    canvas: &mut Canvas,
+    camera: (i32, i32),
+    ring: Option<&crysta_runtime::world::Ring>,
+    backdrop: Option<Bgr555>,
+) {
+    let (Some(ring), Some(backdrop)) = (ring, backdrop) else {
+        return;
+    };
+    let added = |pixel: u32, shift: u32, raw: u16| {
+        let add = u32::from(raw) & 0x1F;
+        let wide = ((pixel >> shift & 0xFF) >> 3) + add;
+        let wide = wide.min(31);
+        (wide << 3 | wide >> 2) << shift
+    };
+    let raw = backdrop.raw();
+    for row in 0..signed(VIEW_HEIGHT) {
+        let Some((first, end)) = ring.span(camera.1 + row) else {
+            continue;
+        };
+        for x in (first - camera.0).max(0)..(end - camera.0).min(signed(canvas.width)) {
+            let at = usize::try_from(row).unwrap_or(0) * canvas.width + usize::try_from(x).unwrap_or(0);
+            if let Some(pixel) = canvas.pixels.get_mut(at) {
+                *pixel = added(*pixel, 16, raw) | added(*pixel, 8, raw >> 5) | added(*pixel, 0, raw >> 10);
+            }
+        }
+    }
+}
+
 /// A colour as the canvas keeps it, `0x00RRGGBB`.
 /// Takes the first layer off the main screen inside the circle window
 /// (`World::circle`, `W12SEL $02` with `TMW`): the backdrop, black on
@@ -459,6 +492,18 @@ mod tests {
         tint_and_darken(&mut canvas, (0, 0), Tint::Raise(37), backdrop);
         assert_eq!(canvas.pixels[0], 0x00FF_FFFF, "a sprite: white");
         assert_eq!(canvas.pixels[1], 0x00C6_C6C6, "the room: 24 a channel");
+    }
+
+    #[test]
+    fn the_ring_adds_the_backdrop_to_the_background_inside_it() {
+        let mut canvas = filled(256, 0x0042_4242);
+        let ring = crysta_runtime::world::Ring::new((128, 128), 43).unwrap();
+        let backdrop = assets::graphics::Bgr555::new(0x0421);
+        lighten_in_ring(&mut canvas, (0, 0), Some(&ring), Some(backdrop));
+        let at = |x: usize, y: usize| canvas.pixels[y * 256 + x];
+        assert_eq!(at(128, 100), 0x004A_4A4A, "8 plus 1 a channel");
+        assert_eq!(at(128, 80), 0x0042_4242, "above the ring");
+        assert_eq!(at(20, 100), 0x0042_4242, "beside it");
     }
 
     #[test]

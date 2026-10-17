@@ -2195,12 +2195,13 @@ fn tower_ones_head_fades_its_colours_as_natively() {
 
 #[test]
 fn the_guardians_ring_window_grows_as_natively() {
-    // Native JP trace (2026-10-17, the job's `tmp/ring/`): `$11D`, the
+    // Native JP frames (2026-10-17, the job's `tmp/ring/`): `$11D`, the
     // guardian at (128,128) raises `$0474` a frame from 1 to 44 (`COP 64
-    // 01 00`). When it reads 44, the ring's top rows (lines 90..111) span
-    // these columns: tables built from the radius before the frame's raise.
-    const LEFTS: [i32; 22] = [
+    // 01 00`). When it reads 44, the ring lights rows 93..134 with these
+    // left edges, from tables built before the frame's raise.
+    const LEFTS: [i32; 42] = [
         117, 111, 107, 103, 99, 97, 96, 94, 94, 92, 92, 90, 90, 88, 88, 88, 86, 86, 86, 86, 86, 86,
+        86, 86, 86, 86, 88, 88, 88, 90, 90, 92, 92, 94, 94, 96, 97, 99, 103, 107, 111, 117,
     ];
     for rom in roms()
         .iter()
@@ -2225,8 +2226,8 @@ fn the_guardians_ring_window_grows_as_natively() {
             }
         }
         let ring = ring.expect("the ring grows to 44");
-        let lefts: Vec<i32> = (90..112).map(|y| ring.span(y).expect("a row").0).collect();
+        let lefts: Vec<i32> = (93..135).map(|y| ring.span(y).expect("a row").0).collect();
         assert_eq!(lefts, LEFTS);
-        assert_eq!(ring.span(89), None);
+        assert_eq!((ring.span(92), ring.span(135)), (None, None));
     }
 }

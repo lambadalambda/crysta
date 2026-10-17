@@ -575,7 +575,7 @@ impl Session {
         };
         let camera = background.camera(world.camera_focus(), frame.width);
         background.draw(frame, camera, position);
-        frame::hide_in_window(frame, camera, world.circle().as_ref());
+        draw_windows(world, frame, camera);
         let screen = world.screen();
         frame::mosaic(frame, screen.mosaic);
         let backdrop = frame::Backdrop::keep(frame, world.display().darkening());
@@ -842,4 +842,12 @@ fn resident_animation<'s>(
             })
         })
         .as_ref()
+}
+
+/// The windows on the first layer: `$123`'s circle hides it, `$11D`'s
+/// ring lights it.
+fn draw_windows(world: &World, frame: &mut Canvas, camera: (i32, i32)) {
+    frame::hide_in_window(frame, camera, world.circle().as_ref());
+    let light = world.display().backdrop_addition();
+    frame::lighten_in_ring(frame, camera, world.ring().as_ref(), light);
 }
