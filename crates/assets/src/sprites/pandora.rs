@@ -848,7 +848,9 @@ fn pot_art(loader: &mut Loader<'_>) -> Result<Vec<PandoraArt>, SpriteError> {
         let lists = direct_lists(
             loader,
             sheet,
-            &[25, 26, 29, 30, 37, 38, 43, 44, 45, 46, 47, 48, 60],
+            &[
+                25, 26, 29, 30, 34, 35, 36, 37, 38, 43, 44, 45, 46, 47, 48, 60,
+            ],
             240,
             256,
         )?;
@@ -893,6 +895,8 @@ pub enum PandoraCarryMotion {
     JumpRising,
     /// The same jump, falling.
     JumpFalling,
+    /// A dash with the pot in hand (`$84:B5A7`, `COP 83 1C 01`).
+    Dashing,
 }
 /// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
 /// the brake that ends it.
@@ -929,7 +933,11 @@ impl PandoraSprites {
         let mut loader = Loader::new(image);
         Ok([
             ark_art(&mut loader, 0, &[9, 10, 11])?,
-            ark_art(&mut loader, 1, &[0x13, 0x14, 0x15, 0x16, 23, 24, 25])?,
+            ark_art(
+                &mut loader,
+                1,
+                &[0x13, 0x14, 0x15, 0x16, 23, 24, 25, 0x1A, 0x1B, 0x1C],
+            )?,
         ])
     }
     /// Ark's art, list and mirror for a run motion and facing (0 Down, 1 Up,
@@ -968,6 +976,8 @@ impl PandoraSprites {
             // pot's `$25`/`$26`/`$27` (`$84:C3F6`..`C411`).
             PandoraCarryMotion::JumpRising => (0x80_a261, 0x1B + 3 * axis, 0x25 + axis),
             PandoraCarryMotion::JumpFalling => (0x80_a261, 0x1C + 3 * axis, 0x25 + axis),
+            // Resource 1 `$1A`..`$1C`, the pot's `$22`..`$24` (native `c_*`).
+            PandoraCarryMotion::Dashing => (0x80_a255, 0x1A + axis, 0x22 + axis),
         };
         let hflip = facing == 2 && motion != PandoraCarryMotion::Dropping;
         Some(PandoraCarryPose {

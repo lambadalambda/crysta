@@ -244,4 +244,12 @@ fn carry_selection_is_explicit_and_separate_from_physics() {
     assert!(rising.ark_hflip && rising.pot_hflip);
     let falling = PandoraSprites::carry_pose(PandoraCarryMotion::JumpFalling, 1).unwrap();
     assert_eq!((falling.ark_selector, falling.pot_selector), (0x1F, 0x26));
+    // The carry dash (native traces `c_*`): resource 1 `$1A`..`$1C`, the
+    // pot's `$22`..`$24`, Left mirrored.
+    let dash = PandoraSprites::carry_pose(PandoraCarryMotion::Dashing, 2).unwrap();
+    assert_eq!(
+        (dash.ark_art, dash.ark_selector, dash.pot_selector),
+        (0x80_a255, 0x1C, 0x24)
+    );
+    assert!(dash.ark_hflip && dash.pot_hflip);
 }

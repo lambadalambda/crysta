@@ -345,6 +345,7 @@ fn the_pandora_art_is_the_japanese_art_under_the_japanese_keys() {
             PandoraCarryMotion::Walking,
             PandoraCarryMotion::Throwing,
             PandoraCarryMotion::Dropping,
+            PandoraCarryMotion::Dashing,
         ] {
             let pose = PandoraSprites::carry_pose(motion, facing).unwrap();
             same(pose.ark_art, pose.ark_selector, pose.ark_hflip);

@@ -412,6 +412,7 @@ fn every_carry_pose_and_the_flying_pots_rasterize_with_pixels() {
         PandoraCarryMotion::Walking,
         PandoraCarryMotion::Throwing,
         PandoraCarryMotion::Dropping,
+        PandoraCarryMotion::Dashing,
     ] {
         for facing in 0..4 {
             let pose = PandoraSprites::carry_pose(motion, facing).unwrap();
