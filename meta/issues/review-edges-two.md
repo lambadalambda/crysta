@@ -38,6 +38,13 @@ inventory. None breaks a tested path.
   ends. `COP 93` waits for good (the light room's cycle end is not
   modelled). The ring: the `$24 == $06` and `$24 < $06` cases
   (`$87:A340`, `A307`), and the stale row past the bottom table.
+- The ring's light (`frame::lighten_in_ring`) lights the composed
+  background: natively a BG3 pixel there stays unlit, a clear BG1 pixel
+  shows the backdrop alone, and outside the ring the clear pixels show the
+  raised backdrop. `backdrop_addition` ignores `W12SEL`'s invert bit,
+  `CGADSUB`'s half bit and `CGWSEL`'s clip and prevent bits; the light is
+  drawn before the mosaic, natively after. The runtime's backdrop is a step
+  behind (`$42` phase): 21 steps where the native frame has 22.
 
 ## Acceptance Criteria
 
