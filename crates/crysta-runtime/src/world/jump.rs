@@ -12,7 +12,7 @@ use super::{facing_delta, Step, World, WorldError};
 use crate::scene::Presses;
 use assets::sprites::PandoraCarryMotion;
 use room_core::run::Run;
-use room_core::{Direction, FrameInput};
+use room_core::Direction;
 
 /// Sounds on port 3: the leap and the landing.
 const LEAP_SOUND: u8 = 0x0E;
@@ -389,15 +389,17 @@ impl World<'_> {
     /// The dash runs on through the jump as if its way were held: the pad
     /// does not steer.
     fn dash_on(&mut self) {
-        let Some(Run::Dash { direction, .. }) = self.run else {
+        let Some(Run::Dash {
+            direction, cross, ..
+        }) = self.run
+        else {
             return;
         };
-        let input = FrameInput {
+        let input = room_core::PadInput {
             direction: Some(direction),
+            cross,
         };
-        if room_core::run::step(&mut self.walking, &mut self.run, &self.room.room, input).is_ok() {
-            self.ran = true;
-            self.track_run();
+        if self.run_step(input).is_ok() {
             if let Some(actor) = &mut self.player_actor {
                 actor.position = self.walking.position();
             }
@@ -434,6 +436,10 @@ impl World<'_> {
                 // The grace's pose lasts while the dash runs on its way.
                 let on = matches!(self.run, Some(Run::Dash { direction, .. }) if direction == jump.facing);
                 self.jump = (on && jump.showing()).then_some(jump);
+                if on && self.jump.is_none() {
+                    // The dash's pose again: its stream starts over.
+                    self.run = self.run.map(Run::restarted);
+                }
                 return Ok(None);
             }
             AfterLanding::Silent => {

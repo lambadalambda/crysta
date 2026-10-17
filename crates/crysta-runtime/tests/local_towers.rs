@@ -776,11 +776,11 @@ fn b_jumps_ark_over_a_two_cell_pit() {
 
 #[test]
 fn b_in_a_dash_jumps_on_with_the_dash() {
-    // `docs/jump.md`, the native trace `d_jp_right_held` (its row n is
-    // frame n - 1 here): on `$101` a double tap dashes right from x 40; B
-    // at 14; the air from 15 (x 68, h -4), `$0E` at 16, lists `$0D` then
-    // `$0E`, h 0 from 37; the grace's `$28` from 40 (x 127) to 46; the
-    // dash on from 47 (x 143).
+    // `docs/jump.md`, the native trace `d_jp_right_held`: on `$101` a
+    // double tap dashes right from x 40; B at 15; the air from 16 (x 68,
+    // h -4), `$0E` at 17, lists `$0D` then `$0E`, h 0 from 38; the grace's
+    // `$28` from 41 (x 127) to 47; the dash on from 48 (x 143), its
+    // stream starting over at 49 (x 146).
     use crysta_runtime::audio::Cue;
     let right = Some(Direction::Right);
     for rom in roms() {
@@ -788,11 +788,11 @@ fn b_in_a_dash_jumps_on_with_the_dash() {
             World::enter_with_events(rom.image(), 0x0101, 40, 448, after_the_intro()).unwrap();
         play(&mut world, 30, false);
         let mut inputs = vec![right, None, None];
-        inputs.extend([right; 46]);
+        inputs.extend([right; 48]);
         let mut rows = vec![];
         for (frame, direction) in inputs.into_iter().enumerate() {
             let press = Presses {
-                cancel: frame == 14,
+                cancel: frame == 15,
                 ..Presses::default()
             };
             world.update(direction, press).unwrap();
@@ -804,14 +804,15 @@ fn b_in_a_dash_jumps_on_with_the_dash() {
             rows.push((world.position().0, world.ark_lift(), pose, leap));
         }
         let expected = [
-            (14, (66, 0, None, false)),
-            (15, (68, -4, Some((3, 0x0D)), false)),
-            (16, (71, -8, Some((3, 0x0D)), true)),
-            (27, (96, -23, Some((3, 0x0E)), false)),
-            (37, (120, 0, Some((3, 0x0E)), false)),
-            (40, (127, 0, Some((1, 0x28)), false)),
-            (46, (141, 0, Some((1, 0x28)), false)),
-            (47, (143, 0, None, false)),
+            (15, (66, 0, None, false)),
+            (16, (68, -4, Some((3, 0x0D)), false)),
+            (17, (71, -8, Some((3, 0x0D)), true)),
+            (28, (96, -23, Some((3, 0x0E)), false)),
+            (38, (120, 0, Some((3, 0x0E)), false)),
+            (41, (127, 0, Some((1, 0x28)), false)),
+            (47, (141, 0, Some((1, 0x28)), false)),
+            (48, (143, 0, None, false)),
+            (49, (146, 0, None, false)),
         ];
         for (frame, row) in expected {
             assert_eq!(rows[frame], row, "{:?}: {frame}", rom.revision());
@@ -2235,11 +2236,11 @@ fn the_guardians_ring_window_grows_as_natively() {
 #[test]
 fn a_in_a_dash_is_the_dash_attack() {
     // Native JP traces `g_jp_*` (2026-10-17, the job's `tmp/jump/`, the
-    // spear equipped; row n is frame n - 202 here): A at 14 in a dash
-    // plays resource 4's `$0C`/`$0D`/`$0E` for 18 frames, 3 pixels a frame
-    // from the press, sound `$06` at 15; then resource 3's `$36`..`$38`
-    // for 7 frames, sliding 1, 2, 1, 2, 1, 2, 1; a standing frame at 39;
-    // then the walk. The attack box is live from 14 to 32.
+    // spear equipped; row n is frame n - 200 here): A at 15 in a dash; the
+    // dash's own stride that frame, then resource 4's `$0C`/`$0D`/`$0E` for
+    // 18 frames from 16, 3 pixels a frame, sound `$06` at 17; then resource
+    // 3's `$36`..`$38` for 7 frames, sliding 1, 2, 1, 2, 1, 2, 1; a standing
+    // frame at 41; then the walk. The attack box is live from 16 to 34.
     use crysta_runtime::audio::Cue;
     let a = Presses {
         confirm: true,
@@ -2281,10 +2282,10 @@ fn a_in_a_dash_is_the_dash_attack() {
             world.equip_weapon(0x81);
             play(&mut world, 30, false);
             let mut inputs = vec![Some(way), None, None];
-            inputs.extend([Some(way); 46]);
+            inputs.extend([Some(way); 48]);
             let (mut rows, mut start) = (vec![], None);
             for (frame, direction) in inputs.into_iter().enumerate() {
-                let press = if frame == 14 { a } else { Presses::default() };
+                let press = if frame == 15 { a } else { Presses::default() };
                 world.update(direction, press).unwrap();
                 let swish = world
                     .take_cues()
@@ -2292,7 +2293,7 @@ fn a_in_a_dash_is_the_dash_attack() {
                     .any(|cue| matches!(cue, Cue::Sound(0x0600)));
                 let (px, py) = world.position();
                 let at = (i32::from(px), i32::from(py));
-                start = start.or((frame == 13).then_some(at));
+                start = start.or((frame == 15).then_some(at));
                 let pose = world
                     .ark_pose()
                     .map(|pose| (pose.resource, pose.list, pose.hflip));
@@ -2301,13 +2302,13 @@ fn a_in_a_dash_is_the_dash_attack() {
             let (sx, sy) = start.unwrap();
             let along = |n: i32| (sx + dx * n, sy + dy * n);
             let expected = [
-                (14, (along(3), Some((4, attack, hflip)), true, false)),
-                (15, (along(6), Some((4, attack, hflip)), true, true)),
-                (31, (along(54), Some((4, attack, hflip)), true, false)),
-                (32, (along(55), Some((3, slide, hflip)), true, false)),
-                (33, (along(57), Some((3, slide, hflip)), false, false)),
-                (38, (along(64), Some((3, slide, hflip)), false, false)),
-                (39, (along(64), Some((0, stand, hflip)), false, false)),
+                (16, (along(3), Some((4, attack, hflip)), true, false)),
+                (17, (along(6), Some((4, attack, hflip)), true, true)),
+                (33, (along(54), Some((4, attack, hflip)), true, false)),
+                (34, (along(55), Some((3, slide, hflip)), true, false)),
+                (35, (along(57), Some((3, slide, hflip)), false, false)),
+                (40, (along(64), Some((3, slide, hflip)), false, false)),
+                (41, (along(64), Some((0, stand, hflip)), false, false)),
             ];
             for (frame, row) in expected {
                 assert_eq!(rows[frame], row, "{way:?}: {frame}");
@@ -2344,13 +2345,60 @@ fn a_in_the_dashs_grace_does_not_attack() {
     }
 }
 
+/// A native trace's input plan: frames, the direction and the cross.
+type Plan = [(usize, Option<Direction>, Option<Direction>)];
+
+/// Plays each case's plan on `$101` from its place, with the spear and
+/// `press` on its frame, and compares each frame's move with the native
+/// run-length string (`count:dx,dy`), which starts at the first input.
+fn replay_moves(cases: &[(&str, (u16, u16), &Plan, &str)], press: (usize, Presses)) {
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        for &(name, (x, y), plan, native) in cases {
+            let expected: Vec<(i32, i32)> = native
+                .split(' ')
+                .flat_map(|run| {
+                    let (count, delta) = run.split_once(':').unwrap();
+                    let (dx, dy) = delta.split_once(',').unwrap();
+                    let delta = (dx.parse().unwrap(), dy.parse().unwrap());
+                    std::iter::repeat_n(delta, count.parse().unwrap())
+                })
+                .collect();
+            let mut world =
+                World::enter_with_events(rom.image(), 0x0101, x, y, after_the_intro()).unwrap();
+            world.equip_weapon(0x81);
+            play(&mut world, 30, false);
+            let mut moves = Vec::new();
+            for &(frames, direction, cross) in plan {
+                for _ in 0..frames {
+                    let before = world.position();
+                    let input = room_core::PadInput { direction, cross };
+                    let presses = if moves.len() == press.0 {
+                        press.1
+                    } else {
+                        Presses::default()
+                    };
+                    world.update_with(input, presses).unwrap();
+                    let after = world.position();
+                    moves.push((
+                        i32::from(after.0) - i32::from(before.0),
+                        i32::from(after.1) - i32::from(before.1),
+                    ));
+                }
+            }
+            moves.truncate(expected.len());
+            assert_eq!(moves, expected, "{name}");
+        }
+    }
+}
+
 #[test]
 fn ark_walks_diagonally_as_natively() {
-    // Native JP traces `k_*` (2026-10-17, the job's `tmp/jump/`) on `$101`:
-    // each frame's move, run-length (`count:dx,dy`), from the first input.
+    // Native JP traces `k_*` (2026-10-17, the job's `tmp/jump/`) on `$101`.
     use Direction::{Down, Left, Right, Up};
-    type Plan = [(usize, Option<Direction>, Option<Direction>)];
-    let cases: [(&str, (u16, u16), &Plan, &str); 6] = [
+    replay_moves(&[
         (
             "ur",
             (128, 560),
@@ -2387,75 +2435,175 @@ fn ark_walks_diagonally_as_natively() {
             &[(30, Some(Right), None), (30, Some(Right), Some(Up)), (30, Some(Up), None), (5, None, None)],
             "2:0,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 9:0,-1 4:0,-2 11:1,-1 1:0,0 5:1,-1 1:0,0 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 12:0,0",
         ),
-    ];
-    for rom in roms()
-        .iter()
-        .filter(|rom| rom.revision() == Revision::Japan)
-    {
-        for (name, (x, y), plan, native) in cases {
-            let expected: Vec<(i32, i32)> = native
-                .split(' ')
-                .flat_map(|run| {
-                    let (count, delta) = run.split_once(':').unwrap();
-                    let (dx, dy) = delta.split_once(',').unwrap();
-                    let delta = (dx.parse().unwrap(), dy.parse().unwrap());
-                    std::iter::repeat_n(delta, count.parse().unwrap())
-                })
-                .collect();
-            let mut world =
-                World::enter_with_events(rom.image(), 0x0101, x, y, after_the_intro()).unwrap();
-            play(&mut world, 30, false);
-            let mut moves = Vec::new();
-            for &(frames, direction, cross) in plan {
-                for _ in 0..frames {
-                    let before = world.position();
-                    let input = room_core::PadInput { direction, cross };
-                    world.update_with(input, Presses::default()).unwrap();
-                    let after = world.position();
-                    moves.push((
-                        i32::from(after.0) - i32::from(before.0),
-                        i32::from(after.1) - i32::from(before.1),
-                    ));
-                }
-            }
-            moves.truncate(expected.len());
-            assert_eq!(moves, expected, "{name}");
-        }
-    }
+    ], (0, Presses::default()));
 }
 
 #[test]
-fn a_diagonal_does_not_turn_a_dash() {
-    // The walk under a dash starts over each frame, so the dash's own way
-    // leads a diagonal held in it (the lock: `world::tests`).
-    use room_core::PadInput;
+fn ark_dashes_diagonally_as_natively() {
+    // Native JP traces `h_*` and `q_*` (2026-10-17, the job's `tmp/jump/`)
+    // on `$101`: double taps, diagonals, cross changes, turns and walls.
+    use Direction::{Down, Left, Right, Up};
+    replay_moves(&[
+        (
+            "h_up_right",
+            (128, 560),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (30, Some(Up), Some(Right)), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "h_down_left",
+            (128, 560),
+            &[(1, Some(Down), Some(Left)), (2, None, None), (30, Some(Down), Some(Left)), (30, None, None)],
+            "5:0,0 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,3 2:-1,2 1:-1,1 30:0,0",
+        ),
+        (
+            "q_cross_wall",
+            (156, 600),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (30, Some(Up), Some(Right)), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:0,-2 2:0,-1 3:0,-2 1:0,-3 2:0,-2 1:0,-3 1:0,-2 1:0,-3 1:0,-4 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "q_drop_cross",
+            (128, 600),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (10, Some(Up), Some(Right)), (15, Some(Up), None), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "q_add_cross",
+            (128, 600),
+            &[(1, Some(Up), None), (2, None, None), (10, Some(Up), None), (15, Some(Up), Some(Right)), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "q_grace_cross",
+            (128, 600),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (10, Some(Up), Some(Right)), (3, Some(Right), None), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 4:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+        (
+            "q_turn_held",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (10, Some(Up), None), (15, Some(Right), None), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 4:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+        (
+            "q_turn_grace",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (10, Some(Up), None), (3, None, None), (15, Some(Right), None), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 4:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+        (
+            "q_diag_grace",
+            (100, 600),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (10, Some(Up), Some(Right)), (3, None, None), (15, Some(Right), None), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 4:2,0 1:1,0 1:1,1 5:0,1 2:0,0 1:0,1 10:0,0",
+        ),
+        (
+            "q_right_add_up",
+            (60, 600),
+            &[(1, Some(Right), None), (2, None, None), (8, Some(Right), None), (12, Some(Right), Some(Up)), (30, None, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+        (
+            "q_right_then_ur",
+            (60, 600),
+            &[(1, Some(Right), None), (2, None, None), (20, Some(Up), Some(Right)), (30, None, None)],
+            "5:0,0 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 2:2,-1 1:3,-1 1:2,-1 2:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+        (
+            "q_drop9",
+            (128, 600),
+            &[(1, Some(Up), Some(Right)), (2, None, None), (9, Some(Up), Some(Right)), (12, Some(Up), None), (30, None, None)],
+            "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:1,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "q_add9",
+            (128, 600),
+            &[(1, Some(Up), None), (2, None, None), (9, Some(Up), None), (12, Some(Up), Some(Right)), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:0,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+        (
+            "q_opposite",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (6, Some(Up), None), (10, Some(Down), None), (20, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 3:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,0 1:0,1 1:0,2 1:0,1 1:0,2 19:0,0",
+        ),
+        (
+            "q_release",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (6, Some(Up), None), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 4:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1 10:0,0",
+        ),
+    ], (0, Presses::default()));
+}
+
+#[test]
+fn a_diagonal_dash_attacks_straight_and_jumps_on_diagonally() {
+    // Native JP traces `q_attack_ur` and `q_jump_ur` on `$101`, the spear
+    // equipped: A at 15 drops the cross for the attack and its slide, then
+    // the walk is diagonal again; B at 15 jumps on with the cross.
+    use Direction::{Right, Up};
+    let plan: &Plan = &[
+        (1, Some(Up), Some(Right)),
+        (2, None, None),
+        (53, Some(Up), Some(Right)),
+        (14, None, None),
+    ];
+    let attack = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    replay_moves(&[(
+        "q_attack_ur",
+        (100, 620),
+        plan,
+        "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:1,-2 18:0,-3 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 14:1,-1 13:0,0",
+    )], (15, attack));
+    let jump = Presses {
+        cancel: true,
+        ..Presses::default()
+    };
+    replay_moves(&[(
+        "q_jump_ur",
+        (100, 620),
+        plan,
+        "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2",
+    )], (15, jump));
+}
+
+#[test]
+fn a_wall_stops_a_dash_with_its_sound() {
+    // The native trace `h_down_left`: the lower wall of `$101` stops the
+    // dash at y 624 with port 3 `$4F` (`$80:E70A`).
+    use crysta_runtime::audio::Cue;
+    use Direction::{Down, Left};
     for rom in roms()
         .iter()
         .filter(|rom| rom.revision() == Revision::Japan)
     {
-        // A right dash held up-right runs on to the right.
         let mut world =
-            World::enter_with_events(rom.image(), 0x0101, 40, 448, after_the_intro()).unwrap();
+            World::enter_with_events(rom.image(), 0x0101, 128, 560, after_the_intro()).unwrap();
         play(&mut world, 30, false);
-        let right = Some(Direction::Right);
-        for direction in [right, None, None, right, right, right, right, right] {
-            world.update(direction, Presses::default()).unwrap();
+        world.take_cues();
+        let plan: &Plan = &[
+            (1, Some(Down), Some(Left)),
+            (2, None, None),
+            (30, Some(Down), Some(Left)),
+            (10, None, None),
+        ];
+        let mut bumps = Vec::new();
+        let mut frame = 0;
+        for &(frames, direction, cross) in plan {
+            for _ in 0..frames {
+                let input = room_core::PadInput { direction, cross };
+                world.update_with(input, Presses::default()).unwrap();
+                if world.take_cues().contains(&Cue::Sound(0x4F00)) {
+                    bumps.push(frame);
+                }
+                frame += 1;
+            }
         }
-        let before = world.position();
-        for _ in 0..8 {
-            world
-                .update_with(
-                    PadInput {
-                        direction: right,
-                        cross: Some(Direction::Up),
-                    },
-                    Presses::default(),
-                )
-                .unwrap();
-        }
-        let after = world.position();
-        assert!(world.run_pose().is_some(), "still dashing");
-        assert_eq!(after.1, before.1, "straight");
-        assert!(after.0 > before.0 + 16);
+        assert_eq!(bumps, [32]);
+        assert_eq!(world.position(), (100, 624));
     }
 }

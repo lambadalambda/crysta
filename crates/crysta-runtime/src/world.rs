@@ -59,6 +59,8 @@ pub use fade::{Screen, Tint};
 pub use pots::{CarriedPot, Carry};
 
 /// A map the player is standing in, and where they are standing.
+// Independent per-frame flags, not a state machine.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone)]
 pub struct World<'a> {
     image: &'a [u8],
@@ -93,6 +95,8 @@ pub struct World<'a> {
     walking: WalkingState,
     /// The perpendicular direction held with this frame's, a diagonal.
     cross: Option<Direction>,
+    /// A was pressed in a held dash: the attack starts the next frame.
+    dash_attack_armed: bool,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
     /// Residents the spawn lists install for the current flags, where their
@@ -378,6 +382,7 @@ impl<'a> World<'a> {
             dash_attack: None,
             walking: WalkingState::new(x, y),
             cross: None,
+            dash_attack_armed: false,
             residents: present,
             actors,
             player_actor: None,
@@ -482,7 +487,7 @@ impl<'a> World<'a> {
         let (motion, direction) = match self.run {
             Some(Run::Dash { direction, .. }) => (PandoraRunMotion::Dashing, direction),
             Some(Run::Brake { direction, .. }) => (PandoraRunMotion::Braking, direction),
-            None => return self.scripted_run_pose(),
+            Some(Run::Tap { .. }) | None => return self.scripted_run_pose(),
         };
         Some((motion, direction as u8, self.run_age))
     }
@@ -501,25 +506,41 @@ impl<'a> World<'a> {
         Some((motion, Direction::Down as u8, age))
     }
 
+    /// A frame of the walk or the run under way (`room_core::run`), with
+    /// its sounds.
+    fn run_step(&mut self, input: PadInput) -> Result<(), Unqualified> {
+        let before = self.run;
+        let step = room_core::run::step(&mut self.walking, &mut self.run, &self.room.room, input)?;
+        self.ran = true;
+        if step.braked {
+            self.globals.audio.sound_port3(BRAKE_SOUND);
+        }
+        if step.bumped {
+            self.globals.audio.sound_port3(BUMP_SOUND);
+        }
+        self.track_run(before);
+        Ok(())
+    }
+
     /// Faces the run and counts frames into its motion, from 0 when it
-    /// starts, brakes or turns.
-    fn track_run(&mut self) {
+    /// starts, brakes or turns (`before` is the run of the frame before).
+    fn track_run(&mut self, before: Option<Run>) {
         match self.run {
-            Some(Run::Dash {
-                direction, frame, ..
-            }) => {
+            Some(Run::Dash { direction, .. }) => {
                 self.facing = direction;
-                self.run_age = if frame == 0 {
-                    0
-                } else {
+                let same =
+                    matches!(before, Some(Run::Dash { direction: was, .. }) if was == direction);
+                self.run_age = if same {
                     self.run_age.wrapping_add(1)
+                } else {
+                    0
                 };
             }
             Some(Run::Brake { direction, frame }) => {
                 self.facing = direction;
                 self.run_age = u16::from(frame);
             }
-            None => self.run_age = 0,
+            Some(Run::Tap { .. }) | None => self.run_age = 0,
         }
     }
 
@@ -621,15 +642,8 @@ impl<'a> World<'a> {
         };
         if self.animate {
             // The frame API runs: a double tap dashes (`room_core::run`).
-            match room_core::run::step(&mut self.walking, &mut self.run, &self.room.room, input) {
-                Ok(step) => {
-                    self.ran = true;
-                    if step.braked {
-                        self.globals.audio.sound_port3(BRAKE_SOUND);
-                    }
-                    self.track_run();
-                }
-                Err(refused) => return Ok(Step::Refused(refused)),
+            if let Err(refused) = self.run_step(input) {
+                return Ok(Step::Refused(refused));
             }
         } else if let Err(refused) = self.walking.step(&self.room.room, input) {
             return Ok(Step::Refused(refused));
@@ -1391,12 +1405,7 @@ impl<'a> World<'a> {
         input: impl Into<PadInput>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
-        // A dash keeps its way: the walk under it starts over each frame.
-        let walking = match self.run {
-            Some(room_core::run::Run::Dash { direction, .. }) => Some(direction),
-            _ => self.walking.delayed_direction(),
-        };
-        let (direction, cross) = input.into().lead(walking);
+        let (direction, cross) = room_core::run::lead(&self.walking, self.run, input.into());
         self.cross = cross;
         self.animate = true;
         self.ran = false;
@@ -1511,11 +1520,7 @@ impl<'a> World<'a> {
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
-        // A in a held dash attacks from this frame (`$84:9549`); B first.
-        let held_dash = self.run.is_some_and(room_core::run::Run::held);
-        if presses.confirm && !presses.cancel && held_dash && !locked && !busy {
-            self.dash_attack();
-        }
+        self.arm_dash_attack(presses, !locked && !busy);
         // B with a pot: the pot's frame runs on, the jump from the next.
         if presses.cancel && !presses.confirm && !locked && !busy && self.holds_pot() {
             self.start_jump();
@@ -2510,6 +2515,8 @@ const PRESENTATION_LIFT: u16 = 22;
 
 /// Port 3's sound as a brake starts (`COP 36 0D`).
 const BRAKE_SOUND: u8 = 0x0D;
+/// Port 3's sound as a wall stops a dash (`$80:E70A`).
+const BUMP_SOUND: u8 = 0x4F;
 
 /// A counter tile's collision attribute (`$2000` in the cell word): the
 /// talk probe reaches over it (`$87:923F`).
@@ -2846,6 +2853,7 @@ mod tests {
             dash_attack: None,
             walking: WalkingState::new(56, 64),
             cross: None,
+            dash_attack_armed: false,
             residents: vec![],
             actors: vec![],
             player_actor: None,

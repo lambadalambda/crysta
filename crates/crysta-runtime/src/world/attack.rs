@@ -7,7 +7,7 @@
 use super::pose::ArkPose;
 use super::{Step, World, WorldError};
 use crate::combat;
-use crate::scene::{DigitKind, Digits};
+use crate::scene::{DigitKind, Digits, Presses};
 use assets::sprites::boxes::{self, Record, Rect};
 use room_core::Direction;
 
@@ -182,7 +182,7 @@ impl World<'_> {
                     Some(step) => Some(step),
                     None => match self.thrust_frame()? {
                         Some(step) => Some(step),
-                        None => self.dash_attack_frame()?,
+                        None => self.dash_attack_frame(direction)?,
                     },
                 },
             },
@@ -205,6 +205,17 @@ impl World<'_> {
         true
     }
 
+    /// A in a held dash attacks from the next frame, if the dash is still
+    /// held: the loop reads the frame before (`$84:9078`, `$84:9549`). B
+    /// first.
+    pub(super) fn arm_dash_attack(&mut self, presses: Presses, free: bool) {
+        let held = |run: Option<room_core::run::Run>| run.is_some_and(room_core::run::Run::held);
+        if self.dash_attack_armed && free && held(self.run) {
+            self.dash_attack();
+        }
+        self.dash_attack_armed = presses.confirm && !presses.cancel && free && held(self.run);
+    }
+
     /// Starts the dash attack: A in a dash with a weapon equipped.
     pub(super) fn dash_attack(&mut self) {
         if self.globals.slot.weapon().is_some() {
@@ -218,7 +229,10 @@ impl World<'_> {
 
     /// A frame of the dash attack: Ark moves by its stride while the
     /// actors run; past its standing frame the ordinary frame goes on.
-    fn dash_attack_frame(&mut self) -> Result<Option<Step>, WorldError> {
+    fn dash_attack_frame(
+        &mut self,
+        direction: Option<Direction>,
+    ) -> Result<Option<Step>, WorldError> {
         let Some(mut attack) = self.dash_attack.take() else {
             return Ok(None);
         };
@@ -233,6 +247,14 @@ impl World<'_> {
         // A refused move leaves Ark where he is.
         let stride = phase.stride();
         let _ = room_core::run::push(&mut self.walking, &self.room.room, attack.facing, stride);
+        if matches!(phase, Phase::Stand) {
+            // The standing frame is the walk's input frame (`g_jp_*`).
+            let input = room_core::PadInput {
+                direction,
+                cross: self.cross,
+            };
+            let _ = self.walking.step(&self.room.room, input);
+        }
         if let Some(actor) = &mut self.player_actor {
             actor.position = self.walking.position();
         }

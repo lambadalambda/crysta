@@ -1775,8 +1775,9 @@ fn the_item_shop_browses_refuses_sells_and_lets_ark_go() {
 
 #[test]
 fn a_double_tap_dashes_and_a_release_brakes_with_its_sound() {
-    // Native probe from the town: 3, 2, 2 pixels a frame after a still
-    // frame; released, 8 frames on, then a 15-pixel brake (port 3 `$0D`).
+    // Native probe from the town: 3, 2, 2 pixels a frame after the press's
+    // and the setup's still frames (timed on `$101`, `docs/input-admission.md`);
+    // released, 8 frames on, then a 15-pixel brake (port 3 `$0D`).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -1789,16 +1790,19 @@ fn a_double_tap_dashes_and_a_release_brakes_with_its_sound() {
         world.update(direction, Presses::default()).unwrap();
     }
     let start = world.position().0;
-    world.update(right, Presses::default()).unwrap();
-    assert_eq!(world.position().0, start, "the still setup frame");
+    for _ in 0..2 {
+        world.update(right, Presses::default()).unwrap();
+    }
+    assert_eq!(world.position().0, start, "the still frames");
     for _ in 0..6 {
         world.update(right, Presses::default()).unwrap();
     }
     assert_eq!(world.position().0, start + 14, "3, 2, 2 twice");
     let pose = world.run_pose().unwrap();
     assert_eq!(
-        (pose.0, pose.1),
-        (assets::sprites::PandoraRunMotion::Dashing, 3)
+        pose,
+        (assets::sprites::PandoraRunMotion::Dashing, 3, 6),
+        "frames into the dash from its setup"
     );
     for _ in 0..8 + 1 + 16 {
         world.update(None, Presses::default()).unwrap();

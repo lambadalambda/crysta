@@ -3,15 +3,20 @@
 //!
 //! A second press of the same direction inside the onset window, which
 //! [`WalkingState::step`] refuses as an accelerated trigger, starts a dash
-//! (`$84:AE12`): a still setup frame, then 3, 2, 2 pixels a frame for as long
-//! as the direction is held. Released, it runs on for 8 frames of grace;
-//! the same direction again resumes it, another one turns it, and the
-//! opposite one brakes the frame after. The brake slides 15 pixels over 16 frames
-//! (sound `$0D`), and a direction from its fifth frame walks off. A wall
-//! ends the dash: a walk if the direction is held, else a stand.
-//! Diagonals are not modelled (`meta/issues/dash-diagonals-attack-jump.md`);
-//! the dash attack and the dash jump are the runtime's (`docs/combat.md`,
-//! `docs/jump.md`).
+//! (`$84:AE12`): the press's frame and a setup frame stand still, then it
+//! runs 3, 2, 2 pixels a frame for as long as the direction is held.
+//! Released, it runs on for 8 frames of grace; the same direction again
+//! resumes it, the opposite one brakes the frame after, and another one
+//! turns it: the old dash runs one frame more, then the new one starts at
+//! 3. The brake slides 15 pixels over 16 frames (sound `$0D`), and a
+//! direction from its fifth frame walks off. A wall ends the dash: a walk
+//! if the direction is held, else a stand.
+//!
+//! A diagonal dashes along its lead with the cross 1 pixel a frame; a
+//! change of the cross restarts the stream the next frame, and the grace
+//! keeps the last one. The brake slides on the lead alone, and only a wall
+//! across the lead stops the dash. The dash attack and the dash jump are
+//! the runtime's (`docs/combat.md`, `docs/jump.md`).
 
 use crate::{Direction, MovementOutput, PadInput, Room, Unqualified, WalkingState};
 
@@ -30,15 +35,25 @@ const ONSET: u8 = 11;
 /// A run under way.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Run {
-    /// Dashing: `frame` 0 is the still setup frame; `grace` counts down
-    /// once the direction is released.
+    /// The frame of a double tap: the dash's setup frame follows.
+    Tap {
+        /// The way it will run.
+        direction: Direction,
+        /// The diagonal's other direction.
+        cross: Option<Direction>,
+    },
+    /// Dashing; `grace` counts down once the direction is released.
     Dash {
         /// The way it runs.
         direction: Direction,
-        /// 0 on the setup frame, then 1..=3 around the stream.
+        /// The diagonal's other direction, 1 pixel a frame.
+        cross: Option<Direction>,
+        /// Where in the 3, 2, 2 stream the next stride is, 0..=2.
         frame: u8,
         /// Frames left to run once released.
         grace: u8,
+        /// A turn: the dash that starts after this frame's stride.
+        turn: Option<(Direction, Option<Direction>)>,
     },
     /// Braking.
     Brake {
@@ -56,6 +71,29 @@ impl Run {
     pub const fn held(self) -> bool {
         matches!(self, Self::Dash { grace: GRACE, .. })
     }
+
+    /// A dash that runs this frame's stride, then starts its stream over
+    /// at 3, as when a dash jump's pose hands back to the dash (native
+    /// trace `d_jp_right_held`).
+    #[must_use]
+    pub const fn restarted(self) -> Self {
+        match self {
+            Self::Dash {
+                direction,
+                cross,
+                frame,
+                grace,
+                ..
+            } => Self::Dash {
+                direction,
+                cross,
+                frame,
+                grace,
+                turn: Some((direction, cross)),
+            },
+            other => other,
+        }
+    }
 }
 
 /// A frame of walking or running.
@@ -65,6 +103,33 @@ pub struct RunStep {
     pub output: MovementOutput,
     /// Whether a brake started this frame (port 3 `$0D`).
     pub braked: bool,
+    /// Whether a wall stopped the dash this frame (port 3 `$4F`).
+    pub bumped: bool,
+}
+
+impl RunStep {
+    /// A frame that neither brakes nor bumps.
+    const fn plain(output: MovementOutput) -> Self {
+        Self {
+            output,
+            braked: false,
+            bumped: false,
+        }
+    }
+}
+
+/// The lead and the cross of `input` ([`PadInput::lead`]): a dash keeps
+/// its way, else as the walk ([`WalkingState::lead`]).
+#[must_use]
+pub fn lead(
+    walking: &WalkingState,
+    run: Option<Run>,
+    input: PadInput,
+) -> (Option<Direction>, Option<Direction>) {
+    match run {
+        Some(Run::Dash { direction, .. }) => input.lead(Some(direction)),
+        _ => walking.lead(input),
+    }
 }
 
 /// A frame of a move the player's state forces, `distance` pixels along
@@ -80,8 +145,7 @@ pub fn push(
     distance: i16,
 ) -> Result<bool, Unqualified> {
     let (x, y) = walking.position();
-    let (dx, dy) = delta(direction, distance);
-    let (nx, ny, blocked) = room.resolve(x, y, Some(direction), dx, dy)?;
+    let (nx, ny, blocked) = resolve(room, (x, y), direction, None, distance)?;
     *walking = WalkingState::new(nx, ny);
     Ok(blocked)
 }
@@ -98,55 +162,65 @@ pub fn step(
     input: impl Into<PadInput>,
 ) -> Result<RunStep, Unqualified> {
     let input = input.into();
+    let (held, held_cross) = lead(walking, *run, input);
     let (x, y) = walking.position();
-    let (next, direction, distance) = match *run {
+    let (next, direction, cross, distance) = match *run {
         None => match walking.step(room, input) {
             Err(Unqualified::AcceleratedTrigger(direction)) => {
-                (Some(dash(direction, 0, GRACE)), direction, 0)
+                let cross = held_cross;
+                (Some(Run::Tap { direction, cross }), direction, None, 0)
             }
-            other => {
-                return other.map(|output| RunStep {
-                    output,
-                    braked: false,
-                })
-            }
+            other => return other.map(RunStep::plain),
         },
+        Some(Run::Tap { direction, cross }) => {
+            (Some(dash(direction, cross, 0, GRACE)), direction, None, 0)
+        }
         Some(Run::Dash {
             direction,
+            cross,
             frame,
             grace,
+            turn,
         }) => {
-            let stride = DASH[usize::from(frame % 3)];
-            let on = |grace| Some(dash(direction, frame % 3 + 1, grace));
-            match input.direction {
-                Some(held) if held == direction => (on(GRACE), direction, stride),
+            let following = (frame + 1) % 3;
+            // A new cross starts the stream over the next frame.
+            let on = |new: Option<Direction>, grace| {
+                let frame = if new == cross { following } else { 0 };
+                Some(dash(direction, new, frame, grace))
+            };
+            let next = match (turn, held) {
+                // A restart in its own way keeps the grace.
+                (Some((turn, cross)), _) => {
+                    let grace = if turn == direction { grace } else { GRACE };
+                    Some(dash(turn, cross, 0, grace))
+                }
+                (None, Some(held)) if held == direction => on(held_cross, GRACE),
                 // Out of grace, or the frame after an opposite press.
-                _ if grace == 0 => (Some(brake(direction, 0)), direction, BRAKE[0]),
-                Some(held) if held == direction.opposite() => (on(0), direction, stride),
-                // Another direction turns the dash, from a setup frame.
-                Some(turn) => (Some(dash(turn, 0, GRACE)), turn, 0),
-                None => (on(grace - 1), direction, stride),
+                _ if grace == 0 => Some(brake(direction, 0)),
+                (None, Some(held)) if held == direction.opposite() => on(cross, 0),
+                // The old dash runs one frame more before the turn.
+                (None, Some(held)) => Some(Run::Dash {
+                    direction,
+                    cross,
+                    frame: following,
+                    grace,
+                    turn: Some((held, held_cross)),
+                }),
+                (None, None) => on(cross, grace - 1),
+            };
+            match next {
+                Some(Run::Brake { .. }) => (next, direction, None, BRAKE[0]),
+                _ => (next, direction, cross, DASH[usize::from(frame)]),
             }
         }
         Some(Run::Brake { direction, frame }) => {
-            if frame + 1 >= BRAKE_CANCEL && input.direction.is_some() {
-                let mut standing = WalkingState::new(x, y);
-                let output = standing.step(room, input)?;
-                *walking = standing;
-                *run = None;
-                return Ok(RunStep {
-                    output,
-                    braked: false,
-                });
-            }
-            match BRAKE.get(usize::from(frame) + 1) {
-                Some(&slide) => (Some(brake(direction, frame + 1)), direction, slide),
-                None => (None, direction, 0),
-            }
+            let slide = BRAKE.get(usize::from(frame) + 1).copied();
+            let next = slide.map(|_| brake(direction, frame + 1));
+            (next, direction, None, slide.unwrap_or(0))
         }
     };
-    let (dx, dy) = delta(direction, distance);
-    let (nx, ny, blocked) = room.resolve(x, y, Some(direction), dx, dy)?;
+    let (nx, ny, blocked) = resolve(room, (x, y), direction, cross, distance)?;
+    let attempted = attempt(direction, cross, distance);
     let output = MovementOutput {
         x: nx,
         y: ny,
@@ -154,30 +228,88 @@ pub fn step(
             .map_err(|_| Unqualified::ArithmeticOverflow)?,
         dy: i16::try_from(i32::from(ny) - i32::from(y))
             .map_err(|_| Unqualified::ArithmeticOverflow)?,
-        attempted_dx: dx,
-        attempted_dy: dy,
+        attempted_dx: attempted.0,
+        attempted_dy: attempted.1,
         blocked,
     };
-    *walking = WalkingState::new(nx, ny);
-    *run = next;
-    if blocked && matches!(next, Some(Run::Dash { .. })) {
-        // A wall ends the dash (`$80:E70A`): a walk if the direction is held.
+    let mut standing = WalkingState::new(nx, ny);
+    let walks_off = matches!(*run, Some(Run::Brake { frame, .. }) if frame + 1 >= BRAKE_CANCEL)
+        && held.is_some();
+    if walks_off {
+        // The slide's last frame is the walk's input frame.
+        standing.step(room, input)?;
+        *walking = standing;
         *run = None;
-        if input.direction == Some(direction) {
+        return Ok(RunStep::plain(output));
+    }
+    *walking = standing;
+    *run = next;
+    let bumped = blocked && matches!(next, Some(Run::Dash { .. }));
+    if bumped {
+        // A wall across the lead ends the dash (`$80:E70A`): a walk if
+        // the direction is held.
+        *run = None;
+        if held == Some(direction) {
             *walking = WalkingState::walking(nx, ny, direction, ONSET);
         }
     }
     Ok(RunStep {
         output,
         braked: matches!(next, Some(Run::Brake { frame: 0, .. })),
+        bumped,
     })
 }
 
-const fn dash(direction: Direction, frame: u8, grace: u8) -> Run {
+/// The move `distance` along `direction`, with 1 along `cross` when it
+/// moves at all.
+fn attempt(direction: Direction, cross: Option<Direction>, distance: i16) -> (i16, i16) {
+    let (dx, dy) = delta(direction, distance);
+    let (cx, cy) = match cross {
+        Some(cross) if distance != 0 => delta(cross, 1),
+        _ => (0, 0),
+    };
+    (dx + cx, dy + cy)
+}
+
+/// Moves from `at` as [`attempt`] against the walls, x first; returns the
+/// place and whether a wall across `direction` stopped it.
+fn resolve(
+    room: &Room,
+    at: (u16, u16),
+    direction: Direction,
+    cross: Option<Direction>,
+    distance: i16,
+) -> Result<(u16, u16, bool), Unqualified> {
+    let (x, y) = at;
+    let Some(cross) = cross.filter(|_| distance != 0) else {
+        let (dx, dy) = delta(direction, distance);
+        return room.resolve(x, y, Some(direction), dx, dy);
+    };
+    let (horizontal, vertical) = if direction.horizontal() {
+        (direction, cross)
+    } else {
+        (cross, direction)
+    };
+    let along = |axis: Direction| if axis == direction { distance } else { 1 };
+    let (dx, _) = delta(horizontal, along(horizontal));
+    let (x, y, across) = room.resolve(x, y, Some(horizontal), dx, 0)?;
+    let (_, dy) = delta(vertical, along(vertical));
+    let (x, y, down) = room.resolve(x, y, Some(vertical), 0, dy)?;
+    let blocked = if horizontal == direction {
+        across
+    } else {
+        down
+    };
+    Ok((x, y, blocked))
+}
+
+const fn dash(direction: Direction, cross: Option<Direction>, frame: u8, grace: u8) -> Run {
     Run::Dash {
         direction,
+        cross,
         frame,
         grace,
+        turn: None,
     }
 }
 
@@ -205,11 +337,7 @@ mod tests {
 
     #[test]
     fn a_dash_is_held_until_its_grace_starts() {
-        let dash = |grace| Run::Dash {
-            direction: Direction::Up,
-            frame: 1,
-            grace,
-        };
+        let dash = |grace| dash(Direction::Up, None, 1, grace);
         assert!(dash(GRACE).held());
         assert!(!dash(GRACE - 1).held());
         let brake = Run::Brake {
@@ -249,11 +377,11 @@ mod tests {
     }
 
     #[test]
-    fn a_double_tap_dashes_three_two_two_after_a_still_frame() {
+    fn a_double_tap_dashes_three_two_two_after_two_still_frames() {
         let mut inputs = tap();
         inputs.extend([R; 7]);
         let (moves, brakes, state) = run(&floor(), &inputs);
-        assert_eq!(moves[3..], [0, 3, 2, 2, 3, 2, 2, 3]);
+        assert_eq!(moves[3..], [0, 0, 3, 2, 2, 3, 2, 2]);
         assert!(brakes.is_empty());
         assert!(matches!(state, Some(Run::Dash { grace: GRACE, .. })));
     }
@@ -265,7 +393,7 @@ mod tests {
         inputs.extend([None; 8 + 16 + 1]);
         let (moves, brakes, state) = run(&floor(), &inputs);
         assert_eq!(brakes, [6 + 8]);
-        assert_eq!(moves[6..14], [2, 3, 2, 2, 3, 2, 2, 3], "the grace");
+        assert_eq!(moves[6..14], [2, 2, 3, 2, 2, 3, 2, 2], "the grace");
         assert_eq!(moves[14..30].iter().sum::<i16>(), 15, "the slide");
         assert_eq!(state, None, "standing after 16 frames");
     }

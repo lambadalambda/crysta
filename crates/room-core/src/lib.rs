@@ -257,6 +257,16 @@ impl WalkingState {
     pub const fn delayed_direction(&self) -> Option<Direction> {
         self.delayed
     }
+    /// The lead and the cross of `input` ([`PadInput::lead`]) for this
+    /// walk: the walk going on, else, in the window a double tap dashes in,
+    /// the direction last pressed (a tap then a diagonal dashes the tap's
+    /// way, the native trace `q_right_then_ur`).
+    #[must_use]
+    pub fn lead(&self, input: PadInput) -> (Option<Direction>, Option<Direction>) {
+        let tapped = self.last_activation.filter(|_| self.onset_remaining > 1);
+        input.lead(self.delayed.or(tapped))
+    }
+
     /// The walk list's counter: horizontal 0..53 (0=setup/gap), vertical
     /// 0=setup/1=odd/2=even, idle=0. After a diagonal the stream's own
     /// parity sets the next strides.
@@ -305,7 +315,7 @@ impl WalkingState {
         let input = input.into();
         room.validate_position(self.x, self.y)?;
         let mut next = *self;
-        let (lead, cross) = input.lead(self.delayed);
+        let (lead, cross) = self.lead(input);
         next.onset_remaining = self.onset_remaining.saturating_sub(1);
         if let Some(direction) = lead {
             if lead != self.delayed {
