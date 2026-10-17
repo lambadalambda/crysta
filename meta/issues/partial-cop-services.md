@@ -24,6 +24,7 @@ Some COP services refuse or skip a rare case. No played script needs one yet.
 ## Notes
 
 - Markers: `actors.rs`, `scene.rs`.
+- The services the underworld scripts reach, and which the runtime steps over: `docs/cop-inventory.md`.
 
 ## Progress
 
