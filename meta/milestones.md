@@ -204,6 +204,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [Finish the partial COP services](issues/partial-cop-services.md)
 - [Close the later review edge cases](issues/review-edges-two.md)
+- [Cover the native routines the underworld scripts call](issues/native-calls.md)
 - [Draw the towers' second layer](issues/tower-second-layer.md)
 - [Draw colour addition](issues/colour-addition.md)
 - [Draw tower 1's sky backdrop](issues/tower-one-backdrop.md)
