@@ -43,8 +43,8 @@ fn open_solid_partial_pairs_match_all_four_tables_at_every_remainder() {
     let high = [[0, 0, 0], [1, 0, 1], [1, 0, 0]];
     for direction in DIRECTIONS {
         for q in 0..16 {
-            for (a, class_a) in [(0, 0), (2, 0), (22, 0), (12, 1), (14, 1), (16, 2)] {
-                for (b, class_b) in [(0, 0), (2, 0), (22, 0), (12, 1), (14, 1), (16, 2)] {
+            for (a, class_a) in [(0, 0), (2, 0), (22, 0), (12, 1), (14, 1), (15, 1), (16, 2)] {
+                for (b, class_b) in [(0, 0), (2, 0), (22, 0), (12, 1), (14, 1), (15, 1), (16, 2)] {
                     let (x, y, first, second) = geometry(direction, q);
                     let mut cells = vec![0; 2048];
                     cells[first] = a << 9;

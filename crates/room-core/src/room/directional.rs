@@ -126,7 +126,7 @@ impl Room {
             6 | 7 => Ok(kind),
             // Both $E85C[8] and $E88F[8] are $0F, even with raw bit15 set.
             8 if self.type8_special_bit_clear => Ok(15),
-            5 | 12 | 14 | 16 | 18 | 21 | 29 => Ok(15),
+            5 | 12 | 14 | 15 | 16 | 18 | 21 | 29 => Ok(15),
             25 => {
                 // Authenticate the existing scoped alias even for a raw probe.
                 let col = u16::try_from(cell.0).map_err(|_| Unqualified::SampleOutOfBounds)?;

@@ -449,7 +449,9 @@ impl Room {
             8 if !self.type8_special_bit_clear => Err(Unqualified::UnsupportedType(8)),
             8 if direction == Direction::Up => Ok(Material::Partial),
             0 | 1 | 2 | 8 | 17 | 18 | 20 | 22 => Ok(Material::Open),
-            12 | 14 => Ok(Material::Solid),
+            // `15` takes `12`'s and `14`'s handlers in all sixteen tables;
+            // `$101`'s lower walls.
+            12 | 14 | 15 => Ok(Material::Solid),
             16 => Ok(Material::Partial),
             _ => Err(Unqualified::UnsupportedType(kind)),
         }
