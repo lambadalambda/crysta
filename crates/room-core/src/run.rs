@@ -150,6 +150,16 @@ pub fn push(
     Ok(blocked)
 }
 
+/// Whether Ark runs free or with a pot in hand.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Mode {
+    Free,
+    /// The carry dash (`$84:B5A7`, native traces `c_*`): the carry walk's
+    /// cadence; a release runs one frame more, then ends without a brake;
+    /// the opposite way reverses it; a wall does not end it.
+    Carry,
+}
+
 /// One frame of walking, or of the run under way.
 ///
 /// # Errors
@@ -161,11 +171,32 @@ pub fn step(
     room: &Room,
     input: impl Into<PadInput>,
 ) -> Result<RunStep, Unqualified> {
-    let input = input.into();
+    step_in(Mode::Free, walking, run, room, input.into())
+}
+
+/// As [`step`], with a pot in hand (`crate::pots`).
+pub(crate) fn carry_step(
+    walking: &mut WalkingState,
+    run: &mut Option<Run>,
+    room: &Room,
+    input: impl Into<PadInput>,
+) -> Result<RunStep, Unqualified> {
+    step_in(Mode::Carry, walking, run, room, input.into())
+}
+
+fn step_in(
+    mode: Mode,
+    walking: &mut WalkingState,
+    run: &mut Option<Run>,
+    room: &Room,
+    input: PadInput,
+) -> Result<RunStep, Unqualified> {
+    let carry = mode == Mode::Carry;
+    let before = *run;
     let (held, held_cross) = lead(walking, *run, input);
     let (x, y) = walking.position();
     let (next, direction, cross, distance) = match *run {
-        None => match walking.step(room, input) {
+        None => match walking.step_with_cadence(room, input, carry) {
             Err(Unqualified::AcceleratedTrigger(direction)) => {
                 let cross = held_cross;
                 (Some(Run::Tap { direction, cross }), direction, None, 0)
@@ -175,39 +206,15 @@ pub fn step(
         Some(Run::Tap { direction, cross }) => {
             (Some(dash(direction, cross, 0, GRACE)), direction, None, 0)
         }
-        Some(Run::Dash {
-            direction,
-            cross,
-            frame,
-            grace,
-            turn,
-        }) => {
-            let following = (frame + 1) % 3;
-            // A new cross starts the stream over the next frame.
-            let on = |new: Option<Direction>, grace| {
-                let frame = if new == cross { following } else { 0 };
-                Some(dash(direction, new, frame, grace))
-            };
-            let next = match (turn, held) {
-                // A restart in its own way keeps the grace.
-                (Some((turn, cross)), _) => {
-                    let grace = if turn == direction { grace } else { GRACE };
-                    Some(dash(turn, cross, 0, grace))
-                }
-                (None, Some(held)) if held == direction => on(held_cross, GRACE),
-                // Out of grace, or the frame after an opposite press.
-                _ if grace == 0 => Some(brake(direction, 0)),
-                (None, Some(held)) if held == direction.opposite() => on(cross, 0),
-                // The old dash runs one frame more before the turn.
-                (None, Some(held)) => Some(Run::Dash {
-                    direction,
-                    cross,
-                    frame: following,
-                    grace,
-                    turn: Some((held, held_cross)),
-                }),
-                (None, None) => on(cross, grace - 1),
-            };
+        Some(
+            now @ Run::Dash {
+                direction,
+                cross,
+                frame,
+                ..
+            },
+        ) => {
+            let next = dash_next(mode, now, held, held_cross);
             match next {
                 Some(Run::Brake { .. }) => (next, direction, None, BRAKE[0]),
                 _ => (next, direction, cross, DASH[usize::from(frame)]),
@@ -244,7 +251,13 @@ pub fn step(
     }
     *walking = standing;
     *run = next;
-    let bumped = blocked && matches!(next, Some(Run::Dash { .. }));
+    if carry && next.is_none() {
+        // Its last frame: a direction held walks on at once.
+        if let (Some(Run::Dash { .. }), Some(held)) = (before, held) {
+            *walking = WalkingState::walking(nx, ny, held, ONSET);
+        }
+    }
+    let bumped = !carry && blocked && matches!(next, Some(Run::Dash { .. }));
     if bumped {
         // A wall across the lead ends the dash (`$80:E70A`): a walk if
         // the direction is held.
@@ -258,6 +271,61 @@ pub fn step(
         braked: matches!(next, Some(Run::Brake { frame: 0, .. })),
         bumped,
     })
+}
+
+/// The run after a frame of `now`, a dash, with `held` and `held_cross`
+/// on the pad.
+fn dash_next(
+    mode: Mode,
+    now: Run,
+    held: Option<Direction>,
+    held_cross: Option<Direction>,
+) -> Option<Run> {
+    let Run::Dash {
+        direction,
+        cross,
+        frame,
+        grace,
+        turn,
+    } = now
+    else {
+        return Some(now);
+    };
+    let carry = mode == Mode::Carry;
+    let following = (frame + 1) % 3;
+    // A new cross starts the stream over the next frame.
+    let on = |new: Option<Direction>, grace| {
+        let frame = if new == cross { following } else { 0 };
+        Some(dash(direction, new, frame, grace))
+    };
+    match (turn, held) {
+        // A restart in its own way keeps the grace.
+        (Some((turn, cross)), _) => {
+            let grace = if turn == direction { grace } else { GRACE };
+            Some(dash(turn, cross, 0, grace))
+        }
+        // Released, a carry dash runs this frame, then ends.
+        _ if carry && grace == 0 => None,
+        (None, Some(held)) if held == direction => on(held_cross, GRACE),
+        // Out of grace, or the frame after an opposite press.
+        _ if grace == 0 => Some(brake(direction, 0)),
+        (None, Some(held)) if held == direction.opposite() => {
+            if carry {
+                Some(dash(held, None, 0, GRACE))
+            } else {
+                on(cross, 0)
+            }
+        }
+        // The old dash runs one frame more before the turn.
+        (None, Some(held)) => Some(Run::Dash {
+            direction,
+            cross,
+            frame: following,
+            grace,
+            turn: Some((held, held_cross)),
+        }),
+        (None, None) => on(cross, if carry { 0 } else { grace - 1 }),
+    }
 }
 
 /// The move `distance` along `direction`, with 1 along `cross` when it
@@ -429,5 +497,57 @@ mod tests {
         let (moves, _, state) = run(&room, &inputs);
         assert_eq!(state, None);
         assert!(moves.iter().rev().take(3).all(|&dx| dx <= 2), "walking");
+    }
+
+    /// As [`run`], with a pot in hand.
+    fn carry(room: &Room, inputs: &[Option<Direction>]) -> (Vec<i16>, Option<Run>) {
+        let mut walking = WalkingState::new(256, 256);
+        let mut state = None;
+        let mut moves = Vec::new();
+        for &direction in inputs {
+            let step =
+                carry_step(&mut walking, &mut state, room, FrameInput { direction }).unwrap();
+            moves.push(step.output.dx);
+            assert!(!step.braked && !step.bumped);
+        }
+        (moves, state)
+    }
+
+    #[test]
+    fn a_carry_dash_stops_two_frames_after_a_release_without_a_brake() {
+        // Native `c_rel_a`: released at n, it runs n and n + 1, then stands.
+        let mut inputs = tap();
+        inputs.extend([R; 6]);
+        inputs.extend([None; 4]);
+        let (moves, state) = carry(&floor(), &inputs);
+        assert_eq!(moves[3..], [0, 0, 3, 2, 2, 3, 2, 2, 3, 0, 0]);
+        assert_eq!(state, None);
+        // `c_release1`: pressed again on the last frame, he walks on at once.
+        let mut inputs = tap();
+        inputs.extend([R; 6]);
+        inputs.extend([None, R, R, R]);
+        let (moves, _) = carry(&floor(), &inputs);
+        assert_eq!(moves[10..], [2, 3, 1, 2]);
+    }
+
+    #[test]
+    fn the_opposite_reverses_a_carry_dash_and_a_wall_does_not_end_it() {
+        // Native `c_opp`: the old stride, then 3 the other way.
+        let mut inputs = tap();
+        inputs.extend([R; 6]);
+        inputs.extend([Some(Direction::Left); 3]);
+        let (moves, _) = carry(&floor(), &inputs);
+        assert_eq!(moves[10..], [2, -3, -2]);
+        // `c_d_turn`: against a wall he runs on in place.
+        let mut cells = vec![0; 2048];
+        for row in 0..64 {
+            cells[row * 32 + 18] = 14 << 9;
+        }
+        let room = Room::new(32, 64, cells).unwrap();
+        let mut inputs = tap();
+        inputs.extend([R; 30]);
+        let (moves, state) = carry(&room, &inputs);
+        assert_eq!(moves.last(), Some(&0));
+        assert!(matches!(state, Some(Run::Dash { grace: GRACE, .. })));
     }
 }

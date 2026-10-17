@@ -12,6 +12,7 @@ use crate::actors::Actor;
 use crate::audio::Audio;
 use assets::sprites::PandoraCarryMotion;
 use room_core::pots::{Admission, Input, Output, Phase, PotState, Sound, SourceObject};
+use room_core::run::Run;
 use room_core::{AnimationState, Direction, Room};
 
 /// A source pot's word.
@@ -49,6 +50,8 @@ pub(super) struct Pots {
     /// `COP 65` callback runs a frame later).
     struck: Vec<usize>,
     pending: Vec<usize>,
+    /// A dash with the pot in hand ([`PotState::step_over_running`]).
+    run: Option<Run>,
 }
 
 impl Pots {
@@ -74,6 +77,7 @@ impl Pots {
             throw_room: None,
             struck: Vec::new(),
             pending: Vec::new(),
+            run: None,
         })
     }
 }
@@ -172,8 +176,10 @@ impl World<'_> {
                 tick: u8::try_from(drop.frame()).unwrap_or(u8::MAX),
             });
         }
+        let dashing = matches!(self.pots.as_ref()?.run, Some(Run::Dash { .. }));
         let motion = match state.phase() {
             Phase::Empty => return None,
+            Phase::Held if dashing => PandoraCarryMotion::Dashing,
             Phase::Lifting => PandoraCarryMotion::Lifting,
             Phase::Throwing => PandoraCarryMotion::Throwing,
             // The queued step, not the walker's retained direction: Ark
@@ -301,7 +307,7 @@ impl World<'_> {
         let mut refusal = None;
         let mut done = None;
         for &input in tries {
-            match state.step_over(&admission, &self.base.room, input) {
+            match state.step_over_running(&admission, &self.base.room, input, &mut pots.run) {
                 Ok(output) => {
                     done = Some((input, output));
                     break;
@@ -399,6 +405,14 @@ impl World<'_> {
         Ok(())
     }
 
+    /// Ends a dash with the pot in hand: a jump or a drop gives the
+    /// carry's control again (`$84:AC02`).
+    pub(super) fn end_carry_run(&mut self) {
+        if let Some(pots) = &mut self.pots {
+            pots.run = None;
+        }
+    }
+
     /// Ark lands from a lip with the pot still in hand; onto pits, he
     /// falls and it flies (`$84:9F53`).
     pub(super) fn carry_to_landing(&mut self, falls: bool) {
@@ -408,6 +422,7 @@ impl World<'_> {
         if let Some(state) = &mut pots.state {
             state.carry_to(self.walking);
         }
+        pots.run = None;
         if falls {
             self.fly_carried(&mut pots);
         }

@@ -6,6 +6,7 @@
 //! initializer is used here. The cellar's recorded segments
 //! (`docs/pandora-pots.md`) remain exact.
 
+use crate::run::{self, Run};
 use crate::{
     Direction, FrameInput, MaterialAlias, MaterialRule, MovementOutput, Room, Unqualified,
     WalkingState,
@@ -512,6 +513,35 @@ impl PotState {
         ground: &Room,
         input: Input,
     ) -> Result<Output, Error> {
+        self.step_running(a, ground, input, None)
+    }
+
+    /// As [`Self::step_over`], with the parent's carry run: a double tap
+    /// with the pot in hand dashes ([`crate::run`]'s carry mode). The run
+    /// ends whenever the pot leaves Ark's hands.
+    ///
+    /// # Errors
+    /// As [`Self::step`]; the run is unchanged too.
+    pub fn step_over_running(
+        &mut self,
+        a: &Admission<'_>,
+        ground: &Room,
+        input: Input,
+        run: &mut Option<Run>,
+    ) -> Result<Output, Error> {
+        let mut next = *run;
+        let out = self.step_running(a, ground, input, Some(&mut next))?;
+        *run = next.filter(|_| self.phase == Phase::Held);
+        Ok(out)
+    }
+
+    fn step_running(
+        &mut self,
+        a: &Admission<'_>,
+        ground: &Room,
+        input: Input,
+        run: Option<&mut Option<Run>>,
+    ) -> Result<Output, Error> {
         a.validate()?;
         let mut next = *self;
         let mut out = Output {
@@ -579,18 +609,16 @@ impl PotState {
                 }
             }
             (None, Phase::Empty | Phase::Held) => {
-                let held = self.phase == Phase::Held;
                 let collision = a.collision(self.consumed)?;
-                out.movement = Some(next.walking.step_with_cadence(
-                    &collision,
-                    FrameInput {
-                        direction: input.direction,
-                    },
-                    held,
-                )?);
-                if let Some(d) = next.walking.active_direction() {
+                let (movement, way) = next.walk(&collision, input.direction, run)?;
+                out.movement = Some(movement);
+                if let Some(d) = way {
                     next.facing = d;
-                    out.control = if held { 0x20 } else { 0xa0 };
+                    out.control = if next.phase == Phase::Held {
+                        0x20
+                    } else {
+                        0xa0
+                    };
                 }
             }
         }
@@ -613,6 +641,29 @@ impl PotState {
         }
         *self = next;
         Ok(out)
+    }
+
+    /// A frame of walking, or of the carry `run` with the pot in hand;
+    /// returns the move and the way Ark goes.
+    fn walk(
+        &mut self,
+        collision: &Room,
+        direction: Option<Direction>,
+        run: Option<&mut Option<Run>>,
+    ) -> Result<(MovementOutput, Option<Direction>), Unqualified> {
+        let held = self.phase == Phase::Held;
+        let pad = FrameInput { direction };
+        let movement = match run {
+            Some(run) if held => {
+                let movement = run::carry_step(&mut self.walking, run, collision, pad)?.output;
+                if let Some(Run::Tap { direction, .. } | Run::Dash { direction, .. }) = *run {
+                    return Ok((movement, Some(direction)));
+                }
+                movement
+            }
+            _ => self.walking.step_with_cadence(collision, pad, held)?,
+        };
+        Ok((movement, self.walking.active_direction()))
     }
 
     /// The release (`$84:C721`): the pot leaves Ark's hands at the launch

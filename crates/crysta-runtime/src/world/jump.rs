@@ -331,6 +331,9 @@ impl World<'_> {
                 (_, facing) => facing,
             };
             self.jump = Some(Jump::new(facing, kind));
+            if kind == Kind::Carry {
+                self.end_carry_run();
+            }
         }
     }
 

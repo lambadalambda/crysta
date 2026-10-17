@@ -1672,6 +1672,8 @@ impl<'a> World<'a> {
         (self.thrust, self.hurt, self.jump) = (None, None, None);
         self.dash_attack = None;
         self.walking = WalkingState::new(x, y);
+        // A pot in hand comes along, as a poke of `$1000`/`$1002` takes it.
+        self.carry_to_landing(false);
         self.arrival = None;
         self.leaving = None;
         self.arriving = None;

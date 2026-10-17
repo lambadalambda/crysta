@@ -557,6 +557,214 @@ fn ark_lifts_carries_and_throws_in_the_carry_poses() {
     assert!(world.carry().is_none());
 }
 
+/// A carry dash case: its name, the poked y, the pad's plan and the native
+/// moves.
+type CarryDash = (
+    &'static str,
+    u16,
+    &'static [(usize, Option<Direction>)],
+    &'static str,
+);
+
+/// Native JP traces `c_*` (2026-10-17, the job's `tmp/throws/`): the pot
+/// left of (104, 352) lifted, Ark poked to (296, y) on open floor, then
+/// a double tap; each frame's move from the first tap, run-length
+/// (`count:dx,dy`). Off the 16-pixel rows the walls nudge him.
+fn carry_dashes() -> Vec<CarryDash> {
+    use Direction::{Down, Left, Right, Up};
+    vec![
+        (
+            "c_y368",
+            368,
+            &[(1, Some(Right)), (2, None), (30, Some(Right)), (10, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 8:0,0",
+        ),
+        (
+            "c_rel_a",
+            368,
+            &[(1, Some(Right)), (2, None), (9, Some(Right)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 18:0,0",
+        ),
+        (
+            "c_rel_b",
+            368,
+            &[(1, Some(Right)), (2, None), (10, Some(Right)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 18:0,0",
+        ),
+        (
+            "c_rel_c",
+            368,
+            &[(1, Some(Right)), (2, None), (8, Some(Right)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 1:2,0 18:0,0",
+        ),
+        (
+            "c_release1",
+            368,
+            &[(1, Some(Right)), (2, None), (10, Some(Right)), (1, None), (10, Some(Right)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 19:0,0",
+        ),
+        (
+            "c_opp",
+            368,
+            &[(1, Some(Right)), (2, None), (10, Some(Right)), (10, Some(Left)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:-3,0 2:-2,0 1:-3,0 2:-2,0 1:-3,0 2:-2,0 20:0,0",
+        ),
+        (
+            "c_turn",
+            368,
+            &[(1, Some(Right)), (2, None), (10, Some(Right)), (10, Some(Down)), (20, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 28:0,0",
+        ),
+        (
+            "c_d_turn",
+            368,
+            &[(1, Some(Down)), (2, None), (7, Some(Down)), (10, Some(Right)), (20, None)],
+            "5:0,0 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 1:3,0 2:2,0 1:3,0 3:2,0 21:0,0",
+        ),
+        (
+            "c_up",
+            440,
+            &[(1, Some(Up)), (2, None), (20, Some(Up)), (10, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:0,-2 8:0,0",
+        ),
+        (
+            "c_dash",
+            360,
+            &[(1, Some(Right)), (2, None), (30, Some(Right)), (40, None)],
+            "5:0,0 8:0,1 1:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 10:0,0",
+        ),
+        (
+            "c_y364",
+            364,
+            &[(1, Some(Right)), (2, None), (30, Some(Right)), (10, None)],
+            "5:0,0 4:0,1 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 8:0,0",
+        ),
+        (
+            "c_y372",
+            372,
+            &[(1, Some(Right)), (2, None), (30, Some(Right)), (10, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:2,-1 3:0,-1 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 8:0,0",
+        ),
+        (
+            "c_y376",
+            376,
+            &[(1, Some(Right)), (2, None), (30, Some(Right)), (10, None)],
+            "5:0,0 1:3,0 2:2,0 1:3,0 3:2,0 31:0,0",
+        ),
+    ]
+}
+
+#[test]
+fn ark_dashes_with_a_pot_as_natively() {
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    for (name, y, plan, native) in carry_dashes() {
+        let expected: Vec<(i32, i32)> = native
+            .split(' ')
+            .flat_map(|run| {
+                let (count, delta) = run.split_once(':').unwrap();
+                let (dx, dy) = delta.split_once(',').unwrap();
+                let delta = (dx.parse().unwrap(), dy.parse().unwrap());
+                std::iter::repeat_n(delta, count.parse().unwrap())
+            })
+            .collect();
+        let mut world =
+            World::enter_with_events(cartridge.image(), 0x000C, 184, 400, events.clone()).unwrap();
+        world.update(None, Presses::default()).unwrap();
+        world.place(104, 352);
+        world.face(Direction::Left);
+        let lift = Presses {
+            confirm: true,
+            ..Presses::default()
+        };
+        world.update(None, lift).unwrap();
+        for _ in 0..40 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        world.place(296, y);
+        for _ in 0..20 {
+            world.update(None, Presses::default()).unwrap();
+        }
+        assert!(world.carry().is_some(), "{name}: carrying");
+        let mut moves = Vec::new();
+        let mut poses = Vec::new();
+        for &(frames, direction) in plan {
+            for _ in 0..frames {
+                let before = world.position();
+                world.update(direction, Presses::default()).unwrap();
+                poses.push(world.carry().map(|carry| carry.motion));
+                let after = world.position();
+                moves.push((
+                    i32::from(after.0) - i32::from(before.0),
+                    i32::from(after.1) - i32::from(before.1),
+                ));
+            }
+        }
+        moves.truncate(expected.len());
+        assert_eq!(moves, expected, "{name}");
+        if name == "c_rel_a" {
+            // Its list `$1C` from the setup frame to the last held one.
+            let dashing = Some(PandoraCarryMotion::Dashing);
+            assert!(poses[4..13].iter().all(|&pose| pose == dashing));
+            assert_ne!(poses[3], dashing);
+            assert_ne!(poses[13], dashing);
+        }
+    }
+}
+
+#[test]
+fn a_jump_ends_a_carry_dash() {
+    // The landing gives the carry's control again (`$84:AC02`): no dash
+    // runs on from before the jump.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(cartridge.image(), 0x000C, 184, 400, events).unwrap();
+    world.update(None, Presses::default()).unwrap();
+    world.place(104, 352);
+    world.face(Direction::Left);
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    world.update(None, a).unwrap();
+    for _ in 0..40 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    world.place(296, 368);
+    let right = Some(Direction::Right);
+    for direction in [right, None, None, right, right, right, right] {
+        world.update(direction, Presses::default()).unwrap();
+    }
+    assert_eq!(
+        world.carry().map(|carry| carry.motion),
+        Some(PandoraCarryMotion::Dashing)
+    );
+    let b = Presses {
+        cancel: true,
+        ..Presses::default()
+    };
+    world.update(None, b).unwrap();
+    let x = world.position().0;
+    for frame in 0..40 {
+        world.update(None, Presses::default()).unwrap();
+        assert_eq!(world.position().0, x, "{frame}: no dash after the landing");
+    }
+    assert_eq!(
+        world.carry().map(|carry| carry.motion),
+        Some(PandoraCarryMotion::Standing)
+    );
+}
+
 #[test]
 fn a_carried_pot_is_shown_in_hand_then_in_flight() {
     let Some(cartridge) = owned_rom() else {
