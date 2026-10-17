@@ -237,6 +237,7 @@ impl World<'_> {
         });
         self.globals.audio.sound_port2(HURT_SOUND);
         self.thrust = None;
+        self.dash_attack = None;
         self.hurt = Some(Hurt::new(
             self.image,
             away(from, self.position()),

@@ -244,6 +244,7 @@ impl World<'_> {
             });
             self.rope = None;
             self.thrust = None;
+            self.dash_attack = None;
             return;
         }
         match ground(under, at.1) {
@@ -268,6 +269,7 @@ impl World<'_> {
         });
         self.rope = None;
         self.thrust = None;
+        self.dash_attack = None;
     }
 
     /// A frame of a drop from a lip: Ark sinks, an exit under him is

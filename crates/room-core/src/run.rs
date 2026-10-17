@@ -9,9 +9,9 @@
 //! opposite one brakes the frame after. The brake slides 15 pixels over 16 frames
 //! (sound `$0D`), and a direction from its fifth frame walks off. A wall
 //! ends the dash: a walk if the direction is held, else a stand.
-//! Diagonals and the dash attack are not modelled
-//! (`meta/issues/dash-diagonals-attack-jump.md`); the dash jump is the
-//! runtime's (`docs/jump.md`).
+//! Diagonals are not modelled (`meta/issues/dash-diagonals-attack-jump.md`);
+//! the dash attack and the dash jump are the runtime's (`docs/combat.md`,
+//! `docs/jump.md`).
 
 use crate::{Direction, FrameInput, MovementOutput, Room, Unqualified, WalkingState};
 
@@ -49,6 +49,15 @@ pub enum Run {
     },
 }
 
+impl Run {
+    /// Whether the dash runs with its direction held, before the grace a
+    /// release starts: the loop that takes A (`$84:9078`..`916B`).
+    #[must_use]
+    pub const fn held(self) -> bool {
+        matches!(self, Self::Dash { grace: GRACE, .. })
+    }
+}
+
 /// A frame of walking or running.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct RunStep {
@@ -56,6 +65,25 @@ pub struct RunStep {
     pub output: MovementOutput,
     /// Whether a brake started this frame (port 3 `$0D`).
     pub braked: bool,
+}
+
+/// A frame of a move the player's state forces, `distance` pixels along
+/// `direction` against the walls, as the dash moves (the dash attack's
+/// stream, `$84:9549`). Returns whether a wall stopped it.
+///
+/// # Errors
+/// As the dash's step; on an error the place is unchanged.
+pub fn push(
+    walking: &mut WalkingState,
+    room: &Room,
+    direction: Direction,
+    distance: i16,
+) -> Result<bool, Unqualified> {
+    let (x, y) = walking.position();
+    let (dx, dy) = delta(direction, distance);
+    let (nx, ny, blocked) = room.resolve(x, y, Some(direction), dx, dy)?;
+    *walking = WalkingState::new(nx, ny);
+    Ok(blocked)
 }
 
 /// One frame of walking, or of the run under way.
@@ -172,6 +200,22 @@ fn delta(direction: Direction, distance: i16) -> (i16, i16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_dash_is_held_until_its_grace_starts() {
+        let dash = |grace| Run::Dash {
+            direction: Direction::Up,
+            frame: 1,
+            grace,
+        };
+        assert!(dash(GRACE).held());
+        assert!(!dash(GRACE - 1).held());
+        let brake = Run::Brake {
+            direction: Direction::Up,
+            frame: 0,
+        };
+        assert!(!brake.held());
+    }
     use alloc::vec;
     use alloc::vec::Vec;
 

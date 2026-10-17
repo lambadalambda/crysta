@@ -170,7 +170,7 @@ Other measured timings (JP, facing Up):
 - **Turn/walk out**: during a thrust a direction other than the facing (`$84:9282`) aborts it into walking after loop frame 5 (counter < 11).
 - **Jump** (B at J, standing): crouch res3 list 3 (J+1..J+3), air lists 4 (8+4) and 5 (6+6), stand at J+28. Height is `$0970` (negative is up).
 - **Jump attack** (B at J, A at J+10): res4 `$08` from J+11 to landing at J+28 (attacking), landing list `$09` 4 frames (not attacking), stand at J+32.
-- **Dash attack** (dash Up, A at D): 18 frames of res4 `$0D` moving 3 px/frame (stream `$28`), attacking D+1..D+19. Then res3 `$37` 5+2 frames, and the dash goes on if Up is held.
+- **Dash attack** (A at D in a held dash, a weapon equipped; native traces `g_jp_*` on `$101`, all four ways): from D, 18 frames of res4 `$0C`/`$0D`/`$0E` (Left mirrored) moving 3 px/frame (stream `$27`-`$29`), sound `$06` at D+1, attacking D..D+18. Then res3 `$36`-`$38` for 7 frames sliding 1, 2, 1, 2, 1, 2, 1, a standing frame at D+25, then the ordinary walk. The dash's grace takes no A (`$84:8F0E`); B in the same frame jumps (`$84:9078` tests B first). Modelled in `world/attack.rs`.
 - **Dash-jump attack** (B at D, A at D+10): `$19` 3 frames, then the spin until landing (D+34, 1 frame a record, 2 px/frame), then the slide for 16 frames (still attacking, 32 px). On landing Ark gets `7F:1020 = $1E` (30 frames of invulnerability).
 
 ## 4. Ark's hit on an enemy

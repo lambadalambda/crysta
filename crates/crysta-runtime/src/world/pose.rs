@@ -71,6 +71,7 @@ impl World<'_> {
             .or_else(|| self.jump_pose())
             .or_else(|| self.burn.and_then(super::status::Burn::pose))
             .or_else(|| self.hurt.and_then(super::hurt::Hurt::pose))
+            .or_else(|| self.dash_attack.map(super::attack::DashAttack::pose))
             .or_else(|| {
                 let walking = self.walking.active_direction();
                 self.rope

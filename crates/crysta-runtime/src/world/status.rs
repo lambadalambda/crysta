@@ -167,6 +167,7 @@ impl World<'_> {
                 self.hurt = None;
                 self.ark_immune = BURN_IMMUNE;
                 self.thrust = None;
+                self.dash_attack = None;
                 if !self.globals.dialogue.busy() {
                     let at = TOASTED[assets::layout::per_revision(self.image, 0, 1)];
                     let pages =

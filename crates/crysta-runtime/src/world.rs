@@ -71,6 +71,7 @@ pub struct World<'a> {
     region: Option<assets::maps::visual::camera::CameraRegion>,
     /// Ark's thrust under way.
     thrust: Option<attack::Thrust>,
+    dash_attack: Option<attack::DashAttack>,
     /// Ark pushed by an enemy's hit.
     hurt: Option<hurt::Hurt>,
     /// Frames since Ark went down at no life.
@@ -87,7 +88,7 @@ pub struct World<'a> {
     /// Frames before an enemy can hurt Ark again.
     ark_immune: u16,
     /// The thrust lists' records and boxes.
-    thrust_records: attack::ThrustRecords,
+    attack_records: attack::AttackRecords,
     walking: WalkingState,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
@@ -370,7 +371,8 @@ impl<'a> World<'a> {
             second: None,
             second_patched: Vec::new(),
             ark_immune: 0,
-            thrust_records: attack::ThrustRecords::from_rom(image),
+            attack_records: attack::AttackRecords::from_rom(image),
+            dash_attack: None,
             walking: WalkingState::new(x, y),
             residents: present,
             actors,
@@ -1474,6 +1476,11 @@ impl<'a> World<'a> {
         // A dash takes no A (`$0980 = $0010`); its bump does.
         let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
+        // A in a held dash attacks from this frame (`$84:9549`); B first.
+        let held_dash = self.run.is_some_and(room_core::run::Run::held);
+        if presses.confirm && !presses.cancel && held_dash && !locked && !busy {
+            self.dash_attack();
+        }
         // B with a pot: the pot's frame runs on, the jump from the next.
         if presses.cancel && !presses.confirm && !locked && !busy && self.holds_pot() {
             self.start_jump();
@@ -1482,6 +1489,11 @@ impl<'a> World<'a> {
             self.apply_patches()?;
             return Ok((step, None));
         }
+        // A dash takes no other A: no talk, door or thrust in it.
+        let presses = Presses {
+            confirm: presses.confirm && !dashing,
+            ..presses
+        };
         self.walk_frame(direction, presses, (busy, locked))
     }
 
@@ -1614,6 +1626,7 @@ impl<'a> World<'a> {
         self.pickup = None;
         (self.fall, self.lip_drop, self.rope) = (None, None, None);
         (self.thrust, self.hurt, self.jump) = (None, None, None);
+        self.dash_attack = None;
         self.walking = WalkingState::new(x, y);
         self.arrival = None;
         self.leaving = None;
@@ -2790,7 +2803,8 @@ mod tests {
             second: None,
             second_patched: Vec::new(),
             ark_immune: 0,
-            thrust_records: attack::ThrustRecords::default(),
+            attack_records: attack::AttackRecords::default(),
+            dash_attack: None,
             walking: WalkingState::new(56, 64),
             residents: vec![],
             actors: vec![],

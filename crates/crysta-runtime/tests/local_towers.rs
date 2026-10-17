@@ -2231,3 +2231,115 @@ fn the_guardians_ring_window_grows_as_natively() {
         assert_eq!((ring.span(92), ring.span(135)), (None, None));
     }
 }
+
+#[test]
+fn a_in_a_dash_is_the_dash_attack() {
+    // Native JP traces `g_jp_*` (2026-10-17, the job's `tmp/jump/`, the
+    // spear equipped; row n is frame n - 202 here): A at 14 in a dash
+    // plays resource 4's `$0C`/`$0D`/`$0E` for 18 frames, 3 pixels a frame
+    // from the press, sound `$06` at 15; then resource 3's `$36`..`$38`
+    // for 7 frames, sliding 1, 2, 1, 2, 1, 2, 1; a standing frame at 39;
+    // then the walk. The attack box is live from 14 to 32.
+    use crysta_runtime::audio::Cue;
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    let cases = [
+        (
+            Direction::Up,
+            (128, 620),
+            (0x0D, 0x37, 0x01, false),
+            (0, -1),
+        ),
+        (
+            Direction::Down,
+            (128, 260),
+            (0x0C, 0x36, 0x00, false),
+            (0, 1),
+        ),
+        (
+            Direction::Left,
+            (216, 448),
+            (0x0E, 0x38, 0x02, true),
+            (-1, 0),
+        ),
+        (
+            Direction::Right,
+            (40, 448),
+            (0x0E, 0x38, 0x02, false),
+            (1, 0),
+        ),
+    ];
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        for (way, (x, y), (attack, slide, stand, hflip), (dx, dy)) in cases {
+            let mut world =
+                World::enter_with_events(rom.image(), 0x0101, x, y, after_the_intro()).unwrap();
+            world.equip_weapon(0x81);
+            play(&mut world, 30, false);
+            let mut inputs = vec![Some(way), None, None];
+            inputs.extend([Some(way); 46]);
+            let (mut rows, mut start) = (vec![], None);
+            for (frame, direction) in inputs.into_iter().enumerate() {
+                let press = if frame == 14 { a } else { Presses::default() };
+                world.update(direction, press).unwrap();
+                let swish = world
+                    .take_cues()
+                    .into_iter()
+                    .any(|cue| matches!(cue, Cue::Sound(0x0600)));
+                let (px, py) = world.position();
+                let at = (i32::from(px), i32::from(py));
+                start = start.or((frame == 13).then_some(at));
+                let pose = world
+                    .ark_pose()
+                    .map(|pose| (pose.resource, pose.list, pose.hflip));
+                rows.push((at, pose, world.attack_box().is_some(), swish));
+            }
+            let (sx, sy) = start.unwrap();
+            let along = |n: i32| (sx + dx * n, sy + dy * n);
+            let expected = [
+                (14, (along(3), Some((4, attack, hflip)), true, false)),
+                (15, (along(6), Some((4, attack, hflip)), true, true)),
+                (31, (along(54), Some((4, attack, hflip)), true, false)),
+                (32, (along(55), Some((3, slide, hflip)), true, false)),
+                (33, (along(57), Some((3, slide, hflip)), false, false)),
+                (38, (along(64), Some((3, slide, hflip)), false, false)),
+                (39, (along(64), Some((0, stand, hflip)), false, false)),
+            ];
+            for (frame, row) in expected {
+                assert_eq!(rows[frame], row, "{way:?}: {frame}");
+            }
+        }
+    }
+}
+
+#[test]
+fn a_in_the_dashs_grace_does_not_attack() {
+    // `$84:8F0E`: the grace loop tests the pits, B and the directions, not
+    // A; the held loop's A (`$84:9078`) reads the frame before, so A on the
+    // second frame after the release no longer attacks.
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0101, 128, 620, after_the_intro()).unwrap();
+        world.equip_weapon(0x81);
+        play(&mut world, 30, false);
+        let mut inputs = vec![Some(Direction::Up), None, None];
+        inputs.extend([Some(Direction::Up); 12]);
+        inputs.extend([None; 3]);
+        for (frame, direction) in inputs.into_iter().enumerate() {
+            let press = Presses {
+                confirm: frame == 16,
+                ..Presses::default()
+            };
+            world.update(direction, press).unwrap();
+        }
+        assert!(world.ark_pose().is_none(), "{:?}", world.ark_pose());
+        assert!(world.run_pose().is_some());
+    }
+}
