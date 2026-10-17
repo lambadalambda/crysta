@@ -19,3 +19,20 @@ hosts send one direction too.
 ## Acceptance Criteria
 
 - Diagonal walks and dashes match native frames.
+
+## Progress
+
+- Done: diagonal walking in `room_core` (`PadInput`, snapshot
+  version 4), the world (`World::update_with`) and the native app (two keys,
+  the d-pad, the stick on both axes); six native traces on `$101` match frame
+  by frame (`ark_walks_diagonally_as_natively`).
+- Open: the web hosts still send one direction; jump steering, the rope, the
+  plane and the pots take only the lead; the diagonal dash.
+- Not traced yet: releasing the lead (not the cross) of a diagonal; a
+  diagonal double tap (here a dash along the lead); a diagonal into a corner,
+  where both axes' nudges can add up.
+- Edges from the review: a pot's lift or rebase keeps a stale delayed cross
+  for one frame; the app's edged presses and its trace log take the main
+  direction only, and the app hands the cross to the session in a field, not
+  with the frame; `room_core::run::step` reads the raw direction, not the
+  lead (the world gives it the lead already).

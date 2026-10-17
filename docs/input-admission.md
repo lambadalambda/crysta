@@ -216,8 +216,29 @@ rejecting the trigger. Measured:
 - Animation: dash lists 23/24/25 of resource 1 (6 records of 6 frames), brake
   lists 9/10/11 of resource 0 (one of 16).
 
-Not modelled: diagonal dashes (streams `$16`/`$17`), the dash attack (A/L) and
-the dash jump (B).
+Not modelled: diagonal dashes (streams `$16`/`$17`). The dash attack is in
+`docs/combat.md`, the dash jump in `docs/jump.md`.
+
+### Diagonal walking
+
+Native JP traces `k_*` on `$101` (2026-10-17, the job's `tmp/jump/`):
+
+- Each walk direction starts its own x and y streams in the common movement
+  resource (`$7F:6000`): Right `$62D8`, Up y `$62CC`, the diagonal up-right x
+  `$62F4`, y `$62FC`, one pixel a frame on each axis.
+- From standing, a diagonal faces and poses as its vertical direction: the
+  input's frame, a setup frame, then (±1, ±1) every frame.
+- A second direction added to a walk turns it diagonal from the next frame,
+  with no setup frame; the facing and the pose stay the first direction's.
+  Released, the walk goes on in the remaining direction at once, its stream
+  starting over (1, 2, ...).
+- The horizontal walk's gap comes from its pose list's wrap, 54 frames after
+  its setup frame; the list runs on through a diagonal, so the gap stops a
+  diagonal too, on the first walk's schedule.
+- Against a wall each axis is resolved in turn, x first: a blocked x can nudge
+  y by one on top of its own move.
+
+Modelled in `room_core::WalkingState` (`PadInput`, `PadInput::lead`).
 
 ## Revisit route and measurements
 
