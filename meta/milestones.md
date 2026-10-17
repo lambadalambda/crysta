@@ -201,6 +201,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Jump from a dash, with a pot and on a rope](issues/jump-variants.md)
 - [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [Spend the map loads' own frames](issues/map-load-frames.md)
+- [Walk diagonally](issues/walk-diagonally.md)
 - [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [Finish the partial COP services](issues/partial-cop-services.md)
 - [Close the later review edge cases](issues/review-edges-two.md)

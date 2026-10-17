@@ -86,6 +86,7 @@
 - [ ] [Show the player's poses at a wooden door](issues/door-player-poses.md)
 - [ ] [Spend the map loads' own frames](issues/map-load-frames.md)
 - [ ] [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
+- [ ] [Walk diagonally](issues/walk-diagonally.md)
 - [ ] [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [ ] [Finish the partial COP services](issues/partial-cop-services.md)
 - [ ] [Close the later review edge cases](issues/review-edges-two.md)
