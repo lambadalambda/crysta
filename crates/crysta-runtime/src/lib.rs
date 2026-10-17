@@ -30,6 +30,7 @@ pub mod residents;
 pub mod restart;
 pub mod save;
 pub mod scene;
+pub mod service_sites;
 pub mod shop;
 pub mod sram;
 pub mod world;
