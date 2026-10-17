@@ -11,7 +11,10 @@ runtime's operand layout where it models the service, else the native
 handler's), the scripts spawns start, `JSR` subroutines and the native code
 between the services. It takes both arms of every test and runs nothing, so
 it finds code that a played game may never reach. Native routines called
-with `JSL` are listed, not walked.
+with `JSL` are listed, not walked: "native model" means the runtime's
+model of script code runs the call; "site models only" means a call runs
+only where a Rust model replaces the code around it
+(`meta/issues/native-calls.md` has each site).
 
 "Modelled" means the runtime has a handler; some handlers refuse rare
 operands (`meta/issues/partial-cop-services.md`). "Stepped over" means the
@@ -146,24 +149,24 @@ None.
 
 ## Native routines called with `JSL`
 
-| Routine | Maps |
-|---|---|
-| `$80:BBC7` | `$102`-`$104`, `$107`-`$109`, `$10B`, `$10E`, `$110`, `$112`, `$114`-`$115`, `$117`, `$119`-`$11A`, `$11C` |
-| `$80:BBCD` | `$102`-`$104`, `$108`-`$109`, `$10B`, `$110`, `$112`, `$114`, `$117`, `$119`-`$11A` |
-| `$80:ED75` | `$102`-`$104`, `$108`-`$109`, `$10B`, `$112`-`$114`, `$117`, `$119`-`$11B`, `$12A`-`$12B` |
-| `$86:81B0` | `$123` |
-| `$86:81C7` | `$123` |
-| `$86:8236` | `$113`, `$11B` |
-| `$86:83BE` | `$12A`-`$12B` |
-| `$86:E834` | `$12A`-`$12B` |
-| `$86:E894` | `$12A`-`$12B` |
-| `$8D:8C7E` | `$113`, `$11B` |
-| `$8D:8CE1` | `$113`, `$11B` |
-| `$8D:8D10` | `$113`, `$11B` |
-| `$8D:8D3D` | `$113`, `$11B` |
-| `$8D:8D55` | `$113`, `$11B` |
-| `$8D:A889` | `$12A`-`$12B` |
-| `$8F:8129` | `$123` |
+| Routine | Runtime | Call sites | Maps |
+|---|---|---|---|
+| `$80:BBC7` | native model | `$84:DD8D`, `$90:8F9E`, `$90:9A69`, `$90:9A8A`, `$90:9AAB` | `$102`-`$104`, `$107`-`$109`, `$10B`, `$10E`, `$110`, `$112`, `$114`-`$115`, `$117`, `$119`-`$11A`, `$11C` |
+| `$80:BBCD` | native model | `$84:DEA7`, `$90:FBDD`, `$90:FBFE` | `$102`-`$104`, `$108`-`$109`, `$10B`, `$110`, `$112`, `$114`, `$117`, `$119`-`$11A` |
+| `$80:ED75` | native model | `$84:DDB7`, `$85:E2DB`, `$90:A6A3`, `$90:A6E0`, `$90:A71D`, `$90:A75A` | `$102`-`$104`, `$108`-`$109`, `$10B`, `$112`-`$114`, `$117`, `$119`-`$11B`, `$12A`-`$12B` |
+| `$86:81B0` | site models only | `$93:E787`, `$93:E7BB`, `$93:E7F9`, `$93:E82D`, `$93:E86F`, `$93:E8A0` | `$123` |
+| `$86:81C7` | site models only | `$93:E5A8`, `$93:E5BB` | `$123` |
+| `$86:8236` | site models only | `$85:E2F9` | `$113`, `$11B` |
+| `$86:83BE` | site models only | `$90:A4FB` | `$12A`-`$12B` |
+| `$86:E834` | site models only | `$90:A513` | `$12A`-`$12B` |
+| `$86:E894` | site models only | `$90:A530` | `$12A`-`$12B` |
+| `$8D:8C7E` | site models only | `$85:E4D8` | `$113`, `$11B` |
+| `$8D:8CE1` | site models only | `$85:E4F7` | `$113`, `$11B` |
+| `$8D:8D10` | site models only | `$85:E506` | `$113`, `$11B` |
+| `$8D:8D3D` | site models only | `$85:E513` | `$113`, `$11B` |
+| `$8D:8D55` | site models only | `$85:E4E7` | `$113`, `$11B` |
+| `$8D:A889` | site models only | `$90:A4D7` | `$12A`-`$12B` |
+| `$8F:8129` | site models only | `$8F:80F9` | `$123` |
 
 ## Walk stops
 

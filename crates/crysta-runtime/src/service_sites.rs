@@ -24,6 +24,19 @@ pub struct Service {
     pub maps: BTreeSet<u16>,
 }
 
+/// A native routine scripts call with `JSL`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Call {
+    /// Whether the runtime's native model runs the call itself
+    /// ([`crate::actors::models_call`]); otherwise only a Rust model of the
+    /// code around a call site covers it.
+    pub modelled: bool,
+    /// The call sites, as normalized offsets.
+    pub sites: BTreeSet<usize>,
+    /// The maps whose scripts reach it.
+    pub maps: BTreeSet<u16>,
+}
+
 /// The services, native routines and stops of every script that `maps`'
 /// spawn lists install, Ark's own excepted (the runtime models him
 /// natively).
@@ -33,8 +46,8 @@ pub struct Census {
     pub scripts: usize,
     /// Each service found.
     pub services: BTreeMap<u8, Service>,
-    /// The native routines scripts call, with the maps that reach them.
-    pub calls: BTreeMap<usize, BTreeSet<u16>>,
+    /// The native routines scripts call, by normalized offset.
+    pub calls: BTreeMap<usize, Call>,
     /// Where the walk stopped.
     pub stops: BTreeMap<usize, Stop>,
 }
@@ -65,8 +78,11 @@ pub fn census(image: &[u8], maps: &[u16]) -> Census {
             entry.sites.extend(sites);
             entry.maps.insert(map);
         }
-        for routine in walk.calls {
-            census.calls.entry(routine).or_default().insert(map);
+        for (routine, sites) in walk.calls {
+            let call = census.calls.entry(routine).or_default();
+            call.modelled = crate::actors::models_call(image, routine);
+            call.sites.extend(sites);
+            call.maps.insert(map);
         }
         census.stops.extend(walk.stops);
     }
@@ -163,14 +179,28 @@ pub fn markdown(census: &Census) -> String {
                 format!("- `COP {code:02X}`: {}", sites.join(", "))
             }),
     );
-    lines
-        .push("\n## Native routines called with `JSL`\n\n| Routine | Maps |\n|---|---|".to_owned());
-    lines.extend(
-        census
-            .calls
-            .iter()
-            .map(|(routine, maps)| format!("| `{}` | {} |", address(*routine), map_runs(maps))),
+    lines.push(
+        "\n## Native routines called with `JSL`\n\n| Routine | Runtime | Call sites | Maps |\n|---|---|---|---|"
+            .to_owned(),
     );
+    lines.extend(census.calls.iter().map(|(routine, call)| {
+        let sites: Vec<String> = call
+            .sites
+            .iter()
+            .map(|&at| format!("`{}`", address(at)))
+            .collect();
+        format!(
+            "| `{}` | {} | {} | {} |",
+            address(*routine),
+            if call.modelled {
+                "native model"
+            } else {
+                "site models only"
+            },
+            sites.join(", "),
+            map_runs(&call.maps)
+        )
+    }));
     lines.push("\n## Walk stops\n".to_owned());
     if census.stops.is_empty() {
         lines.push("None.".to_owned());
@@ -198,7 +228,10 @@ runtime's operand layout where it models the service, else the native
 handler's), the scripts spawns start, `JSR` subroutines and the native code
 between the services. It takes both arms of every test and runs nothing, so
 it finds code that a played game may never reach. Native routines called
-with `JSL` are listed, not walked.
+with `JSL` are listed, not walked: \"native model\" means the runtime's
+model of script code runs the call; \"site models only\" means a call runs
+only where a Rust model replaces the code around it
+(`meta/issues/native-calls.md` has each site).
 
 \"Modelled\" means the runtime has a handler; some handlers refuse rare
 operands (`meta/issues/partial-cop-services.md`). \"Stepped over\" means the
@@ -226,8 +259,9 @@ pub enum Stop {
 pub struct Walk {
     /// Each service's sites, as normalized offsets of the `COP`.
     pub sites: BTreeMap<u8, BTreeSet<usize>>,
-    /// The native routines scripts call with `JSL`, by normalized offset.
-    pub calls: BTreeSet<usize>,
+    /// The native routines scripts call with `JSL`, by normalized offset,
+    /// with the offsets of the calls.
+    pub calls: BTreeMap<usize, BTreeSet<usize>>,
     /// Where paths stopped, by normalized offset.
     pub stops: BTreeMap<usize, Stop>,
 }
@@ -337,7 +371,7 @@ impl Path {
             }
             0x22 => {
                 if let Some(routine) = long(image.get(at + 1..at + 4)?) {
-                    found.calls.insert(routine);
+                    found.calls.entry(routine).or_default().insert(at);
                 }
                 at + 4
             }

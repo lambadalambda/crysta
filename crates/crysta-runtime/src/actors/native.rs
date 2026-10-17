@@ -382,6 +382,21 @@ const FLAG_TEST: usize = 0x00_BBC7;
 const FLAG_WRITE: usize = 0x00_BBCD;
 /// `$80:ED75`: one step of the pose, which the runtime's pose clock keeps.
 const POSE_STEP: usize = 0x00_ED75;
+/// The routine among [`CALLS`] at `target` (a normalized offset), named
+/// in the image's revision; one unrecorded matches nothing.
+fn called(image: &[u8], target: usize) -> Option<usize> {
+    CALLS
+        .into_iter()
+        .find(|&call| assets::layout::offset(image, call) == Some(target))
+}
+
+/// Whether the native model runs a `JSL` to `routine` (a normalized
+/// offset) itself.
+#[must_use]
+pub fn models_call(image: &[u8], routine: usize) -> bool {
+    called(image, routine).is_some()
+}
+
 /// The call among [`CALLS`] that also clobbers X.
 const CLOBBERS_X: usize = RAISE_PALETTE;
 
@@ -1317,8 +1332,7 @@ impl<'a> Machine<'a> {
             usize::from(bytes[0]) | usize::from(bytes[1]) << 8 | usize::from(bytes[2] & 0x7F) << 16;
         let target = target & 0x3F_FFFF;
         // Named in the image's revision; one unrecorded matches nothing.
-        let named = |call: usize| assets::layout::offset(self.image, call) == Some(target);
-        let call = CALLS.into_iter().find(|&call| named(call))?;
+        let call = called(self.image, target)?;
         match call {
             SAVE_PALETTE => display.save_palette(),
             RAISE_PALETTE => display.raise_palette(),
@@ -1346,6 +1360,14 @@ impl<'a> Machine<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_modelled_calls_are_the_named_routines() {
+        let image = [0u8; 4];
+        assert!(models_call(&image, FLAG_TEST));
+        assert!(models_call(&image, POSE_STEP));
+        assert!(!models_call(&image, 0x06_8236));
+    }
 
     const AT: usize = 0x09_8000;
 

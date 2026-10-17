@@ -29,8 +29,8 @@ mod walls;
 
 pub(crate) use foe::helper;
 pub use native::{
-    Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE, CAMERA,
-    CURRENT_MAP, ENEMIES, FRAMES, HITS_OFF, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
+    models_call, Poke, Scratch, View, ARK_ARMOR, ARK_FLAGS, ARK_GATES, ARK_LIFE, ARK_MAX_LIFE,
+    CAMERA, CURRENT_MAP, ENEMIES, FRAMES, HITS_OFF, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
     PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, SAFE_X, SAFE_Y, WINDOW_BUSY,
 };
 pub use route::{handling, Handling};
