@@ -14,7 +14,7 @@ hosts send one direction too.
 
 - Diagonal input from the hosts to the world.
 - Diagonal walking with its collision and facing, from native traces.
-- Then the diagonal dash (`meta/issues/dash-diagonals-attack-jump.md`).
+- The diagonal dash is done (`meta/issues/dash-diagonals-attack-jump.md`).
 
 ## Acceptance Criteria
 
@@ -27,7 +27,7 @@ hosts send one direction too.
   the d-pad, the stick on both axes); six native traces on `$101` match frame
   by frame (`ark_walks_diagonally_as_natively`).
 - Open: the web hosts still send one direction; jump steering, the rope, the
-  plane and the pots take only the lead; the diagonal dash.
+  plane and the pots take only the lead.
 - Not traced yet: releasing the lead (not the cross) of a diagonal; a
   diagonal double tap (here a dash along the lead); a diagonal into a corner,
   where both axes' nudges can add up.

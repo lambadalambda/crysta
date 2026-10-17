@@ -204,20 +204,34 @@ probe run in the town (map `$0A`, from (538,815)); the replay path above keeps
 rejecting the trigger. Measured:
 
 - It holds while the direction is held (`COP 02 08 00` … `COP 61`, `$84:90FC`),
-  moving **3,2,2** after the still setup frame, with no time limit.
+  moving **3,2,2** with no time limit. The press's frame and a setup frame
+  stand still (the town probe saw one of them; the `$101` traces show both).
 - Released, it runs on for **8 frames** of grace (`COP 02 08`/`COP 03`); the same
-  direction resumes it, a perpendicular one turns it, the opposite one brakes
-  the next frame (`COP 2B` → `$84:8A88`).
+  direction resumes it and the opposite one brakes the next frame
+  (`COP 2B` → `$84:8A88`). Another direction turns it: the old dash runs one
+  frame more, then the new one starts at 3 (no still frame).
 - The brake (`$84:A223/A231/A23F/A246`) slides **2,2,1,2,1,2,1,2,1,0,0,1,0,0,0,0**
   over 16 frames with port 3 sound `$0D`; a direction from its fifth frame walks
-  off (`COP C1 04`).
-- A wall ends it (`$80:E6BD` → `$80:E70A`): a walk in the held direction with
-  the window re-armed to 11, else a stand.
+  off, the slide's frame being the walk's input frame (`COP C1 04`).
+- A wall ends it (`$80:E6BD` → `$80:E70A`) with port 3 `$4F`: a walk in the
+  held direction with the window re-armed to 11, else a stand.
 - Animation: dash lists 23/24/25 of resource 1 (6 records of 6 frames), brake
   lists 9/10/11 of resource 0 (one of 16).
 
-Not modelled: diagonal dashes (streams `$16`/`$17`). The dash attack is in
-`docs/combat.md`, the dash jump in `docs/jump.md`.
+Diagonal dashes (native JP traces `h_*`, `q_*` on `$101`, 2026-10-17, the
+job's `tmp/jump/`), modelled in `room_core::run`:
+
+- A double tap of a diagonal dashes along its vertical, or along the
+  direction tapped first (Right, then Up+Right dashes right); the other
+  direction moves 1 a frame on top of the 3,2,2.
+- A change of the held cross (added, dropped) moves the old way that frame
+  and restarts the stream at 3 the next; the grace keeps the last cross.
+- The brake slides on the dash's own axis only. A wall across the cross
+  axis does not stop the dash; one across its own axis does, with `$4F`.
+- Cell type 15 (`$101`'s lower walls) takes types 12/14's handlers in all
+  sixteen tables, so it is solid.
+
+The dash attack is in `docs/combat.md`, the dash jump in `docs/jump.md`.
 
 ### Diagonal walking
 

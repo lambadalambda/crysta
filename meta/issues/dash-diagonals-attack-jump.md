@@ -25,4 +25,5 @@ The dash (`room_core::run`) runs only in the four directions. Diagonal dashes, t
 
 - The dash jump runs (`world/jump.rs`, `b_in_a_dash_jumps_on_with_the_dash`, the native trace `d_jp_right_held`).
 - The dash attack runs (`world/attack.rs`, `a_in_a_dash_is_the_dash_attack`, the native traces `g_jp_*`, all four ways).
-- Diagonals: measured (`h_*` on `$101`): a diagonal double tap dashes with the vertical's facing and list, the vertical axis 3, 2, 2 and the horizontal 1 a frame; the 8-frame grace runs on diagonally; the brake slides on the vertical only; a wall stops it with `$4F`. They need diagonal input first: [Walk diagonally](walk-diagonally.md).
+- Diagonals run (`room_core::run`, `ark_dashes_diagonally_as_natively`, 15 native traces `h_*`/`q_*` on `$101`; `a_diagonal_dash_attacks_straight_and_jumps_on_diagonally`, `q_attack_ur`/`q_jump_ur`). The same traces fixed the plain dash's timing: a still frame more at the start, turns without a still frame, the dash attack from the frame after A, the stream's restart after a dash jump, the wall's `$4F`; cell type 15 is solid.
+- Done; the untraced inputs inside it: [Trace the dash's open edges](dash-edges.md).

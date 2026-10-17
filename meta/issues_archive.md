@@ -180,3 +180,4 @@
 - [x] [Model COP 3C, 5F and 64](issues/cop-3c-5f-64.md)
 - [x] [Model COP AA and AF](issues/cop-aa-af.md)
 - [x] [Model the COP services the runtime steps over](issues/skipped-cop-services.md)
+- [x] [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
