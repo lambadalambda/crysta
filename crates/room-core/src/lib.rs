@@ -59,7 +59,9 @@ impl Direction {
         }
     }
 
-    const fn horizontal(self) -> bool {
+    /// Whether it is Left or Right.
+    #[must_use]
+    pub const fn horizontal(self) -> bool {
         matches!(self, Self::Left | Self::Right)
     }
 
@@ -73,6 +75,48 @@ impl Direction {
 pub struct FrameInput {
     /// Held cardinal direction, or neutral.
     pub direction: Option<Direction>,
+}
+
+/// One frame of the pad's directions, which can hold a diagonal; a
+/// [`FrameInput`] is one without.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct PadInput {
+    /// Held cardinal direction, or neutral.
+    pub direction: Option<Direction>,
+    /// The perpendicular direction held with it: a diagonal. Which of the
+    /// two leads is the walk's to decide ([`WalkingState::step`]).
+    pub cross: Option<Direction>,
+}
+
+impl From<FrameInput> for PadInput {
+    fn from(input: FrameInput) -> Self {
+        Self {
+            direction: input.direction,
+            cross: None,
+        }
+    }
+}
+
+impl PadInput {
+    /// The two directions of a diagonal, the walk going on in `walking` if
+    /// it is one of them, else the vertical one leading; one direction
+    /// alone, or neutral, as given. Returns the lead and the cross.
+    #[must_use]
+    pub fn lead(self, walking: Option<Direction>) -> (Option<Direction>, Option<Direction>) {
+        let (Some(first), Some(second)) = (self.direction, self.cross) else {
+            return (self.direction.or(self.cross), None);
+        };
+        if first.horizontal() == second.horizontal() {
+            return (Some(first), None);
+        }
+        let lead = if walking == Some(second) || (walking != Some(first) && first.horizontal()) {
+            second
+        } else {
+            first
+        };
+        let cross = if lead == first { second } else { first };
+        (Some(lead), Some(cross))
+    }
 }
 
 /// An unsupported operation. A failed walking step never modifies state.
@@ -140,6 +184,13 @@ pub struct WalkingState {
     phase: u8,
     last_activation: Option<Direction>,
     onset_remaining: u8,
+    /// The perpendicular direction walked with `active`: a diagonal.
+    cross: Option<Direction>,
+    /// The cross direction submitted, governing the next step.
+    delayed_cross: Option<Direction>,
+    /// The parity of the frames into the lead's stream (1 odd), which a
+    /// diagonal's end restarts while the walk's list (`phase`) runs on.
+    stream: u8,
 }
 
 impl WalkingState {
@@ -158,6 +209,9 @@ impl WalkingState {
             phase: 0,
             last_activation: None,
             onset_remaining: 0,
+            cross: None,
+            delayed_cross: None,
+            stream: 0,
         }
     }
 
@@ -172,6 +226,9 @@ impl WalkingState {
             phase: 0,
             last_activation: Some(direction),
             onset_remaining: onset,
+            cross: None,
+            delayed_cross: None,
+            stream: 0,
         }
     }
 
@@ -200,7 +257,9 @@ impl WalkingState {
     pub const fn delayed_direction(&self) -> Option<Direction> {
         self.delayed
     }
-    /// Horizontal 0..53 (0=setup/gap), vertical 0=setup/1=odd/2=even, idle=0.
+    /// The walk list's counter: horizontal 0..53 (0=setup/gap), vertical
+    /// 0=setup/1=odd/2=even, idle=0. After a diagonal the stream's own
+    /// parity sets the next strides.
     #[must_use]
     pub const fn phase(&self) -> u8 {
         self.phase
@@ -220,12 +279,18 @@ impl WalkingState {
     ///
     /// New input takes effect after one old-input step and one zero/setup step.
     /// Horizontal walking repeats a 54-phase cycle; vertical walking alternates
-    /// 1,2 without that restart. The caller selects exits after a successful step.
+    /// 1,2 without that restart. A diagonal (`PadInput::cross`) moves 1 on
+    /// each axis, from the next frame when added to a walk; its end restarts
+    /// the lead's 1,2 stream. The caller selects exits after a successful step.
     ///
     /// # Errors
     /// Returns [`Unqualified`] for invalid bounds, cells, arithmetic or
     /// accelerated input triggers. Every error leaves all state fields unchanged.
-    pub fn step(&mut self, room: &Room, input: FrameInput) -> Result<MovementOutput, Unqualified> {
+    pub fn step(
+        &mut self,
+        room: &Room,
+        input: impl Into<PadInput>,
+    ) -> Result<MovementOutput, Unqualified> {
         self.step_with_cadence(room, input, false)
     }
 
@@ -234,14 +299,16 @@ impl WalkingState {
     pub(crate) fn step_with_cadence(
         &mut self,
         room: &Room,
-        input: FrameInput,
+        input: impl Into<PadInput>,
         continuous_horizontal: bool,
     ) -> Result<MovementOutput, Unqualified> {
+        let input = input.into();
         room.validate_position(self.x, self.y)?;
         let mut next = *self;
+        let (lead, cross) = input.lead(self.delayed);
         next.onset_remaining = self.onset_remaining.saturating_sub(1);
-        if let Some(direction) = input.direction {
-            if input.direction != self.delayed {
+        if let Some(direction) = lead {
+            if lead != self.delayed {
                 if self.last_activation == Some(direction) && next.onset_remaining != 0 {
                     return Err(Unqualified::AcceleratedTrigger(direction));
                 }
@@ -261,20 +328,32 @@ impl WalkingState {
                     }
                 }
             };
+            // The lead's stream runs on; it starts over where the list does
+            // and where a diagonal ends (native traces `k_*`).
+            next.stream =
+                if next.phase == 0 || (self.cross.is_some() && self.delayed_cross.is_none()) {
+                    u8::from(next.phase != 0)
+                } else {
+                    (self.stream + 1) & 1
+                };
         } else {
             next.active = self.delayed;
             next.phase = 0;
+            next.stream = 0;
         }
-        next.delayed = input.direction;
+        next.cross = self.delayed_cross.filter(|_| next.active.is_some());
+        next.delayed = lead;
+        next.delayed_cross = cross;
+        // A diagonal moves one on each axis; the lead alone 1, 2 by its stream.
         let magnitude = if next.phase == 0 {
             0
-        } else if next.phase % 2 == 1 {
+        } else if next.cross.is_some() || next.stream % 2 == 1 {
             1
         } else {
             2
         };
         let (mut dx, mut dy) = (0_i16, 0_i16);
-        if let Some(direction) = next.active {
+        for direction in next.active.into_iter().chain(next.cross) {
             let delta = if direction.negative() {
                 -magnitude
             } else {
@@ -286,7 +365,20 @@ impl WalkingState {
                 dy = delta;
             }
         }
-        let (x, y, blocked) = room.resolve(self.x, self.y, next.active, dx, dy)?;
+        let (x, y, blocked) = match (next.active, next.cross) {
+            // A diagonal: each axis against the walls in turn, x first.
+            (Some(lead), Some(cross)) => {
+                let (horizontal, vertical) = if lead.horizontal() {
+                    (lead, cross)
+                } else {
+                    (cross, lead)
+                };
+                let (x, y, across) = room.resolve(self.x, self.y, Some(horizontal), dx, 0)?;
+                let (x, y, along) = room.resolve(x, y, Some(vertical), 0, dy)?;
+                (x, y, across || along)
+            }
+            (active, _) => room.resolve(self.x, self.y, active, dx, dy)?,
+        };
         next.x = x;
         next.y = y;
         let output = MovementOutput {

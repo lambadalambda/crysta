@@ -100,15 +100,15 @@ fn errors_roll_back_history_timer_cadence_and_delayed_input() {
 }
 
 #[test]
-fn snapshot_v3_preserves_history_on_both_sides_of_boundary() {
+fn snapshot_v4_preserves_history_on_both_sides_of_boundary() {
     let room = floor();
     let mut state = WalkingState::new(104, 112);
     state.step(&room, input(Some(Direction::Right))).unwrap();
     state.step(&room, input(Some(Direction::Right))).unwrap();
-    assert_eq!(SNAPSHOT_VERSION, 3);
+    assert_eq!(SNAPSHOT_VERSION, 4);
     assert_eq!(
         state.encode_snapshot(),
-        [b'R', b'W', b'K', 0, 3, 0, 104, 0, 112, 0, 4, 4, 0, 4, 10, 0]
+        [b'R', b'W', b'K', 0, 4, 0, 104, 0, 112, 0, 4, 4, 0, 4, 10, 0]
     );
     for _ in 0..12 {
         let bytes = state.encode_snapshot();
@@ -135,8 +135,8 @@ fn snapshot_rejects_invalid_encodings_and_history_relationships() {
     for (offset, value) in [
         (0, 0),
         (4, 1),
-        (4, 2),
-        (4, 4),
+        (4, 3),
+        (4, 5),
         (5, 1),
         (10, 5),
         (11, 5),
@@ -147,7 +147,8 @@ fn snapshot_rejects_invalid_encodings_and_history_relationships() {
         (14, 11),
         (14, 12),
         (14, 255),
-        (15, 1),
+        (15, 0x80),
+        (15, 4),
     ] {
         let mut invalid = bytes;
         invalid[offset] = value;

@@ -1,5 +1,5 @@
 //! ROM-free walking and snapshot regressions.
-use room_core::{Direction, FrameInput, Room, Unqualified, WalkingState};
+use room_core::{Direction, FrameInput, PadInput, Room, Unqualified, WalkingState};
 
 fn floor() -> Room {
     Room::new(32, 64, vec![0; 2048]).unwrap()
@@ -196,10 +196,10 @@ fn snapshots_validate_encoding_phase_history_and_room_bounds() {
     let bytes = state.encode_snapshot();
     assert_eq!(
         bytes,
-        [b'R', b'W', b'K', 0, 3, 0, 104, 0, 112, 0, 4, 4, 0, 4, 10, 0]
+        [b'R', b'W', b'K', 0, 4, 0, 104, 0, 112, 0, 4, 4, 0, 4, 10, 0]
     );
     for (offset, value) in [
-        (4, 2),
+        (4, 3),
         (5, 1),
         (10, 5),
         (11, 255),
@@ -207,7 +207,11 @@ fn snapshots_validate_encoding_phase_history_and_room_bounds() {
         (13, 0),
         (13, 16),
         (14, 11),
-        (15, 1),
+        // The reserved bit, a cross along the walk, and an odd stream at
+        // the setup phase.
+        (15, 0x80),
+        (15, 4),
+        (15, 0x40),
     ] {
         let mut invalid = bytes;
         invalid[offset] = value;
@@ -400,4 +404,79 @@ fn mixed_nudges_survive_rollback_and_resume_after_alignment() {
         (two.dx, two.dy, two.attempted_dx, two.attempted_dy),
         (0, -1, 2, 0)
     );
+}
+
+fn diagonal(direction: Direction, cross: Direction) -> PadInput {
+    PadInput {
+        direction: Some(direction),
+        cross: Some(cross),
+    }
+}
+
+/// Native JP traces `k_*` on `$101` (2026-10-17, the job's `tmp/jump/`).
+#[test]
+fn a_diagonal_from_standing_faces_the_vertical_and_moves_one_on_each_axis() {
+    let room = floor();
+    for input in [
+        diagonal(Direction::Up, Direction::Right),
+        diagonal(Direction::Right, Direction::Up),
+    ] {
+        let mut state = WalkingState::new(104, 512);
+        let moves: Vec<(i16, i16)> = (0..6)
+            .map(|_| {
+                let out = state.step(&room, input).unwrap();
+                (out.dx, out.dy)
+            })
+            .collect();
+        assert_eq!(moves, [(0, 0), (0, 0), (1, -1), (1, -1), (1, -1), (1, -1)]);
+        assert_eq!(state.active_direction(), Some(Direction::Up));
+    }
+}
+
+#[test]
+fn a_second_direction_turns_a_walk_diagonal_and_its_release_restarts_the_stream() {
+    let room = floor();
+    let mut state = WalkingState::new(104, 512);
+    let mut moves = Vec::new();
+    // Right for 20 frames, up-right for 20, right for 20.
+    for frame in 0..60 {
+        let input = if (20..40).contains(&frame) {
+            diagonal(Direction::Right, Direction::Up)
+        } else {
+            PadInput {
+                direction: Some(Direction::Right),
+                cross: None,
+            }
+        };
+        let out = state.step(&room, input).unwrap();
+        moves.push((out.dx, out.dy));
+    }
+    assert_eq!(state.active_direction(), Some(Direction::Right));
+    // The input applies a frame late: diagonal on 21..=40, no setup frame.
+    assert_eq!(moves[20], (1, 0));
+    assert_eq!(moves[21..41], [(1, -1); 20]);
+    // Released: the right stream starts over at 1, 2.
+    assert_eq!(moves[41..45], [(1, 0), (2, 0), (1, 0), (2, 0)]);
+    // The walk's list still wraps 54 frames after its setup frame (1).
+    assert_eq!(moves[55], (0, 0));
+    assert_eq!(moves[56], (1, 0));
+}
+
+#[test]
+fn the_horizontal_gap_stops_a_diagonal_too() {
+    let room = floor();
+    let mut state = WalkingState::new(64, 600);
+    let mut moves = Vec::new();
+    for frame in 0..62 {
+        let input = if frame < 40 {
+            PadInput::from(input(Direction::Right))
+        } else {
+            diagonal(Direction::Right, Direction::Up)
+        };
+        let out = state.step(&room, input).unwrap();
+        moves.push((out.dx, out.dy));
+    }
+    assert_eq!(moves[54], (1, -1));
+    assert_eq!(moves[55], (0, 0));
+    assert_eq!(moves[56], (1, -1));
 }

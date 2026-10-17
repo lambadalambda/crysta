@@ -1,7 +1,7 @@
 use crate::{Direction, Room, Unqualified, WalkingState};
 
 /// Version of the fixed walking-component encoding (not a game/asset schema).
-pub const SNAPSHOT_VERSION: u16 = 3;
+pub const SNAPSHOT_VERSION: u16 = 4;
 /// Byte length of a walking-component snapshot.
 pub const SNAPSHOT_SIZE: usize = 16;
 
@@ -22,7 +22,8 @@ fn decode_direction(byte: u8) -> Result<Option<Direction>, Unqualified> {
 impl WalkingState {
     /// Encodes 16 bytes: `RWK\0`, version/u16 LE, x/u16 LE, y/u16 LE,
     /// active/u8, delayed/u8, phase/u8, last activation/u8, onset remaining/u8,
-    /// one reserved zero byte.
+    /// then the diagonal byte: the cross direction in bits 0-2, the delayed
+    /// cross direction in bits 3-5 and the lead's stream parity in bit 6.
     /// Directions encode None=0, Down=1, Up=2, Left=3, Right=4.
     /// Room identity and top-level simulation policy must be encoded by the caller.
     #[must_use]
@@ -37,6 +38,9 @@ impl WalkingState {
         bytes[12] = self.phase;
         bytes[13] = encode_direction(self.last_activation);
         bytes[14] = self.onset_remaining;
+        bytes[15] = encode_direction(self.cross)
+            | encode_direction(self.delayed_cross) << 3
+            | (self.stream & 1) << 6;
         bytes
     }
 
@@ -52,7 +56,7 @@ impl WalkingState {
         if bytes.len() != SNAPSHOT_SIZE
             || &bytes[..4] != b"RWK\0"
             || u16::from_le_bytes([bytes[4], bytes[5]]) != SNAPSHOT_VERSION
-            || bytes[15] != 0
+            || bytes[15] & 0x80 != 0
         {
             return Err(Unqualified::Snapshot);
         }
@@ -64,12 +68,27 @@ impl WalkingState {
             phase: bytes[12],
             last_activation: decode_direction(bytes[13])?,
             onset_remaining: bytes[14],
+            cross: decode_direction(bytes[15] & 7)?,
+            delayed_cross: decode_direction(bytes[15] >> 3 & 7)?,
+            stream: bytes[15] >> 6 & 1,
         };
-        let phase_valid = match state.active {
-            None => state.phase == 0,
-            Some(d) if d.horizontal() => state.phase < 54,
-            Some(_) => state.phase <= 2,
+        let perpendicular = |lead: Option<Direction>, cross: Option<Direction>| {
+            cross.is_none_or(|cross| {
+                lead.is_some_and(|lead| lead.horizontal() != cross.horizontal())
+            })
         };
+        if !perpendicular(state.active, state.cross)
+            || !perpendicular(state.delayed, state.delayed_cross)
+        {
+            return Err(Unqualified::Snapshot);
+        }
+        // The stream starts over with the walk's list.
+        let phase_valid = (state.phase != 0 || state.stream == 0)
+            && match state.active {
+                None => state.phase == 0,
+                Some(d) if d.horizontal() => state.phase < 54,
+                Some(_) => state.phase <= 2,
+            };
         let history_valid = match (state.last_activation, state.delayed, state.active) {
             (None, None, None) => state.onset_remaining == 0,
             (Some(last), Some(delayed), active) => {

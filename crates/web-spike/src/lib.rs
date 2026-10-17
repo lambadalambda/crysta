@@ -71,8 +71,8 @@ mod tests {
     fn replay_pins_synthetic_final_state_and_trace() {
         assert_eq!(replay(), concat!(
             "{\"fixture\":\"walking-six-v1\",\"frames\":6,",
-            "\"state_sha256\":\"5794285e77e705ad7f20335be388a6efd1b81c9c40a5cc89854042fd74db82e5\",",
-            "\"trace_sha256\":\"c4512040a2288ee874b1d9815005bd5be4ea0fd12ba11810b2ce233374911e5a\"}"
+            "\"state_sha256\":\"3dd42bc9558fc1a5d7fe5fb331fcdfdb2e7917af6df14334ab70366c388f5ea5\",",
+            "\"trace_sha256\":\"254a759a557e8c8c4ccf479cc794f14b9a6331bdb1238400e4ea022f38a774f4\"}"
         ));
     }
 

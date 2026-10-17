@@ -13,7 +13,7 @@
 //! the dash attack and the dash jump are the runtime's (`docs/combat.md`,
 //! `docs/jump.md`).
 
-use crate::{Direction, FrameInput, MovementOutput, Room, Unqualified, WalkingState};
+use crate::{Direction, MovementOutput, PadInput, Room, Unqualified, WalkingState};
 
 /// The dash's repeating stream after its setup frame.
 const DASH: [i16; 3] = [3, 2, 2];
@@ -95,8 +95,9 @@ pub fn step(
     walking: &mut WalkingState,
     run: &mut Option<Run>,
     room: &Room,
-    input: FrameInput,
+    input: impl Into<PadInput>,
 ) -> Result<RunStep, Unqualified> {
+    let input = input.into();
     let (x, y) = walking.position();
     let (next, direction, distance) = match *run {
         None => match walking.step(room, input) {
@@ -200,6 +201,7 @@ fn delta(direction: Direction, distance: i16) -> (i16, i16) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::FrameInput;
 
     #[test]
     fn a_dash_is_held_until_its_grace_starts() {

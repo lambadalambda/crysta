@@ -105,10 +105,12 @@ Release Wasm is 70,614 bytes, SHA-256
 - Replay is the existing room-core six-frame walking test: a 32×64 open grid,
   start `(104,112)`, inputs Left/neutral/neutral/Down/Down/Down, snapshot restore
   after each step. Canonical final 16-byte snapshot SHA-256:
-  `5794285e77e705ad7f20335be388a6efd1b81c9c40a5cc89854042fd74db82e5`.
+  `3dd42bc9558fc1a5d7fe5fb331fcdfdb2e7917af6df14334ab70366c388f5ea5`.
   SHA-256 of all six concatenated snapshots:
-  `c4512040a2288ee874b1d9815005bd5be4ea0fd12ba11810b2ce233374911e5a`.
+  `254a759a557e8c8c4ccf479cc794f14b9a6331bdb1238400e4ea022f38a774f4`.
   Both are pinned in ROM-free tests and identical in actual native and browser runs.
+  Snapshot version 4 (the diagonal byte) repinned both; under version 3 they
+  were `5794285e…db82e5` and `c4512040…911e5a`.
 - Browser startup compares replay before enabling input; each selection compares
   the entire metadata report against freshly generated native metadata. Valid
   headered normalization also passes the local Rust test. The browser rejects
