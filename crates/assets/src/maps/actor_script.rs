@@ -270,8 +270,32 @@ pub struct ScriptEffects {
 /// a property of the stream rather than of the handler.
 #[must_use]
 pub fn operand_length(image: &[u8], service: u8) -> Option<usize> {
+    match resumes(image, service)?.lengths[..] {
+        [length] => Some(length),
+        _ => None,
+    }
+}
+
+/// Where a service's handler sends the stream, path by path.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Resumes {
+    /// The distinct operand lengths of the paths that go on, ascending.
+    pub lengths: Vec<usize>,
+    /// The operand offsets of the stream words the paths that branch resume
+    /// at (`LDA [$36] : STA $02,S`), ascending.
+    pub targets: Vec<usize>,
+}
+
+/// Every way a service's handler leaves the stream, or `None` when a path
+/// cannot be accounted for or the budget runs out. A path that rewinds
+/// the stream to re-run the `COP` (a stall) is neither.
+#[must_use]
+pub fn resumes(image: &[u8], service: u8) -> Option<Resumes> {
     let entry = handler(image, service)?;
-    let mut lengths = Vec::new();
+    let mut found = Resumes {
+        lengths: Vec::new(),
+        targets: Vec::new(),
+    };
     let mut seen = Vec::new();
     let mut queue = vec![Path {
         at: entry,
@@ -285,14 +309,15 @@ pub fn operand_length(image: &[u8], service: u8) -> Option<usize> {
             continue;
         }
         seen.push(key);
-        explore(image, path, &mut queue, &mut lengths)?;
+        explore(image, path, &mut queue, &mut found)?;
+    }
+    for list in [&mut found.lengths, &mut found.targets] {
+        list.sort_unstable();
+        list.dedup();
     }
     // Paths still queued means the budget ran out, not that the handler was
     // understood; a length derived from a partial exploration would be a guess.
-    if queue.is_empty() && !lengths.is_empty() && lengths.iter().all(|&n| n == lengths[0]) {
-        return usize::try_from(lengths[0]).ok();
-    }
-    None
+    queue.is_empty().then_some(found)
 }
 
 /// Bank-`$80` subroutines that consume stream bytes, with how many. The
@@ -321,8 +346,9 @@ struct Path {
 enum Value {
     /// `$36` plus an offset: a resume address the handler computed.
     Pointer(isize),
-    /// A word read through `$36`: a branch target, not a length.
-    Stream,
+    /// A word read through `$36` at this offset: a branch target, not a
+    /// length.
+    Stream(isize),
     /// Anything else.
     Other,
 }
@@ -353,12 +379,7 @@ const PRESERVES_ACCUMULATOR: [u8; 98] = [
 ///
 /// Returns `None` when the path reaches something the model cannot account
 /// for, which refuses the whole derivation rather than yielding a partial one.
-fn explore(
-    image: &[u8],
-    path: Path,
-    queue: &mut Vec<Path>,
-    lengths: &mut Vec<isize>,
-) -> Option<()> {
+fn explore(image: &[u8], path: Path, queue: &mut Vec<Path>, found: &mut Resumes) -> Option<()> {
     let mut widths = path.widths;
     let mut cursor = path.at;
     let mut advance = path.advance;
@@ -389,7 +410,7 @@ fn explore(
             0xE6 if operand == Some(0x36) => advance += 1,
             0xC6 if operand == Some(0x36) => advance -= 1,
             0xA5 if operand == Some(0x36) => value = Value::Pointer(0),
-            0xA7 if operand == Some(0x36) => value = Value::Stream,
+            0xA7 if operand == Some(0x36) => value = Value::Stream(advance),
             0x1A => value = shift(value, 1),
             0x3A => value = shift(value, -1),
             // ADC #imm. Every one of these that acts on a live pointer in this
@@ -442,14 +463,17 @@ fn explore(
             // Terminals. Only a committed pointer is an operand length; a
             // stall or a stream-sourced branch is not.
             0x40 | 0x6B => {
-                if let Some(Value::Pointer(delta)) = committed {
-                    // A commit at or before the `COP` is a stall, not a length:
-                    // `$80:8BEB` rewinds two bytes so the command re-runs once
-                    // the text engine is free.
-                    let total = advance + delta;
-                    if total >= 0 {
-                        lengths.push(total);
+                match committed {
+                    // A commit at or before the `COP` is a stall, not a
+                    // length: `$80:8BEB` rewinds two bytes so the command
+                    // re-runs once the text engine is free.
+                    Some(Value::Pointer(delta)) => {
+                        if let Ok(length) = usize::try_from(advance + delta) {
+                            found.lengths.push(length);
+                        }
                     }
+                    Some(Value::Stream(at)) => found.targets.extend(usize::try_from(at)),
+                    _ => {}
                 }
                 return Some(());
             }
@@ -634,4 +658,38 @@ fn walk_inner(
         cursor += 2 + length;
     }
     Ok(effects)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// An image whose `COP 7B` handler is `code` at `$00:9000`.
+    fn image_with_handler(code: &[u8]) -> Vec<u8> {
+        let mut image = vec![0; 0x1_0000];
+        image[COP_TABLE + 0x7B * 2..][..2].copy_from_slice(&0x9000u16.to_le_bytes());
+        image[0x9000..0x9000 + code.len()].copy_from_slice(code);
+        image
+    }
+
+    #[test]
+    fn a_handler_resuming_at_a_stream_word_names_a_branch_target() {
+        // BEQ +5; LDA [$36]; STA $02,S; RTI; INC $36 x2; LDA $36; STA $02,S; RTI.
+        let image = image_with_handler(&[
+            0xF0, 0x05, 0xA7, 0x36, 0x83, 0x02, 0x40, 0xE6, 0x36, 0xE6, 0x36, 0xA5, 0x36, 0x83,
+            0x02, 0x40,
+        ]);
+        let resumes = resumes(&image, 0x7B).unwrap();
+        assert_eq!((resumes.lengths, resumes.targets), (vec![2], vec![0]));
+        assert_eq!(operand_length(&image, 0x7B), Some(2));
+    }
+
+    #[test]
+    fn a_target_read_after_the_pointer_moves_is_at_that_offset() {
+        // INC $36 x2; LDA [$36]; STA $02,S; RTI: always jumps, never goes on.
+        let image = image_with_handler(&[0xE6, 0x36, 0xE6, 0x36, 0xA7, 0x36, 0x83, 0x02, 0x40]);
+        let resumes = resumes(&image, 0x7B).unwrap();
+        assert_eq!((resumes.lengths, resumes.targets), (vec![], vec![2]));
+        assert_eq!(operand_length(&image, 0x7B), None);
+    }
 }
