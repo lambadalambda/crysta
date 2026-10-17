@@ -20,6 +20,7 @@ mod line;
 mod motion;
 mod native;
 mod push;
+mod route;
 mod routines;
 mod shadowkeeper;
 pub(crate) use routines::TORCHES;
@@ -32,6 +33,8 @@ pub use native::{
     CURRENT_MAP, ENEMIES, FRAMES, HITS_OFF, MAP_MODE, PENDING_MAP, PLAYER_ACTION, PLAYER_X,
     PLAYER_Y, PREVIOUS_MAP, PRIME_BLUE, SAFE_X, SAFE_Y, WINDOW_BUSY,
 };
+pub use route::{handling, Handling};
+use route::{route, Route};
 use sense::probe;
 
 use crate::scene::{Globals, Transfer};
@@ -1802,101 +1805,69 @@ impl Actor {
         around: &mut Surroundings<'_>,
     ) -> bool {
         let image = around.image;
-        match service {
-            SHOW_TEXT | SHOW_TEXT_BANKED | TEXT_WAIT | TEXT_STEP | CHOICE => {
-                return self.text_service(service, operands, bank, around)
-            }
-            _ if SCRIPT_SERVICES.contains(&service) => {
-                return self.script_service(service, operands, around)
-            }
-            EASE_START | EASE_STEP => return self.ease_service(service, operands, image),
-            SWITCH | SPEED => return self.parameter_service(service, operands, bank, image),
-            PLAYER_POSE_MOVING | ARK_POSE_REPEAT if self.ark => {
-                return self.ark_pose(service, operands, image)
-            }
-            POSE_MOVING | POSE_SELECTOR | REPEAT_POSE_MOVING | REPEAT_MOVING => {
-                return self.moving_pose(service, operands, image)
-            }
-            PLAY_TRACK | FADE_TO_TRACK | PLAY_SELECTION | SOUND_PORT3 | SOUND_PORT2
-            | SOUND_WORD => return self.audio_service(service, operands, around),
-            CALL => return self.call_service(operands, around),
-            PLAYER_NEAR | PLAYER_AXIS | PLAYER_SIDE | PLAYER_HEIGHT | PLAYER_FRONT => {
-                return self.player_test(service, operands, bank, around)
-            }
-            RANDOMIZE | SLEEP_OFF_SCREEN => return self.engine_service(service, operands, around),
-            RETURN => self.pc = self.call.take().unwrap_or(operands),
-            GIVE_ITEM | GRANT_ITEM | TAKE_ITEM | NO_ROOM => {
-                return self.item_service(service, operands, bank, around)
-            }
-            PLACE | DELETE_ON_MAP | REPEAT_POSE | COUNT | YIELD => {
-                return self.stage_service(service, operands, around)
-            }
-            TILE_BRANCH | PATCH => return self.tile_service(service, operands, bank, around),
-            STAMP
-            | UNSTAMP
-            | SEAL
-            | BLOCK
-            | UNSEAL
-            | PATCH_AT
-            | HELD
-            | BLOCKED_UP..=BLOCKED_RIGHT => {
-                return self.cell_service(service, operands, bank, around)
-            }
-            HIT_TARGET | HIT_RETURN | COUNT_BRANCH | HELD_BRANCH | MUSIC_WAIT | 0x6A | 0x76 => {
-                return self.door_service(service, operands, bank, around)
-            }
-            _ if SPAWNS.contains(&service) => return self.spawn(service, operands, around),
-            WALK_TO_ROW | WALK_TO_COLUMN => return self.walk_toward(service, operands, image),
-            SELECT_POSE => return self.select_pose(operands, image),
-            LINE_START | LINE_STEP => return self.line_service(service, operands, image),
-            // One arm for both keeps this dispatch inside clippy's length.
-            PROFILE | SIDE_CALLBACKS => return self.profile_service(service, operands, image),
-            ARK_BUSY => return self.ark_busy(operands, bank, around),
-            _ if FLIPS.contains(&service) => {
+        match route(service, self.ark) {
+            Route::Text => return self.text_service(service, operands, bank, around),
+            Route::Script => return self.script_service(service, operands, around),
+            Route::Ease => return self.ease_service(service, operands, image),
+            Route::Parameter => return self.parameter_service(service, operands, bank, image),
+            Route::ArkPose => return self.ark_pose(service, operands, image),
+            Route::MovingPose => return self.moving_pose(service, operands, image),
+            Route::Audio => return self.audio_service(service, operands, around),
+            Route::Call => return self.call_service(operands, around),
+            Route::PlayerTest => return self.player_test(service, operands, bank, around),
+            Route::Engine => return self.engine_service(service, operands, around),
+            Route::Return => self.pc = self.call.take().unwrap_or(operands),
+            Route::Item => return self.item_service(service, operands, bank, around),
+            Route::Stage => return self.stage_service(service, operands, around),
+            Route::Tile => return self.tile_service(service, operands, bank, around),
+            Route::Cell => return self.cell_service(service, operands, bank, around),
+            Route::Door => return self.door_service(service, operands, bank, around),
+            Route::Spawn => return self.spawn(service, operands, around),
+            Route::WalkToward => return self.walk_toward(service, operands, image),
+            Route::SelectPose => return self.select_pose(operands, image),
+            Route::Line => return self.line_service(service, operands, image),
+            Route::Profile => return self.profile_service(service, operands, image),
+            Route::ArkBusy => return self.ark_busy(operands, bank, around),
+            Route::Flip => {
                 self.flip(service);
                 self.pc = operands;
             }
-            WAIT => return self.wait_for_pose(operands),
-            WAIT_STEP => return self.wait_step(operands),
-            RANDOM_STEP => return self.random_step_service(operands, around),
-            _ if PLAYER_SERVICES.contains(&service) => {
-                return self.player_service(service, operands, bank, around)
-            }
-            BRANCH_ON_GLOBAL => self.pc = operands + 4,
-            _ if BODY.contains(&service) => {
-                return self.body(service, operands, image, around.player)
-            }
-            PAN | PAN_WAIT => return self.pan(service, operands, around),
-            LOOP_START => return self.loop_start(operands, image),
-            LOOP_END => return self.loop_end(operands),
-            LOOP_AGAIN => {
+            Route::Wait => return self.wait_for_pose(operands),
+            Route::WaitStep => return self.wait_step(operands),
+            Route::RandomStep => return self.random_step_service(operands, around),
+            Route::Player => return self.player_service(service, operands, bank, around),
+            Route::BranchOnGlobal => self.pc = operands + 4,
+            Route::Body => return self.body(service, operands, image, around.player),
+            Route::Pan => return self.pan(service, operands, around),
+            Route::LoopStart => return self.loop_start(operands, image),
+            Route::LoopEnd => return self.loop_end(operands),
+            Route::LoopAgain => {
                 self.loop_end(operands);
                 return true;
             }
-            BRANCH_ON_MAP => return self.branch_on_map(operands, bank, image),
-            TIMED_WAIT => return self.timed_wait(operands, image),
-            STOP_FOR_PLAYER => return self.stop_for_player(operands, None, bank, around),
-            FACE_PLAYER_POSED => {
+            Route::BranchOnMap => return self.branch_on_map(operands, bank, image),
+            Route::TimedWait => return self.timed_wait(operands, image),
+            Route::StopForPlayer => return self.stop_for_player(operands, None, bank, around),
+            Route::FacePlayerPosed => {
                 let Some(&base) = image.get(operands) else {
                     self.state = State::Frozen;
                     return false;
                 };
                 return self.stop_for_player(operands + 1, Some(base), bank, around);
             }
-            BRANCH_ON_FLAG => return self.branch_on_flag(operands, bank, around),
-            CHAINED_BRANCH | CHAINED_DESPAWN => {
-                return self.branch_on_chain(service, operands, bank, around)
-            }
-            LOAD_COLOURS | CIRCLE => return self.display_service(service, operands, around),
+            Route::BranchOnFlag => return self.branch_on_flag(operands, bank, around),
+            Route::Chain => return self.branch_on_chain(service, operands, bank, around),
+            Route::Display => return self.display_service(service, operands, around),
             // Anything else is stepped over by its derived length. That
             // includes text and flag writes: the loop's ambient effects
-            // are not the runtime's to apply from here.
-            other => {
+            // are not the runtime's to apply from here. `COP 91` ends the
+            // frame in [`Self::run`] before it comes here.
+            Route::Skip | Route::EndFrame => {
                 if !cadence::benign_skipped_service(image, self.pc) {
                     self.cadence = None;
                 }
-                let length = *self.lengths[usize::from(other)]
-                    .get_or_insert_with(|| actor_script::operand_length(image, other));
+                let length = *self.lengths[usize::from(service)]
+                    .get_or_insert_with(|| actor_script::operand_length(image, service));
                 let Some(length) = length else {
                     self.state = State::Frozen;
                     return false;
