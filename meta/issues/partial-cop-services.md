@@ -25,6 +25,8 @@ Some COP services refuse or skip a rare case. No played script needs one yet.
 
 - Markers: `actors.rs`, `scene.rs`.
 - The services the underworld scripts reach, and which the runtime steps over: `docs/cop-inventory.md`.
+- The native operand derivation (`actor_script::resumes`) reads 3 bytes for `COP 46`, where every site has 7, and more exit paths for `DD`, `DE` and `EE` than the runtime models (`service_sites`, `the_fixed_layouts_agree_with_the_native_handlers`).
+- The inventory lists the native routines scripts call with `JSL`, but not whether the runtime models each one.
 
 ## Progress
 

@@ -1,0 +1,20 @@
+# Model COP AA and AF
+
+## Summary
+
+`COP AA` (`$90:8B01`, `8CB2`, `8D02`: the light room and the tower doors)
+and `COP AF` (`$93:DA8C`, `DB04`, `DB93`: Shadowkeeper's room `$123`) are
+stepped over. `COP AA` starts an HDMA child (`docs/light-room.md`).
+
+## Dependencies
+
+- [List the COP services the underworld scripts use](cop-inventory.md)
+
+## Requirements
+
+- Read the handlers and model what the scripts need, or show that stepping
+  over is right.
+
+## Acceptance Criteria
+
+- A unit test per modelled service, checked against a native trace.
