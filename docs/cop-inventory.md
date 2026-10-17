@@ -19,7 +19,7 @@ runtime skips the service by its native operand length: right for a service
 that only changes the picture or the sound, a gap otherwise. "Stops" means
 the runtime does not know the length and freezes the actor.
 
-66 scripts, 114 services at 1769 sites: 108 modelled, 6 stepped over, 0 that stop the actor. 16 native routines called, 0 walk stops.
+66 scripts, 114 services at 1769 sites: 114 modelled, 0 stepped over, 0 that stop the actor. 16 native routines called, 0 walk stops.
 
 ## Services
 
@@ -72,7 +72,7 @@ the runtime does not know the length and freezes the actor.
 | `5A` | modelled | 4 | `$11B`, `$123`, `$12A`-`$12B` |
 | `5F` | modelled | 1 | `$102`-`$104`, `$108`-`$109`, `$10B`, `$112`, `$114`, `$117`, `$119`-`$11A` |
 | `63` | modelled | 1 | `$123` |
-| `64` | stepped over | 1 | `$11D` |
+| `64` | modelled | 1 | `$11D` |
 | `65` | modelled | 1 | `$10C` |
 | `66` | modelled | 1 | `$10C` |
 | `71` | modelled | 5 | `$102`-`$104`, `$108`-`$10B`, `$110`-`$112`, `$114`, `$116`-`$11A`, `$11F`-`$120`, `$12A` |
@@ -83,10 +83,10 @@ the runtime does not know the length and freezes the actor.
 | `85` | modelled | 38 | `$101`-`$106`, `$108`-`$10B`, `$10F`-`$113`, `$116`-`$11B`, `$11E`-`$120`, `$12B` |
 | `86` | modelled | 11 | `$105`-`$106`, `$10A`-`$10B`, `$10F`-`$110`, `$112`, `$116`-`$117`, `$119`-`$11A` |
 | `87` | modelled | 25 | `$106`, `$110`-`$111`, `$116`-`$117`, `$119`-`$11B`, `$120` |
-| `8A` | stepped over | 1 | `$106` |
+| `8A` | modelled | 1 | `$106` |
 | `8E` | modelled | 174 | `$100`-`$10C`, `$10E`-`$120`, `$122`-`$123`, `$127`, `$12A`-`$12B` |
 | `8F` | modelled | 71 | `$101`-`$106`, `$108`-`$10B`, `$10F`-`$113`, `$116`-`$11B`, `$11E`-`$120`, `$12B` |
-| `93` | stepped over | 1 | `$106` |
+| `93` | modelled | 1 | `$106` |
 | `99` | modelled | 4 | `$10A`-`$10B`, `$12A` |
 | `9A` | modelled | 2 | `$123` |
 | `A0` | modelled | 2 | `$123` |
@@ -94,8 +94,8 @@ the runtime does not know the length and freezes the actor.
 | `A2` | modelled | 33 | `$100`, `$105`, `$107`, `$109`-`$10B`, `$10E`, `$110`-`$112`, `$115`-`$11A`, `$11C`-`$11D`, `$11F`-`$120`, `$123` |
 | `A4` | modelled | 30 | `$102`, `$108`-`$10A`, `$10F`-`$113`, `$116`-`$11B`, `$11D`-`$120`, `$12B` |
 | `A7` | modelled | 73 | `$100`, `$102`-`$105`, `$107`-`$10C`, `$10E`-`$120`, `$122`-`$123`, `$127`, `$12A`-`$12B` |
-| `AA` | stepped over | 3 | `$100`, `$106`-`$107`, `$10E`, `$115`, `$11C` |
-| `AE` | stepped over | 3 | `$100`, `$106`-`$107`, `$10E`, `$115`, `$11C` |
+| `AA` | modelled | 3 | `$100`, `$106`-`$107`, `$10E`, `$115`, `$11C` |
+| `AE` | modelled | 3 | `$100`, `$106`-`$107`, `$10E`, `$115`, `$11C` |
 | `AF` | modelled | 3 | `$123` |
 | `B0` | modelled | 11 | `$102`, `$106`, `$108`-`$10A`, `$10F`-`$112`, `$116`-`$117`, `$119`-`$11B`, `$11E`, `$120`, `$123`, `$12B` |
 | `B1` | modelled | 26 | `$100`, `$105`-`$108`, `$10A`-`$10B`, `$10E`-`$111`, `$113`, `$115`-`$117`, `$119`-`$11A`, `$11C`-`$11D`, `$120`, `$123`, `$12A`-`$12B` |
@@ -138,16 +138,11 @@ the runtime does not know the length and freezes the actor.
 | `E8` | modelled | 9 | `$110`-`$111`, `$113`, `$116`-`$117`, `$119`-`$11B`, `$120` |
 | `EA` | modelled | 1 | `$123` |
 | `EB` | modelled | 3 | `$110`-`$111`, `$113`, `$116`-`$117`, `$119`-`$11A`, `$120` |
-| `EC` | stepped over | 2 | `$100`, `$107`, `$10E`, `$115`, `$11C` |
+| `EC` | modelled | 2 | `$100`, `$107`, `$10E`, `$115`, `$11C` |
 
 ## Sites of the services not modelled
 
-- `COP 64`: `$90:A115`
-- `COP 8A`: `$90:8BB0`
-- `COP 93`: `$90:8BB3`
-- `COP AA`: `$90:8B01`, `$90:8CB2`, `$90:8D02`
-- `COP AE`: `$90:8BB5`, `$90:8D26`, `$90:8D41`
-- `COP EC`: `$90:8D1C`, `$90:8D37`
+None.
 
 ## Native routines called with `JSL`
 

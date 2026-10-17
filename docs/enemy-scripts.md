@@ -142,6 +142,8 @@ derivable or wrong behaviour).
 | `87 c p s` | `A1D4` | count, pose, selector | `E+$22 = c`, then `82 p s` | `B847`, show | ok |
 | `8E` | `A32F` | – | `ED75`; list not ended: yield (re-run at `E+$0A`); ended: go on | all | ok |
 | `8F` | `A33E` | – | `ED75`; at list end `DEC E+$22`: not 0: restart list and streams (`7F:0010/12 = 0014/16`) in the same frame; 0: go on | blob, Hiballs | ok |
+| `AA` | `A8EE` | long script | a hidden effect entity after the parent (`7F:0100` = parent): `EC` blends OBJ colours a step a frame (`7F:000A` of `7F:0008`) and goes on at the last, `AE` unlinks it, `8A` starts a palette cycle and yields, `93` steps it | tower heads `$90:8D0E`, light room `$90:8BA2`, `$123` `$8F:816D` | ok |
+| `64` | `9CE6` | shape, radius | the ring window: an effect at `$87:A249`/`A26B` builds an ellipse r wide and r/2 high around the caller, 16 above it, a frame behind `$0474`'s raises | `$11D` guardian | ok (not drawn) |
 | `E4` | `B929` | – | `8E` with its own record countdown in `7F:200A`: the script runs every frame up to it, back from its continuation (`PLA; PLA; RTL`), and goes on in the frame `8E` would; the High Cadet's copies flicker so, hidden and shown on alternate frames | knockback `$85:E03D`, the copies | ok |
 | `E5` | `B953` | – | the same for `8F`: the copies' 3 passes of a 50-frame list take 150 frames (native trace, `$113`) | the copies `$97:C77C` | ok |
 | `AF s` | `A965` | selector | start movement selector s only | Shadowkeeper | missing |

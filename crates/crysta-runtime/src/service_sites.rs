@@ -142,6 +142,13 @@ pub fn markdown(census: &Census) -> String {
         )
     }));
     lines.push("\n## Sites of the services not modelled\n".to_owned());
+    if census
+        .services
+        .values()
+        .all(|service| service.handling == Handling::Modelled)
+    {
+        lines.push("None.".to_owned());
+    }
     lines.extend(
         census
             .services
@@ -458,6 +465,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0x5F, 8, &[0, 2, 4, 6]),
     (0x60, 4, &[]),
     (0x63, 2, &[]),
+    (0x64, 2, &[]),
     (0x6A, 2, &[]),
     (0x71, 6, &[4]),
     (0x76, 2, &[]),
@@ -467,8 +475,10 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0x85, 2, &[]),
     (0x86, 2, &[]),
     (0x87, 3, &[]),
+    (0x8A, 1, &[]),
     (0x8E, 0, &[]),
     (0x8F, 0, &[]),
+    (0x93, 0, &[]),
     (0xAF, 1, &[]),
     (0xB1, 2, &[]),
     (0xB2, 2, &[]),
@@ -503,6 +513,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0xE4, 0, &[]),
     (0xE5, 0, &[]),
     (0xEB, 0, &[]),
+    (0xEC, 8, &[]),
     (0xED, 5, &[]),
     (0xEE, 1, &[]),
 ];
@@ -527,12 +538,12 @@ fn modelled_shape(image: &[u8], service: u8, operands: usize) -> Option<Shape> {
         0x21 | 0xDA => (after(2), vec![0], &[]),
         // The hit target and the long return `COP 66` resumes at.
         0x65 => (after(5), vec![0], &[2]),
-        // A return, a frame's end without a continuation, a deletion.
-        0x01 | 0x66 | 0x91 | 0xA7 => (Next::Never, vec![], &[]),
-        // The spawns by their operand lengths; a call, which `COP 01`
-        // returns from, and the continuation. `COP AA` starts an effect
-        // entity at a long script (`$80:A8EE`): the runtime steps over it,
-        // but its script is listed.
+        // A return, a frame's end without a continuation, a deletion,
+        // an effect's end.
+        0x01 | 0x66 | 0x91 | 0xA7 | 0xAE => (Next::Never, vec![], &[]),
+        // The spawns by their operand lengths, `COP AA`'s effect entity
+        // among them; a call, which `COP 01` returns from, and the
+        // continuation.
         0x00 | 0xC0 | 0x9A | 0xA1 | 0xE6 | 0xEA | 0xAA => (after(3), vec![], &[0]),
         0x99 | 0x9B | 0xA0 | 0xA2 | 0xE7 => (after(5), vec![], &[0]),
         0x9C => (after(7), vec![], &[0]),

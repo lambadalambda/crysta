@@ -38,6 +38,7 @@ use route::{route, Route};
 use sense::probe;
 
 use crate::scene::{Globals, Transfer};
+use assets::graphics::Bgr555;
 use assets::maps::actor_script::{
     self, chained_condition_holds, chained_condition_length, flag_branch_taken, BRANCH_ON_FLAG,
     CHAINED_BRANCH, CHAINED_DESPAWN, REGISTER_CALLBACK, SHOW_TEXT, WRITE_FLAG,
@@ -276,6 +277,22 @@ const SPAWN_BEFORE: u8 = 0x9A;
 const SPAWN_BEFORE_FLAGS: u8 = 0x9B;
 /// A script with a flags word at the list's end (`$80:A693`).
 const SPAWN_LAST: u8 = 0xA0;
+/// An effect entity at a long script, hidden, its parent kept in
+/// `7F:0100` (`$80:A8EE`): the tower doors' colour fades.
+const EFFECT: u8 = 0xAA;
+/// Blends OBJ colours toward a table a step a frame (`$80:B9FB`):
+/// `from to count index`, the steps in `7F:0008`, the step in `000A`.
+const BLEND: u8 = 0xEC;
+/// Unlinks an effect entity (`$80:A95B`, `$80:BE18`).
+const END_EFFECT: u8 = 0xAE;
+/// Steps a palette cycle `COP 8A` started (`$80:A3B5`), a frame each
+/// time, and goes on at its table's end. The cycles the effects play loop
+/// (`$123`'s light, the light room's), so here it waits; their colours are
+/// the hosts' ([`crate::world::Darkness`]).
+const PALETTE_WAIT: u8 = 0x93;
+/// Starts a palette service table on the effect (`$80:A2E3`) and yields a
+/// frame; the hosts play it ([`crate::world::World::palette_cycle`]).
+const PALETTE_CYCLE: u8 = 0x8A;
 
 /// Where a spawned entity joins the actor list.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -299,6 +316,7 @@ const SPAWNS: &[u8] = &[
     SPAWN_BEFORE,
     SPAWN_BEFORE_FLAGS,
     SPAWN_LAST,
+    EFFECT,
     0xE6,
     0xE7,
     0xE8,
@@ -568,6 +586,9 @@ const PALETTE: u8 = 0xBB;
 /// The circle window around the caller (`$80:9CA5`): the shape, then
 /// `$0474`, the radius ([`crate::world::Circle`]).
 const CIRCLE: u8 = 0x63;
+/// The ring window, an ellipse around the caller (`$80:9CE6`): shape,
+/// radius ([`crate::world::Ring`]). Shape 0's colour math is not kept.
+const RING: u8 = 0x64;
 /// `$0474`: the circle window's radius.
 pub(crate) const CIRCLE_RADIUS: u16 = 0x0474;
 /// Colours from the ROM into CGRAM (`$80:9AEB`): bank, word, index,
@@ -903,6 +924,8 @@ pub struct Actor {
     legs: bool,
     /// The repeat count `COP 85` set for the next `COP 8F`.
     repeats: Option<u16>,
+    /// An effect entity `COP AA` started ([`native::Memory::effect`]).
+    effect: bool,
     /// The frames `COP E4`/`E5` still wait on their own countdown.
     own_wait: Option<u16>,
     /// Where this frame's run began: an `RTL` comes back there unless a
@@ -1027,6 +1050,7 @@ impl Actor {
             legs: false,
             repeats: None,
             own_wait: None,
+            effect: false,
             entry: 0,
             stamp: None,
             frozen_at: None,
@@ -1100,6 +1124,7 @@ impl Actor {
             .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok())
             .and_then(|script| image.get(script.checked_sub(2)?..script))
             .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]));
+        actor.keeps_streams = actor.interaction & KEEP_STREAMS != 0;
         actor.cadence = resident
             .descriptor
             .filter(|_| resident.body)
@@ -1502,6 +1527,7 @@ impl Actor {
             carried: &mut self.carried,
             pokes: &mut globals.pokes,
             bank: u8::try_from(self.pc >> 16 & 0x3F).unwrap_or(0) | 0x80,
+            effect: self.effect,
         }
     }
 
@@ -1877,6 +1903,7 @@ impl Actor {
             Route::BranchOnFlag => return self.branch_on_flag(operands, bank, around),
             Route::Chain => return self.branch_on_chain(service, operands, bank, around),
             Route::Display => return self.display_service(service, operands, around),
+            Route::Effect => return self.effect_service(service, operands, around),
             // Anything else is stepped over by its derived length. That
             // includes text and flag writes: the loop's ambient effects
             // are not the runtime's to apply from here. `COP 91` ends the
@@ -1898,7 +1925,8 @@ impl Actor {
     }
 
     /// `COP 5A`, the OBJ colours into [`crate::colours::ObjColours`], and
-    /// `COP 63`, the circle window around this actor with its radius.
+    /// `COP 63` and `64`, the circle and ring windows around this actor
+    /// with their radius.
     /// Returns whether execution continues.
     fn display_service(
         &mut self,
@@ -1909,6 +1937,14 @@ impl Actor {
         self.cadence = None;
         let (done, length) = if service == LOAD_COLOURS {
             (around.globals.obj_colours.load(around.image, operands), 5)
+        } else if let (RING, Some(&radius)) = (service, around.image.get(operands + 1)) {
+            // `$80:9CE6`: `$0474` the radius, `$0476` the caller.
+            around.globals.ring = Some((self.id, u16::from(radius)));
+            around
+                .globals
+                .scratch
+                .insert(CIRCLE_RADIUS, u16::from(radius));
+            (true, 2)
         } else if let Some(&radius) = around.image.get(operands + 1) {
             around.globals.circle = Some(self.id);
             let words = &mut around.globals.scratch;
@@ -1923,6 +1959,70 @@ impl Actor {
         }
         self.pc = operands + length;
         true
+    }
+
+    /// `COP EC`, `AE`, `93` and `8A` on an effect entity: a step of the
+    /// colour blend, re-run each frame until its last step (`7F:000A`
+    /// reaching `7F:0008`), the entity's end, and the palette cycle's wait
+    /// and start. Returns
+    /// whether execution continues.
+    fn effect_service(
+        &mut self,
+        service: u8,
+        operands: usize,
+        around: &mut Surroundings<'_>,
+    ) -> bool {
+        let image = around.image;
+        match service {
+            END_EFFECT => {
+                self.state = State::Gone;
+                return false;
+            }
+            PALETTE_WAIT => {
+                self.pc = operands - 2;
+                return false;
+            }
+            PALETTE_CYCLE => {
+                let Some(&table) = image.get(operands) else {
+                    self.state = State::Frozen;
+                    return false;
+                };
+                around.globals.palette_cycle = Some((table, around.globals.frames));
+                self.pc = operands + 1;
+                return false;
+            }
+            _ => {}
+        }
+        let table = |at: usize| image.get(operands + at..operands + at + 3).and_then(long);
+        let (Some(from), Some(to), Some(&[count, index])) =
+            (table(0), table(3), image.get(operands + 6..operands + 8))
+        else {
+            self.state = State::Frozen;
+            return false;
+        };
+        let (total, step) = (self.own_word(0x0008), self.own_word(0x000A).wrapping_add(1));
+        self.set_own_word(0x000A, step);
+        for n in 0..count {
+            let at = 2 * usize::from(n);
+            let (Some(a), Some(b)) = (
+                cadence::word(image, from + at),
+                cadence::word(image, to + at),
+            ) else {
+                self.state = State::Frozen;
+                return false;
+            };
+            let colour = crate::colours::blend(Bgr555::new(a), Bgr555::new(b), step, total);
+            around
+                .globals
+                .obj_colours
+                .set(index.wrapping_add(n), colour);
+        }
+        if step == total {
+            self.pc = operands + 8;
+            return true;
+        }
+        self.pc = operands - 2;
+        false
     }
 
     /// Ticks of the display list a selector names, when the packet is known.
@@ -3031,6 +3131,7 @@ impl Actor {
             // and out of the nested frame (`$80:BCD2`: `ORA #$8000`, `AND
             // #$EFFF`).
             SPAWN_AFTER | SPAWN_BEFORE => (script, Some(copied), Some((0, 0)), 3),
+            EFFECT => (script, Some(0x8000), Some((0, 0)), 3),
             SPAWN_AT => (script, Some(copied), word(3).zip(word(5)), 7),
             _ => (script, word(7), word(3).zip(word(5)), 9),
         };
@@ -3044,6 +3145,7 @@ impl Actor {
             self.position.1.wrapping_add(dy),
         );
         let mut child = self.child(script, flags, at);
+        child.effect = kind == EFFECT;
         child.place = match kind {
             SPAWN_BEFORE | SPAWN_BEFORE_FLAGS => ListPlace::Before,
             SPAWN_LINKED => ListPlace::Head,
@@ -5906,6 +6008,71 @@ mod script_service_tests {
     }
 
     #[test]
+    fn cop_aa_starts_a_hidden_effect_after_its_parent() {
+        // COP AA $88:8029; yield.
+        let code = [2, 0xAA, 0x29, 0x80, 0x88, 2, 0xBD];
+        let (image, mut actor) = actor_running(&code);
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        let [(script, child)] = &globals.spawns[..] else {
+            panic!("one spawn");
+        };
+        assert_eq!(*script, 0x08_8029);
+        assert!(child.effect && child.hidden && child.place == ListPlace::After);
+    }
+
+    #[test]
+    fn cop_ec_blends_the_obj_colours_a_frame_a_step() {
+        // Two steps: `7F:0008 = 2`, `7F:000A = 0`; COP EC from `$88:8040`
+        // (black) to `$88:8042` (red 31), one colour to `$D1`; pose 5.
+        let mut code = vec![
+            0xA9, 2, 0, 0x9F, 8, 0, 0x7F, 0xA9, 0, 0, 0x9F, 0x0A, 0, 0x7F, 2, 0xEC, 0x40, 0x80,
+            0x88, 0x42, 0x80, 0x88, 1, 0xD1, 2, 0x80, 5, 2, 0xBD,
+        ];
+        code.resize(0x40, 0);
+        code.extend([0, 0, 0x1F, 0]);
+        let (image, mut actor) = actor_running(&code);
+        actor.effect = true;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        let red = |red| Some(assets::graphics::Bgr555::new(red));
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(
+            (globals.obj_colours.get(0xD1), actor.selector),
+            (red(15), 0)
+        );
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(
+            (globals.obj_colours.get(0xD1), actor.selector),
+            (red(31), 5)
+        );
+    }
+
+    #[test]
+    fn cop_8a_starts_a_palette_cycle_and_yields_a_frame() {
+        let (image, mut actor) = actor_running(&[2, 0x8A, 0x1F, 2, 0x80, 5, 2, 0xBD]);
+        actor.effect = true;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(
+            (globals.palette_cycle, actor.selector),
+            (Some((0x1F, globals.frames)), 0)
+        );
+        tick_at(&mut actor, &image, &mut globals, (0, 0));
+        assert_eq!(actor.selector, 5);
+    }
+
+    #[test]
+    fn cop_93_waits_on_its_palette_cycle() {
+        let (image, mut actor) = actor_running(&[2, 0x93, 2, 0x80, 5, 2, 0xBD]);
+        actor.effect = true;
+        let mut globals = Globals::with_events(vec![0; 512]);
+        for _ in 0..3 {
+            tick_at(&mut actor, &image, &mut globals, (0, 0));
+        }
+        assert_eq!((actor.selector, actor.frozen_at()), (0, None));
+    }
+
+    #[test]
     fn cop_a1_spawns_at_the_actor() {
         // COP A1 $88:8029; yield.
         let code = [2, 0xA1, 0x29, 0x80, 0x88, 2, 0xBD];
@@ -6451,6 +6618,25 @@ mod script_service_tests {
                 "{word:04X} on {map:#x}"
             );
         }
+    }
+
+    #[test]
+    fn a_header_with_bit_six_keeps_the_streams() {
+        // Shadowkeeper's body `$93:D876`: header `+$06` = `$0040`.
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../local/Tenchi Souzou (Japan).sfc");
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let image = rom::Rom::load(&bytes).unwrap().image().to_vec();
+        let flags = crate::world::new_game_flags();
+        let events = assets::maps::scripts::EventFlags::Bitmap(&flags);
+        let residents = crate::residents::residents(&image, 0x123, events).unwrap();
+        let body = residents
+            .iter()
+            .find(|resident| resident.script == Some(0x93_D876))
+            .unwrap();
+        assert!(Actor::for_resident(&image, 0x123, body, 7).keeps_streams);
     }
 
     #[test]

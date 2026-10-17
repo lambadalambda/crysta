@@ -60,6 +60,10 @@ pub struct Memory<'m> {
     pub pokes: &'m mut Vec<Poke>,
     /// The bank of the actor's script as the CPU sees it (`+$0C`).
     pub bank: u8,
+    /// An effect entity (`COP AA`), whose own words also hold its
+    /// frame count and step (`7F:0008`, `000A`) and parameters
+    /// (`7F:0100`..`010F`).
+    pub effect: bool,
 }
 
 /// A write into another entity by its id.
@@ -208,6 +212,9 @@ const OWN: [std::ops::RangeInclusive<u16>; 6] = [
     0x201A..=0x201D,
     0x2020..=0x2021,
 ];
+/// An effect entity's further own bytes: its count and step, and its
+/// parameters (`$90:8BA2`, `$90:8D0E`).
+const EFFECT_OWN: [std::ops::RangeInclusive<u16>; 2] = [0x0008..=0x000B, 0x0100..=0x010F];
 /// Own words that hold an entity's id: the group root (`7F:102E`) and the
 /// root a copy keeps after it leaves the group (`7F:201C`, `$97:CA02`).
 const ID_FIELDS: [u16; 2] = [0x102E, 0x201C];
@@ -614,7 +621,7 @@ impl<'a> Machine<'a> {
                 *memory.sleep = self.a?;
                 self.pc + 3
             }
-            0xBF | 0x9F => self.own(opcode, memory.own)?,
+            0xBF | 0x9F => self.own(opcode, memory.own, memory.effect)?,
             // The palette buffer (`$7F:0600..07FF`): a room's colour effect,
             // not drawn here (`$90:A45C`); and the fixed colour after it
             // (`$7F:0800..0802`, Crysta's night, `$88:8014`).
@@ -1009,12 +1016,14 @@ impl<'a> Machine<'a> {
     }
 
     /// `LDA` / `STA $7F:xxxx,X` on [`OWN`], X still the actor.
-    fn own(&mut self, opcode: u8, own: &mut Own) -> Option<usize> {
+    fn own(&mut self, opcode: u8, own: &mut Own, effect: bool) -> Option<usize> {
         let long = self.long()?;
         let width: u16 = if self.narrow { 1 } else { 2 };
         let address = u16::try_from(long & 0xFFFF).ok()?;
+        let ranges = if effect { &EFFECT_OWN[..] } else { &[] };
         let owned = OWN
             .iter()
+            .chain(ranges)
             .any(|own| own.contains(&address) && own.contains(&(address + width - 1)));
         if long >> 16 != 0x7F || !self.x || !owned {
             return None;
@@ -1362,6 +1371,7 @@ mod tests {
                 carried: &mut None,
                 pokes: &mut Vec::new(),
                 bank: 0x97,
+                effect: false,
             },
         )? {
             Ran::Next(next) => Some(next),
@@ -1409,6 +1419,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&fade, AT, &mut memory)), Some(AT + 37));
         assert!(!memory.display.shows_bg1());
@@ -1459,6 +1470,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&flyer, AT, &mut memory)), Some(AT + 21));
         let bytes: Vec<u8> = [0x2004, 0x2005, 0x2006, 0x2007, 0x1016, 0x1017]
@@ -1500,6 +1512,7 @@ mod tests {
                 carried: &mut None,
                 pokes: &mut Vec::new(),
                 bank: 0x97,
+                effect: false,
             };
             assert_eq!(next(super::run(&magirock, AT, &mut memory)), Some(at));
         }
@@ -1538,6 +1551,7 @@ mod tests {
                 carried: &mut None,
                 pokes: &mut Vec::new(),
                 bank: 0x97,
+                effect: false,
             };
             let end = AT + code.len() - 1;
             assert_eq!(next(super::run(&pedestal, AT, &mut memory)), Some(end));
@@ -1572,6 +1586,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&ball, AT, &mut memory)), Some(AT + 13));
         assert_eq!(sleep, 5 << 3);
@@ -1613,6 +1628,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut pokes,
             bank: 0x97,
+            effect: false,
         };
         (next(super::run(&run, AT, &mut memory)), pokes)
     }
@@ -1823,6 +1839,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&cadet, AT, &mut memory)), Some(AT + 35));
         // Target 8 left and 64 below: no branch, and the second PLA finds
@@ -1872,6 +1889,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&spell, AT, &mut memory)), Some(AT + 26));
         assert_eq!((own[&0x2004], own[&0x2005]), (0xC0, 0));
@@ -1905,6 +1923,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 17));
         assert_eq!(own[&0x2006], 0x70);
@@ -1937,6 +1956,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         // 0x1E0 + 0x1A < 0x200: BMI to the -1 branch.
         assert_eq!(next(super::run(&run, AT, &mut memory)), Some(AT + 19));
@@ -2054,6 +2074,7 @@ mod tests {
             carried: &mut None,
             pokes: &mut Vec::new(),
             bank: 0x97,
+            effect: false,
         };
         // Each pass raises the palette and ends the frame in `$80:80DF`.
         let mut ran = super::run(&whitening, AT, &mut memory);

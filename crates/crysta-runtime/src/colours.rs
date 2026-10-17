@@ -40,6 +40,17 @@ impl ObjColours {
         true
     }
 
+    /// Sets CGRAM `index` when it is an OBJ colour; a background one is
+    /// not kept.
+    pub fn set(&mut self, index: u8, colour: Bgr555) {
+        if let Some(slot) = usize::from(index)
+            .checked_sub(OBJ)
+            .and_then(|at| self.0.get_mut(at))
+        {
+            *slot = Some(colour);
+        }
+    }
+
     /// The colour a script loaded at CGRAM `index`, `$80` to `$FF`.
     #[must_use]
     pub fn get(&self, index: u8) -> Option<Bgr555> {
@@ -49,9 +60,33 @@ impl ObjColours {
     }
 }
 
+/// `COP EC`'s blend (`$80:BA35`): each channel goes from `from` toward
+/// `to` by the difference times `step / total`, the share rounded down.
+#[must_use]
+pub fn blend(from: Bgr555, to: Bgr555, step: u16, total: u16) -> Bgr555 {
+    let channel = |shift: u16| {
+        let (a, b) = ((from.raw() >> shift) & 0x1F, (to.raw() >> shift) & 0x1F);
+        let share = (a.abs_diff(b) * step).checked_div(total).unwrap_or(0);
+        let value = if b >= a { a + share } else { a - share };
+        (value & 0x1F) << shift
+    };
+    Bgr555::new(channel(0) | channel(5) | channel(10))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_blend_steps_each_channel_by_its_share_rounded_down() {
+        let rgb = |r: u16, g: u16, b: u16| Bgr555::new(b << 10 | g << 5 | r);
+        // Red 0 to 31, green 31 to 0, blue 10 to 13, at steps of 60.
+        let (from, to) = (rgb(0, 31, 10), rgb(31, 0, 13));
+        assert_eq!(blend(from, to, 0, 60), from);
+        assert_eq!(blend(from, to, 30, 60), rgb(15, 16, 11));
+        assert_eq!(blend(from, to, 59, 60), rgb(30, 1, 12));
+        assert_eq!(blend(from, to, 60, 60), to);
+    }
 
     #[test]
     fn a_load_keeps_the_obj_colours_and_drops_the_background_ones() {

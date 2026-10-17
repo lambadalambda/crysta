@@ -2131,3 +2131,102 @@ fn the_high_cadets_copies_flicker_three_passes_before_they_move() {
         assert_eq!(moves, Some(flicker + 150));
     }
 }
+
+#[test]
+fn tower_ones_head_fades_its_colours_as_natively() {
+    // Native JP trace (2026-10-17, the job's `tmp/door/`): `$100`, Ark
+    // walks up to the head. `COP AA $90:8D0E` starts an effect that blends
+    // CGRAM `$D1`..`$DF` from `$CD:188D` to `$CD:18AD` over 60 frames
+    // (`COP EC`), a step a frame from the frame it starts, then ends.
+    const NATIVE: [(usize, [u16; 15]); 3] = [
+        (
+            1,
+            [
+                0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6, 0x34E6,
+                0x34E6, 0x34E6, 0x34E6, 0x7C1F, 0x34E6,
+            ],
+        ),
+        (
+            30,
+            [
+                0x20A4, 0x2CC4, 0x28C6, 0x30E5, 0x34E6, 0x3907, 0x3D6A, 0x5650, 0x24A4, 0x2CE5,
+                0x34E6, 0x3507, 0x3947, 0x7C1F, 0x49CC,
+            ],
+        ),
+        (
+            60,
+            [
+                0x0842, 0x2082, 0x1CA6, 0x2CC4, 0x3505, 0x4148, 0x460E, 0x77DA, 0x1462, 0x24C3,
+                0x34E6, 0x3548, 0x3DC9, 0x7C1F, 0x5EB2,
+            ],
+        ),
+    ];
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        let mut world =
+            World::enter_with_events(rom.image(), 0x0100, 256, 1007, after_the_intro()).unwrap();
+        let colours = |world: &World| -> Vec<Option<u16>> {
+            (0xD1..=0xDF)
+                .map(|index| {
+                    world
+                        .obj_colours()
+                        .get(index)
+                        .map(assets::graphics::Bgr555::raw)
+                })
+                .collect()
+        };
+        let mut steps = Vec::new();
+        for frame in 0..300 {
+            let up = (frame < 60).then_some(Direction::Up);
+            world.update(up, Presses::default()).unwrap();
+            if colours(&world)[0].is_some() {
+                steps.push(colours(&world));
+            }
+        }
+        for (step, native) in NATIVE {
+            let expected: Vec<Option<u16>> = native.iter().map(|&raw| Some(raw)).collect();
+            assert_eq!(steps.get(step - 1), Some(&expected), "step {step}");
+        }
+        assert_eq!(steps.last(), steps.get(59), "the last step stays");
+    }
+}
+
+#[test]
+fn the_guardians_ring_window_grows_as_natively() {
+    // Native JP trace (2026-10-17, the job's `tmp/ring/`): `$11D`, the
+    // guardian at (128,128) raises `$0474` a frame from 1 to 44 (`COP 64
+    // 01 00`). When it reads 44, the ring's top rows (lines 90..111) span
+    // these columns: tables built from the radius before the frame's raise.
+    const LEFTS: [i32; 22] = [
+        117, 111, 107, 103, 99, 97, 96, 94, 94, 92, 92, 90, 90, 88, 88, 88, 86, 86, 86, 86, 86, 86,
+    ];
+    for rom in roms()
+        .iter()
+        .filter(|rom| rom.revision() == Revision::Japan)
+    {
+        let mut events = after_the_intro();
+        for flag in 0x101..=0x107 {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x011D, 128, 192, events).unwrap();
+        let mut ring = None;
+        for frame in 0..700 {
+            let confirm = world.dialogue().is_some() && !world.typing() && frame % 2 == 0;
+            let presses = Presses {
+                confirm,
+                ..Presses::default()
+            };
+            world.update(None, presses).unwrap();
+            if world.script_word(0x0474) == Some(44) {
+                ring = world.ring();
+                break;
+            }
+        }
+        let ring = ring.expect("the ring grows to 44");
+        let lefts: Vec<i32> = (90..112).map(|y| ring.span(y).expect("a row").0).collect();
+        assert_eq!(lefts, LEFTS);
+        assert_eq!(ring.span(89), None);
+    }
+}

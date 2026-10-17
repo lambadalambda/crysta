@@ -20,7 +20,7 @@ use assets::maps::exits::{ExitError, ExitList, ExitRecord};
 use assets::maps::flag_patches::{self, Patch};
 use assets::maps::scripts::EventFlags;
 use assets::sprites::PandoraRunMotion;
-pub use circle::Circle;
+pub use circle::{Circle, Ring};
 pub use darkness::Darkness;
 pub use pose::ArkPose;
 use room_core::arrival::{Arrival, ReturnRoute};
@@ -924,6 +924,12 @@ impl<'a> World<'a> {
             .collect();
         // Ark's turn reads the last frame's push (`$80:D0F0`).
         self.push_ark();
+        // The ring's effect builds its tables before its caller's script
+        // raises the radius (native `$11D`).
+        if let Some((caller, _)) = self.globals.ring {
+            let radius = self.script_word(crate::actors::CIRCLE_RADIUS).unwrap_or(0);
+            self.globals.ring = Some((caller, radius));
+        }
         self.walk_actors(nested, (x, y));
         // The draw pass sees the actors where they are now.
         let view = self.globals.view;
@@ -1175,6 +1181,8 @@ impl<'a> World<'a> {
         (self.globals.camera_target, self.globals.enemy_hold) = (None, 0);
         self.globals.torch_darkness = None;
         self.globals.circle = None;
+        self.globals.ring = None;
+        self.globals.palette_cycle = None;
         self.globals.obj_colours = crate::colours::ObjColours::default();
         self.start_landing();
         self.load_second();
@@ -2058,6 +2066,15 @@ impl<'a> World<'a> {
                 )
             })
             .collect()
+    }
+
+    /// The palette cycle an effect started (`COP 8A`): the palette
+    /// service's table (`$9A:8000`) and the frames since it started; the
+    /// light room's, for the hosts to play.
+    #[must_use]
+    pub fn palette_cycle(&self) -> Option<(u8, u16)> {
+        let (table, start) = self.globals.palette_cycle?;
+        Some((table, self.globals.frames.wrapping_sub(start)))
     }
 
     /// A WRAM word the scripts keep (`$04A6`, Shadowkeeper's phase), for

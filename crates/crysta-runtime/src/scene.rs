@@ -78,6 +78,12 @@ pub struct Globals {
     pub camera_target: Option<u16>,
     /// `$0476`: the actor the circle window (`COP 63`) is drawn around.
     pub circle: Option<u16>,
+    /// The palette cycle an effect started (`COP 8A`): the palette
+    /// service's table and the frame (`$42`) it started on.
+    pub palette_cycle: Option<(u8, u16)>,
+    /// The ring window (`COP 64`): its caller, and `$0474` as the frame's
+    /// actors began, which its tables are built from.
+    pub ring: Option<(u16, u16)>,
     /// Money, Prime Blue and the items scripts have given.
     pub inventory: crate::inventory::Inventory,
     /// The native save slot the world was loaded from or began with: the
@@ -265,6 +271,8 @@ impl Globals {
             scratch: crate::actors::Scratch::new(),
             camera_target: None,
             circle: None,
+            ring: None,
+            palette_cycle: None,
             inventory: crate::inventory::Inventory::default(),
             slot: crate::save::SaveSlot::default(),
             sram: crate::sram::Sram::default(),
