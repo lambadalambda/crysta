@@ -89,6 +89,10 @@ air frame, the frame after `$0454` shows B; there is no crouch.
   J+27 is a new dash jump at J+28. The brake: J+32..J+47 (2,2,1,2,1,2,1,2,1,
   0,0,1,0,0,0,0), resource 0 `$09`/`$0A`/`$0B`; Ark stands at J+48.
 
+## The carry dash jump
+
+B in a carry dash keeps the dash: `docs/pots.md`, "B in a carry dash".
+
 ## The carry jump
 
 `$84:AE94` Down, `AE9C` Up, `AEA4` Right, `AF14` Left; J is the first air

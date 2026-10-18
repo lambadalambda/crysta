@@ -133,6 +133,14 @@ once (1,2). The opposite way reverses it at n+1, from 3; a turn runs the
 old way two frames, then the new way from 3. A wall does not end it: Ark
 runs in place, and off the 16-pixel rows the walls nudge him 1 a frame.
 
+B in a carry dash (traces `t_b_held`, `t_b_free`, `t_b_down`, 2026-10-18)
+jumps on with the dash: no leap sound, the dash jump's heights from J+1,
+Ark's resource 3 `$24`/`$26`/`$28` rising for 12 frames and `$25`/`$27`/
+`$29` falling for 12, then resource 1's `$23`..`$25` for 7 frames; the pot
+keeps the dash's list. The dash runs on as if held through J+29; from J+30
+the pad counts again. Modelled as the jump's `Kind::CarryDash`. Not
+modelled: one frame of the other vertical list after the landing.
+
 Dash-throw (A while carry-dashing, `COP 2B $0080` at `$84:B117`/`B14B`/
 `B17F`/`B1B3`; JP = EU): release at F+1 with no windup, from ±16 (pot
 script `$84:C52F`), first sample x+22, **6 px per frame**, stream `$2D`
