@@ -1689,16 +1689,12 @@ impl<'a> World<'a> {
         match menu.step(pad, presses) {
             Some(crate::menu::Event::Closed) => self.menu = None,
             Some(crate::menu::Event::Sort(screen)) => {
-                // The weapons' slots `$7F:8040..805F`, the armor's `8060..807F`.
-                let slots = if screen == crate::menu::Screen::Weapon {
-                    0x20..0x30
-                } else {
-                    0x30..0x40
-                };
                 let image = self.image;
-                self.globals
-                    .inventory
-                    .sort_slots(slots, |item| attack::equipment_power(image, item));
+                if let Some(slots) = screen.slots() {
+                    self.globals
+                        .inventory
+                        .sort_slots(slots, |item| attack::equipment_power(image, item));
+                }
             }
             None => {}
         }

@@ -112,7 +112,7 @@ fn yomi_eases_to_the_weapon_door() {
                 let View::Screen(page) = menu.view() else {
                     panic!()
                 };
-                page.yomi.unwrap().0
+                page.yomi.0
             })
             .collect();
         assert_eq!(
@@ -358,7 +358,7 @@ fn the_weapon_door_leads_into_the_weapon_room_and_back() {
         let first = pages[dark.1 + 1].unwrap();
         assert_eq!((first.screen, first.hotspot), (Screen::Weapon, 0));
         // At the left door from P+99, in the window opening on her.
-        assert_eq!(first.yomi, Some((72, 56)));
+        assert_eq!(first.yomi, (72, 56));
         assert_eq!(pages[label - 1].unwrap().label, None);
         assert_eq!(pages[label].unwrap().label, Some(0), "{:?}", rom.revision());
         assert_eq!(
@@ -392,5 +392,52 @@ fn the_weapon_door_leads_into_the_weapon_room_and_back() {
             (back.screen, back.hotspot, back.label),
             (Screen::Hall, 6, Some(6))
         );
+    }
+}
+
+#[test]
+fn the_armor_door_and_the_rooms_doors_lead_on() {
+    // From the hall the armor room starts at its position 2; its door 1
+    // leads to the weapon room's 1, whose door 0 leads to the hall's
+    // weapon door, the label at P+162 (Japanese; the European 154 is not
+    // measured).
+    for rom in roms() {
+        let japan = rom.revision() == Revision::Japan;
+        let mut menu = open(&rom);
+        in_hall(&mut menu);
+        menu.step(pad(Direction::Right), Presses::NONE);
+        for _ in 0..20 {
+            menu.step(NONE, Presses::NONE);
+        }
+        let through = |menu: &mut Menu, frames: usize| {
+            menu.step(NONE, press_a());
+            (0..frames)
+                .filter_map(|_| menu.step(NONE, Presses::NONE))
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(through(&mut menu, 200), [Event::Sort(Screen::Armor)]);
+        let at = |menu: &Menu| page(menu).map(|page| (page.screen, page.hotspot));
+        assert_eq!(at(&menu), Some((Screen::Armor, 2)));
+        menu.step(pad(Direction::Left), Presses::NONE);
+        for _ in 0..20 {
+            menu.step(NONE, Presses::NONE);
+        }
+        assert_eq!(through(&mut menu, 200), [Event::Sort(Screen::Weapon)]);
+        assert_eq!(at(&menu), Some((Screen::Weapon, 1)));
+        menu.step(pad(Direction::Left), Presses::NONE);
+        for _ in 0..20 {
+            menu.step(NONE, Presses::NONE);
+        }
+        menu.step(NONE, press_a());
+        let label = if japan { 162 } else { 154 };
+        let labels: Vec<_> = (0..label)
+            .map(|_| {
+                menu.step(NONE, Presses::NONE);
+                page(&menu).and_then(|page| page.label)
+            })
+            .collect();
+        assert_eq!(labels[label - 2], None);
+        assert_eq!(labels[label - 1], Some(6), "{:?}", rom.revision());
+        assert_eq!(at(&menu), Some((Screen::Hall, 6)));
     }
 }

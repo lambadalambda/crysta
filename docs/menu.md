@@ -235,9 +235,9 @@ item room (256,256). The rooms use the hall's tiles, metatiles and layers
 
 `$92:BCA3[$06BC]` as in the hall (12 bytes: x, y, Up, Down, Left, Right);
 x, y are map pixels (Yomi's entity x/y); screen = map − camera. Same
-values in both ROMs. The table gives screen positions; the two rooms have
-the same graph and screen positions (weapon map y = screen y + 256, armor
-map x = screen x + 256):
+values in both ROMs. The two rooms have the same graph and screen
+positions; the table below gives the screen ones (the ROM's: weapon y +
+256, armor x + 256):
 
 | # | x, y | Up | Down | Left | Right | What |
 |---|---|---|---|---|---|---|

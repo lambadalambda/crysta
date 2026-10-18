@@ -216,25 +216,6 @@ fn take(from: &mut u32, amount: u32) -> bool {
 #[cfg(test)]
 mod tests {
 
-    #[test]
-    fn a_rooms_sort_puts_the_strongest_first_and_keeps_ties() {
-        // `docs/menu.md`: `$81` (3), `$82` (6), `$80`×2 (4) become
-        // `82 01 80 02 81 01`.
-        let mut inventory = Inventory::default();
-        let mut bytes = vec![0; 0x100];
-        bytes[0x40..0x46].copy_from_slice(&[0x81, 1, 0x82, 1, 0x80, 2]);
-        inventory.set_slot_bytes(&bytes);
-        let power = |item: u8| match item {
-            0x80 => 4,
-            0x81 => 3,
-            _ => 6,
-        };
-        inventory.sort_slots(0x20..0x30, power);
-        assert_eq!(
-            &inventory.slot_bytes()[0x40..0x48],
-            &[0x82, 1, 0x80, 2, 0x81, 1, 0, 0]
-        );
-    }
     use super::*;
 
     #[test]
@@ -314,5 +295,25 @@ mod tests {
         assert_eq!(inventory.prime_blue(), 0x0398);
         inventory.add_prime_blue(2);
         assert_eq!(inventory.prime_blue(), 0x03E7, "400 or more: the raw cap");
+    }
+
+    #[test]
+    fn a_rooms_sort_puts_the_strongest_first_and_keeps_ties() {
+        // `docs/menu.md`: `$81` (3), `$82` (6), `$80`×2 (4) become
+        // `82 01 80 02 81 01`.
+        let mut inventory = Inventory::default();
+        let mut bytes = vec![0; 0x100];
+        bytes[0x40..0x46].copy_from_slice(&[0x81, 1, 0x82, 1, 0x80, 2]);
+        inventory.set_slot_bytes(&bytes);
+        let power = |item: u8| match item {
+            0x80 => 4,
+            0x81 => 3,
+            _ => 6,
+        };
+        inventory.sort_slots(0x20..0x30, power);
+        assert_eq!(
+            &inventory.slot_bytes()[0x40..0x48],
+            &[0x82, 1, 0x80, 2, 0x81, 1, 0, 0]
+        );
     }
 }

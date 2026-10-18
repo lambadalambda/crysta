@@ -607,8 +607,8 @@ impl Session {
         let (cx, cy) = page.screen.camera();
         let camera = (i32::from(cx) - left, i32::from(cy));
         frame::draw_background(frame, hall, camera);
-        let at = page.yomi.map(|(x, y)| (u16::try_from(x + cx), u16::try_from(y + cy)));
-        if let (Some(yomi), Some((Ok(x), Ok(y)))) = (yomi, at) {
+        let (x, y) = page.yomi;
+        if let (Some(yomi), Ok(x), Ok(y)) = (yomi, u16::try_from(x + cx), u16::try_from(y + cy)) {
             // Priority 3, over the hall's high tiles.
             let raster = yomi.frame_at(u64::from(page.flap));
             frame::draw_sprite_over(frame, hall, camera, raster, (x, y));

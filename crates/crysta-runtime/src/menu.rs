@@ -36,9 +36,10 @@ struct DoorTiming {
     dark: (u32, u32),
     /// Yomi at the target; the window starts opening.
     yomi: u32,
-    /// The label, in a room and back in the hall (not measured in
-    /// European: 8 frames sooner, as the room's).
+    /// The label in a room.
     label: u32,
+    /// The label back in the hall (European not measured: 8 frames sooner,
+    /// as its room's).
     hall_label: u32,
 }
 
@@ -59,7 +60,8 @@ const EUROPE_DOOR: DoorTiming = DoorTiming {
 const WIPE_START: u32 = 2;
 const WIPE: u32 = 64;
 /// The new screen loads after the dark begins: the room's slots are
-/// sorted then (P+68 in Japanese).
+/// sorted then (P+68 in Japanese; European not measured, the same
+/// distance assumed).
 const LOAD: u32 = 6;
 
 /// The field's fade out: its first step, then one a frame to black.
@@ -91,12 +93,23 @@ pub enum Screen {
 }
 
 impl Screen {
-    /// `$06BC` and the screen's position count.
-    const fn table(self) -> (usize, usize) {
+    /// `$06BC`, the screen's position count, and its place in [`Hall`].
+    const fn table(self) -> (usize, usize, usize) {
         match self {
-            Self::Hall => (0, 9),
-            Self::Armor => (3, 20),
-            Self::Weapon => (4, 20),
+            Self::Hall => (0, 9, 0),
+            Self::Armor => (3, 20, 1),
+            Self::Weapon => (4, 20, 2),
+        }
+    }
+
+    /// A room's sixteen slots, as indices of the inventory's (`$7F:8040`,
+    /// `$7F:8060`).
+    #[must_use]
+    pub const fn slots(self) -> Option<std::ops::Range<usize>> {
+        match self {
+            Self::Hall => None,
+            Self::Weapon => Some(0x20..0x30),
+            Self::Armor => Some(0x30..0x40),
         }
     }
 
@@ -173,7 +186,7 @@ impl Hall {
         let tables = assets::layout::per_revision(image, 0x12_BCA3, 0x12_BE51);
         let word = |at: usize| Some(u16::from_le_bytes([*image.get(at)?, *image.get(at + 1)?]));
         let screen = |screen: Screen| {
-            let (index, count) = screen.table();
+            let (index, count, _) = screen.table();
             let table = (tables & 0xFF_0000) | usize::from(word(tables + index * 2)?);
             (0..count)
                 .map(|entry| {
@@ -209,11 +222,7 @@ impl Hall {
     /// A screen's hotspots or positions.
     #[must_use]
     pub fn hotspots(&self, screen: Screen) -> &[Hotspot] {
-        &self.screens[match screen {
-            Screen::Hall => 0,
-            Screen::Armor => 1,
-            Screen::Weapon => 2,
-        }]
+        &self.screens[screen.table().2]
     }
 }
 
@@ -291,8 +300,8 @@ pub struct Page {
     pub screen: Screen,
     /// The hotspot or position (`$06A6`, `$06AA`, `$06AC`).
     pub hotspot: u8,
-    /// Yomi's place on the screen; none while a door loads.
-    pub yomi: Option<(i16, i16)>,
+    /// Yomi's place on the screen.
+    pub yomi: (i16, i16),
     /// The hotspot whose label shows; none while it is redrawn.
     pub label: Option<u8>,
     /// Yomi's flapping: frames since she was spawned while the hall
@@ -323,11 +332,10 @@ enum Phase {
     Closing(u32),
 }
 
-/// A door under way: from where, to which screen and cursor.
+/// A door under way: to which screen and cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Door {
     since: u32,
-    from: Screen,
     /// The door's place: 0, 1 or 2 (`$7F:201C`).
     place: u8,
     to: Screen,
@@ -401,7 +409,11 @@ impl Menu {
                     self.phase = Phase::Closing(self.frame);
                 } else if presses.confirm {
                     self.take_door();
-                } else if let Some(door) = presses.cancel.then(|| self.screen.hall_door()).flatten()
+                } else if let Some(door) = presses
+                    .cancel
+                    .then(|| self.screen.hall_door())
+                    .flatten()
+                    .filter(|&door| door != self.hotspot)
                 {
                     self.go(door, None);
                 } else {
@@ -428,11 +440,9 @@ impl Menu {
         } else {
             self.hotspot
         };
-        self.ease = None;
         self.moved = None;
         self.phase = Phase::Door(Door {
             since: self.frame,
-            from: self.screen,
             place,
             to,
             cursor,
@@ -444,7 +454,10 @@ impl Menu {
     fn door_frame(&mut self, door: Door) -> Option<Event> {
         let after = self.frame - door.since;
         let load = self.doors.dark.0 + LOAD;
+        // A move under way goes on to the load.
+        self.ease_yomi();
         if after == load {
+            self.ease = None;
             self.screen = door.to;
             self.hotspot = door.cursor;
             self.yomi = self
@@ -587,18 +600,17 @@ impl Menu {
             return View::Blank;
         }
         let page = self.page();
-        let (wipe, yomi) = if after < first {
+        // The old screen until the dark, the new one after it; the window
+        // done (JP P+165) is not separate from the label yet.
+        let wipe = if after < first {
             let closing = after.saturating_sub(WIPE_START).min(WIPE);
-            ((Wipe::Closing(door.place), closing), page.yomi)
+            (Wipe::Closing(door.place), closing)
         } else {
-            let shown = (after >= self.doors.yomi).then_some(page.yomi).flatten();
-            ((Wipe::Opening(door.place), after - self.doors.yomi), shown)
+            (Wipe::Opening(door.place), after - self.doors.yomi)
         };
         // The label goes at the press's second frame.
         let label = (after < WIPE_START).then_some(page.label).flatten();
         View::Screen(Page {
-            screen: if after < first { door.from } else { door.to },
-            yomi,
             label,
             wipe: Some(wipe),
             ..page
@@ -617,7 +629,7 @@ impl Menu {
         Page {
             screen: self.screen,
             hotspot: self.hotspot,
-            yomi: Some((self.yomi.0 - camera.0, self.yomi.1 - camera.1)),
+            yomi: (self.yomi.0 - camera.0, self.yomi.1 - camera.1),
             label,
             flap: self.frame.saturating_sub(self.timing.hall) + FLAP_AT_HALL,
             wipe: None,
