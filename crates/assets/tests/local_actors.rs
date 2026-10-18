@@ -867,3 +867,26 @@ fn the_box_halls_labels_decode() {
     // 武器のとびら, 道具のとびら, 防具のとびら.
     assert_eq!(glyphs, [6, 5, 2, 3, 6, 5, 6, 6, 6]);
 }
+
+#[test]
+fn a_pedestals_label_shows_its_count_from_two() {
+    // `$92:B47C`: the item's name (`$0DD0`), then `$DE $0DD2` (`$85:9A2F`):
+    // the count when it is 2 or more.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let glyphs = |count: u8| {
+        let pages =
+            assets::text::HouseDialogue::decode_reading(cartridge.image(), 0x92_B47C, |address| {
+                match address {
+                    0x0DD0 => Some(0x81),
+                    0x0DD2 => Some(count),
+                    0x0DD1 | 0x0DD3 => Some(0),
+                    _ => None,
+                }
+            })
+            .unwrap();
+        pages[0].glyphs().len()
+    };
+    assert_eq!(glyphs(3), glyphs(1) + 1);
+}

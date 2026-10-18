@@ -630,12 +630,16 @@ impl Decoder<'_> {
         self.enter(bank | u32::from(u16::from_le_bytes([entry[0], entry[1]])))
     }
     /// `$CD addr`: the word at `addr` in decimal, without leading zeros;
-    /// digit `d` is glyph `$73 + d` (European `$63 + d`).
-    fn number(&mut self, at: u32) -> Result<(), TextError> {
+    /// digit `d` is glyph `$73 + d` (European `$63 + d`). `$DE addr`
+    /// (`$85:9A2F`) prints it only from 2: a pedestal's count.
+    fn number(&mut self, at: u32, from: u16) -> Result<(), TextError> {
         let address = self.word()?;
         let byte =
             |address: u16| (self.read)(address).ok_or_else(|| invalid(at, "unresolved number"));
         let value = u16::from_le_bytes([byte(address)?, byte(address.wrapping_add(1))?]);
+        if value < from {
+            return Ok(());
+        }
         let font = self.address(FONT)?;
         let zero = per_revision(self.image, 0x73, 0x63);
         for digit in value.to_string().bytes() {
@@ -887,7 +891,8 @@ impl Decoder<'_> {
                     let [column, line] = [self.next()?, self.next()?];
                     self.position = [u16::from(column) * 4, u16::from(line) * 16];
                 }
-                0xcd => self.number(at)?,
+                0xcd => self.number(at, 0)?,
+                0xde => self.number(at, 2)?,
                 0xd8 => self.bcd_number(at)?,
                 0xcf => {
                     if self.position[1] + 16 >= self.dimensions[1] {
