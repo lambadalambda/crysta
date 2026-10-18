@@ -18,11 +18,12 @@ these problems.
   refused.
 - [x] `$111`'s darts are placeholders and tower 2's statues draw blank:
   mode-4 frames name sheet tiles, not moved OBJ tiles.
-- [ ] Mu (`$12A`) and Polynesia (`$12B`) show "unsupported house movement
-  resource" placeholders; Mu's scripts stop.
-- [ ] The box tour stops a script on `$041` (`$39554`).
+- [x] Mu (`$12A`) and Polynesia (`$12B`) show placeholders: Mu's rocks
+  (frame facing 8) and the controllers hidden by their header.
+- [x] The box tour stops a script on `$041` (`$39554`).
 - [ ] The Elder's head draws over Ark (Crysta, the opening).
-- [ ] Check the grey screen as the box opens and the area-title glyphs.
+- [ ] Check the grey screen as the box opens. (The area title's scattered
+  glyphs are its fly-in, natively too.)
 
 ## Acceptance Criteria
 
