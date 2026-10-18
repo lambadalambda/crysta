@@ -2656,3 +2656,66 @@ fn a_wall_stops_a_dash_with_its_sound() {
         assert_eq!(world.position(), (100, 624));
     }
 }
+
+#[test]
+fn shadowkeeper_falls_after_the_torch_intro_too() {
+    // Climbed to from the room's foot, Ark stands within `$40` of the body
+    // (`$93:D9CC`): its loop takes the stage count's branch (`$93:D9F6` to
+    // `$DA4D`, `INC $0498`), which the walkthrough found frozen. The fight
+    // goes on to the light room, as from the test's start.
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    for rom in roms() {
+        let mut events = after_the_intro();
+        for flag in (0x101..=0x107).chain([0x19B]) {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0123, 128, 976, events).unwrap();
+        world.set_life(999);
+        for _ in 0..1200 {
+            world
+                .update(Some(Direction::Up), Presses::default())
+                .unwrap();
+            if world.events()[0] & 2 != 0 {
+                break;
+            }
+        }
+        let body = world
+            .residents()
+            .iter()
+            .find(|resident| matches!(resident.script, Some(0x93_D876 | 0x99_9B5E)))
+            .map(|resident| resident.record)
+            .unwrap();
+        let mut phases = vec![];
+        for frame in 0..4000 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            let up = (frame < 30).then_some(Direction::Up);
+            let press = if reading && frame % 2 == 0 {
+                a
+            } else {
+                Presses::default()
+            };
+            world.update(up, press).unwrap();
+            assert!(
+                world.frozen_scripts().is_empty(),
+                "{:?} {frame}: {:x?}",
+                rom.revision(),
+                world.frozen_scripts()
+            );
+            let phase = world.script_word(0x04A6).unwrap_or(0);
+            if phase != 0 && phases.last() != Some(&phase) {
+                phases.push(phase);
+            }
+            if frame % 40 == 0 && frame > 300 && world.hit_spawned(30).is_none() {
+                world.hit_foe(body, 60);
+            }
+            if world.map() != 0x0123 {
+                break;
+            }
+        }
+        assert_eq!(phases.last(), Some(&0x11), "{:?}", rom.revision());
+        assert_eq!(world.map(), 0x0106, "{:?}", rom.revision());
+    }
+}

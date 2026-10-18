@@ -650,6 +650,9 @@ impl<'a> Machine<'a> {
                 self.pc + 4
             }
             0x8F => self.stop_spin(memory.display)?,
+            // The enemies' hold (`$0498`) is the counting recognisers' (as
+            // Shadowkeeper's body, `$93:DA4D`): stop before it.
+            0xEE | 0x9C if self.operand() == Some(ENEMIES) => return Some(Flow::Stop),
             // Scratch words are words: a narrow accumulator refuses them.
             0x9C | 0x8D | 0xAD | 0xEE | 0xCE | 0xCD | 0x0C | 0x1C if self.narrow => {
                 return None;
