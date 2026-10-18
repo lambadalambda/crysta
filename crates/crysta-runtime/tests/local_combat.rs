@@ -551,3 +551,28 @@ fn a_soul_goes_after_its_talk() {
         );
     }
 }
+
+#[test]
+fn a_soul_blocks_the_way() {
+    // A soul stands where its carrier died: Ark walking up into it stops
+    // below it (natively at y 402, 18 pixels below; its cell here, 400).
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0102, 520, 460, events).unwrap();
+        let record = world
+            .residents()
+            .iter()
+            .find(|resident| resident.position == (520, 384))
+            .expect("the marked blob")
+            .record;
+        assert!(world.kill_foe(record), "{:?}", rom.revision());
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        for _ in 0..90 {
+            world.update(Some(Direction::Up), Presses::NONE).unwrap();
+        }
+        assert_eq!(world.position(), (520, 400), "{:?}", rom.revision());
+    }
+}

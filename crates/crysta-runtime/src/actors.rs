@@ -840,6 +840,8 @@ pub struct Actor {
     /// A spawn's art turned to the helper art's (`COP D8`, Shadowkeeper's
     /// wisps `$8F:80C5`): its lists are drawn in place of its parent's.
     helper_art: Option<u32>,
+    /// A soul a marked enemy left (`$85:E2BA`): it stands in Ark's way.
+    soul: bool,
     /// A sleep `COP 46` or a native store leaves for the next yield
     /// (`E+$0E`).
     sleep: u16,
@@ -1007,6 +1009,7 @@ impl Actor {
             died: false,
             overlay: None,
             helper_art: None,
+            soul: false,
             sleep: 0,
             unseen: false,
             walked: false,
@@ -1276,12 +1279,13 @@ impl Actor {
     }
 
     /// Whether a body holds its own cell without a mark: a walker, whose
-    /// steps the runtime does not mark, or one whose script froze before it
-    /// could mark. A body whose script runs and marks nothing -- C's blue
+    /// steps the runtime does not mark, one whose script froze before it
+    /// could mark, or a soul (natively a box test: Ark stops 2 pixels
+    /// sooner). A body whose script runs and marks nothing -- C's blue
     /// door -- leaves its cell alone, as natively.
     #[must_use]
     pub const fn holds_its_cell(&self) -> bool {
-        self.walked || self.frozen_at.is_some()
+        self.walked || self.frozen_at.is_some() || self.soul
     }
 
     fn frame(&mut self, around: &mut Surroundings<'_>) {

@@ -28,6 +28,8 @@ Marked enemies: `$102`, `$103`, `$108`, `$109`, `$118`, `$12E`.
 - [ ] `$102`'s soul instead pans the camera to the gate and opens it
   (`$90:90CD`: flags `$282`/`$283`, `COP DF`, `COP DC`, `7F:201A`, `COP 46`).
   It stops at `$90:90DE`.
+- [x] The soul stands in Ark's way (its cell; natively Ark stops 2 pixels
+  sooner, at y 402 below `$102`'s soul).
 - [ ] Sound `$37` with the burst.
 
 ## Acceptance Criteria

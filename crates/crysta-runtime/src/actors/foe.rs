@@ -356,7 +356,7 @@ impl Actor {
     fn free_soul(&mut self, image: &[u8]) {
         let helper = helper(image);
         self.load_packet(image, &helper.to_le_bytes()[..3]);
-        (self.overlay, self.helper_art) = (None, Some(helper));
+        (self.overlay, self.helper_art, self.soul) = (None, Some(helper), true);
         (self.selector, self.pose_age) = (SOUL, 0);
         (self.hidden, self.touchable, self.guard) = (false, false, (0, 0));
         self.interaction = super::INTERACT_ANY_SIDE;
