@@ -398,11 +398,15 @@ impl World<'_> {
                 self.carry_to_landing(false);
             }
         }
-        if let Some(step) = self.take_exit()? {
-            // An exit puts the pot down, as a carry step's does.
-            if matches!(jump.kind, Kind::Carry | Kind::CarryDash) {
-                self.drop_carried_on_exit();
-            }
+        // An exit puts the pot down, as a carry step's does; the frame API
+        // walks him out first.
+        let exit = self.take_exit()?;
+        if (exit.is_some() || self.in_transition())
+            && matches!(jump.kind, Kind::Carry | Kind::CarryDash)
+        {
+            self.drop_carried_on_exit();
+        }
+        if let Some(step) = exit {
             return Ok(Some(step));
         }
         self.jump = Some(jump);

@@ -523,6 +523,8 @@ impl World<'_> {
             let Some(delta) = leaving.walk.step() else {
                 return self.arrive(&leaving.record).map(Some);
             };
+            // A pot dropped on the exit falls where he was as he walks out.
+            self.fly_pot()?;
             self.move_by(delta);
             self.leaving = Some(leaving);
             self.run_actors()?;

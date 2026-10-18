@@ -55,6 +55,14 @@ pub(super) struct Pots {
 }
 
 impl Pots {
+    /// The pot in hand falls as Ark walks out of an exit
+    /// ([`World::fly_pot`]).
+    fn drop_on_exit(&mut self) {
+        if let Some(state) = &mut self.state {
+            state.drop_on_exit();
+        }
+    }
+
     /// The source pots of a freshly built room, if it has any.
     pub(super) fn at_entry(cells: &[u16]) -> Option<Self> {
         let objects: Vec<SourceObject> = cells
@@ -178,6 +186,8 @@ impl World<'_> {
         }
         let dashing = matches!(self.pots.as_ref()?.run, Some(Run::Dash { .. }));
         let motion = match state.phase() {
+            // Dropped on an exit, it is in hand a frame more.
+            Phase::Empty if state.drop_pending() => PandoraCarryMotion::Walking,
             Phase::Empty => return None,
             Phase::Held if dashing => PandoraCarryMotion::Dashing,
             Phase::Lifting => PandoraCarryMotion::Lifting,
@@ -224,11 +234,9 @@ impl World<'_> {
 
     /// An exit Ark jumped onto with the pot: he puts it down as he leaves.
     pub(super) fn drop_carried_on_exit(&mut self) {
-        let Some(mut pots) = self.pots.take() else {
-            return;
-        };
-        self.drop_carried(&mut pots);
-        self.pots = Some(pots);
+        if let Some(pots) = &mut self.pots {
+            pots.drop_on_exit();
+        }
     }
 
     /// One frame of a pot action, when the component owns the player or `lift`
@@ -406,8 +414,8 @@ impl World<'_> {
         }
     }
 
-    /// A frame of a flying pot while Ark falls or drops: it flies on where
-    /// he is.
+    /// A frame of a flying or falling pot while Ark falls, drops or walks
+    /// out of an exit: it flies on where he is.
     pub(super) fn fly_pot(&mut self) -> Result<(), WorldError> {
         let Some(mut pots) = self.pots.take() else {
             return Ok(());
@@ -415,11 +423,12 @@ impl World<'_> {
         let (walking, facing) = (self.walking, self.facing);
         let flying = pots.owned
             && pots.state.as_mut().is_some_and(|state| {
-                state.flight().is_some() && state.rebase(walking, facing).is_ok()
+                (state.flight().is_some() || state.drop_pending())
+                    && state.rebase(walking, facing).is_ok()
             });
         if flying {
             let animation = self.animation;
-            let step = self.pot_step(&mut pots, None, false, true);
+            let step = self.pot_step(&mut pots, None, false, false);
             (self.walking, self.facing, self.animation) = (walking, facing, animation);
             step?;
         }
@@ -481,10 +490,9 @@ impl World<'_> {
     /// `$12`, unbroken) and leaves.
     fn leave_carrying(&mut self, pots: &mut Pots) -> Result<(), WorldError> {
         self.take_exit()?;
-        if !self.in_transition() {
-            return Ok(());
+        if self.in_transition() {
+            pots.drop_on_exit();
         }
-        self.drop_carried(pots);
         Ok(())
     }
 

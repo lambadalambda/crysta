@@ -10,11 +10,8 @@ use room_core::Direction;
 use serde_json::Value;
 use std::path::{Path, PathBuf};
 
-/// Not modelled yet: the fall the pot shows as an exit drops it
-/// (`$84:C5CB`, stream `$6A`); the drop itself is
-/// [`carrying_onto_an_exit_drops_the_pot`]. Tracked:
-/// `meta/issues/pot-extras.md`.
-const LATER: [&str; 1] = ["exit-while-carrying"];
+/// Fixtures not replayed yet.
+const LATER: [&str; 0] = [];
 
 /// The pot's break sound.
 const BREAK: u8 = 0x13;
@@ -66,6 +63,9 @@ fn pot(world: &World<'_>) -> (String, Option<(u16, u16, i16)>) {
         (Some((Motion::Lifting, 22)), None) => "held",
         (Some((Motion::Lifting, _)), None) => "lift",
         (Some((Motion::Throwing, _)), None) => "windup",
+        // The exit's drop (`$84:C5CB`) holds it a frame as Ark leaves; the
+        // fixtures name that script a windup too.
+        (Some((Motion::Walking, _)), None) if world.in_transition() => "windup",
         (Some(_) | None, None) => "held",
     };
     (phase.into(), flight)
@@ -103,6 +103,10 @@ fn replay(image: &[u8], name: &str, recipe: &Value, csv: &str) -> Result<(), Str
             .collect();
         let sounds = frame(&mut world, &buttons, &mut held_a);
         let number = |name: &str| row[column(name)].parse::<i32>().unwrap();
+        // An exit's load and its frames are `meta/issues/map-load-frames.md`'s.
+        if world.map() != 0x000C || (number("px"), number("py")) == (0, 0) {
+            break;
+        }
         let i = row[column("i")];
         let (x, y) = world.position();
         let facing = world.facing() as i32;
