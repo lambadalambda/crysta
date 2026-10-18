@@ -50,12 +50,13 @@ pub struct PandoraBackground {
     initialization: Initialization,
 }
 /// The box menu's hall: the tour's tiles and colors with its own metatiles
-/// and layer (`docs/menu.md`).
+/// and layer (`docs/menu.md`); with the weapon and armor rooms' colors when
+/// `room`.
 ///
 /// # Errors
 /// As [`PandoraBackground::from_rom`]'s tour.
-pub fn box_hall(image: &[u8]) -> Result<StaticBackground, VisualMapError> {
-    recipes::hall(image)
+pub fn box_hall(image: &[u8], room: bool) -> Result<StaticBackground, VisualMapError> {
+    recipes::hall(image, room)
 }
 
 impl PandoraBackground {

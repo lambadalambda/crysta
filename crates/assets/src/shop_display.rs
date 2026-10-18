@@ -94,6 +94,15 @@ impl ShopArt {
     }
 }
 
+/// The palette an item's icon takes (`$B1:DA31` + item): its colours are
+/// `$AF:E43B` + 32 × this, as BG palette this in the box's rooms.
+///
+/// # Errors
+/// Refuses reads outside the image.
+pub fn icon_palette(image: &[u8], item: u8) -> Result<u8, ShopError> {
+    Ok(read(image, located(image, ICON_PALETTES.1)? + u32::from(item), 1)?[0])
+}
+
 /// An item's 16×16 icon, top-left, top-right, bottom-left, bottom-right,
 /// and its 8 colours (OBJ palette 7, colours 8..15).
 ///
@@ -116,7 +125,7 @@ pub fn item_icon(image: &[u8], item: u8) -> Result<([Tile4bpp; 4], [Bgr555; 8]),
                 .map_err(|_| ShopError::Invalid(row, "icon tiles"))?,
         );
     }
-    let entry = read(image, located(image, ICON_PALETTES.1)? + u32::from(item), 1)?[0];
+    let entry = icon_palette(image, item)?;
     let palette = read(
         image,
         located(image, ICON_PALETTES.0)? + u32::from(entry) * 32,
