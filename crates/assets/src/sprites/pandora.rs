@@ -265,7 +265,8 @@ impl PandoraSprites {
             (
                 3,
                 &[
-                    0x12, 0x13, 0x14, 15, 16, 17, 0x18, 0x19, 0x1A, 0x1D, 0x20, 0x39, 0x3A,
+                    0x12, 0x13, 0x14, 15, 16, 17, 0x18, 0x19, 0x1A, 0x1D, 0x20, 0x24, 0x25, 0x26,
+                    0x27, 0x28, 0x29, 0x39, 0x3A,
                 ][..],
             ),
             (5, &[4, 5, 7, 8][..]),
@@ -902,6 +903,12 @@ pub enum PandoraCarryMotion {
     Dashing,
     /// A in that dash: the pot flies at once (`$84:B117`..`B1B3`).
     DashThrowing,
+    /// B in that dash, rising (native traces `t_b_*`).
+    DashJumpRising,
+    /// The same jump, falling.
+    DashJumpFalling,
+    /// Its landing, while the dash's grace runs.
+    DashJumpLanding,
 }
 /// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
 /// the brake that ends it.
@@ -941,7 +948,9 @@ impl PandoraSprites {
             ark_art(
                 &mut loader,
                 1,
-                &[0x13, 0x14, 0x15, 0x16, 23, 24, 25, 0x1A, 0x1B, 0x1C],
+                &[
+                    0x13, 0x14, 0x15, 0x16, 23, 24, 25, 0x1A, 0x1B, 0x1C, 0x23, 0x24, 0x25,
+                ],
             )?,
         ])
     }
@@ -985,6 +994,11 @@ impl PandoraSprites {
             PandoraCarryMotion::Dashing => (0x80_a255, 0x1A + axis, 0x22 + axis),
             // Resource 3 `$12`..`$14`; the pot is in flight (native `t_*`).
             PandoraCarryMotion::DashThrowing => (0x80_a261, 0x12 + axis, 60),
+            // Resource 3 `$24`/`$26`/`$28`, then `$25`/`$27`/`$29`, then
+            // resource 1 `$23`..`$25`; the pot keeps the dash's list.
+            PandoraCarryMotion::DashJumpRising => (0x80_a261, 0x24 + 2 * axis, 0x22 + axis),
+            PandoraCarryMotion::DashJumpFalling => (0x80_a261, 0x25 + 2 * axis, 0x22 + axis),
+            PandoraCarryMotion::DashJumpLanding => (0x80_a255, 0x23 + axis, 0x22 + axis),
         };
         let hflip = facing == 2 && motion != PandoraCarryMotion::Dropping;
         Some(PandoraCarryPose {
