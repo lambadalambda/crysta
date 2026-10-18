@@ -12,10 +12,12 @@
 //! ([`World::update`]) plays them; the stepping API loads at once, at its
 //! raw or exact source-qualified placement, for route discovery.
 //!
-//! Not modelled: the loads' own frames (3 to 5 natively, more between the
-//! house and the town, which only lengthens the dark). Script transfers
-//! fade by their mode ([`super::fade`]). Load frames tracked:
-//! `meta/issues/map-load-frames.md`.
+//! After the walk the old map stays for the load's frames ([`load_frames`]),
+//! then the player stands in the new one, in the dark, with the world
+//! running: the fade in starts the dark's frames ([`dark_frames`]) and 3
+//! after the walk's last, and the arrival's walk is timed to it (native
+//! traces `loads/*`, 2026-10-18). Script transfers fade by their mode
+//! ([`super::fade`]).
 
 use super::{Step, World, WorldError, EXIT_SOUND, STAIRS, STAIRS_UP};
 use crate::WORLD_MAPS;
@@ -25,10 +27,12 @@ use room_core::{AnimationState, Direction, WalkingState};
 /// Per-frame moves as runs: (frames, dx, dy).
 type Motion = &'static [(u8, i8, i8)];
 
-/// Out through a door, drawn going Down: 16 pixels, one a frame.
-const DOOR_LEAVING: Motion = &[(16, 0, 1)];
+/// Out through a door, drawn going Down: 17 pixels, one a frame (native
+/// traces `loads/to0d`, `exit-while-carrying`).
+const DOOR_LEAVING: Motion = &[(17, 0, 1)];
 /// In through one, from native 6989 (`$0F` to `$10`): a pause, then 17
-/// pixels.
+/// pixels; control returns on the frame after the last (native trace
+/// `loads/ctl`).
 const DOOR_ARRIVING: Motion = &[
     (8, 0, 0),
     (1, 0, 1),
@@ -36,7 +40,15 @@ const DOOR_ARRIVING: Motion = &[
     (1, 0, 1),
     (1, 0, 0),
     (15, 0, 1),
+];
+/// The same on the PAL ROM (native traces `loads/eu_to0d`, `eu_to10`).
+const PAL_DOOR_ARRIVING: Motion = &[
+    (8, 0, 0),
+    (1, 0, 1),
     (1, 0, 0),
+    (1, 0, 1),
+    (1, 0, 0),
+    (15, 0, 1),
 ];
 /// Down the stairs (selector 14), C to E at native 24987: 63 frames, +10, +7 in all.
 const STAIRS_DOWN_LEAVING: Motion = &[
@@ -216,8 +228,7 @@ const FADE: u16 = 16;
 /// must decompress and whether the music's samples change, which the
 /// cache (`$0418`..`$044E`) decides. Loads the route does not take stay
 /// dark for [`DARK`] frames, its usual room-to-room load.
-/// Japanese route measurements except for the European bedroom door, whose
-/// PAL load has been measured at 14 rather than 17 dark frames.
+/// Japanese route measurements; the PAL ROM's are 3 shorter.
 const MEASURED_DARK: [((u16, u16), u16); 27] = [
     ((0x0F, 0x10), 17),
     ((0x10, 0x0C), 18),
@@ -249,17 +260,66 @@ const MEASURED_DARK: [((u16, u16), u16); 27] = [
 ];
 const DARK: u16 = 17;
 
+/// The frames from a walk's last to the player's place in the new map
+/// (the old map's last frames and the load's), on the native route
+/// (`local/pandora-tower-discovery/departure`); others take [`LOAD`].
+const MEASURED_LOAD: [((u16, u16), u16); 12] = [
+    ((0x0D, 0x0A), 34),
+    ((0x0A, 0x13), 26),
+    ((0x13, 0x0A), 34),
+    ((0x0A, 0x0D), 26),
+    ((0x0C, 0x0E), 60),
+    ((0x20, 0x21), 3),
+    ((0x21, 0x41), 50),
+    ((0x42, 0x21), 69),
+    ((0x21, 0x20), 6),
+    ((0x0A, 0x03), 77),
+    ((0x03, 0x100), 70),
+    ((0x100, 0x101), 56),
+];
+/// A room's load, and a tower room's.
+const LOAD: u16 = 5;
+const TOWER_LOAD: u16 = 4;
+
+/// The frames from a walk's last to the player's place after the load from
+/// `from` to `to` on this ROM: a frame fewer on the PAL one (native traces
+/// `loads/eu_*`).
+pub(super) fn load_frames(image: &[u8], from: u16, to: u16) -> u16 {
+    let japanese = japanese_load_frames(from, to);
+    assets::layout::per_revision(image, japanese, japanese.saturating_sub(1))
+}
+
+fn japanese_load_frames(from: u16, to: u16) -> u16 {
+    MEASURED_LOAD
+        .iter()
+        .find(|(maps, _)| *maps == (from, to))
+        .map_or_else(
+            || {
+                if from >= 0x40 && to >= 0x40 {
+                    TOWER_LOAD
+                } else {
+                    LOAD
+                }
+            },
+            |&(_, frames)| frames,
+        )
+}
+
+/// An arrival's walk starts this many frames before the fade in: its
+/// first step comes 6 before it (native traces `loads/*`), 5 on the PAL
+/// ROM.
+const ARRIVAL_LEAD: u16 = 14;
+const PAL_ARRIVAL_LEAD: u16 = 13;
+
 /// The dark frames of the load from `from` to `to` on this ROM.
 pub(super) fn dark_frames(image: &[u8], from: u16, to: u16) -> u16 {
     let japanese = MEASURED_DARK
         .iter()
         .find(|(maps, _)| *maps == (from, to))
         .map_or(DARK, |&(_, frames)| frames);
-    if (from, to) == (0x0f, 0x10) {
-        assets::layout::per_revision(image, japanese, 14)
-    } else {
-        japanese
-    }
+    // The PAL loads are 3 frames shorter (the bedroom door's 14, native
+    // traces `loads/eu_*`).
+    assets::layout::per_revision(image, japanese, japanese.saturating_sub(3))
 }
 
 /// `$8D:8985`: each selector's arrival adjustment, as (dx, dy).
@@ -310,6 +370,14 @@ impl Walk {
         }
     }
 
+    /// The still frames it starts with.
+    fn leading_stills(self) -> u16 {
+        match self.motion.first() {
+            Some(&(frames, 0, 0)) => u16::from(frames),
+            _ => 0,
+        }
+    }
+
     fn len(self) -> u16 {
         self.motion
             .iter()
@@ -354,6 +422,10 @@ fn moved((x, y): (u16, u16), (dx, dy): (i16, i16)) -> (u16, u16) {
 pub(super) struct Leaving {
     record: ExitRecord,
     walk: Walk,
+    /// The load's frames from the walk's last to the arrival.
+    load: u16,
+    /// Of them, the frames still to wait.
+    waiting: u16,
     /// An upward door walk's threshold: the top of the cell it began in.
     door_up: Option<(u16, u16)>,
     /// Where the player stood on the exit frame, the stairs' mask anchor.
@@ -364,6 +436,8 @@ pub(super) struct Leaving {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Arriving {
     walk: Walk,
+    /// Frames the player stands before the walk starts.
+    hold: u16,
     /// The stair tile, 16 above where the walk ends: the mask's anchor.
     anchor: (u16, u16),
 }
@@ -391,6 +465,8 @@ impl Leaving {
         Self {
             record: record.clone(),
             walk: Walk::new(motion, toward),
+            load: 0,
+            waiting: 0,
             door_up: (motion == DOOR_LEAVING && toward == Direction::Up)
                 .then_some((start.0, start.1 & !15)),
             start,
@@ -401,17 +477,18 @@ impl Leaving {
 impl Arriving {
     /// The arrival `record` leads to, and where it starts: `None` for a
     /// selector without one.
-    fn after(record: &ExitRecord) -> Option<(Self, (u16, u16))> {
+    fn after(image: &[u8], record: &ExitRecord) -> Option<(Self, (u16, u16))> {
+        let door = assets::layout::per_revision(image, DOOR_ARRIVING, PAL_DOOR_ARRIVING);
         let selector = kind(record.selector());
         let &(dx, dy) = ADJUSTMENTS.get(usize::from(selector))?;
         let (motion, toward) = match (selector, dx.signum(), dy.signum()) {
             (STAIRS, ..) => (STAIRS_DOWN_ARRIVING, Direction::Down),
             (STAIRS_UP, ..) => (STAIRS_UP_ARRIVING, Direction::Down),
             (_, 0, 0) => return None,
-            (_, 0, -1) => (DOOR_ARRIVING, Direction::Down),
-            (_, 0, _) => (DOOR_ARRIVING, Direction::Up),
-            (_, 1, _) => (DOOR_ARRIVING, Direction::Left),
-            _ => (DOOR_ARRIVING, Direction::Right),
+            (_, 0, -1) => (door, Direction::Down),
+            (_, 0, _) => (door, Direction::Up),
+            (_, 1, _) => (door, Direction::Left),
+            _ => (door, Direction::Right),
         };
         let (x, y) = record.destination_position();
         let start = moved((x, y), (dx + 8, dy + 16));
@@ -419,6 +496,7 @@ impl Arriving {
         Some((
             Self {
                 walk,
+                hold: 0,
                 anchor: moved(walk.end(start), (0, -16)),
             },
             start,
@@ -438,7 +516,10 @@ impl World<'_> {
             return false;
         };
         let plain = self.plane.is_some() || WORLD_MAPS.contains(&destination);
-        self.leaving = Some(Leaving::new(record, (self.facing, self.position()), plain));
+        let mut leaving = Leaving::new(record, (self.facing, self.position()), plain);
+        leaving.load = load_frames(self.image, self.map, destination);
+        leaving.waiting = leaving.load.saturating_sub(1);
+        self.leaving = Some(leaving);
         self.globals.audio.sound_port3(EXIT_SOUND);
         true
     }
@@ -500,11 +581,12 @@ impl World<'_> {
 
     /// The brightness of an exit's fades, 0 dark to 15 full.
     pub(super) fn exit_brightness(&self) -> u8 {
+        // Leaving, it reaches dark the frame after the walk's last.
         let level = self
             .leaving
             .as_ref()
             .map_or(u16::from(self.dawn), |leaving| {
-                leaving.walk.len().saturating_sub(leaving.walk.frame)
+                (leaving.walk.len() + 1).saturating_sub(leaving.walk.frame)
             });
         u8::try_from(level.min(FADE - 1)).unwrap_or(15)
     }
@@ -521,7 +603,14 @@ impl World<'_> {
     pub(super) fn transition_frame(&mut self) -> Result<Option<Step>, WorldError> {
         if let Some(mut leaving) = self.leaving.take() {
             let Some(delta) = leaving.walk.step() else {
-                return self.arrive(&leaving.record).map(Some);
+                // The old map's last frames and the load's: the player and
+                // the actors wait.
+                if leaving.waiting > 0 {
+                    leaving.waiting -= 1;
+                    self.leaving = Some(leaving);
+                    return Ok(Some(Step::Stayed));
+                }
+                return self.arrive(&leaving.record, leaving.load).map(Some);
             };
             // A pot dropped on the exit falls where he was as he walks out.
             self.fly_pot()?;
@@ -531,12 +620,22 @@ impl World<'_> {
             return Ok(Some(Step::Walked));
         }
         let Some(mut arriving) = self.arriving.take() else {
+            // The dark after a load holds the player; the world runs.
+            if self.dawn == 0 {
+                self.run_actors()?;
+                return Ok(Some(Step::Stayed));
+            }
             return Ok(None);
         };
-        let step = arriving
-            .walk
-            .step()
-            .map_or(Step::Stayed, |delta| self.move_by(delta));
+        let step = if arriving.hold > 0 {
+            arriving.hold -= 1;
+            Step::Stayed
+        } else {
+            arriving
+                .walk
+                .step()
+                .map_or(Step::Stayed, |delta| self.move_by(delta))
+        };
         if arriving.walk.frame < arriving.walk.len() {
             self.arriving = Some(arriving);
         } else {
@@ -565,21 +664,34 @@ impl World<'_> {
     }
 
     /// Loads the exit's destination, the player at its arrival's start.
-    fn arrive(&mut self, record: &ExitRecord) -> Result<Step, WorldError> {
+    fn arrive(&mut self, record: &ExitRecord, load: u16) -> Result<Step, WorldError> {
         let Some(mut entered) = self.enter_exit(record, true)? else {
             return Ok(Step::Stayed);
         };
         entered.face(self.facing);
         entered.dawn = 0;
         if entered.arrival.is_none() && entered.plane.is_none() {
-            if let Some((arriving, (x, y))) = Arriving::after(record) {
+            if let Some((arriving, (x, y))) = Arriving::after(self.image, record) {
                 entered.walking = WalkingState::new(x, y);
                 entered.arriving = Some(arriving);
             }
         }
         let from = self.map;
         let to = entered.map;
-        entered.dark = dark_frames(self.image, from, to);
+        // The fade in starts the dark's frames and 3 after the walk's last;
+        // the arrival's walk starts its lead before that.
+        let dark = dark_frames(self.image, from, to);
+        let ahead = assets::layout::per_revision(self.image, ARRIVAL_LEAD, PAL_ARRIVAL_LEAD);
+        entered.dark = (dark + 2).saturating_sub(load);
+        if let Some(arriving) = &mut entered.arriving {
+            // Sooner than the placement, it skips its first still frames
+            // (native trace `loads/eu_to10`).
+            let (start, walk) = (dark + 3, load + 1 + ahead);
+            arriving.hold = start.saturating_sub(walk);
+            arriving.walk.frame = walk
+                .saturating_sub(start)
+                .min(arriving.walk.leading_stills());
+        }
         *self = entered;
         Ok(Step::Entered { from, to })
     }
@@ -606,11 +718,12 @@ mod tests {
     }
 
     #[test]
-    fn a_door_walks_out_sixteen_and_in_seventeen_along_its_way() {
+    fn a_door_walks_out_seventeen_and_in_seventeen_along_its_way() {
+        // Native traces `loads/to0d` and `exit-while-carrying`.
         let mut out = Walk::new(DOOR_LEAVING, Direction::Left);
-        assert_eq!(out.len(), 16);
+        assert_eq!(out.len(), 17);
         assert_eq!(out.step(), Some((-1, 0)));
-        assert_eq!(out.end((100, 100)), (85, 100));
+        assert_eq!(out.end((100, 100)), (84, 100));
         assert_eq!(
             Walk::new(DOOR_ARRIVING, Direction::Up).end((0, 100)),
             (0, 83)
@@ -618,16 +731,23 @@ mod tests {
     }
 
     #[test]
-    fn the_european_bedroom_door_has_fourteen_dark_frames_only() {
+    fn rooms_load_in_five_frames_towers_in_four_and_the_town_longer() {
+        assert_eq!(japanese_load_frames(0x0c, 0x0d), 5);
+        assert_eq!(japanese_load_frames(0x41, 0x44), 4);
+        assert_eq!(japanese_load_frames(0x0d, 0x0a), 34);
+    }
+
+    #[test]
+    fn the_european_darks_are_three_frames_shorter() {
         let mut europe = vec![0; 0x1_0000];
         europe[0xffc0..0xffc0 + 21].fill(b' ');
         europe[0xffc0..0xffc0 + 12].copy_from_slice(b"TERRANIGMA P");
         let japan = [0; 16]; // No revision header falls back to Japan.
         assert_eq!(dark_frames(&europe, 0x0f, 0x10), 14);
         assert_eq!(dark_frames(&japan, 0x0f, 0x10), 17);
-        for image in [&europe[..], &japan[..]] {
-            assert_eq!(dark_frames(image, 0x0c, 0x0d), 18);
-            assert_eq!(dark_frames(image, 0x0f, 0x0b), DARK);
-        }
+        assert_eq!(dark_frames(&europe, 0x0c, 0x0d), 15);
+        assert_eq!(dark_frames(&japan, 0x0c, 0x0d), 18);
+        assert_eq!(dark_frames(&japan, 0x0f, 0x0b), DARK);
+        assert_eq!(dark_frames(&europe, 0x0f, 0x0b), DARK - 3);
     }
 }

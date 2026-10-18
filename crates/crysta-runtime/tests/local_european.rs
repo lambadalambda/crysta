@@ -81,10 +81,18 @@ fn the_european_wake_up_releases_ark_after_elles_dialogue() {
     for _ in 0..67 {
         world.update(Some(Direction::Down), Presses::NONE).unwrap();
     }
+    // The black frames: the load's after the walk, then the dark's in the
+    // new room (`world/transition.rs`).
+    let mut black = 0;
     let mut waited = 0;
     for _ in 0..83 {
         waited += 1;
         let (movement, interaction) = world.update(None, Presses::NONE).unwrap();
+        black = if world.brightness() == 0 {
+            black + 1
+        } else {
+            0
+        };
         if matches!(
             movement,
             Step::Entered {
@@ -110,7 +118,11 @@ fn the_european_wake_up_releases_ark_after_elles_dialogue() {
         }
         dark += 1;
     }
-    assert_eq!(dark, 14, "native European bedroom load is 14 dark frames");
+    assert_eq!(
+        black + dark,
+        14 + 2,
+        "native European bedroom load: 14 dark frames, and the walk's last + 1 and the arrival's"
+    );
     assert!(waited + dark < 83, "doorway timing fits the native leg");
     for _ in (waited + dark + 1)..83 {
         world.update(None, Presses::NONE).unwrap();
@@ -1084,7 +1096,8 @@ fn eu_check_post_box_detour(image: &[u8], start: &World<'_>) {
     eu_until(&mut world, 35, Direction::Down, |w| w.position().1 >= 432);
     assert_eq!(world.position(), (120, 432));
     eu_frames(&mut world, 160, Some(Direction::Right));
-    assert_eq!((world.map(), world.position()), (0x10, (321, 432)));
+    // The door's load and arrival as native (`world/transition.rs`).
+    assert_eq!((world.map(), world.position()), (0x10, (345, 432)));
     assert_eq!(
         frozen_variants(&world, &[0x03_8d84, 0x03_8d8e]),
         ten_variants

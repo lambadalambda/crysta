@@ -549,6 +549,26 @@ impl<'a> World<'a> {
         }
     }
 
+    /// A frame of the clocks and of a load's dark; returns whether the frame
+    /// runs nothing. A script transfer's dark runs nothing ([`fade`]); an
+    /// exit's, after its load, runs the world with the screen black (`dawn`
+    /// 0 from the arrival, [`transition`]).
+    fn spend_dark(&mut self) -> bool {
+        let dark = self.dark > 0;
+        self.dark = self.dark.saturating_sub(1);
+        if dark && self.dawn != 0 {
+            return true;
+        }
+        self.tick_clocks();
+        self.age_fragments();
+        if !dark {
+            // The title's clock starts with the fade in.
+            self.arrived = self.arrived.saturating_add(1);
+            self.dawn = (self.dawn + 1).min(15);
+        }
+        false
+    }
+
     /// The player's current ordinary frame.
     ///
     /// Advanced once per successful step from the walking state's active
@@ -1445,16 +1465,9 @@ impl<'a> World<'a> {
         if self.player_turn == PlayerTurn::Ran {
             self.player_turn = PlayerTurn::Ready;
         }
-        // A load's dark frames run nothing.
-        if self.dark > 0 {
-            self.dark -= 1;
+        if self.spend_dark() {
             return Ok((Step::Stayed, None));
         }
-        // The frame gate's play clock; a load's dark frames skip the gate.
-        self.tick_clocks();
-        self.age_fragments();
-        self.arrived = self.arrived.saturating_add(1);
-        self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
             self.globals.audio.sound_port3(blip);
         }

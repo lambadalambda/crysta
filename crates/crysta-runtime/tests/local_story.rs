@@ -1677,10 +1677,11 @@ fn the_stairs_lead_back_up_from_the_box_room_to_c() {
 
 #[test]
 fn a_door_walks_ark_out_and_in_with_the_fades() {
-    // C down into D, as natively at 55064 (`return-C-exit`): 16 frames out
-    // from (120,464), D loads with Ark at (120,608), and he walks in to
-    // (120,625). The screen fades out over the last 16 frames and in over
-    // the first 16.
+    // C down into D, as natively (`return-C-exit`, and the trace
+    // `loads/to0d` with the screen's brightness): 17 frames out from
+    // (120,464) as the screen fades, 4 load frames in the dark, D with Ark
+    // at (120,608), 15 more dark frames as he starts in, then the fade in
+    // as he walks on to (120,625).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -1701,11 +1702,15 @@ fn a_door_walks_ark_out_and_in_with_the_fades() {
         out.push((world.position(), world.brightness()));
     }
     let leaving = &out[..out.len() - 1];
-    assert_eq!(leaving.len(), 16);
-    assert_eq!(leaving[15].0, (trigger.0, trigger.1 + 16));
+    assert_eq!(leaving.len(), 17 + 4);
+    assert_eq!(leaving[16].0, (trigger.0, trigger.1 + 17));
+    assert_eq!(leaving[20].0, leaving[16].0, "still while it loads");
+    let fade: Vec<u8> = leaving.iter().map(|&(_, b)| b).collect();
+    // Full, then a step a frame to 1 on the walk's last, then dark.
+    assert_eq!(fade[..3], [15, 15, 15]);
     assert_eq!(
-        leaving.iter().map(|&(_, b)| b).collect::<Vec<_>>(),
-        (0..16).rev().collect::<Vec<u8>>()
+        fade[3..],
+        [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 0, 0, 0]
     );
     assert_eq!(world.position(), (120, 608), "native spawn");
     let mut brightness = Vec::new();
@@ -1716,15 +1721,11 @@ fn a_door_walks_ark_out_and_in_with_the_fades() {
         arrived.push(world.since_arrival());
     }
     // The title's clock starts with the fade in, after the dark.
-    assert!(arrived[..18].iter().all(|&frames| frames == 0));
-    assert_eq!(arrived[18], 1);
+    assert!(arrived[..15].iter().all(|&frames| frames == 0));
+    assert_eq!(arrived[15], 1);
     assert_eq!(world.position(), (120, 625), "native rest");
-    // Dark for the load's 18 native frames, then the fade in.
-    assert!(brightness[..18].iter().all(|&level| level == 0));
-    assert_eq!(
-        brightness[18..34],
-        (1..=15).chain([15]).collect::<Vec<u8>>()[..]
-    );
+    assert!(brightness[..15].iter().all(|&level| level == 0));
+    assert_eq!(brightness[15..], (1..=14).collect::<Vec<u8>>()[..]);
 }
 
 #[test]

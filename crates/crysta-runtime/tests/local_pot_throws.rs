@@ -71,6 +71,23 @@ fn pot(world: &World<'_>) -> (String, Option<(u16, u16, i16)>) {
     (phase.into(), flight)
 }
 
+/// Whether the player stands at the native row's place, past an exit.
+fn placed_as(
+    world: &World<'_>,
+    (name, i): (&str, &str),
+    expected: (i32, i32),
+) -> Result<(), String> {
+    let (x, y) = world.position();
+    if (i32::from(x), i32::from(y)) == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "{name} row {i}: player {:?} in {:#x}, native {expected:?}",
+        (x, y),
+        world.map()
+    ))
+}
+
 fn replay(image: &[u8], name: &str, recipe: &Value, csv: &str) -> Result<(), String> {
     let mut events = new_game_flags();
     for set in [0x26, 0x27, 0x28, 0x2E] {
@@ -103,9 +120,15 @@ fn replay(image: &[u8], name: &str, recipe: &Value, csv: &str) -> Result<(), Str
             .collect();
         let sounds = frame(&mut world, &buttons, &mut held_a);
         let number = |name: &str| row[column(name)].parse::<i32>().unwrap();
-        // An exit's load and its frames are `meta/issues/map-load-frames.md`'s.
-        if world.map() != 0x000C || (number("px"), number("py")) == (0, 0) {
-            break;
+        // Through an exit's load (`world/transition.rs`): its frames with
+        // no player (0, 0), then the next map, where only the player counts.
+        if (number("px"), number("py")) == (0, 0) {
+            continue;
+        }
+        if world.map() != 0x000C {
+            let expected = (number("px"), number("py"));
+            placed_as(&world, (name, row[column("i")]), expected)?;
+            continue;
         }
         let i = row[column("i")];
         let (x, y) = world.position();
