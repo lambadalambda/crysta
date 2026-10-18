@@ -260,7 +260,7 @@ impl World<'_> {
                 let _ = state.rebase(room_core::WalkingState::new(x, y), state.facing());
             }
         }
-        let step = self.pot_step(&mut pots, direction, lift);
+        let step = self.pot_step(&mut pots, direction, lift, true);
         self.pots = Some(pots);
         let Some(step) = step? else {
             return Ok(None);
@@ -269,11 +269,14 @@ impl World<'_> {
         Ok(Some(step))
     }
 
+    /// The component's frame; `grounded` takes exits and runs the carry's
+    /// ground test after a move.
     fn pot_step(
         &mut self,
         pots: &mut Pots,
         direction: Option<Direction>,
         lift: bool,
+        grounded: bool,
     ) -> Result<Option<Step>, WorldError> {
         // Talking wins over a lift (`$87:C783` before `$87:C7F1`).
         if !pots.owned && (!lift || self.arrival.is_some() || self.faces_resident()) {
@@ -370,8 +373,11 @@ impl World<'_> {
         if self.position() == before {
             return Ok(Some(Step::Stayed));
         }
-        self.leave_carrying(pots)?;
-        self.carried_ground_test(pots);
+        // In a jump the jump's frame takes exits and the ground waits.
+        if grounded {
+            self.leave_carrying(pots)?;
+            self.carried_ground_test(pots);
+        }
         Ok(Some(Step::Walked))
     }
 
@@ -413,12 +419,38 @@ impl World<'_> {
             });
         if flying {
             let animation = self.animation;
-            let step = self.pot_step(&mut pots, None, false);
+            let step = self.pot_step(&mut pots, None, false, true);
             (self.walking, self.facing, self.animation) = (walking, facing, animation);
             step?;
         }
         self.pots = Some(pots);
         Ok(())
+    }
+
+    /// Whether Ark dashes with the pot in hand.
+    pub(super) fn carry_dashing(&self) -> bool {
+        self.pots
+            .as_ref()
+            .is_some_and(|pots| matches!(pots.run, Some(Run::Dash { .. })))
+    }
+
+    /// A frame of the carry dash in a jump, as if its way were held, with
+    /// no ground test: Ark is in the air (native traces `t_b_*`).
+    pub(super) fn carry_dash_on(&mut self) -> Result<(), WorldError> {
+        let Some(mut pots) = self.pots.take() else {
+            return Ok(());
+        };
+        let step = match pots.run {
+            Some(Run::Dash { direction, .. }) => {
+                let animation = self.animation;
+                let step = self.pot_step(&mut pots, Some(direction), false, false);
+                self.animation = animation;
+                step.map(|_| ())
+            }
+            _ => Ok(()),
+        };
+        self.pots = Some(pots);
+        step
     }
 
     /// Ends a dash with the pot in hand: a jump or a drop gives the

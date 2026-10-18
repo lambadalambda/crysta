@@ -802,35 +802,54 @@ fn a_in_a_carry_dash_is_the_dash_throw() {
 }
 
 #[test]
-fn a_jump_ends_a_carry_dash() {
-    // The landing gives the carry's control again (`$84:AC02`): no dash
-    // runs on from before the jump.
+fn b_in_a_carry_dash_jumps_on_with_the_dash() {
+    // Native JP traces `t_b_held`, `t_b_free` and `t_b_down` (2026-10-18):
+    // B at 9 from the first tap; the dash runs on through the air on the
+    // dash jump's heights in resource 3's `$24`..`$29` (rise from 10, fall
+    // from 22), then resource 1's `$23`..`$25` from 34 to 40.
+    use PandoraCarryMotion::{DashJumpFalling, DashJumpLanding, DashJumpRising, Dashing};
     let Some(cartridge) = owned_rom() else {
         return;
     };
-    let mut world = carrying_at(cartridge.image(), 368);
-    let right = Some(Direction::Right);
-    for direction in [right, None, None, right, right, right, right] {
-        world.update(direction, Presses::default()).unwrap();
+    let heights = [
+        -4, -8, -11, -14, -16, -18, -20, -21, -22, -23, -23, -23, -23, -22, -21, -20, -18, -16,
+        -14, -11, -8, -4, 0, 0,
+    ];
+    let (right, down) = (Some(Direction::Right), Some(Direction::Down));
+    for (name, way, y, after, native) in [
+        ("t_b_held", right, 368, right, "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0"),
+        ("t_b_free", right, 368, None, "5:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 3:0,0"),
+        ("t_b_down", down, 368, down, "5:0,0 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3 2:0,2 1:0,3"),
+    ] {
+        let expected = native_moves(native);
+        let mut world = carrying_at(cartridge.image(), y);
+        let mut pad = vec![way, None, None];
+        pad.extend([way; 7]);
+        pad.resize(expected.len(), after);
+        let (mut moves, mut lifts, mut motions) = (vec![], vec![], vec![]);
+        for (frame, direction) in pad.into_iter().enumerate() {
+            let press = Presses {
+                cancel: frame == 9,
+                ..Presses::default()
+            };
+            let before = world.position();
+            world.update(direction, press).unwrap();
+            let after = world.position();
+            moves.push((
+                i32::from(after.0) - i32::from(before.0),
+                i32::from(after.1) - i32::from(before.1),
+            ));
+            lifts.push(world.ark_lift());
+            motions.push(world.carry().map(|carry| carry.motion));
+        }
+        assert_eq!(moves, expected, "{name}");
+        assert_eq!(lifts[10..34], heights, "{name}");
+        let mut poses = vec![Some(Dashing); 6];
+        poses.extend([Some(DashJumpRising); 12]);
+        poses.extend([Some(DashJumpFalling); 12]);
+        poses.extend([Some(DashJumpLanding); 7]);
+        assert_eq!(motions[4..41], poses, "{name}");
     }
-    assert_eq!(
-        world.carry().map(|carry| carry.motion),
-        Some(PandoraCarryMotion::Dashing)
-    );
-    let b = Presses {
-        cancel: true,
-        ..Presses::default()
-    };
-    world.update(None, b).unwrap();
-    let x = world.position().0;
-    for frame in 0..40 {
-        world.update(None, Presses::default()).unwrap();
-        assert_eq!(world.position().0, x, "{frame}: no dash after the landing");
-    }
-    assert_eq!(
-        world.carry().map(|carry| carry.motion),
-        Some(PandoraCarryMotion::Standing)
-    );
 }
 
 #[test]
