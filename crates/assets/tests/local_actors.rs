@@ -830,3 +830,16 @@ fn the_window_art_decodes_its_frame_shading_and_prompt() {
     assert_eq!(art.shade(32), art.shade(0));
     assert_eq!(art.prompt.len(), 4);
 }
+
+#[test]
+fn a_souls_text_heals_ark() {
+    // `$102`'s soul (`$90:917A`) ends with `$DD $04CE 50` (`$85:96A9`):
+    // fifty points of pending life.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let pages = assets::text::HouseDialogue::decode_at(cartridge.image(), 0x90_917A).unwrap();
+    let heals: Vec<u16> = pages.iter().map(assets::text::DialoguePage::heal).collect();
+    assert_eq!(heals.iter().sum::<u16>(), 50);
+    assert_eq!(heals.last(), Some(&50));
+}

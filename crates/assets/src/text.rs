@@ -130,8 +130,16 @@ pub struct DialoguePage {
     speaker: u16,
     /// Where the text stood as the page ended: the prompt's cell.
     end: [u16; 2],
+    /// Life the page's text adds once typed (`$DD $04CE n`).
+    heal: u16,
 }
 impl DialoguePage {
+    /// Life the page's text adds to Ark's pending life (`$04CE`) once
+    /// typed: a soul's thanks (`$DD`, `$85:96A9`).
+    #[must_use]
+    pub const fn heal(&self) -> u16 {
+        self.heal
+    }
     /// Where the text stood as the page ended, relative to the content:
     /// a `$D5` page's prompt shows there (`$85:9D94`).
     #[must_use]
@@ -516,6 +524,16 @@ impl Decoder<'_> {
         self.position[0] += 12;
         Ok(())
     }
+    /// `$DD address value` (`$85:96A9`) adds a word to a word of memory;
+    /// only the pending life (`$04CE`) is modelled.
+    fn memory_addition(&mut self, at: u32) -> Result<(), TextError> {
+        let [address, value] = [self.word()?, self.word()?];
+        if address != 0x04CE {
+            return Err(invalid(at, "unsupported text memory addition"));
+        }
+        self.page.heal = self.page.heal.saturating_add(value);
+        Ok(())
+    }
     fn boundary(&mut self, source: u32, action: Acknowledgement) -> Result<(), TextError> {
         if self.page.glyphs.is_empty() || self.pages.len() >= 16 || !self.stack.is_empty() {
             return Err(invalid(
@@ -734,6 +752,7 @@ fn blank_page(dimensions: [u16; 2], transparent: bool, placement: Placement) -> 
         duration: 0,
         speaker: SPEAKER,
         end: [0, 0],
+        heal: 0,
     }
 }
 /// Draws a glyph into a page's pixels, `transparent` clearing its colour 3
@@ -859,6 +878,7 @@ impl Decoder<'_> {
                     self.enter(destination)?;
                 }
                 0xce => self.indexed_call(at)?,
+                0xdd => self.memory_addition(at)?,
                 // `$C3 xx yy`: to line `yy`, `xx` map bytes (4 pixels each) in.
                 0xc3 => {
                     let [column, line] = [self.next()?, self.next()?];
