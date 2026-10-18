@@ -265,7 +265,7 @@ pub(super) fn compile(
     )?
     .1;
     Ok((
-        tour(image, layer_source, definitions, |_| Ok(()))?,
+        tour(image, layer_source, definitions, |_| {})?,
         Initialization::Map21ThenController41Tour,
     ))
 }
@@ -278,25 +278,15 @@ pub(super) fn hall(image: &[u8], room: bool) -> Result<StaticBackground, VisualM
     let layer = crate::layout::per_revision(image, 0x30_B111, 0x32_B213);
     let definitions = crate::layout::per_revision(image, 0x2D_B7E4, 0x2C_F824);
     tour(image, layer, definitions, |palette| {
-        if !room {
-            return Ok(());
+        // Captured in the JP weapon room only: color 1 of palettes 1 to
+        // 6 is black (the stage's `$AF:E4DB` is the tour's color 88 load
+        // again); what clears it is not traced, and the armor room and
+        // European are assumed alike.
+        if room {
+            for row in 1..=6 {
+                palette[row * 16 + 1] = Bgr555::new(0);
+            }
         }
-        // The stage's `$AF:E4DB` (European `$B1:EA21`) at colors
-        // `$58..$5F`.
-        let stage = crate::layout::per_revision(image, 0x2F_E4DB, 0x31_EA21);
-        let colors = image
-            .get(stage..stage + 16)
-            .ok_or(VisualMapError::Unsupported("truncated box stage palette"))?;
-        for (color, bytes) in palette[0x58..0x60].iter_mut().zip(colors.chunks_exact(2)) {
-            *color = Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]]));
-        }
-        // Captured in the weapon room (JP): the backdrop and color 1 of
-        // palettes 1 to 6 are black; what clears them is not traced.
-        palette[0] = Bgr555::new(0);
-        for row in 1..=6 {
-            palette[row * 16 + 1] = Bgr555::new(0);
-        }
-        Ok(())
     })
 }
 
@@ -306,7 +296,7 @@ fn tour(
     image: &[u8],
     layer_source: usize,
     definitions: usize,
-    adjust: impl Fn(&mut [Bgr555; 128]) -> Result<(), VisualMapError>,
+    adjust: impl Fn(&mut [Bgr555; 128]),
 ) -> Result<StaticBackground, VisualMapError> {
     // The route enters from 21. Its shared load supplies colors 0..15, untouched by COP5A.
     let predecessor = ordinary_loads(image, 0x21)?;
@@ -351,7 +341,7 @@ fn tour(
             *color = Bgr555::new(u16::from_le_bytes([bytes[0], bytes[1]]));
         }
     }
-    adjust(&mut palette)?;
+    adjust(&mut palette);
     let mut colors = colors.into_iter();
     let mut resources = vec![
         graphics,

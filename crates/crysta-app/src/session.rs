@@ -608,31 +608,8 @@ impl Session {
         let (cx, cy) = page.screen.camera();
         let camera = (i32::from(cx) - left, i32::from(cy));
         frame::draw_background(frame, hall, camera);
-        // A room's pedestals: each slot's icon on layer 2 in BG palette
-        // `$B1:DA31[item]`; an empty one item 0's tiles in palette 0, the
-        // metatile left as it is (`$85:CE9E`).
-        for (slot, &(item, _)) in self.world.room_slots(page.screen).iter().enumerate() {
-            let palette = if item == 0 {
-                Ok(0)
-            } else {
-                assets::shop_display::icon_palette(image, item)
-            };
-            let (Some((column, row)), Ok((tiles, _)), Ok(palette)) = (
-                page.screen.icon_cell(slot),
-                assets::shop_display::item_icon(image, item),
-                palette,
-            ) else {
-                continue;
-            };
-            // Layer 2 lies 6 lines above layer 1 here (measured).
-            let at = (i32::from(column) * 16 - camera.0, i32::from(row) * 16 - 6 - camera.1);
-            for (py, px) in (0..16).flat_map(|py| (0..16).map(move |px| (py, px))) {
-                let index = tiles[py / 8 * 2 + px / 8].pixels()[py % 8 * 8 + px % 8];
-                if let (true, Some(&colour)) = (index != 0, colours.get(usize::from(palette) * 16 + usize::from(index))) {
-                    frame.set((at.0 + frame::signed(px), at.1 + frame::signed(py)), frame::rgb(colour));
-                }
-            }
-        }
+        let slots = self.world.room_slots(page.screen);
+        draw_pedestals(frame, image, (page.screen, &slots), colours, camera);
         let (x, y) = page.yomi;
         if let (Some(yomi), Ok(x), Ok(y)) = (yomi, u16::try_from(x + cx), u16::try_from(y + cy)) {
             // Priority 3, over the hall's high tiles.
@@ -891,6 +868,41 @@ pub enum SpriteKey {
     /// The helper art's list: an explosion, a dropped gem, a wisp; mirror
     /// and vertical flip.
     Overlay(u32, u8, bool, bool),
+}
+
+/// A room's pedestals (`$85:CE9E`): each slot's icon on layer 2 in BG
+/// palette `$B1:DA31[item]`; an empty one item 0's tiles in palette 0.
+/// Layer 2 lies 6 lines above layer 1 (measured in the JP weapon room).
+fn draw_pedestals(
+    frame: &mut Canvas,
+    image: &[u8],
+    (screen, slots): (crysta_runtime::menu::Screen, &[(u8, u8)]),
+    colours: &[assets::graphics::Bgr555; 128],
+    camera: (i32, i32),
+) {
+    for (slot, &(item, _)) in slots.iter().enumerate() {
+        let Some((column, row)) = screen.icon_cell(slot) else {
+            continue;
+        };
+        let Ok((tiles, _)) = assets::shop_display::item_icon(image, item) else {
+            continue;
+        };
+        let palette = if item == 0 {
+            0
+        } else {
+            assets::shop_display::icon_palette(image, item).unwrap_or(0)
+        };
+        let at = (i32::from(column) * 16 - camera.0, i32::from(row) * 16 - 6 - camera.1);
+        for (py, px) in (0..16).flat_map(|py| (0..16).map(move |px| (py, px))) {
+            let index = tiles[py / 8 * 2 + px / 8].pixels()[py % 8 * 8 + px % 8];
+            if index == 0 {
+                continue;
+            }
+            if let Some(&colour) = colours.get(usize::from(palette) * 16 + usize::from(index)) {
+                frame.set((at.0 + frame::signed(px), at.1 + frame::signed(py)), frame::rgb(colour));
+            }
+        }
+    }
 }
 
 /// A text window of Yomi's box: `shown` glyphs of `page` and its choice

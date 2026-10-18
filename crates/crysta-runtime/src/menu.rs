@@ -71,7 +71,7 @@ const FADE_START: u32 = 20;
 /// The hall stays this long after the closing press, then goes black.
 const CLOSE_BLANK: u32 = 11;
 /// Yomi's flapping as the hall shows, and as a door spawns her again
-/// (P+99): native captures of the hall and the weapon room pin it.
+/// (P+99): the hall's captures (JP, EU) and the JP weapon room's pin it.
 const FLAP_AT_SPAWN: u32 = 4;
 /// The hotspot the box opens on: the item door.
 pub const ITEM_DOOR: u8 = 7;
@@ -525,9 +525,10 @@ impl<'a> Menu<'a> {
             .hotspots(Screen::Hall)
             .get(usize::from(ITEM_DOOR))
             .map_or((0, 0), |hotspot| hotspot.at);
+        let timing = assets::layout::per_revision(image, JAPAN, EUROPE);
         Some(Self {
             image,
-            timing: assets::layout::per_revision(image, JAPAN, EUROPE),
+            timing,
             doors: assets::layout::per_revision(image, JAPAN_DOOR, EUROPE_DOOR),
             hall,
             screen: Screen::Hall,
@@ -540,7 +541,8 @@ impl<'a> Menu<'a> {
             task: None,
             dialogue: Dialogue::default(),
             label_at: 0,
-            spawned: 0,
+            // Spawned while the hall loads.
+            spawned: timing.hall - FLAP_AT_SPAWN,
         })
     }
 
@@ -911,11 +913,7 @@ impl<'a> Menu<'a> {
             hotspot: self.hotspot,
             yomi: (self.yomi.0 - camera.0, self.yomi.1 - camera.1),
             label,
-            flap: if self.spawned == 0 {
-                self.frame.saturating_sub(self.timing.hall) + FLAP_AT_SPAWN
-            } else {
-                self.frame - self.spawned
-            },
+            flap: self.frame.saturating_sub(self.spawned),
             wipe: None,
         }
     }
