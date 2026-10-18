@@ -211,16 +211,16 @@ struck at the first sample (184,357). `$0640` changes at (184,354). The
 wall stops the pot at 348. A Right throw at y=368 also strikes the door,
 from x≥168.
 
-Fragment: the object is at the break point with frames `$A2:E2BD`, `E2EA`,
-`E31E` and `E352` (3 frames each), then `E386`. The object stays allocated
-(it was seen 360 frames later). `E386` shows nothing on screen (guess:
-empty frame).
+Fragment: the object (`$84:C7A9`: the helper art `$A2:C000`, list `$36`)
+is at the break point with frames `$A2:E2BD`, `E2EA`, `E31E`, `E352` and
+`E386`, 3 frames each, and then leaves the entity list (trace `f_break`,
+2026-10-18: 15 frames). Modelled: `World::fragments`, drawn by the app.
 
 ## Other cases
 
 | Case | Native |
 |---|---|
-| Stepping on an exit while carrying (C's bottom exit) | The pot script becomes `$84:C5CB` (drop, stream `$6A`). Sound `$12`, no break. The map changes and `$0988` clears after the load. The cell stays consumed. |
+| Stepping on an exit while carrying (C's bottom exit) | The pot script becomes `$84:C5CB` (drop, stream `$6A`): in hand on the exit frame, then from (x−1, y) heights −29, −26, −22, −18, −13, −8, −3, 2, 7, 12, 17, 22, 27, 32, then 0 until the load, in place. Sound `$12` on the first, no break. The map changes and `$0988` clears after the load. The cell stays consumed. Modelled (`PotState::drop_on_exit`, `Arc::Dropped`); only Down is traced, the other facings take the same point. |
 | Other drop entries (source only) | `$84:C7F3` picks `C5D3`/`C5CB`/`C5E5`/`C5E9` for transitions by `$097C & $0300`. `C5FB` covers 4 facings, ±16, streams `$8B`–`$8D`. `C649` covers ±16 with the throw streams (from `$84:9C22`, `9C68`, `9F5B`; guess: damage or knockback). |
 | Throwing onto a resident | See "What ends the flight", item 3 |
 
@@ -293,7 +293,6 @@ The columns hold the state after the frame ran:
   have no native measurement.
 - The frame of the `$13` sound jitters by one frame (`throw-down-standing-over-table`
   is one frame later than the other landings).
-- The end of the fragment object's lifetime. Whether `E386` is empty.
 - The stale held records in maps `$0E`, `$11`, `$14`, `$17`, `$1A` and `$1E`.
 - `$04F6` switches the probe to `F3` only and forces the exit drop.
   Its meaning is unknown.

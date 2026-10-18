@@ -179,7 +179,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Show the title screen](issues/title-screen.md)
 - [Enter a name and read the opening text](issues/name-entry-opening.md)
 - [Play the logos and the intro film](issues/intro-film.md)
-- [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)
+- [Trace the pots' open edges](issues/pot-carry-edges.md)
 - [Fix the slice bugs the user reported on 2026-10-01](issues/slice-bug-report.md)
 - [Draw the world map in Mode 7](issues/world-map-mode7.md)
 - [Enter the towers from the world map](issues/enter-the-towers.md)
