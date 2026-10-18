@@ -49,6 +49,15 @@ pub struct PandoraBackground {
     camera: SourceCamera,
     initialization: Initialization,
 }
+/// The box menu's hall: the tour's tiles and colors with its own metatiles
+/// and layer (`docs/menu.md`).
+///
+/// # Errors
+/// As [`PandoraBackground::from_rom`]'s tour.
+pub fn box_hall(image: &[u8]) -> Result<StaticBackground, VisualMapError> {
+    recipes::hall(image)
+}
+
 impl PandoraBackground {
     /// Compile A, E, 13, 20, 21 or the controller-initialized 41–44 tour.
     /// The caller authenticates the Japanese ROM. No native capture is an input.

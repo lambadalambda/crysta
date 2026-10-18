@@ -246,8 +246,6 @@ pub(super) fn compile(
             Initialization::MapLoad,
         ));
     }
-    // The route enters from 21. Its shared load supplies colors 0..15, untouched by COP5A.
-    let predecessor = ordinary_loads(image, 0x21)?;
     root(image, 0x41)?;
     let current = root(image, id)?;
     let layer_source = load(
@@ -258,6 +256,38 @@ pub(super) fn compile(
         ResourceKind::Layer,
     )?
     .1;
+    let definitions = load(
+        image,
+        located(image, 0x18_8321)?,
+        5,
+        8,
+        ResourceKind::Metatiles,
+    )?
+    .1;
+    Ok((
+        tour(image, layer_source, definitions)?,
+        Initialization::Map21ThenController41Tour,
+    ))
+}
+
+/// The box menu's hall (`$85:A842`, `docs/menu.md`): the tour's tiles and
+/// colors, its own metatiles (`$AD:B7E4`, European `$AC:F824`) and first
+/// layer (`$B0:B111`, European `$B2:B213`).
+pub(super) fn hall(image: &[u8]) -> Result<StaticBackground, VisualMapError> {
+    let layer = crate::layout::per_revision(image, 0x30_B111, 0x32_B213);
+    let definitions = crate::layout::per_revision(image, 0x2D_B7E4, 0x2C_F824);
+    tour(image, layer, definitions)
+}
+
+/// The controller-loaded tiles and colors over `layer_source` with the
+/// metatiles at `definitions`.
+fn tour(
+    image: &[u8],
+    layer_source: usize,
+    definitions: usize,
+) -> Result<StaticBackground, VisualMapError> {
+    // The route enters from 21. Its shared load supplies colors 0..15, untouched by COP5A.
+    let predecessor = ordinary_loads(image, 0x21)?;
     let layer = StaticLayer::from_rom(image, layer_source).map_err(VisualMapError::Layer)?;
     let graphics = resource(
         image,
@@ -266,20 +296,7 @@ pub(super) fn compile(
         0x3000,
         true,
     )?;
-    let definitions = resource(
-        image,
-        load(
-            image,
-            located(image, 0x18_8321)?,
-            5,
-            8,
-            ResourceKind::Metatiles,
-        )?
-        .1,
-        ResourceKind::Metatiles,
-        4096,
-        true,
-    )?;
+    let definitions = resource(image, definitions, ResourceKind::Metatiles, 4096, true)?;
     let attributes = resource(
         image,
         load(
@@ -332,7 +349,7 @@ pub(super) fn compile(
             "Pandora sheet references unsupplied controller tiles",
         ));
     }
-    Ok((background, Initialization::Map21ThenController41Tour))
+    Ok(background)
 }
 
 #[cfg(test)]

@@ -106,6 +106,35 @@ impl PandoraArt {
     pub fn object(image: &[u8], base: u32, selector: u8) -> Result<Self, SpriteError> {
         object_list(&mut Loader::new(image), base, base, selector)
     }
+    /// Yomi in the box's hall (`docs/menu.md`): list 3 of `$AB:DE71`
+    /// (European `$AD:E8FA`), her tiles (`$B1:D322`, European `$B3:D8A3`)
+    /// at OBJ tile `$1A0` (the frames name `$A0..` of the second table) and
+    /// her colours (`$B2:8C40`, European `$B4:91C3`) in OBJ palette 7.
+    ///
+    /// # Errors
+    /// Refuses a list outside the qualified shapes.
+    pub fn yomi(image: &[u8]) -> Result<Self, SpriteError> {
+        const FIRST_TILE: usize = 0xA0;
+        let mut loader = Loader::new(image);
+        let sheet = crate::layout::per_revision(image, 0xB1_D322_u32, 0xB3_D8A3);
+        let packet = loader.packet(sheet)?;
+        let blank = Tile4bpp::decode(&[0; 32])?;
+        let graphics: Arc<[Tile4bpp]> = std::iter::repeat_n(blank, FIRST_TILE)
+            .chain(decode_tiles_4bpp(&packet.bytes)?)
+            .collect();
+        let colours = loader.read(crate::layout::per_revision(image, 0x32_8C40, 0x34_91C3), 32)?;
+        let palette = std::array::from_fn(|i| Bgr555::new(word(colours, i * 2)));
+        let base = crate::layout::per_revision(image, 0xAB_DE71_u32, 0xAD_E8FA);
+        let lists = direct_lists(&mut loader, base, &[3], 240, graphics.len())?;
+        Ok(Self {
+            id: base,
+            graphics_key: PandoraGraphicsKey::Compressed(sheet),
+            graphics,
+            palette_base: 240,
+            palette,
+            lists,
+        })
+    }
     /// Exact source selector lookup.
     #[must_use]
     pub fn list(&self, selector: u8) -> Option<&PandoraPoseList> {
