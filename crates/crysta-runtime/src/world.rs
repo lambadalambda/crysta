@@ -2600,20 +2600,21 @@ fn qualified_arrival(map: u16, record: &ExitRecord) -> Result<Option<Arrival>, W
     Ok(Some(Arrival::new(route)))
 }
 
-/// Cells that block the player: those visible actors' scripts marked
-/// (`COP 3B`, `COP 3D`), as natively (`$80:BE8E`), and the cells of bodies
-/// that [hold them](Actor::holds_its_cell) unmarked. C's blue door stands on
-/// its closed-door cell unmarked, which the pots' throw lane needs
+/// Cells that block the player: those actors' scripts marked (`COP 3B`,
+/// `COP 3D`), as natively (`$80:BE8E`), hidden or not (D's gate, header
+/// `$C000`), and the cells of visible bodies that
+/// [hold them](Actor::holds_its_cell) unmarked. C's blue door stands on its
+/// closed-door cell unmarked, which the pots' throw lane needs
 /// (`docs/pandora-pots.md`).
 fn blocking_cells(residents: &[Resident], actors: &[Actor]) -> Vec<(u16, u16)> {
     residents
         .iter()
         .zip(actors)
         // Enemies block nothing, not even each other (`docs/enemy-scripts.md`).
-        .filter(|(resident, actor)| !resident.hidden && actor.foe.is_none())
+        .filter(|(_, actor)| actor.foe.is_none())
         .flat_map(|(resident, actor)| {
             let own = if resident.body && actor.holds_its_cell() {
-                Some(resident.collision_cell())
+                (!resident.hidden).then(|| resident.collision_cell())
             } else {
                 actor.stamp()
             };
@@ -2752,13 +2753,14 @@ fn occupied_by_others(
 ) -> Vec<(u16, u16)> {
     let mut occupied = vec![(x.saturating_sub(8) / 16, y.saturating_sub(16) / 16)];
     for (other, actor) in actors.iter().enumerate() {
-        if other == index || actor.hidden {
+        if other == index {
             continue;
         }
-        if residents[other].body {
+        // A hidden body takes no cell; its marks stand ([`blocking_cells`]).
+        if residents[other].body && !actor.hidden {
             occupied.push(actor.collision_cell());
             occupied.extend(actor.destination());
-        } else {
+        } else if !residents[other].body {
             occupied.extend(actor.stamp());
         }
     }

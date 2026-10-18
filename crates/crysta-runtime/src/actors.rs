@@ -1176,10 +1176,11 @@ impl Actor {
                 actor.own.extend(fields.into_iter().zip([a, b, c, d, e, f]));
             }
         }
+        // The header's `+$04` (`$80:F5AB`): hidden, as Mu's controllers
+        // (`$90:A66F`) start. An enemy's (`$80:F9xx`) is out of the hit scan
+        // too, and off screen until drawn; D's wanderer (`$5100`) is not.
+        actor.hidden |= header & 0x8000 != 0;
         if actor.foe.is_some() {
-            // The header's `+$04` (`$80:F9xx`): hidden, out of the hit scan;
-            // off screen until drawn.
-            actor.hidden |= header & 0x8000 != 0;
             actor.unseen = header & 0x4000 != 0;
             actor.guard.0 = header & GUARD_04;
         }

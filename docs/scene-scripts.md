@@ -119,7 +119,7 @@ Scripts also hide and show their actor with inline native code on entity
 160 and 265 sites). The draw list (`$80:EB68`) skips such an actor and its
 animation and movement stop; its script runs on. The runtime recognises
 exactly these two sequences: a hidden resident is neither drawn nor
-occupying its cell.
+occupying its cell, but the cells it marked (`COP 3B`/`3D`) stay blocked.
 
 Text pages end in `$D5` (A goes on), `$D3` (A closes) or `$D4` (the request
 returns at once and the page stays up for a following choice). A or L
@@ -214,8 +214,9 @@ D's hidden gate `$83:8CC8` (`$88:A9B4`: `COP 48 $8026`, `COP 3B`, `COP BC`,
 `RTL`) stamps the house exit cell `(7,44)` while `$26` is clear and deletes
 itself once it is set. It is load-time only, as natively: setting `$26`
 while D is loaded does not lift the stamp. The runtime blocks the player on
-the cells visible actors mark (`COP 3B`/`3D`), as natively, and on the cells
-of bodies that have walked or whose script froze before it could mark. A
+the cells actors mark (`COP 3B`/`3D`), hidden or not, as natively, and on
+the cells of bodies that have walked or whose script froze before it could
+mark. A
 standing body whose script marks nothing, as C's blue door, leaves its cell
 alone. The host doorway action refuses a blocked cell, and one whose exit
 cell holds a closed door (collision type 5, C's blue door on its stairs).

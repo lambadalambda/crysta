@@ -890,3 +890,39 @@ fn mus_rocks_draw() {
         .collect::<Vec<_>>();
     assert_eq!(rocks, vec![Ok(()); 6]);
 }
+
+#[test]
+fn mu_and_polynesia_show_no_placeholders() {
+    // Their four controllers (`$90:A66F`) start hidden by their header's
+    // `+$04` (`$D000`, `$80:F5AB`) and wait there; their resource is not art.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = new_game();
+    for flag in 0x101..=0x109usize {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    for map in [0x012A, 0x012B] {
+        let mut world = World::enter_with_events(image, map, 1120, 124, events.clone()).unwrap();
+        for _ in 0..150 {
+            world
+                .update(None, crysta_runtime::scene::Presses::NONE)
+                .unwrap();
+        }
+        let art = residents_art(
+            image,
+            map,
+            world.residents(),
+            EventFlags::Bitmap(world.spawn_events()),
+            EventFlags::Bitmap(world.events()),
+        );
+        for (resident, body) in world.residents().iter().zip(&art) {
+            assert!(
+                body.is_ok() || resident.hidden,
+                "{map:#x} {:#x}",
+                resident.record
+            );
+        }
+    }
+}
