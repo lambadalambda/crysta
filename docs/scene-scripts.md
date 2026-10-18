@@ -167,7 +167,7 @@ catalog's neighbour links, A or L confirms, B cancels with result 0.
   setting `$243` on the last and `$244` after the final request. Ark then
   walks as natively (`pandora-left-rest`). The tour maps load through the
   Pandora compile (`first_background`). The graphics controller `$89:D253`
-  stays frozen: its loads are the compile's.
+  skips to its park (`$89:D2AA`): its loads are the compile's.
 - **The Crystal Spear, `$42`** (`$89:DA17`, callback `$89:DA56`): the first
   talk sets `$240` and asks; consent sets `$241`; the next talk sets `$242`
   and hands the resident's script to `$89:DA20`: `COP 60` grants item `$81`,

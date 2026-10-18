@@ -1308,14 +1308,7 @@ fn the_guide_tours_44_42_43_and_back_to_41_then_frees_ark() {
         ]
     );
     assert!(flag(&world, 0x243) && flag(&world, 0x244));
-    assert!(
-        world
-            .frozen_scripts()
-            .iter()
-            .all(|&(_, at)| at == 0x09_D253),
-        "only the graphics controller, whose loads the background compiles: {:x?}",
-        world.frozen_scripts()
-    );
+    assert_eq!(world.frozen_scripts(), []);
     // Ark walks again: native `pandora-left-rest`, Left 12 then neutral.
     replay(&mut world, &[(2, 12), (5, 120)]);
     assert_eq!(world.position(), (120, 208));

@@ -327,6 +327,11 @@ const SPAWNS: &[u8] = &[
 /// (`$90:A4CE`, `$90:A565`) and European (`$97:BDCF`, `$97:BE66`); skipped
 /// until `meta/issues/continent-door-parchment.md`.
 const PARCHMENT: [(usize, usize); 2] = [(0x10_A4CE, 0x10_A565), (0x17_BDCF, 0x17_BE66)];
+/// The box hall's graphics controller (`$89:D253`, European `$89:CB43`)
+/// and its park: its loads (the sheet, `COP 5A`'s colours) are the
+/// background compiler's (`docs/pandora-backgrounds.md`); the words it then
+/// clears (`$0419`-`$0437`, `$86:925C`) the runtime does not keep.
+const HALL_LOADS: [(usize, usize); 2] = [(0x09_D253, 0x09_D2AA), (0x09_CB43, 0x09_CB9A)];
 /// The enemies' death script (`$85:E27B`), which a script may jump to
 /// (`COP 06`) or go on in (`COP BF`, the show's controller, `$97:CD07`).
 const DEATH: usize = 0x05_E27B;
@@ -1480,9 +1485,11 @@ impl Actor {
         // §2): the parchment's set-up (the picture's DMA, the palette, the
         // colour math) is not drawn here; the door, hidden, goes on at its
         // text.
-        let parchment = assets::layout::per_revision(image, PARCHMENT[0], PARCHMENT[1]);
-        if at == parchment.0 {
-            return Some(parchment.1);
+        for [japan, europe] in [PARCHMENT, HALL_LOADS] {
+            let (from, to) = assets::layout::per_revision(image, japan, europe);
+            if at == from {
+                return Some(to);
+            }
         }
         let player = (around.player, around.facing);
         let ran = native::run(image, at, &mut self.memory(around.globals, player))?;
