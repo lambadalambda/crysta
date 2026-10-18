@@ -34,3 +34,9 @@ leaves. The field waits meanwhile (`$049A`).
 - The host draws the hall, Yomi, the label and the HUD, matching native
   captures (`local/menu/*-hall.rgb`) on both ROMs except the wall lamps'
   tile animation and the item icon ([icon](hud-item-icon.md)).
+- The wall lamps animate by tiles, not colours: 4 frames of 6, a
+  24-frame cycle (JP capture). The hall's helper `$85:D1EE` runs
+  `COP 8C $3C` (`$80:A30C`: `7F:0008` = `$3C`, then `$8D:93D8`, `$8D:940D`,
+  `$8D:9470`, the town animation's consumers) and `COP 95` in a loop;
+  `$8D:93D8` reads `$9B:8000 + 2n`, whose bit 15 points it at the second
+  base `$9C:8000` (list `$8D:9407`); the records there are not decoded.
