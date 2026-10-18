@@ -21,7 +21,9 @@ these problems.
 - [x] Mu (`$12A`) and Polynesia (`$12B`) show placeholders: Mu's rocks
   (frame facing 8) and the controllers hidden by their header.
 - [x] The box tour stops a script on `$041` (`$39554`).
-- [ ] The Elder's head draws over Ark (Crysta, the opening).
+- [x] The Elder's head draws over Ark (Crysta, the opening): native too.
+- [x] A third statue stands on the entrance stairs of `$100` and `$10E`:
+  the guardian started in list 0, not its header's list 1.
 - [ ] Check the grey screen as the box opens. (The area title's scattered
   glyphs are its fly-in, natively too.)
 

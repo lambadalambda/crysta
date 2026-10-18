@@ -926,3 +926,31 @@ fn mu_and_polynesia_show_no_placeholders() {
         }
     }
 }
+
+#[test]
+fn the_guardians_start_in_their_headers_list() {
+    // The guardians of `$100` and `$10E` share the statues' mode-4 art
+    // (`$82:F65A`) but start in list 1 (headers `$90:8BF0`, `$90:8F7E`:
+    // `01 00 51 00 20`); list 0 drew them as a third statue.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut flags = new_game();
+    for flag in 0x101..=0x103usize {
+        flags[flag / 8] |= 1 << (flag % 8);
+    }
+    for map in [0x0100, 0x010E] {
+        let present = residents(image, map, EventFlags::Bitmap(&flags)).unwrap();
+        let lists: Vec<_> = present
+            .iter()
+            .filter(|resident| resident.descriptor == Some(0x2F65A))
+            .map(|resident| (resident.position, resident.selector))
+            .collect();
+        assert_eq!(
+            lists,
+            [((248, 880), 1), ((168, 992), 0), ((376, 992), 0)],
+            "{map:#x}"
+        );
+    }
+}

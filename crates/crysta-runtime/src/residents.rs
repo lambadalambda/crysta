@@ -9,7 +9,7 @@ use assets::layout;
 use assets::maps::actor_script::{self, ScriptEffects};
 use assets::maps::actors::{descriptor_owner, list_header, ResolveError, SpawnList};
 use assets::maps::scripts::EventFlags;
-use assets::sprites::{HouseActor, ResidentPose};
+use assets::sprites::{HouseActor, Mode4Art, ResidentPose};
 use assets::text::{DialoguePage, HouseDialogue};
 
 /// Someone standing in a map.
@@ -166,7 +166,24 @@ pub fn residents(
         .filter(|(_, record)| !record.installs_player(image))
         .map(|(index, record)| {
             let actor = decoded[index].as_ref().ok();
-            let initial = actor.map_or(0, HouseActor::initial);
+            let descriptor = descriptor_owner(&present, index)
+                .and_then(|owner| present[owner].descriptor_offset());
+            // The towers' mode-4 figures, which the house decoder does not
+            // take: the header's first byte, as natively (`$80:F59C`), when
+            // it is one of the art's lists (the light room's orb's `$1F` is
+            // not).
+            let initial = match (actor, descriptor) {
+                (Some(actor), _) => actor.initial(),
+                (None, Some(at)) if image.get(at + 3) == Some(&4) => {
+                    let list = header_list(image, record.script());
+                    if Mode4Art::from_rom(image, at, list).is_ok() {
+                        list
+                    } else {
+                        0
+                    }
+                }
+                (None, _) => 0,
+            };
             Resident {
                 position: record.origin(),
                 record: record.offset(),
@@ -178,8 +195,7 @@ pub fn residents(
                 vflip: false,
                 pose_age: 0,
                 walking: false,
-                descriptor: descriptor_owner(&present, index)
-                    .and_then(|owner| present[owner].descriptor_offset()),
+                descriptor,
                 hidden: false,
                 priority: 2,
                 palette: 0,
@@ -299,6 +315,14 @@ fn collect(image: &[u8], bank: u32, effects: &[ScriptEffects]) -> Conversation {
         }
     }
     Conversation::Silent
+}
+
+/// The initial list in a script's header, five bytes before it.
+fn header_list(image: &[u8], script: Option<u32>) -> u8 {
+    script
+        .and_then(|script| usize::try_from(script & 0x3F_FFFF).ok()?.checked_sub(5))
+        .and_then(|header| image.get(header).copied())
+        .unwrap_or(0)
 }
 
 #[cfg(test)]
