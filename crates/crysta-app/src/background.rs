@@ -191,11 +191,20 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
 }
 
 /// Yomi's box's hall (`docs/menu.md`): the tour's tiles and colors with its
-/// own metatiles and layer; the screen is its top-left 256×224.
-pub fn hall(image: &[u8]) -> Result<crate::frame::Background, String> {
-    let scene =
-        assets::maps::visual::pandora::box_hall(image).map_err(|error| error.to_string())?;
-    Ok(render(&scene)?.0)
+/// own metatiles and layer; the screen is its top-left 256×224. The weapon
+/// and armor rooms (`room`) have their own colors.
+pub fn hall(image: &[u8], room: bool) -> Result<(crate::frame::Background, [Bgr555; 128]), String> {
+    let scene = assets::maps::visual::pandora::box_hall(image, room)
+        .map_err(|error| error.to_string())?;
+    let (mut background, indices) = render(&scene)?;
+    // Transparent cells show the box's black backdrop (the rooms'
+    // pedestals).
+    for (pixel, &index) in background.pixels.iter_mut().zip(&indices) {
+        if index == 0 {
+            *pixel = 0;
+        }
+    }
+    Ok((background, *scene.palette()))
 }
 
 /// The whole first layer, as the inspector's static export draws it, and

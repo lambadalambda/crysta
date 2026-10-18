@@ -598,8 +598,9 @@ impl Session {
         use crysta_runtime::menu::Screen;
         frame.pixels.fill(0);
         let image = self.image;
-        let HallArt { hall, yomi, labels } = self.hall.get_or_insert_with(|| HallArt::new(image));
-        let Some(hall) = hall else {
+        let HallArt { hall, rooms, yomi, labels } = self.hall.get_or_insert_with(|| HallArt::new(image));
+        let shown = if page.screen == Screen::Hall { hall } else { rooms };
+        let Some((hall, colours)) = shown else {
             return;
         };
         let left = (i32::try_from(frame.width).unwrap_or(256) - 256) / 2;
@@ -607,6 +608,31 @@ impl Session {
         let (cx, cy) = page.screen.camera();
         let camera = (i32::from(cx) - left, i32::from(cy));
         frame::draw_background(frame, hall, camera);
+        // A room's pedestals: each slot's icon on layer 2 in BG palette
+        // `$B1:DA31[item]`; an empty one item 0's tiles in palette 0, the
+        // metatile left as it is (`$85:CE9E`).
+        for (slot, &(item, _)) in self.world.room_slots(page.screen).iter().enumerate() {
+            let palette = if item == 0 {
+                Ok(0)
+            } else {
+                assets::shop_display::icon_palette(image, item)
+            };
+            let (Some((column, row)), Ok((tiles, _)), Ok(palette)) = (
+                page.screen.icon_cell(slot),
+                assets::shop_display::item_icon(image, item),
+                palette,
+            ) else {
+                continue;
+            };
+            // Layer 2 lies 6 lines above layer 1 here (measured).
+            let at = (i32::from(column) * 16 - camera.0, i32::from(row) * 16 - 6 - camera.1);
+            for (py, px) in (0..16).flat_map(|py| (0..16).map(move |px| (py, px))) {
+                let index = tiles[py / 8 * 2 + px / 8].pixels()[py % 8 * 8 + px % 8];
+                if let (true, Some(&colour)) = (index != 0, colours.get(usize::from(palette) * 16 + usize::from(index))) {
+                    frame.set((at.0 + frame::signed(px), at.1 + frame::signed(py)), frame::rgb(colour));
+                }
+            }
+        }
         let (x, y) = page.yomi;
         if let (Some(yomi), Ok(x), Ok(y)) = (yomi, u16::try_from(x + cx), u16::try_from(y + cy)) {
             // Priority 3, over the hall's high tiles.
@@ -625,9 +651,11 @@ impl Session {
             draw_box_window(frame, art, (view.page, view.glyphs, view.cursor), self.tick);
         }
         // The box's HUD (layout 1).
+        // In the screen's own BG3 colours (the rooms' differ).
+        let bg3: [assets::graphics::Bgr555; 32] = std::array::from_fn(|index| colours[index]);
         if let Some(art) = self.shop_art.art(self.image) {
             let cells = crate::hud::menu_cells(hud_shown(&self.world));
-            crate::hud::draw_cells(frame, art, &cells);
+            crate::hud::draw_cells(frame, art, &cells, &bg3);
         }
         // Only the screen's 256 columns: the layer runs on to its right.
         for row in 0..frame::VIEW_HEIGHT {
@@ -885,16 +913,22 @@ fn draw_box_window(
 /// Yomi's box's art (`docs/menu.md`): the hall, Yomi and each hotspot's
 /// label; `None` where it could not be decoded.
 pub struct HallArt {
-    hall: Option<frame::Background>,
+    /// The hall's map and its BG colours, as the hall and as the rooms
+    /// show them.
+    hall: Option<(frame::Background, [assets::graphics::Bgr555; 128])>,
+    rooms: Option<(frame::Background, [assets::graphics::Bgr555; 128])>,
     yomi: Option<crysta_runtime::art::Animation>,
     labels: Vec<Option<assets::text::DialoguePage>>,
 }
 
 impl HallArt {
     fn new(image: &[u8]) -> Self {
-        let hall = background::hall(image)
-            .inspect_err(|error| eprintln!("the box's hall unavailable: {error}"))
-            .ok();
+        let render = |room| {
+            background::hall(image, room)
+                .inspect_err(|error| eprintln!("the box's hall unavailable: {error}"))
+                .ok()
+        };
+        let (hall, rooms) = (render(false), render(true));
         let yomi = crysta_runtime::art::yomi_animation(image)
             .inspect_err(|error| eprintln!("Yomi's art unavailable: {error}"))
             .ok();
@@ -910,7 +944,12 @@ impl HallArt {
                 .pop()
             })
             .collect();
-        Self { hall, yomi, labels }
+        Self {
+            hall,
+            rooms,
+            yomi,
+            labels,
+        }
     }
 }
 

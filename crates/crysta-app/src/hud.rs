@@ -2,6 +2,7 @@
 //! cells over the view, with the level, the life and the gems.
 
 use crate::frame::{rgb, signed, Canvas, CLASSIC_WIDTH};
+use assets::graphics::Bgr555;
 use assets::shop_display::ShopArt;
 
 /// One BG3 cell: column, row, tile, palette.
@@ -145,11 +146,12 @@ fn layout_cells(layout: &Layout, shown: Shown) -> Vec<Cell> {
 /// Draws the field's HUD on the classic view's columns, centred in a wide
 /// one.
 pub fn draw(canvas: &mut Canvas, art: &ShopArt, shown: Shown) {
-    draw_cells(canvas, art, &cells(shown));
+    draw_cells(canvas, art, &cells(shown), &art.panel_palette);
 }
 
 /// Draws `cells` on the classic view's columns, centred in a wide one.
-pub fn draw_cells(canvas: &mut Canvas, art: &ShopArt, cells: &[Cell]) {
+/// `colours` are BG3's (CGRAM 0..31): the field's, or the box's own.
+pub fn draw_cells(canvas: &mut Canvas, art: &ShopArt, cells: &[Cell], colours: &[Bgr555; 32]) {
     let left = (signed(canvas.width) - signed(CLASSIC_WIDTH)) / 2;
     for &(column, row, tile, palette) in cells {
         let Some(pixels) = art.panel.get(usize::from(tile)) else {
@@ -159,7 +161,7 @@ pub fn draw_cells(canvas: &mut Canvas, art: &ShopArt, cells: &[Cell]) {
             if index == 0 {
                 continue;
             }
-            let colour = art.panel_palette[usize::from(palette) * 4 + usize::from(index)];
+            let colour = colours[usize::from(palette) * 4 + usize::from(index)];
             let x = left + i32::from(column) * 8 + signed(at % 8);
             let y = i32::from(row) * 8 + signed(at / 8);
             canvas.set((x, y), rgb(colour));
