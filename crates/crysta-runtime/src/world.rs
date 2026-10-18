@@ -876,7 +876,9 @@ impl<'a> World<'a> {
                 // Ark's: only the blink is his own here; the rest is
                 // published (`ARK_FLAGS`).
                 match poke {
-                    Poke::Ark { flags } => self.globals.ark_flags = flags & 0x8000,
+                    Poke::Ark { flags } => {
+                        self.globals.ark_flags = flags & (0x8000 | crate::actors::ARK_UNHIT);
+                    }
                     Poke::ArkAt { at, value } if self.arrival.is_none() => {
                         let (x, y) = self.position();
                         let (x, y) = if at == 0 { (value, y) } else { (x, value) };

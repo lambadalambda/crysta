@@ -243,6 +243,9 @@ const SPAWN_LINKED: u8 = 0x99;
 const PAN: u8 = 0xDD;
 /// Starts the move and holds the script until it ends (`$80:B7D6`).
 const PAN_WAIT: u8 = 0xDE;
+/// Starts a camera move at once (`$80:B68E`): a new camera, absolute cells
+/// or offsets from the view, the target in 16-pixel units, a speed index.
+const PAN_TO: u8 = 0xDC;
 /// The speed index the towers use, 2 pixels a frame (measured).
 const PAN_SPEED: u8 = 0x80;
 /// Starts an orbit about the actor's spawn point (`$80:B136`).
@@ -626,6 +629,17 @@ const BLOCKED_RIGHT: u8 = 0xC5;
 const HELD: u8 = 0x2B;
 /// The pad bits a push holds (as `COP 2A $FFF0`).
 const PAD_HELD: u16 = 0xFFF0;
+/// Ark's `+$04` bit that keeps him out of the enemies' hit scan.
+pub(crate) const ARK_UNHIT: u16 = 0x0020;
+/// A scene's hold on Ark (`$90:90DE`) and its release (`$90:9146`).
+const SCENE_HOLD: [u8; 18] = [
+    0xA9, 0x00, 0x80, 0x0C, 0x7C, 0x09, 0xAC, 0xEA, 0x0D, 0xB9, 0x04, 0x00, 0x09, 0x20, 0x00, 0x99,
+    0x04, 0x00,
+];
+const SCENE_RELEASE: [u8; 18] = [
+    0xAC, 0xEA, 0x0D, 0xB9, 0x04, 0x00, 0x29, 0xDF, 0xFF, 0x99, 0x04, 0x00, 0xA9, 0x00, 0x80, 0x1C,
+    0x7C, 0x09,
+];
 /// Starts a line move toward `$7F:2004/2006,X` (`$80:AE38`): legs, pose,
 /// speed, frame limit, selector (`FF` none).
 const LINE_START: u8 = 0xCC;
@@ -1485,18 +1499,8 @@ impl Actor {
         if let Some(next) = player_pose_mismatch(image, at) {
             return Some(next);
         }
-        // `PHX; LDA $7F:001E,X; TAX; COP C0 target; PLX`: the parent's
-        // script goes on at the long `target` (a soul's child, `$90:FB6C`).
-        if let Some(
-            &[0xDA, 0xBF, 0x1E, 0x00, 0x7F, 0xAA, 0x02, SET_SCRIPT, low, high, bank, 0xFA],
-        ) = image.get(at..at + 12)
-        {
-            let parent = self.parent.filter(|parent| parent.id != 0)?;
-            around.globals.pokes.push(native::Poke::Script {
-                id: parent.id,
-                pc: usize::from(bank & 0x3F) << 16 | usize::from(u16::from_le_bytes([low, high])),
-            });
-            return Some(at + 12);
+        if let Some(next) = self.soul_idiom(image, around) {
+            return Some(next);
         }
         // The continents' door after its reload (`docs/underworld-end.md`
         // §2): the parchment's set-up (the picture's DMA, the palette, the
@@ -1511,6 +1515,40 @@ impl Actor {
         let player = (around.player, around.facing);
         let ran = native::run(image, at, &mut self.memory(around.globals, player))?;
         Some(self.ran(ran))
+    }
+
+    /// The souls' native code (`meta/issues/tower-souls.md`): the
+    /// first soul's hold on Ark and its release, and a soul's child sending
+    /// its parent on.
+    fn soul_idiom(&mut self, image: &[u8], around: &mut Surroundings<'_>) -> Option<usize> {
+        let at = self.pc;
+        // A scene holds Ark (`$90:90DE`): `LDA #$8000; TSB $097C` takes the
+        // pad, `LDY $0DEA; LDA $0004,Y; ORA #$0020; STA $0004,Y` keeps him
+        // out of the enemies' hit scan; `$90:9146` gives both back.
+        if image.get(at..at + SCENE_HOLD.len()) == Some(&SCENE_HOLD) {
+            around.globals.input_mask |= PAD_HELD;
+            around.globals.ark_flags |= ARK_UNHIT;
+            return Some(at + SCENE_HOLD.len());
+        }
+        if image.get(at..at + SCENE_RELEASE.len()) == Some(&SCENE_RELEASE) {
+            around.globals.input_mask &= !PAD_HELD;
+            around.globals.ark_flags &= !ARK_UNHIT;
+            return Some(at + SCENE_RELEASE.len());
+        }
+        // `PHX; LDA $7F:001E,X; TAX; COP C0 target; PLX`: the parent's
+        // script goes on at the long `target` (a soul's child, `$90:FB6C`).
+        if let Some(
+            &[0xDA, 0xBF, 0x1E, 0x00, 0x7F, 0xAA, 0x02, SET_SCRIPT, low, high, bank, 0xFA],
+        ) = image.get(at..at + 12)
+        {
+            let parent = self.parent.filter(|parent| parent.id != 0)?;
+            around.globals.pokes.push(native::Poke::Script {
+                id: parent.id,
+                pc: usize::from(bank & 0x3F) << 16 | usize::from(u16::from_le_bytes([low, high])),
+            });
+            return Some(at + 12);
+        }
+        None
     }
 
     /// What a native run may change.
@@ -3083,20 +3121,60 @@ impl Actor {
 
     /// `COP DD new relative sx sy tx ty speed` (a new camera, offsets from
     /// the player, at the towers' speed only) and `COP DE speed`, which
-    /// starts the move and ends the frame until it arrives; its speed
-    /// operand is not read. Returns whether execution continues.
+    /// starts the move and ends the frame until it arrives (its speed not
+    /// read); `COP DC new 1 tx ty speed`, a move to absolute cells at once,
+    /// which `COP DE` brings back to the player at its speed (natively to
+    /// the camera's start: the same while the scene holds Ark). Returns
+    /// whether execution continues.
     fn pan(&mut self, service: u8, operands: usize, around: &mut Surroundings<'_>) -> bool {
         let pan = &mut around.globals.pan;
         let units = |byte: u8| i16::from(i8::from_ne_bytes([byte])) * 16;
+        let view = around.globals.view;
         match (service, around.image.get(operands..operands + 7), *pan) {
             (PAN, Some(&[0, 0, sx, sy, tx, ty, PAN_SPEED]), _) => {
                 *pan = Some(crate::scene::Pan {
                     offset: (units(sx), units(sy)),
                     target: (units(tx), units(ty)),
                     moving: false,
+                    speed: 2,
+                    returns: false,
                 });
                 self.pc = operands + 7;
                 true
+            }
+            // Absolute cells only: the relative form is not traced.
+            (PAN_TO, Some(&[0, 1, tx, ty, index, ..]), _) => {
+                let (Some((left, top, ..)), Some(speed)) = (view, crate::scene::pan_speed(index))
+                else {
+                    self.pc = operands + 5;
+                    return true;
+                };
+                *pan = Some(crate::scene::Pan {
+                    offset: (0, 0),
+                    target: (
+                        units(tx) - left.cast_signed(),
+                        units(ty) - top.cast_signed(),
+                    ),
+                    moving: true,
+                    speed,
+                    returns: true,
+                });
+                self.pc = operands + 5;
+                true
+            }
+            (PAN_WAIT, Some(&[index, ..]), Some(mut started)) if started.returns => {
+                if started.target != (0, 0) {
+                    started.target = (0, 0);
+                    started.speed = crate::scene::pan_speed(index).unwrap_or(started.speed);
+                }
+                if started.arrived() {
+                    *pan = None;
+                    self.pc = operands + 1;
+                    return true;
+                }
+                *pan = Some(started);
+                self.pc = operands - 2;
+                false
             }
             (PAN_WAIT, _, Some(started)) if started.arrived() && started.moving => {
                 *pan = None;
@@ -3110,9 +3188,14 @@ impl Actor {
                 false
             }
             // Other moves are stepped over, as before they were modelled.
-            (PAN, ..) | (PAN_WAIT, _, None) => {
+            (PAN | PAN_TO, ..) | (PAN_WAIT, _, None) => {
                 self.cadence = None;
-                self.pc = operands + if service == PAN { 7 } else { 1 };
+                self.pc = operands
+                    + match service {
+                        PAN => 7,
+                        PAN_TO => 5,
+                        _ => 1,
+                    };
                 true
             }
             _ => {

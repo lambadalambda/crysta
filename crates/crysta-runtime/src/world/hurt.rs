@@ -178,6 +178,7 @@ impl World<'_> {
             || self.hurt.is_some()
             || self.down.is_some()
             || self.hits_off()
+            || self.globals.ark_flags & crate::actors::ARK_UNHIT != 0
             || self.over_hits()
         {
             return;

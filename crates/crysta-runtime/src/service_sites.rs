@@ -541,6 +541,7 @@ const FIXED: &[(u8, usize, &[usize])] = &[
     (0xD6, 3, &[1]),
     (0xD8, 3, &[]),
     (0xD9, 1, &[]),
+    (0xDC, 5, &[]),
     (0xDD, 7, &[]),
     (0xDE, 1, &[]),
     (0xDF, 3, &[]),
@@ -771,7 +772,7 @@ mod tests {
             return;
         };
         let rom = rom::Rom::load(&bytes).unwrap();
-        let differ = [0x46, 0x5F, 0xCD, 0xD9, 0xDD, 0xDE, 0xEE];
+        let differ = [0x46, 0x5F, 0xCD, 0xD9, 0xDC, 0xDD, 0xDE, 0xEE];
         for &(service, length, words) in FIXED {
             let Some(native) = actor_script::resumes(rom.image(), service) else {
                 assert!(differ.contains(&service), "COP {service:02X} unread");

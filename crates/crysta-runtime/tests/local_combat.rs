@@ -576,3 +576,55 @@ fn a_soul_blocks_the_way() {
         assert_eq!(world.position(), (520, 400), "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn the_first_soul_opens_the_gate() {
+    // `$102`'s soul (`$90:90CD`): after its text the camera moves to the
+    // gate (`COP DC`, cell row 1, 2 pixels a frame), the gate opens in four
+    // block copies, and the camera comes back at 4 (`COP DE $90`). Native
+    // (JP): the hold at 60725, the camera at the gate 60863, back 61125,
+    // the pad free at 61127.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0102, 520, 460, events).unwrap();
+        let record = world
+            .residents()
+            .iter()
+            .find(|resident| resident.position == (520, 384))
+            .expect("the marked blob")
+            .record;
+        assert!(world.kill_foe(record), "{:?}", rom.revision());
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.place(520, 400);
+        world.face(Direction::Up);
+        world.update(None, A).unwrap();
+        while world.dialogue().is_some() {
+            let reading = !world.typing();
+            world
+                .update(None, if reading { A } else { Presses::NONE })
+                .unwrap();
+        }
+        let patched = world.patched_cells().len();
+        let mut furthest = 0;
+        let mut frames = 0;
+        for _ in 0..1000 {
+            world.update(None, Presses::NONE).unwrap();
+            frames += 1;
+            furthest = furthest.min(world.camera_offset().1);
+            if furthest < 0 && world.camera_offset() == (0, 0) && !world.pad_locked() {
+                break;
+            }
+        }
+        assert_eq!(world.frozen_scripts(), [], "{:?}", rom.revision());
+        assert!(
+            world.patched_cells().len() > patched,
+            "{:?}",
+            rom.revision()
+        );
+        // Natively 274 pixels up (the view 290 to 16) and 402 frames.
+        assert_eq!((furthest, frames), (-272, 401), "{:?}", rom.revision());
+    }
+}

@@ -211,8 +211,9 @@ impl Digits {
 
 /// A camera move a script set (`COP DD`, `$80:B735`): the view's offset
 /// from where it follows the player, moving to its target once `COP DE`
-/// (`$80:B7D6`) starts it. It lasts until it arrives or the map changes,
-/// even if its script stops first.
+/// (`$80:B7D6`) starts it; or one `COP DC` (`$80:B68E`) starts at once,
+/// which `COP DE` brings back. It lasts until it arrives or the map
+/// changes, even if its script stops first.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Pan {
     /// The offset now, in pixels.
@@ -221,11 +222,22 @@ pub struct Pan {
     pub target: (i16, i16),
     /// Whether `COP DE` started it.
     pub moving: bool,
+    /// Pixels a frame on each axis.
+    pub speed: i16,
+    /// `COP DE` brings it back to the player (`COP DC`'s).
+    pub returns: bool,
 }
 
-/// Pixels a frame of the towers' speed index `$80` (measured; no other
-/// index is).
-const PAN_SPEED: i16 = 2;
+/// Pixels a frame of a speed index (measured: the towers' `$80`, and `$90`
+/// as the first soul's camera comes back).
+#[must_use]
+pub const fn pan_speed(index: u8) -> Option<i16> {
+    match index {
+        0x80 => Some(2),
+        0x90 => Some(4),
+        _ => None,
+    }
+}
 
 impl Pan {
     /// A frame: a step toward the target on each axis.
@@ -233,7 +245,8 @@ impl Pan {
         if !self.moving {
             return;
         }
-        let step = |from: i16, to: i16| from + (to - from).clamp(-PAN_SPEED, PAN_SPEED);
+        let speed = self.speed;
+        let step = |from: i16, to: i16| from + (to - from).clamp(-speed, speed);
         self.offset = (
             step(self.offset.0, self.target.0),
             step(self.offset.1, self.target.1),
