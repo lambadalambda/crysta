@@ -139,8 +139,12 @@ script `$84:C52F`), first sample x+22, **6 px per frame**, stream `$2D`
 (`$7F:65D2`): -33 -34 -35 -35 -35 -35 -35 -34 -33 -32 -30 -28 -26 -23 -20
 -17 -13 -9 -5 0. Ark stops: resource 3 `$12`/`$13`/`$14` (records 4+4+9)
 from F+1, then the plain dash at F+18 (`$84:9051`..): on with the way held
-from F+19, else the grace F+18..F+25 and the brake from F+26 (`$0D`). Not
-modelled.
+from F+19, else the grace F+18..F+25 and the brake from F+26 (`$0D`),
+standing in the dash's pose through that grace (traces `t_held`, `t_free`
+from (296,368), 2026-10-18). Modelled: the pot's `Arc::Dashed`, Ark's
+`PandoraCarryMotion::DashThrowing` and `room_core::run::Run::Rest`; the
+`throw-right-dashing` fixture passes on both ROMs. The break sound comes at
+the landing sample, natively a frame later here.
 
 Jump-throw (A in the air, `$84:AF84`, J+6..J+18 of a carry jump; JP =
 EU): release at F+1 from ±16 (pot script `$84:C4E1`), 3 px a frame, height

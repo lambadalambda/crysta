@@ -26,5 +26,6 @@ frames `$A2:E2BD` onward).
 ## Progress
 
 - The jump-throw runs (`PotState::throw_in_air`, `world/jump.rs`): the fixture `throw-left-jumping` matches on both ROMs; Ark's `$2A`/`$2B`/`$2C`, stand at J+24, control at J+25.
-- Open: the dash-throw (traced in the job's `tmp/throws/`: speed 6, the stream `$2D`, Ark's `$12`-`$14` of resource 3 for 17 frames, then the plain dash), the drop's own stream `$2E` (`$84:C6D3`, code only), the fragments.
-- The carry dash runs (`room_core::run`'s carry mode, `PotState::step_over_running`; `ark_dashes_with_a_pot_as_natively`, 13 native traces `c_*`). Open: A in it still makes the plain throw, not the dash-throw, and its control word stays the walk's `$20` (natively `$10`); B in it jumps as from a stand (not traced); on its last frame the model shows the stand pose, natively the walk's.
+- The dash-throw runs (`Arc::Dashed`, `Run::Rest`; `a_in_a_carry_dash_is_the_dash_throw`, native `t_held`/`t_free`); the `throw-right-dashing` fixture passes on both ROMs. Its break sound comes a frame early, as the landing's jitter. Not traced: A and B in the dash after it (the model lets A talk or lift, B does nothing), a script's pad lock while its pot flies (the dash runs on), a perpendicular or opposite way or a diagonal in it (ignored).
+- Open: the `exit-while-carrying` fixture (the drop's own stream `$2E`, `$84:C6D3`, code only), the fragments.
+- The carry dash runs (`room_core::run`'s carry mode, `PotState::step_over_running`; `ark_dashes_with_a_pot_as_natively`, 13 native traces `c_*`). Open: its control word stays the walk's `$20` (natively `$10`); B in it jumps as from a stand (not traced); on its last frame the model shows the stand pose, natively the walk's.
