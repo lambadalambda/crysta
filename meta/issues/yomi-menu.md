@@ -14,3 +14,9 @@ descriptions), then weapons, armor and the status mirror.
 
 - After the frozen return, Select opens the box and the item room works as
   natively; before it, Select does nothing.
+
+## Sub-issues
+
+1. [Open the box's hall with Select](box-hall.md)
+2. [Equip at the box's weapon and armor doors](box-equip-doors.md)
+3. [Use and equip at the box's item door](box-item-door.md)
