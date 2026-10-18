@@ -1,6 +1,6 @@
 //! Yomi's box, the hall (`docs/menu.md`), against the native captures.
 
-use crysta_runtime::menu::{Event, Hall, Menu, Page, Screen, View, ITEM_DOOR};
+use crysta_runtime::menu::{Event, Hall, Held, Menu, Page, Screen, View, ITEM_DOOR};
 use crysta_runtime::scene::Presses;
 use rom::{Revision, Rom};
 use room_core::Direction;
@@ -21,11 +21,18 @@ fn roms() -> Vec<Rom> {
         .collect()
 }
 
-fn open(rom: &Rom) -> Menu {
+fn open(rom: &Rom) -> Menu<'_> {
     Menu::open(rom.image()).expect("the hall's tables")
 }
 
 const NONE: [Option<Direction>; 2] = [None, None];
+
+/// Nothing held, nothing equipped.
+const HELD: Held<'static> = Held {
+    slots: &[],
+    weapon: None,
+    armor: None,
+};
 
 fn pad(direction: Direction) -> [Option<Direction>; 2] {
     [Some(direction), None]
@@ -37,7 +44,7 @@ fn in_hall(menu: &mut Menu) -> Page {
         if let View::Screen(page) = menu.view() {
             return page;
         }
-        menu.step(NONE, Presses::NONE);
+        menu.step(NONE, Presses::NONE, &HELD);
     }
     panic!("the hall never showed");
 }
@@ -82,7 +89,7 @@ fn the_hall_shows_at_once_after_the_fields_fade() {
         let mut menu = open(&rom);
         let mut views = vec![menu.view()];
         for _ in 0..61 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
             views.push(menu.view());
         }
         let hall = if rom.revision() == Revision::Japan {
@@ -105,10 +112,10 @@ fn yomi_eases_to_the_weapon_door() {
     for rom in roms() {
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Left), Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
         let xs: Vec<_> = (0..15)
             .map(|_| {
-                menu.step(NONE, Presses::NONE);
+                menu.step(NONE, Presses::NONE, &HELD);
                 let View::Screen(page) = menu.view() else {
                     panic!()
                 };
@@ -130,7 +137,7 @@ fn the_label_is_redrawn_and_a_held_direction_repeats() {
         let mut menu = open(&rom);
         in_hall(&mut menu);
         // Down from the item door at P: the jewel box.
-        menu.step(pad(Direction::Down), Presses::NONE);
+        menu.step(pad(Direction::Down), Presses::NONE, &HELD);
         let label = |menu: &Menu| match menu.view() {
             View::Screen(page) => (page.hotspot, page.label),
             other => panic!("{other:?}"),
@@ -138,7 +145,7 @@ fn the_label_is_redrawn_and_a_held_direction_repeats() {
         assert_eq!(label(&menu), (3, Some(7)));
         let mut seen = Vec::new();
         for _ in 0..17 {
-            menu.step(pad(Direction::Down), Presses::NONE);
+            menu.step(pad(Direction::Down), Presses::NONE, &HELD);
             seen.push(label(&menu));
         }
         assert_eq!(seen[0], (3, Some(7)), "P+1");
@@ -150,12 +157,12 @@ fn the_label_is_redrawn_and_a_held_direction_repeats() {
         // A tap at P+2 is lost; at P+4 a new direction is taken.
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Left), Presses::NONE);
-        menu.step(NONE, Presses::NONE);
-        menu.step(pad(Direction::Right), Presses::NONE);
-        menu.step(NONE, Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
+        menu.step(NONE, Presses::NONE, &HELD);
+        menu.step(pad(Direction::Right), Presses::NONE, &HELD);
+        menu.step(NONE, Presses::NONE, &HELD);
         assert_eq!(label(&menu).0, 6, "the tap at P+2");
-        menu.step(pad(Direction::Right), Presses::NONE);
+        menu.step(pad(Direction::Right), Presses::NONE, &HELD);
         assert_eq!(label(&menu).0, 7, "P+4");
     }
 }
@@ -169,7 +176,11 @@ fn select_closes_and_the_field_fades_back() {
         let mut views = Vec::new();
         let mut closed = None;
         for frame in 0..70u16 {
-            let event = menu.step(NONE, if frame == 0 { select() } else { Presses::NONE });
+            let event = menu.step(
+                NONE,
+                if frame == 0 { select() } else { Presses::NONE },
+                &HELD,
+            );
             if event == Some(Event::Closed) && closed.is_none() {
                 closed = Some(frame);
             }
@@ -248,15 +259,15 @@ fn held_releases_and_diagonals_move_as_natively() {
         // door at P+16; nothing further left.
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Right), Presses::NONE);
+        menu.step(pad(Direction::Right), Presses::NONE, &HELD);
         for _ in 0..4 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         assert_eq!(hotspot(&menu), 8);
-        menu.step(pad(Direction::Left), Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
         let mut seen = vec![hotspot(&menu)];
         for _ in 0..21 {
-            menu.step(pad(Direction::Left), Presses::NONE);
+            menu.step(pad(Direction::Left), Presses::NONE, &HELD);
             seen.push(hotspot(&menu));
         }
         assert_eq!((seen[0], seen[15], seen[16], seen[21]), (7, 7, 6, 6));
@@ -264,30 +275,34 @@ fn held_releases_and_diagonals_move_as_natively() {
         // P+16, then nothing below it at P+21.
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Down), Presses::NONE);
+        menu.step(pad(Direction::Down), Presses::NONE, &HELD);
         let mut seen = vec![hotspot(&menu)];
         for _ in 0..21 {
-            menu.step(pad(Direction::Down), Presses::NONE);
+            menu.step(pad(Direction::Down), Presses::NONE, &HELD);
             seen.push(hotspot(&menu));
         }
         assert_eq!((seen[0], seen[16], seen[21]), (3, 0, 0));
         // Released and pressed again: it moves at once after the redraw.
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Down), Presses::NONE);
+        menu.step(pad(Direction::Down), Presses::NONE, &HELD);
         for _ in 0..4 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
-        menu.step(pad(Direction::Up), Presses::NONE);
+        menu.step(pad(Direction::Up), Presses::NONE, &HELD);
         assert_eq!(hotspot(&menu), 7);
         // A diagonal: Up before Left.
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Down), Presses::NONE);
+        menu.step(pad(Direction::Down), Presses::NONE, &HELD);
         for _ in 0..4 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
-        menu.step([Some(Direction::Left), Some(Direction::Up)], Presses::NONE);
+        menu.step(
+            [Some(Direction::Left), Some(Direction::Up)],
+            Presses::NONE,
+            &HELD,
+        );
         assert_eq!(hotspot(&menu), 7, "{:?}", rom.revision());
     }
 }
@@ -333,15 +348,15 @@ fn the_weapon_door_leads_into_the_weapon_room_and_back() {
         let japan = rom.revision() == Revision::Japan;
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Left), Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         // A on the weapon door at P.
-        let mut events = vec![menu.step(NONE, press_a())];
+        let mut events = vec![menu.step(NONE, press_a(), &HELD)];
         let mut pages = vec![page(&menu)];
         for _ in 0..180 {
-            events.push(menu.step(NONE, Presses::NONE));
+            events.push(menu.step(NONE, Presses::NONE, &HELD));
             pages.push(page(&menu));
         }
         let (dark, label) = if japan {
@@ -367,25 +382,23 @@ fn the_weapon_door_leads_into_the_weapon_room_and_back() {
             "the slots are sorted once on entry"
         );
         // B: back to the hall door, which A takes back to the hall.
-        menu.step(pad(Direction::Down), Presses::NONE);
+        menu.step(pad(Direction::Down), Presses::NONE, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         assert_eq!(page(&menu).unwrap().hotspot, 8);
-        menu.step(
-            NONE,
-            Presses {
-                cancel: true,
-                ..Presses::NONE
-            },
-        );
+        let b = Presses {
+            cancel: true,
+            ..Presses::NONE
+        };
+        menu.step(NONE, b, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         assert_eq!(page(&menu).unwrap().hotspot, 0);
-        menu.step(NONE, press_a());
+        menu.step(NONE, press_a(), &HELD);
         for _ in 0..200 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         let back = page(&menu).unwrap();
         assert_eq!(
@@ -405,39 +418,224 @@ fn the_armor_door_and_the_rooms_doors_lead_on() {
         let japan = rom.revision() == Revision::Japan;
         let mut menu = open(&rom);
         in_hall(&mut menu);
-        menu.step(pad(Direction::Right), Presses::NONE);
+        menu.step(pad(Direction::Right), Presses::NONE, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         let through = |menu: &mut Menu, frames: usize| {
-            menu.step(NONE, press_a());
+            menu.step(NONE, press_a(), &HELD);
             (0..frames)
-                .filter_map(|_| menu.step(NONE, Presses::NONE))
+                .filter_map(|_| menu.step(NONE, Presses::NONE, &HELD))
                 .collect::<Vec<_>>()
         };
         assert_eq!(through(&mut menu, 200), [Event::Sort(Screen::Armor)]);
         let at = |menu: &Menu| page(menu).map(|page| (page.screen, page.hotspot));
         assert_eq!(at(&menu), Some((Screen::Armor, 2)));
-        menu.step(pad(Direction::Left), Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
         assert_eq!(through(&mut menu, 200), [Event::Sort(Screen::Weapon)]);
         assert_eq!(at(&menu), Some((Screen::Weapon, 1)));
-        menu.step(pad(Direction::Left), Presses::NONE);
+        menu.step(pad(Direction::Left), Presses::NONE, &HELD);
         for _ in 0..20 {
-            menu.step(NONE, Presses::NONE);
+            menu.step(NONE, Presses::NONE, &HELD);
         }
-        menu.step(NONE, press_a());
+        menu.step(NONE, press_a(), &HELD);
         let label = if japan { 162 } else { 154 };
         let labels: Vec<_> = (0..label)
             .map(|_| {
-                menu.step(NONE, Presses::NONE);
+                menu.step(NONE, Presses::NONE, &HELD);
                 page(&menu).and_then(|page| page.label)
             })
             .collect();
         assert_eq!(labels[label - 2], None);
         assert_eq!(labels[label - 1], Some(6), "{:?}", rom.revision());
         assert_eq!(at(&menu), Some((Screen::Hall, 6)));
+    }
+}
+
+/// A world in `$102` after the frozen return, holding `items`.
+fn world_with<'a>(rom: &'a Rom, items: &[u8]) -> crysta_runtime::world::World<'a> {
+    let mut events = crysta_runtime::world::fresh_game_flags();
+    events[0xFE / 8] |= 1 << (0xFE % 8);
+    let mut world =
+        crysta_runtime::world::World::enter_with_events(rom.image(), 0x0102, 520, 460, events)
+            .unwrap();
+    for &item in items {
+        world.give_item(item);
+    }
+    world
+}
+
+/// Opens the box and walks Yomi into the weapon room, onto its first
+/// pedestal (position 4), where the sort puts the strongest weapon.
+fn at_first_weapon(world: &mut crysta_runtime::world::World<'_>) {
+    world.update(None, select()).unwrap();
+    for _ in 0..80 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    world.update(Some(Direction::Left), Presses::NONE).unwrap();
+    for _ in 0..20 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    world.update(None, press_a()).unwrap();
+    for _ in 0..200 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    for direction in [Direction::Down, Direction::Right, Direction::Down] {
+        world.update(Some(direction), Presses::NONE).unwrap();
+        for _ in 0..20 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+    }
+    assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 4));
+}
+
+#[test]
+fn a_pedestal_equips_its_weapon_and_unequips_it() {
+    // `docs/menu.md`: the question from P+2, complete at P+19; A on its
+    // first answer: `$064A` at P+1, the window closed and `$0659` at P+46
+    // (Japanese, `$81`: 3) or P+68 (European, `$82`: 6); A again: the
+    // unequip question, `$0659` = 0.
+    for rom in roms() {
+        let (item, power, close) = if rom.revision() == Revision::Japan {
+            (0x81, 3, 46)
+        } else {
+            (0x82, 6, 68)
+        };
+        let mut world = world_with(&rom, &[item]);
+        at_first_weapon(&mut world);
+        world.update(None, press_a()).unwrap();
+        for _ in 0..40 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert!(world.menu_dialogue_open(), "the question waits");
+        world.update(None, press_a()).unwrap();
+        assert_eq!(world.weapon_item(), None);
+        world.update(None, Presses::NONE).unwrap();
+        assert_eq!(world.weapon_item(), Some(item), "P+1");
+        let powers: Vec<_> = (2..=close + 2)
+            .map(|_| {
+                world.update(None, Presses::NONE).unwrap();
+                world.stats().weapon
+            })
+            .collect();
+        // The European answer closes 2 frames sooner here than natively
+        // (`meta/issues/box-equip-doors.md`).
+        let arrived = powers.iter().position(|&p| p == power).map(|at| at + 2);
+        let expected = if close == 46 { close } else { close - 2 };
+        assert_eq!(arrived, Some(expected), "{:?}", rom.revision());
+        assert!(!world.menu_dialogue_open());
+        // Equipped: A asks to unequip; its first answer takes it off.
+        for _ in 0..10 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(None, press_a()).unwrap();
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(None, press_a()).unwrap();
+        for _ in 0..80 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert_eq!((world.weapon_item(), world.stats().weapon), (None, 0));
+    }
+}
+
+#[test]
+fn an_empty_pedestal_says_so() {
+    // 何もないぜ！ from the press's second frame to its 20th, the label
+    // again at the 22nd.
+    for rom in roms() {
+        let mut world = world_with(&rom, &[]);
+        at_first_weapon(&mut world);
+        world.update(None, press_a()).unwrap();
+        let frames: Vec<_> = (1..=22)
+            .map(|_| {
+                world.update(None, Presses::NONE).unwrap();
+                let label =
+                    matches!(world.menu(), Some(View::Screen(page)) if page.label.is_some());
+                (world.menu_dialogue_open(), label)
+            })
+            .collect();
+        let at = |frame: usize| frames[frame - 1];
+        assert_eq!(at(1), (false, false), "{:?}", rom.revision());
+        assert_eq!(at(2), (true, false));
+        assert_eq!(at(20), (true, false));
+        assert_eq!(at(21), (false, false));
+        assert_eq!(at(22), (false, true));
+    }
+}
+
+#[test]
+fn unequipping_clears_the_power_at_the_52nd_frame() {
+    let Some(rom) = roms()
+        .into_iter()
+        .find(|rom| rom.revision() == Revision::Japan)
+    else {
+        return;
+    };
+    let mut world = world_with(&rom, &[0x81]);
+    world.equip_weapon(0x81);
+    at_first_weapon(&mut world);
+    world.update(None, press_a()).unwrap();
+    for _ in 0..60 {
+        world.update(None, Presses::NONE).unwrap();
+    }
+    world.update(None, press_a()).unwrap();
+    let powers: Vec<_> = (1..=53)
+        .map(|_| {
+            world.update(None, Presses::NONE).unwrap();
+            world.stats().weapon
+        })
+        .collect();
+    assert_eq!(world.weapon_item(), None);
+    assert_eq!((powers[50], powers[51]), (3, 0), "P+51, P+52");
+}
+
+#[test]
+fn the_armor_rooms_pedestal_puts_the_cloth_on() {
+    // The armor door, then its position 4: cloth `$A0`, power 3.
+    for rom in roms() {
+        let mut world = world_with(&rom, &[0xA0]);
+        world.update(None, select()).unwrap();
+        for _ in 0..80 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(Some(Direction::Right), Presses::NONE).unwrap();
+        for _ in 0..20 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(None, press_a()).unwrap();
+        for _ in 0..200 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        for direction in [
+            Direction::Down,
+            Direction::Left,
+            Direction::Down,
+            Direction::Left,
+        ] {
+            world.update(Some(direction), Presses::NONE).unwrap();
+            for _ in 0..20 {
+                world.update(None, Presses::NONE).unwrap();
+            }
+        }
+        assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 4));
+        world.update(None, press_a()).unwrap();
+        for _ in 0..40 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        world.update(None, press_a()).unwrap();
+        for _ in 0..90 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert_eq!(
+            (world.armor(), world.stats().armor),
+            (Some(0xA0), 3),
+            "{:?}",
+            rom.revision()
+        );
     }
 }

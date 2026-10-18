@@ -28,3 +28,9 @@ window wipe.
    digits and arrows, the equipped marker, Yomi.
 3. The window wipe in and out.
 4. The walkthrough tool equips through the box.
+
+## Notes
+
+- Equipping: the Japanese frames match (`$064A` at P+1, the window closed
+  and `$0659` at P+46); in European the answer's window closes 2 frames
+  sooner than the native P+68 (`$82`), the text's typing not traced.

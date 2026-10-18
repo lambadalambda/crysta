@@ -1,10 +1,12 @@
 //! Yomi's box ([notes](../../../docs/menu.md)): Select opens it
 //! (`$85:A179`) on the hall, the pad moves Yomi across its hotspots, the
-//! weapon and armor doors lead to their rooms, Select closes it. Frame by
-//! frame from the press that opened it; the field waits meanwhile
-//! (`$049A`). The rooms' pedestals and the other screens are not here yet.
+//! weapon and armor doors lead to their rooms, whose pedestals equip,
+//! Select closes it. Frame by frame from the press that opened it; the
+//! field waits meanwhile (`$049A`). The throw and the other screens are not
+//! here yet.
 
-use crate::scene::Presses;
+use crate::scene::{Dialogue, Presses};
+use assets::text::{DialoguePage, HouseDialogue};
 use room_core::Direction;
 
 /// The frames that differ between the ROMs, from the open or close press.
@@ -156,6 +158,82 @@ pub enum Event {
     /// Entering the room: sort its sixteen slots by power, highest first
     /// (`$85:A6FD`, `$85:A663`).
     Sort(Screen),
+    /// The room's equipment is now `item`, or none (`$064A`, `$064C`).
+    Equip(Screen, Option<u8>),
+    /// The stats follow the equipment (`$85:F4BD`): the powers.
+    Stats,
+}
+
+/// What the box reads of the world: a room's slots and the equipment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Held<'s> {
+    /// The inventory's (item, count) slots from `$7F:8000`, as bytes.
+    pub slots: &'s [u8],
+    /// The equipped weapon.
+    pub weapon: Option<u8>,
+    /// The equipped armor.
+    pub armor: Option<u8>,
+}
+
+impl Held<'_> {
+    /// The item and count on a room's position `at` (slot `at - 4`).
+    fn on(&self, screen: Screen, at: u8) -> Option<(u8, u8)> {
+        let slot = screen.slots()?.start + usize::from(at.checked_sub(4)?);
+        let pair = self.slots.get(slot * 2..slot * 2 + 2)?;
+        (pair[0] != 0).then_some((pair[0], pair[1]))
+    }
+
+    /// The room's equipment.
+    const fn equipped(&self, screen: Screen) -> Option<u8> {
+        match screen {
+            Screen::Weapon => self.weapon,
+            Screen::Armor => self.armor,
+            Screen::Hall => None,
+        }
+    }
+}
+
+/// The texts of a pedestal's A (`docs/menu.md`, "Labels and texts"),
+/// Japanese and European.
+const EMPTY: (u32, u32) = (0x92_B6C5, 0x92_B8BC);
+const EQUIP_ASK: (u32, u32) = (0x92_AB47, 0x92_ADE5);
+const EQUIPPED: (u32, u32) = (0x92_AB84, 0x92_AE22);
+const UNEQUIP_ASK: (u32, u32) = (0x92_AB1D, 0x92_ADC5);
+const UNEQUIPPED: (u32, u32) = (0x92_AB6D, 0x92_AE04);
+/// The question's choice (`COP 1A 0A`): the first answer equips or
+/// unequips, B and the second close the window.
+const ANSWERS: u8 = 0x0A;
+/// A text shows from the press's second frame (`COP 00`, then `COP 1C`).
+const TEXT_AT: u32 = 2;
+/// The empty pedestal's text goes at the press's 21st frame, its label at
+/// the 22nd.
+const EMPTY_GONE: u32 = 21;
+/// After a question's window closes: an empty label window, then the
+/// label at the fourth frame.
+const LABEL_AFTER: u32 = 4;
+
+/// A pedestal's A under way (`$85:AE8E`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Task {
+    /// Nothing on it: its text, from this press.
+    Empty(u32),
+    /// The question about `item` (`count` of it): to equip it, or to take
+    /// it off.
+    Asking {
+        since: u32,
+        item: (u8, u8),
+        unequip: bool,
+    },
+    /// The first answer from this frame: the equipment changes on the
+    /// next, the answer's text on the one after; typed out, the window
+    /// closes itself and empties a frame later.
+    Answering {
+        since: u32,
+        item: (u8, u8),
+        unequip: bool,
+    },
+    /// The window emptied: the stats.
+    Closed,
 }
 
 /// A hotspot (`$92:BCA3[$06BC]`): Yomi's place, and where Up, Down, Left
@@ -343,8 +421,9 @@ struct Door {
 }
 
 /// The box while it runs.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Menu {
+#[derive(Debug, Clone)]
+pub struct Menu<'a> {
+    image: &'a [u8],
     timing: Timing,
     doors: DoorTiming,
     hall: Hall,
@@ -356,6 +435,11 @@ pub struct Menu {
     yomi: (i16, i16),
     ease: Option<Ease>,
     moved: Option<Move>,
+    /// A pedestal's A under way, and its window.
+    task: Option<Task>,
+    dialogue: Dialogue,
+    /// After a window closed, the label and the pad wait for this frame.
+    label_at: u32,
 }
 
 /// The last move: its frame, the hotspot it left, its direction and how
@@ -369,17 +453,18 @@ struct Move {
     held: Option<(Direction, u16)>,
 }
 
-impl Menu {
+impl<'a> Menu<'a> {
     /// Opens on the item door (`$06A6` = 7) at the Select press, with the
-    /// hall's tables from `image`.
+    /// hall's tables and texts from `image`.
     #[must_use]
-    pub fn open(image: &[u8]) -> Option<Self> {
+    pub fn open(image: &'a [u8]) -> Option<Self> {
         let hall = Hall::from_rom(image)?;
         let yomi = hall
             .hotspots(Screen::Hall)
             .get(usize::from(ITEM_DOOR))
             .map_or((0, 0), |hotspot| hotspot.at);
         Some(Self {
+            image,
             timing: assets::layout::per_revision(image, JAPAN, EUROPE),
             doors: assets::layout::per_revision(image, JAPAN_DOOR, EUROPE_DOOR),
             hall,
@@ -390,23 +475,40 @@ impl Menu {
             yomi,
             ease: None,
             moved: None,
+            task: None,
+            dialogue: Dialogue::default(),
+            label_at: 0,
         })
     }
 
-    /// A frame with the directions the pad holds (two on a diagonal) and
-    /// the buttons pressed: A takes a door, B goes to a room's hall door,
-    /// Select closes the box. Returns what the world does.
-    pub fn step(&mut self, pad: [Option<Direction>; 2], presses: Presses) -> Option<Event> {
+    /// A frame with the directions the pad holds (two on a diagonal), the
+    /// buttons pressed and what the box reads of the world: A takes a door
+    /// or asks about a pedestal, B goes to a room's hall door, Select
+    /// closes the box. Returns what the world does.
+    pub fn step(
+        &mut self,
+        pad: [Option<Direction>; 2],
+        presses: Presses,
+        held: &Held<'_>,
+    ) -> Option<Event> {
         self.frame += 1;
         match self.phase {
             Phase::Opening if self.frame >= self.timing.hall => self.phase = Phase::Screen,
             Phase::Opening => {}
             Phase::Screen => {
                 self.ease_yomi();
+                if let Some(task) = self.task {
+                    return self.task_frame(task, presses);
+                }
+                if self.frame < self.label_at {
+                    return None;
+                }
                 if self.redrawing() {
                     self.read_pad(pad);
                 } else if presses.select {
                     self.phase = Phase::Closing(self.frame);
+                } else if presses.confirm && self.hotspot >= 4 && self.screen != Screen::Hall {
+                    self.ask(held);
                 } else if presses.confirm {
                     self.take_door();
                 } else if let Some(door) = presses
@@ -426,6 +528,117 @@ impl Menu {
             }
         }
         None
+    }
+
+    /// A on a pedestal (`$85:AE8E`): empty, or the question about its item.
+    fn ask(&mut self, held: &Held<'_>) {
+        self.task = Some(match held.on(self.screen, self.hotspot) {
+            None => Task::Empty(self.frame),
+            Some(item) => Task::Asking {
+                since: self.frame,
+                item,
+                unequip: held.equipped(self.screen) == Some(item.0),
+            },
+        });
+    }
+
+    /// A frame of a pedestal's A: its texts in the window, the choice, the
+    /// equipment changed; the stats when its window closes (`$85:F4BD`,
+    /// after every A on a pedestal).
+    fn task_frame(&mut self, task: Task, presses: Presses) -> Option<Event> {
+        let before = self.dialogue.busy();
+        self.dialogue.tick();
+        let chosen = self.dialogue.press(presses);
+        match task {
+            Task::Empty(since) => match self.frame - since {
+                TEXT_AT if !self.request(EMPTY, (0, 0)) => Some(self.close_window(1)),
+                EMPTY_GONE => Some(self.close_window(1)),
+                _ => None,
+            },
+            Task::Asking {
+                since,
+                item,
+                unequip,
+            } => {
+                let after = self.frame - since;
+                let question = if unequip { UNEQUIP_ASK } else { EQUIP_ASK };
+                if after == TEXT_AT && !self.request(question, item) {
+                    return Some(self.close_window(LABEL_AFTER));
+                }
+                if after > TEXT_AT && !self.dialogue.busy() && chosen.is_none() {
+                    // The question typed out: its answers (`COP 1A 0A`).
+                    let Ok(choice) = HouseDialogue::choice_at(self.image, ANSWERS) else {
+                        return Some(self.close_window(LABEL_AFTER));
+                    };
+                    self.dialogue.ask(choice);
+                }
+                match chosen {
+                    Some(1) => {
+                        self.task = Some(Task::Answering {
+                            since: self.frame,
+                            item,
+                            unequip,
+                        });
+                        None
+                    }
+                    Some(_) => Some(self.close_window(LABEL_AFTER)),
+                    None => None,
+                }
+            }
+            Task::Answering {
+                since,
+                item,
+                unequip,
+            } => match self.frame - since {
+                1 => Some(Event::Equip(self.screen, (!unequip).then_some(item.0))),
+                TEXT_AT => {
+                    let answer = if unequip { UNEQUIPPED } else { EQUIPPED };
+                    if !self.request(answer, item) {
+                        self.task = Some(Task::Closed);
+                    }
+                    None
+                }
+                // The text closes its window when typed out (`$D7`); the
+                // stats a frame later.
+                _ => {
+                    if before && !self.dialogue.busy() {
+                        self.task = Some(Task::Closed);
+                    }
+                    None
+                }
+            },
+            Task::Closed => Some(self.close_window(LABEL_AFTER)),
+        }
+    }
+
+    /// Publishes the text at `source` (Japanese, European) about `item`
+    /// and its count; whether it decoded.
+    fn request(&mut self, source: (u32, u32), (item, count): (u8, u8)) -> bool {
+        let source = assets::layout::per_revision(self.image, source.0, source.1);
+        let read = |address| match address {
+            0x0DD0 => Some(item),
+            0x0DD2 => Some(count),
+            0x0DD1 | 0x0DD3 => Some(0),
+            _ => None,
+        };
+        HouseDialogue::decode_reading(self.image, source, read)
+            .map(|pages| self.dialogue.request(pages))
+            .is_ok()
+    }
+
+    /// The window closed: the label comes back `after` frames on; the stats
+    /// follow the equipment.
+    fn close_window(&mut self, after: u32) -> Event {
+        self.task = None;
+        self.dialogue = Dialogue::default();
+        self.label_at = self.frame + after;
+        Event::Stats
+    }
+
+    /// The box's text window, while a pedestal's A shows one.
+    #[must_use]
+    pub fn dialogue(&self) -> Option<crate::scene::View<'_, DialoguePage>> {
+        self.dialogue.view()
     }
 
     /// A on a door: the window closes on it (`$85:CD43`).
@@ -622,6 +835,7 @@ impl Menu {
         // The old label to the first frame after a move, none to the third,
         // the new one from the fourth.
         let label = match self.moved.map(|moved| (self.frame - moved.at, moved.from)) {
+            _ if self.task.is_some() || self.frame < self.label_at => None,
             Some((0..2, from)) => Some(from),
             Some((2..REDRAW, _)) => None,
             _ => Some(self.hotspot),

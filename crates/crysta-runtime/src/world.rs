@@ -168,7 +168,7 @@ pub struct World<'a> {
     /// The desk's Records screen, while it runs ([`crate::records`]).
     records: Option<Records>,
     /// Yomi's box, while it runs ([`crate::menu`]).
-    menu: Option<crate::menu::Menu>,
+    menu: Option<crate::menu::Menu<'a>>,
     /// Dark frames left of the last load ([`transition::dark_frames`]).
     dark: u16,
     /// Frames since the arrival's fade began, which times the area title.
@@ -1686,7 +1686,19 @@ impl<'a> World<'a> {
         let Some(menu) = &mut self.menu else {
             return false;
         };
-        match menu.step(pad, presses) {
+        // The slots only for an A, which may ask about a pedestal.
+        let slots = if presses.confirm {
+            self.globals.inventory.slot_bytes()
+        } else {
+            Vec::new()
+        };
+        let slot = &self.globals.slot;
+        let held = crate::menu::Held {
+            slots: &slots,
+            weapon: slot.weapon().map(|(item, _)| item),
+            armor: slot.armor(),
+        };
+        match menu.step(pad, presses, &held) {
             Some(crate::menu::Event::Closed) => self.menu = None,
             Some(crate::menu::Event::Sort(screen)) => {
                 let image = self.image;
@@ -1696,9 +1708,43 @@ impl<'a> World<'a> {
                         .sort_slots(slots, |item| attack::equipment_power(image, item));
                 }
             }
+            Some(crate::menu::Event::Equip(screen, item)) => {
+                self.globals
+                    .slot
+                    .equip(screen == crate::menu::Screen::Weapon, item);
+            }
+            Some(crate::menu::Event::Stats) => {
+                let image = self.image;
+                let power =
+                    |item: Option<u8>| item.map_or(0, |item| attack::equipment_power(image, item));
+                let slot = &mut self.globals.slot;
+                let (weapon, armor) = (
+                    power(slot.weapon().map(|(item, _)| item)),
+                    power(slot.armor()),
+                );
+                slot.set_powers(weapon, armor);
+            }
             None => {}
         }
         true
+    }
+
+    /// The box's text window, while a pedestal's A shows one.
+    #[must_use]
+    pub fn menu_dialogue(&self) -> Option<crate::scene::View<'_, assets::text::DialoguePage>> {
+        self.menu.as_ref()?.dialogue()
+    }
+
+    /// Whether the box shows a text window.
+    #[must_use]
+    pub fn menu_dialogue_open(&self) -> bool {
+        self.menu_dialogue().is_some()
+    }
+
+    /// The equipped weapon's item (`$064A`), if any.
+    #[must_use]
+    pub fn weapon_item(&self) -> Option<u8> {
+        self.globals.slot.weapon().map(|(item, _)| item)
     }
 
     /// Yomi's box as the host draws it, while it runs.

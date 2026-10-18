@@ -37,6 +37,8 @@ const WEAPON: usize = 0x4A;
 const ARMOR: usize = 0x4C;
 /// `$0659`: the equipped weapon's power.
 const WEAPON_POWER: usize = 0x59;
+/// `$065B`: the equipped armor's power.
+const ARMOR_POWER: usize = 0x5B;
 const EVENTS: usize = 0xC0;
 /// The event flags the slot keeps: `$7E:06C0–07FF`.
 pub const EVENT_BYTES: usize = 0x200 - EVENTS;
@@ -275,7 +277,7 @@ impl SaveSlot {
             level: self.bytes[0x56],
             max_life: self.word(0x57),
             weapon: self.word(WEAPON_POWER),
-            armor: self.word(0x5B),
+            armor: self.word(ARMOR_POWER),
             life: self.word(LIFE),
             defense: self.word(0x5F),
             attack: self.word(0x62),
@@ -357,6 +359,19 @@ impl SaveSlot {
     /// Equips `item` as the armor; its defense is not counted here.
     pub fn set_armor(&mut self, item: u8) {
         self.set_word(ARMOR, u16::from(item));
+    }
+
+    /// Puts `item` on as the weapon or the armor, or takes it off
+    /// (`$064A`, `$064C`); the powers follow with [`Self::set_powers`].
+    pub fn equip(&mut self, weapon: bool, item: Option<u8>) {
+        let item = u16::from(item.unwrap_or(0));
+        self.set_word(if weapon { WEAPON } else { ARMOR }, item);
+    }
+
+    /// The equipment's powers (`$0659`, `$065B`; `$85:F4BD`).
+    pub fn set_powers(&mut self, weapon: u16, armor: u16) {
+        self.set_word(WEAPON_POWER, weapon);
+        self.set_word(ARMOR_POWER, armor);
     }
 
     /// Equips `item` with `power` (`$85:B009`, `$85:F4BD`).
