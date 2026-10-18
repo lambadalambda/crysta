@@ -850,9 +850,10 @@ impl<'a> Loader<'a> {
         if d[pal] & 0xC0 != 0x80
             || d[pal + 1] % 2 != 0
             || d[pal + 2] != 2
-            // The OBJ palette slot, in 8-colour units: the Guardners' 6
-            // (`$82:EB2B`), 8, 10, or the Cadets' 12 (`$82:EAED`).
-            || ![6, 8, 10, 12].contains(&d[pal + 3])
+            // The OBJ palette slot, in 8-colour units: the Dancing Huball
+            // troupe's 0 (`$82:EA7F`), the Guardners' 6 (`$82:EB2B`), 8, 10,
+            // or the Cadets' 12 (`$82:EAED`).
+            || ![0, 6, 8, 10, 12].contains(&d[pal + 3])
         {
             return Err(SpriteError::Invalid("unsupported house palette descriptor"));
         }

@@ -761,3 +761,47 @@ fn a_broken_pots_fragments_are_five_records_of_three_frames() {
     assert_eq!(fragments.durations, [2; 5]);
     assert!(fragments.frames.iter().all(Raster::is_visible));
 }
+
+#[test]
+fn the_shows_balls_draw_in_the_troupes_art() {
+    // `$11B`'s troupe (`$82:EA7F`) loads its colours to OBJ palette slot 0;
+    // its balls are its spawns and draw in its art (the walkthrough saw
+    // none).
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut events = new_game();
+    events[0x105 / 8] |= 1 << (0x105 % 8);
+    let mut world = World::enter_with_events(cartridge.image(), 0x011B, 136, 128, events).unwrap();
+    for _ in 0..300 {
+        world
+            .update(None, crysta_runtime::scene::Presses::NONE)
+            .unwrap();
+    }
+    let art = residents_art(
+        cartridge.image(),
+        0x011B,
+        world.residents(),
+        EventFlags::Bitmap(world.spawn_events()),
+        EventFlags::Bitmap(world.events()),
+    );
+    let mut balls = 0;
+    for (resident, body) in world.residents().iter().zip(&art) {
+        if resident.record != 0 || resident.hidden {
+            continue;
+        }
+        let shown = body
+            .as_ref()
+            .unwrap()
+            .shown(
+                cartridge.image(),
+                (resident.selector, resident.hflip),
+                resident.palette,
+                world.obj_colours(),
+            )
+            .unwrap();
+        assert!(shown.frames.iter().all(Raster::is_visible));
+        balls += 1;
+    }
+    assert_eq!(balls, 8, "the formation");
+}
