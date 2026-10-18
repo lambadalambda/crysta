@@ -449,6 +449,23 @@ impl Session {
         Some((place, raster))
     }
 
+    /// Broken pots' fragments (`World::fragments`): the helper art's list
+    /// at each break point, once through.
+    pub fn fragment_sprites(&mut self) -> Vec<Placed> {
+        let image = self.image;
+        let mut placed = Vec::new();
+        for (place, art, list, age) in self.world.fragments() {
+            let animation = self
+                .sprites
+                .entry(SpriteKey::Overlay(art, list, false, false))
+                .or_insert_with(|| crysta_runtime::art::overlay_animation(image, art, list, false).ok());
+            if let Some(animation) = animation {
+                placed.push((place, animation.frame_once(u64::from(age)).clone()));
+            }
+        }
+        placed
+    }
+
     /// Ark's carry pose while he lifts, holds or throws a pot, and the pot:
     /// in hand at Ark's origin (its frames carry the height), then along its
     /// flight.
@@ -562,6 +579,8 @@ impl Session {
         self.ensure_background(cartridge);
         self.ensure_art();
         let ((carried, pot), shadow) = (self.carry_sprites(), self.shadow_sprite());
+        // The flying pot, and broken pots' fragments.
+        let loose: Vec<Placed> = pot.into_iter().chain(self.fragment_sprites()).collect();
         let Session {
             world,
             backgrounds,
@@ -638,9 +657,8 @@ impl Session {
                 }
             }
         }
-        if let Some((at, raster)) = pot {
-            frame::draw_sprite(frame, background, camera, &raster, at);
-        }
+        let draw = |(at, raster): &Placed| frame::draw_sprite(frame, background, camera, raster, *at);
+        loose.iter().for_each(draw);
         clouds.cover(frame, camera, &self.world.masks());
         // `TM` may take BG1, the light rays, off (`$88:9CD8`).
         if self.world.display().shows_bg1() {

@@ -747,3 +747,17 @@ fn the_horizon_band_is_40_grey_pieces_over_the_classic_columns() {
     }
     assert!(rasters.windows(2).all(|pair| pair[0] == pair[1]));
 }
+
+#[test]
+fn a_broken_pots_fragments_are_five_records_of_three_frames() {
+    // Native trace `f_break`: the helper art's list `$36` (`$A2:E2BD`
+    // onward) changes every 3 frames, 5 times.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let helper = assets::layout::per_revision(cartridge.image(), 0xA2_C000, 0xA4_C000);
+    let fragments =
+        crysta_runtime::art::overlay_animation(cartridge.image(), helper, 0x36, false).unwrap();
+    assert_eq!(fragments.durations, [2; 5]);
+    assert!(fragments.frames.iter().all(Raster::is_visible));
+}

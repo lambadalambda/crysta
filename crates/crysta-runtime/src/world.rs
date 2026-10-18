@@ -97,6 +97,8 @@ pub struct World<'a> {
     cross: Option<Direction>,
     /// A was pressed in a held dash: the attack starts the next frame.
     dash_attack_armed: bool,
+    /// Broken pots' fragments: their place and frames shown.
+    fragments: Vec<((u16, u16), u16)>,
     /// Source-bound initialized-to-free arrival; never ordinary walking.
     arrival: Option<Arrival>,
     /// Residents the spawn lists install for the current flags, where their
@@ -383,6 +385,7 @@ impl<'a> World<'a> {
             walking: WalkingState::new(x, y),
             cross: None,
             dash_attack_armed: false,
+            fragments: Vec::new(),
             residents: present,
             actors,
             player_actor: None,
@@ -1220,6 +1223,7 @@ impl<'a> World<'a> {
         let selection = map_selection(self.image, self.map, &self.globals.events);
         self.globals.audio.load_map(selection);
         self.pots = pots::Pots::at_entry(self.base.room.cells());
+        self.fragments.clear();
         self.counters = self.shop_counters();
         self.plane = WORLD_MAPS.contains(&self.map).then(|| {
             let cells = self
@@ -1448,6 +1452,7 @@ impl<'a> World<'a> {
         }
         // The frame gate's play clock; a load's dark frames skip the gate.
         self.tick_clocks();
+        self.age_fragments();
         self.arrived = self.arrived.saturating_add(1);
         self.dawn = (self.dawn + 1).min(15);
         if let Some(blip) = self.globals.dialogue.tick() {
@@ -2858,6 +2863,7 @@ mod tests {
             walking: WalkingState::new(56, 64),
             cross: None,
             dash_attack_armed: false,
+            fragments: Vec::new(),
             residents: vec![],
             actors: vec![],
             player_actor: None,

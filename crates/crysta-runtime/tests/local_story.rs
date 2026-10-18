@@ -802,6 +802,41 @@ fn a_in_a_carry_dash_is_the_dash_throw() {
 }
 
 #[test]
+fn a_broken_pot_leaves_its_fragments_for_fifteen_frames() {
+    // Native JP trace `f_break` (2026-10-18, the job's `tmp/throws/`): a
+    // throw to the right from (296, 368); the break spawns the fragments
+    // (`$84:C7A9`: the helper art's list `$36`, 5 records of 3 frames) at
+    // the break point, (363, 376), from 39 to 53.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let mut world = carrying_at(cartridge.image(), 368);
+    world
+        .update(Some(Direction::Right), Presses::default())
+        .unwrap();
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    world.update(None, a).unwrap();
+    let mut seen = Vec::new();
+    for frame in 2..60 {
+        world.update(None, Presses::default()).unwrap();
+        seen.extend(
+            world
+                .fragments()
+                .into_iter()
+                .map(|fragment| (frame, fragment)),
+        );
+    }
+    let helper = assets::layout::per_revision(cartridge.image(), 0xA2_C000, 0xA4_C000);
+    let expected: Vec<_> = (0..15)
+        .map(|age| (39 + age, ((363, 376), helper, 0x36, age)))
+        .collect();
+    assert_eq!(seen, expected);
+}
+
+#[test]
 fn b_in_a_carry_dash_jumps_on_with_the_dash() {
     // Native JP traces `t_b_held`, `t_b_free` and `t_b_down` (2026-10-18):
     // B at 9 from the first tap; the dash runs on through the air on the

@@ -26,6 +26,10 @@ const FA_SLOT: u16 = 0x098A;
 const LIFT_SOUND: u8 = 0x11;
 pub(super) const RELEASE_SOUND: u8 = 0x12;
 const BREAK_SOUND: u8 = 0x13;
+/// A broken pot's fragments: the helper art's list `$36`, 5 records of 3
+/// frames (native trace `f_break`).
+const FRAGMENTS: u8 = 0x36;
+const FRAGMENT_FRAMES: u16 = 15;
 /// A flight strikes an actor whose box (x±8, y±8) overlaps its own,
 /// edges included (`$85:D281`, `$85:F835`).
 const REACH: u16 = 16;
@@ -364,6 +368,10 @@ impl World<'_> {
             self.animation.advance(self.walking.active_direction());
         }
         sounds(&mut self.globals.audio, &output);
+        if let Some(broke) = output.broke {
+            // The fragments rise where it lands (`$84:C7A9`, `$84:C78B`).
+            self.fragments.push(((broke.x, broke.y + 8), 0));
+        }
         if output.dash_resumes {
             // This frame stands in the dash's pose; it runs from the next.
             self.run = Some(Run::after_throw(self.facing));
@@ -434,6 +442,25 @@ impl World<'_> {
         }
         self.pots = Some(pots);
         Ok(())
+    }
+
+    /// Broken pots' fragments: their place, the helper art, its list and
+    /// the frames shown.
+    #[must_use]
+    pub fn fragments(&self) -> Vec<((u16, u16), u32, u8, u16)> {
+        let helper = crate::actors::helper(self.image);
+        self.fragments
+            .iter()
+            .map(|&(place, age)| (place, helper, FRAGMENTS, age))
+            .collect()
+    }
+
+    /// A frame of the fragments: on, then gone.
+    pub(super) fn age_fragments(&mut self) {
+        self.fragments.retain_mut(|(_, age)| {
+            *age += 1;
+            *age < FRAGMENT_FRAMES
+        });
     }
 
     /// Whether Ark dashes with the pot in hand.
