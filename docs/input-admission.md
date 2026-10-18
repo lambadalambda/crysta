@@ -208,8 +208,15 @@ rejecting the trigger. Measured:
   stand still (the town probe saw one of them; the `$101` traces show both).
 - Released, it runs on for **8 frames** of grace (`COP 02 08`/`COP 03`); the same
   direction resumes it and the opposite one brakes the next frame
-  (`COP 2B` → `$84:8A88`). Another direction turns it: the old dash runs one
-  frame more, then the new one starts at 3 (no still frame).
+  (`COP 2B` → `$84:8A88`). Another direction turns it the next frame: the
+  facing and the brake's way change, but the stream runs on along the old
+  way until the new way is held, which starts it at 3 (no still frame).
+  Released, the grace runs on the old way and the brake goes the new one; a
+  turn back to the old way starts its stream over at 3 (`e_turn_off`,
+  `e_turn_back`). The pose starts over at a turn, not at a cross change.
+- A on the setup frame dash-attacks from the next frame; on the double
+  tap's own frame the dash wins and A does nothing (`e_a_setup2`,
+  `e_a_setup`).
 - The brake (`$84:A223/A231/A23F/A246`) slides **2,2,1,2,1,2,1,2,1,0,0,1,0,0,0,0**
   over 16 frames with port 3 sound `$0D`; a direction from its fifth frame walks
   off, the slide's frame being the walk's input frame (`COP C1 04`).

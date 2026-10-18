@@ -87,7 +87,6 @@
 - [ ] [Spend the map loads' own frames](issues/map-load-frames.md)
 - [ ] [Model the plane's own-cell tiles](issues/plane-own-cell-tiles.md)
 - [ ] [Walk diagonally](issues/walk-diagonally.md)
-- [ ] [Trace the dash's open edges](issues/dash-edges.md)
 - [ ] [Finish the partial COP services](issues/partial-cop-services.md)
 - [ ] [Close the later review edge cases](issues/review-edges-two.md)
 - [ ] [Cover the native routines the underworld scripts call](issues/native-calls.md)
