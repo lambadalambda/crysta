@@ -23,8 +23,8 @@ Marked enemies: `$102`, `$103`, `$108`, `$109`, `$118`, `$12E`.
   gem; a group member's death (`$85:E353`) leaves none.
 - [x] Run the soul's script; talking to it shows its text, which heals 50
   (`$DD $04CE`, `$85:96A9`).
-- [ ] After the talk, the souls go: a child (`$90:FB59`, list `$15`) sends
-  the soul to list `$14` and both go (`COP A7`). It stops at `$90:FB59`.
+- [x] After the talk, the souls go: a child (`$90:FB59`, list `$15`) sends
+  the soul to list `$14` and both go (`COP A7`). Not timed natively.
 - [ ] `$102`'s soul instead pans the camera to the gate and opens it
   (`$90:90CD`: flags `$282`/`$283`, `COP DF`, `COP DC`, `7F:201A`, `COP 46`).
   It stops at `$90:90DE`.

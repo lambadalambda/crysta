@@ -500,3 +500,54 @@ fn a_marked_blob_leaves_a_soul() {
         assert_eq!(world.life(), (28, 28), "{:?}", rom.revision());
     }
 }
+#[test]
+fn a_soul_goes_after_its_talk() {
+    // `$103`'s soul (`$90:FB3D`): after its text a child (list `$15`,
+    // `$90:FB59`) sends it to list `$14` (`COP C0` on its parent), and both
+    // go.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        for flag in 0x100..=0x102usize {
+            events[flag / 8] |= 1 << (flag % 8);
+        }
+        let mut world = World::enter_with_events(rom.image(), 0x0103, 840, 624, events).unwrap();
+        let record = world
+            .residents()
+            .iter()
+            .find(|resident| resident.position == (840, 560))
+            .expect("the marked enemy")
+            .record;
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert!(world.kill_foe(record), "{:?}", rom.revision());
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        let at = world
+            .residents()
+            .iter()
+            .find(|resident| resident.record == record)
+            .expect("the soul")
+            .position;
+        world.place(at.0, at.1 + 16);
+        world.face(Direction::Up);
+        world.update(None, A).unwrap();
+        assert!(world.dialogue().is_some(), "{:?}", rom.revision());
+        for _ in 0..600 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { A } else { Presses::NONE })
+                .unwrap();
+        }
+        assert_eq!(world.frozen_scripts(), [], "{:?}", rom.revision());
+        assert!(
+            world
+                .residents()
+                .iter()
+                .all(|resident| resident.record != record),
+            "{:?}",
+            rom.revision()
+        );
+    }
+}

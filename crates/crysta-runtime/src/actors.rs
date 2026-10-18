@@ -1481,6 +1481,19 @@ impl Actor {
         if let Some(next) = player_pose_mismatch(image, at) {
             return Some(next);
         }
+        // `PHX; LDA $7F:001E,X; TAX; COP C0 target; PLX`: the parent's
+        // script goes on at the long `target` (a soul's child, `$90:FB6C`).
+        if let Some(
+            &[0xDA, 0xBF, 0x1E, 0x00, 0x7F, 0xAA, 0x02, SET_SCRIPT, low, high, bank, 0xFA],
+        ) = image.get(at..at + 12)
+        {
+            let parent = self.parent.filter(|parent| parent.id != 0)?;
+            around.globals.pokes.push(native::Poke::Script {
+                id: parent.id,
+                pc: usize::from(bank & 0x3F) << 16 | usize::from(u16::from_le_bytes([low, high])),
+            });
+            return Some(at + 12);
+        }
         // The continents' door after its reload (`docs/underworld-end.md`
         // §2): the parchment's set-up (the picture's DMA, the palette, the
         // colour math) is not drawn here; the door, hidden, goes on at its
@@ -3385,6 +3398,8 @@ impl Actor {
         child.descriptor = self.descriptor;
         child.boxes.clone_from(&self.boxes);
         child.pose_ticks.clone_from(&self.pose_ticks);
+        // A soul's children are in its helper art (`$90:FB59`).
+        child.helper_art = self.helper_art;
         child.legs = self.legs;
         child.hidden = flags & 0x8000 != 0;
         child.nested = flags & 0x1000 != 0;

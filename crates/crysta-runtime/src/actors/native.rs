@@ -579,7 +579,7 @@ impl<'a> Machine<'a> {
         self.pc_is_start = false;
         if matches!(
             opcode,
-            0xAC | 0xA8 | 0x98 | 0xBC | 0xBD | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF | 0xC0
+            0xAC | 0xA8 | 0x98 | 0xBC | 0xBD | 0xB9 | 0xD9 | 0x4A | 0x6D | 0xBF | 0xC0 | 0xE0
         ) && self.entity_op(opcode, memory).is_some()
         {
             return Some(Flow::On);
@@ -943,8 +943,13 @@ impl<'a> Machine<'a> {
                 self.pc + 1
             }
             // CPY # with a spawned child in Y: a slot, never the empty one
-            // (`$1FC0`, `$97:C589`).
+            // (`$1FC0`, `$97:C589`); CPX # with the actor's own in X (a
+            // soul's child, `$90:FB59`).
             0xC0 if matches!(self.y, Some(Entity::Id(_))) => {
+                (self.zero, self.carry) = (Some(false), None);
+                self.pc + 3
+            }
+            0xE0 if self.x => {
                 (self.zero, self.carry) = (Some(false), None);
                 self.pc + 3
             }
