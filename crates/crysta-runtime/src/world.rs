@@ -1702,7 +1702,7 @@ impl<'a> World<'a> {
             Some(crate::menu::Event::Closed) => self.menu = None,
             Some(crate::menu::Event::Sort(screen)) => {
                 let image = self.image;
-                if let Some(slots) = screen.slots() {
+                if let Some(slots) = screen.sorted() {
                     self.globals
                         .inventory
                         .sort_slots(slots, |item| attack::equipment_power(image, item));
@@ -1739,6 +1739,21 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn menu_dialogue_open(&self) -> bool {
         self.menu_dialogue().is_some()
+    }
+
+    /// A room's sixteen (item, count) slots, the fixed ones first.
+    #[must_use]
+    pub fn room_slots(&self, screen: crate::menu::Screen) -> Vec<(u8, u8)> {
+        let bytes = self.globals.inventory.slot_bytes();
+        screen
+            .slots()
+            .and_then(|slots| bytes.get(slots.start * 2..slots.end * 2))
+            .map_or_else(Vec::new, |bytes| {
+                bytes
+                    .chunks_exact(2)
+                    .map(|pair| (pair[0], pair[1]))
+                    .collect()
+            })
     }
 
     /// The equipped weapon's item (`$064A`), if any.

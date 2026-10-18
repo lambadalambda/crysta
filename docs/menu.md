@@ -276,8 +276,9 @@ position 1, 2 → hall (hotspot 8). From the hall the weapon room starts at
 
 ### Entering: the sort
 
-The stage sorts the 16 slots before drawing (`$85:A6FD..A74C`, armor
-`A663..A6B6`): the power of each slot (0 when empty) into `$7F:80A0`, then
+The stage sorts the 12 shared slots before drawing (`$85:A6FD..A74C`,
+armor `A663..A6B6`; a lone `$81` in `$7F:8048` stays there, so the four
+fixed slots are left alone): the power of each slot (0 when empty) into `$7F:80A0`, then
 a bubble sort, descending, swapping only when the next is strictly
 greater (stable). So empty slots go last, and the saved order changes. With
 `$81` (3), `$82` (6), `$80`×2 (4) the slots become `82 01 80 02 81 01`.

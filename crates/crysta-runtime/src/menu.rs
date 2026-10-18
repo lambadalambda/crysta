@@ -105,13 +105,24 @@ impl Screen {
     }
 
     /// A room's sixteen slots, as indices of the inventory's (`$7F:8040`,
-    /// `$7F:8060`).
+    /// `$7F:8060`): four fixed ones, then the twelve shared.
     #[must_use]
     pub const fn slots(self) -> Option<std::ops::Range<usize>> {
         match self {
             Self::Hall => None,
             Self::Weapon => Some(0x20..0x30),
             Self::Armor => Some(0x30..0x40),
+        }
+    }
+
+    /// The slots entering sorts: the twelve shared ones (a lone weapon in
+    /// `$7F:8048` stays there, natively).
+    #[must_use]
+    pub const fn sorted(self) -> Option<std::ops::Range<usize>> {
+        match self {
+            Self::Hall => None,
+            Self::Weapon => Some(0x24..0x30),
+            Self::Armor => Some(0x34..0x40),
         }
     }
 
@@ -155,7 +166,7 @@ impl Screen {
 pub enum Event {
     /// The box has closed; the field runs again.
     Closed,
-    /// Entering the room: sort its sixteen slots by power, highest first
+    /// Entering the room: sort its shared slots by power, highest first
     /// (`$85:A6FD`, `$85:A663`).
     Sort(Screen),
     /// The room's equipment is now `item`, or none (`$064A`, `$064C`).

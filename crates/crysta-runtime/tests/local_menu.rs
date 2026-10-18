@@ -469,7 +469,7 @@ fn world_with<'a>(rom: &'a Rom, items: &[u8]) -> crysta_runtime::world::World<'a
 }
 
 /// Opens the box and walks Yomi into the weapon room, onto its first
-/// pedestal (position 4), where the sort puts the strongest weapon.
+/// shared pedestal (position 8), where the sort puts the strongest weapon.
 fn at_first_weapon(world: &mut crysta_runtime::world::World<'_>) {
     world.update(None, select()).unwrap();
     for _ in 0..80 {
@@ -483,13 +483,28 @@ fn at_first_weapon(world: &mut crysta_runtime::world::World<'_>) {
     for _ in 0..200 {
         world.update(None, Presses::NONE).unwrap();
     }
-    for direction in [Direction::Down, Direction::Right, Direction::Down] {
-        world.update(Some(direction), Presses::NONE).unwrap();
-        for _ in 0..20 {
-            world.update(None, Presses::NONE).unwrap();
-        }
+    world.update(Some(Direction::Down), Presses::NONE).unwrap();
+    for _ in 0..20 {
+        world.update(None, Presses::NONE).unwrap();
     }
-    assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 4));
+    assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 8));
+}
+
+#[test]
+fn entering_sorts_only_the_shared_slots() {
+    // Natively a lone `$81` in `$7F:8048` (slot 4) stays there: the sort
+    // leaves the four fixed slots alone.
+    for rom in roms() {
+        let mut world = world_with(&rom, &[0x81]);
+        at_first_weapon(&mut world);
+        let slots = world.room_slots(Screen::Weapon);
+        assert_eq!(
+            (slots[0], slots[4]),
+            ((0, 0), (0x81, 1)),
+            "{:?}",
+            rom.revision()
+        );
+    }
 }
 
 #[test]
@@ -596,7 +611,7 @@ fn unequipping_clears_the_power_at_the_52nd_frame() {
 
 #[test]
 fn the_armor_rooms_pedestal_puts_the_cloth_on() {
-    // The armor door, then its position 4: cloth `$A0`, power 3.
+    // The armor door, then its position 8: cloth `$A0`, power 3.
     for rom in roms() {
         let mut world = world_with(&rom, &[0xA0]);
         world.update(None, select()).unwrap();
@@ -614,7 +629,7 @@ fn the_armor_rooms_pedestal_puts_the_cloth_on() {
         for direction in [
             Direction::Down,
             Direction::Left,
-            Direction::Down,
+            Direction::Left,
             Direction::Left,
         ] {
             world.update(Some(direction), Presses::NONE).unwrap();
@@ -622,7 +637,7 @@ fn the_armor_rooms_pedestal_puts_the_cloth_on() {
                 world.update(None, Presses::NONE).unwrap();
             }
         }
-        assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 4));
+        assert!(matches!(world.menu(), Some(View::Screen(page)) if page.hotspot == 8));
         world.update(None, press_a()).unwrap();
         for _ in 0..40 {
             world.update(None, Presses::NONE).unwrap();
