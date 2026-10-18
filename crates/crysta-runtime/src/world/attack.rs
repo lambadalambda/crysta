@@ -16,6 +16,16 @@ const THRUST: u16 = 16;
 /// The equipment table (`$8D:BC92`, European `$8D:BB5B`): four bytes an
 /// item from `$80`, the power in the first word's low 10 bits.
 const EQUIPMENT: usize = 0x0D_BC92;
+/// A weapon's or an armor's power (`$80..`, the armor's table
+/// `$8D:BD12` following on).
+pub(crate) fn equipment_power(image: &[u8], item: u8) -> u16 {
+    let at = assets::layout::per_revision(image, EQUIPMENT, EQUIPMENT - 0x137)
+        + usize::from(item.wrapping_sub(0x80)) * 4;
+    image
+        .get(at..at + 2)
+        .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]) & 0x3FF)
+}
+
 /// The sound of a hit (`$85:D4C8`).
 const HIT_SOUND: u8 = 0x09;
 /// The dash attack (`$84:9549`.., native traces `g_jp_*`): from the press,
@@ -147,12 +157,7 @@ const fn list(facing: Direction) -> (u8, bool) {
 impl World<'_> {
     /// Equips `item` as the weapon, its power from the equipment table.
     pub fn equip_weapon(&mut self, item: u8) {
-        let at = assets::layout::per_revision(self.image, EQUIPMENT, EQUIPMENT - 0x137)
-            + usize::from(item.wrapping_sub(0x80)) * 4;
-        let power = self
-            .image
-            .get(at..at + 2)
-            .map_or(0, |word| u16::from_le_bytes([word[0], word[1]]) & 0x3FF);
+        let power = equipment_power(self.image, item);
         self.globals.slot.set_weapon(item, power);
     }
 

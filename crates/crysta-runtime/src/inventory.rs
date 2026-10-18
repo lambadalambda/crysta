@@ -122,6 +122,17 @@ impl Inventory {
         }
     }
 
+    /// Sorts `slots` by `power`, highest first, keeping ties in order: the
+    /// box's rooms on entry (`$85:A6FD`: a bubble sort that swaps only on
+    /// a strictly greater power). An empty slot counts 0.
+    pub fn sort_slots(&mut self, slots: Range<usize>, power: impl Fn(u8) -> u16) {
+        if let Some(slots) = self.slots.get_mut(slots) {
+            slots.sort_by_key(|&(item, _)| {
+                std::cmp::Reverse(if item == 0 { 0 } else { power(item) })
+            });
+        }
+    }
+
     /// The items held, in slot order.
     #[must_use]
     pub fn items(&self) -> Vec<u8> {
@@ -204,6 +215,26 @@ fn take(from: &mut u32, amount: u32) -> bool {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn a_rooms_sort_puts_the_strongest_first_and_keeps_ties() {
+        // `docs/menu.md`: `$81` (3), `$82` (6), `$80`×2 (4) become
+        // `82 01 80 02 81 01`.
+        let mut inventory = Inventory::default();
+        let mut bytes = vec![0; 0x100];
+        bytes[0x40..0x46].copy_from_slice(&[0x81, 1, 0x82, 1, 0x80, 2]);
+        inventory.set_slot_bytes(&bytes);
+        let power = |item: u8| match item {
+            0x80 => 4,
+            0x81 => 3,
+            _ => 6,
+        };
+        inventory.sort_slots(0x20..0x30, power);
+        assert_eq!(
+            &inventory.slot_bytes()[0x40..0x48],
+            &[0x82, 1, 0x80, 2, 0x81, 1, 0, 0]
+        );
+    }
     use super::*;
 
     #[test]

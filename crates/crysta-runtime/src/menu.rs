@@ -1,8 +1,10 @@
-//! Yomi's box, the hall ([notes](../../../docs/menu.md)): Select opens it
-//! (`$85:A179`), the pad moves Yomi across nine hotspots, Select closes it.
-//! Frame by frame from the press that opened it; the field waits meanwhile
-//! (`$049A`). The doors' screens are not here yet.
+//! Yomi's box ([notes](../../../docs/menu.md)): Select opens it
+//! (`$85:A179`) on the hall, the pad moves Yomi across its hotspots, the
+//! weapon and armor doors lead to their rooms, Select closes it. Frame by
+//! frame from the press that opened it; the field waits meanwhile
+//! (`$049A`). The rooms' pedestals and the other screens are not here yet.
 
+use crate::scene::Presses;
 use room_core::Direction;
 
 /// The frames that differ between the ROMs, from the open or close press.
@@ -27,6 +29,39 @@ const EUROPE: Timing = Timing {
     done: 54,
 };
 
+/// A door's frames from the A press (`docs/menu.md`, "Transition").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DoorTiming {
+    /// The first and last black frames.
+    dark: (u32, u32),
+    /// Yomi at the target; the window starts opening.
+    yomi: u32,
+    /// The label, in a room and back in the hall (not measured in
+    /// European: 8 frames sooner, as the room's).
+    label: u32,
+    hall_label: u32,
+}
+
+const JAPAN_DOOR: DoorTiming = DoorTiming {
+    dark: (62, 114),
+    yomi: 99,
+    label: 171,
+    hall_label: 162,
+};
+const EUROPE_DOOR: DoorTiming = DoorTiming {
+    dark: (61, 108),
+    yomi: 93,
+    label: 163,
+    hall_label: 154,
+};
+
+/// The window closes on the door from this frame over [`WIPE`] frames.
+const WIPE_START: u32 = 2;
+const WIPE: u32 = 64;
+/// The new screen loads after the dark begins: the room's slots are
+/// sorted then (P+68 in Japanese).
+const LOAD: u32 = 6;
+
 /// The field's fade out: its first step, then one a frame to black.
 const FADE_START: u32 = 20;
 /// The hall stays this long after the closing press, then goes black.
@@ -44,53 +79,141 @@ const REPEAT_EVERY: u16 = 5;
 /// The ease's end (`$87:CE36`): half a cosine; the table runs to it.
 const LAST_PHASE: u16 = 0x80;
 
-/// A hotspot (`$92:BCB9`): Yomi's place, and where Up, Down, Left and Right
-/// go.
+/// A screen of the box (`$06BC`): its index in the position tables.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Screen {
+    /// The hall, nine hotspots.
+    Hall,
+    /// The armor room, twenty positions.
+    Armor,
+    /// The weapon room, twenty positions.
+    Weapon,
+}
+
+impl Screen {
+    /// `$06BC` and the screen's position count.
+    const fn table(self) -> (usize, usize) {
+        match self {
+            Self::Hall => (0, 9),
+            Self::Armor => (3, 20),
+            Self::Weapon => (4, 20),
+        }
+    }
+
+    /// Where A on position `at` leads: the screen and its cursor
+    /// (`$85:CD04`, `$85:CC81`, `$85:CC49`, `$85:CC65`). The item room is
+    /// not here yet.
+    const fn door(self, at: u8) -> Option<(Self, u8)> {
+        match (self, at) {
+            (Self::Hall, 6) => Some((Self::Weapon, 0)),
+            (Self::Hall, 8) => Some((Self::Armor, 2)),
+            (Self::Weapon, 0) => Some((Self::Hall, 6)),
+            (Self::Weapon, 1) => Some((Self::Armor, 1)),
+            (Self::Armor, 1) => Some((Self::Weapon, 1)),
+            (Self::Armor, 2) => Some((Self::Hall, 8)),
+            _ => None,
+        }
+    }
+
+    /// The camera on the hall's 512×512 map (`docs/menu.md`).
+    #[must_use]
+    pub const fn camera(self) -> (i16, i16) {
+        match self {
+            Self::Hall => (0, 0),
+            Self::Armor => (256, 0),
+            Self::Weapon => (0, 256),
+        }
+    }
+
+    /// The room's door B moves Yomi to: the hall's.
+    const fn hall_door(self) -> Option<u8> {
+        match self {
+            Self::Hall => None,
+            Self::Weapon => Some(0),
+            Self::Armor => Some(2),
+        }
+    }
+}
+
+/// What the world does for the box.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Event {
+    /// The box has closed; the field runs again.
+    Closed,
+    /// Entering the room: sort its sixteen slots by power, highest first
+    /// (`$85:A6FD`, `$85:A663`).
+    Sort(Screen),
+}
+
+/// A hotspot (`$92:BCA3[$06BC]`): Yomi's place, and where Up, Down, Left
+/// and Right go.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Hotspot {
-    /// Yomi's place on the screen.
+    /// Yomi's place on the hall's map.
     pub at: (i16, i16),
     /// The hotspot each direction goes to: Up, Down, Left, Right.
     pub next: [Option<u8>; 4],
 }
 
-/// The hall's data from the ROM.
+/// The box's tables from the ROM.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Hall {
-    /// The nine hotspots.
-    pub hotspots: Vec<Hotspot>,
+    /// The hall's hotspots, then the armor room's and the weapon room's
+    /// positions.
+    screens: [Vec<Hotspot>; 3],
     /// The ease's cosine bytes (`$81:F462`), phases 0 to `$80`.
     pub cosine: Vec<i8>,
 }
 
 impl Hall {
-    /// Reads the hotspots (`$92:BCB9`, European `$92:BE67`) and the cosine
-    /// table (`$81:F462`).
+    /// Reads the positions (`$92:BCA3`, European `$92:BE51`, a table per
+    /// screen) and the cosine table (`$81:F462`).
     #[must_use]
     pub fn from_rom(image: &[u8]) -> Option<Self> {
-        let table = assets::layout::per_revision(image, 0x12_BCB9, 0x12_BE67);
+        let tables = assets::layout::per_revision(image, 0x12_BCA3, 0x12_BE51);
         let word = |at: usize| Some(u16::from_le_bytes([*image.get(at)?, *image.get(at + 1)?]));
-        let hotspots = (0..9)
-            .map(|index| {
-                let entry = table + index * 12;
-                let at = (word(entry)?.cast_signed(), word(entry + 2)?.cast_signed());
-                let mut next = [None; 4];
-                for (side, slot) in next.iter_mut().enumerate() {
-                    let pointer = usize::from(word(entry + 4 + side * 2)?);
-                    let offset = pointer.checked_sub(table & 0xFFFF);
-                    *slot = offset
-                        .filter(|&offset| pointer != 0 && offset % 12 == 0 && offset / 12 < 9)
-                        .and_then(|offset| u8::try_from(offset / 12).ok());
-                }
-                Some(Hotspot { at, next })
-            })
-            .collect::<Option<Vec<_>>>()?;
+        let screen = |screen: Screen| {
+            let (index, count) = screen.table();
+            let table = (tables & 0xFF_0000) | usize::from(word(tables + index * 2)?);
+            (0..count)
+                .map(|entry| {
+                    let entry = table + entry * 12;
+                    let at = (word(entry)?.cast_signed(), word(entry + 2)?.cast_signed());
+                    let mut next = [None; 4];
+                    for (side, slot) in next.iter_mut().enumerate() {
+                        let pointer = usize::from(word(entry + 4 + side * 2)?);
+                        let offset = pointer.checked_sub(table & 0xFFFF);
+                        *slot = offset
+                            .filter(|&offset| {
+                                pointer != 0 && offset % 12 == 0 && offset / 12 < count
+                            })
+                            .and_then(|offset| u8::try_from(offset / 12).ok());
+                    }
+                    Some(Hotspot { at, next })
+                })
+                .collect::<Option<Vec<_>>>()
+        };
+        let screens = [
+            screen(Screen::Hall)?,
+            screen(Screen::Armor)?,
+            screen(Screen::Weapon)?,
+        ];
         let cosine = image
             .get(0x01_F462..=0x01_F462 + usize::from(LAST_PHASE))?
             .iter()
             .map(|&byte| byte.cast_signed())
             .collect();
-        Some(Self { hotspots, cosine })
+        Some(Self { screens, cosine })
+    }
+
+    /// A screen's hotspots or positions.
+    #[must_use]
+    pub fn hotspots(&self, screen: Screen) -> &[Hotspot] {
+        &self.screens[match screen {
+            Screen::Hall => 0,
+            Screen::Armor => 1,
+            Screen::Weapon => 2,
+        }]
     }
 }
 
@@ -157,38 +280,67 @@ pub enum View {
     Field(u8),
     /// Forced blank.
     Blank,
-    /// The hall.
-    Hall(Page),
+    /// A screen of the box.
+    Screen(Page),
 }
 
-/// The hall's state.
+/// A screen's state.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Page {
-    /// The hotspot (`$06A6`).
+    /// The screen shown.
+    pub screen: Screen,
+    /// The hotspot or position (`$06A6`, `$06AA`, `$06AC`).
     pub hotspot: u8,
-    /// Yomi's place on the screen.
-    pub yomi: (i16, i16),
+    /// Yomi's place on the screen; none while a door loads.
+    pub yomi: Option<(i16, i16)>,
     /// The hotspot whose label shows; none while it is redrawn.
     pub label: Option<u8>,
     /// Yomi's flapping: frames since she was spawned while the hall
     /// loaded.
     pub flap: u32,
+    /// A door's window closing on the door or opening on the new screen,
+    /// and its frame.
+    pub wipe: Option<(Wipe, u32)>,
+}
+
+/// A door's rotating window (`$85:C725`, `$85:C7F3`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Wipe {
+    /// Closing on the door it was opened by (0, 1 or 2).
+    Closing(u8),
+    /// Opening from that door's place on the new screen.
+    Opening(u8),
 }
 
 /// Where the box stands.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Phase {
     Opening,
-    Hall,
+    Screen,
+    /// Through a door since this frame.
+    Door(Door),
     /// Closing since this frame.
     Closing(u32),
+}
+
+/// A door under way: from where, to which screen and cursor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Door {
+    since: u32,
+    from: Screen,
+    /// The door's place: 0, 1 or 2 (`$7F:201C`).
+    place: u8,
+    to: Screen,
+    cursor: u8,
 }
 
 /// The box while it runs.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Menu {
     timing: Timing,
+    doors: DoorTiming,
     hall: Hall,
+    screen: Screen,
     phase: Phase,
     /// Frames since the press that opened it.
     frame: u32,
@@ -216,12 +368,14 @@ impl Menu {
     pub fn open(image: &[u8]) -> Option<Self> {
         let hall = Hall::from_rom(image)?;
         let yomi = hall
-            .hotspots
+            .hotspots(Screen::Hall)
             .get(usize::from(ITEM_DOOR))
             .map_or((0, 0), |hotspot| hotspot.at);
         Some(Self {
             timing: assets::layout::per_revision(image, JAPAN, EUROPE),
+            doors: assets::layout::per_revision(image, JAPAN_DOOR, EUROPE_DOOR),
             hall,
+            screen: Screen::Hall,
             phase: Phase::Opening,
             frame: 0,
             hotspot: ITEM_DOOR,
@@ -232,29 +386,96 @@ impl Menu {
     }
 
     /// A frame with the directions the pad holds (two on a diagonal) and
-    /// whether Select was pressed. Returns whether the box has closed and
-    /// the field runs again.
-    pub fn step(&mut self, pad: [Option<Direction>; 2], select: bool) -> bool {
+    /// the buttons pressed: A takes a door, B goes to a room's hall door,
+    /// Select closes the box. Returns what the world does.
+    pub fn step(&mut self, pad: [Option<Direction>; 2], presses: Presses) -> Option<Event> {
         self.frame += 1;
         match self.phase {
-            Phase::Opening if self.frame >= self.timing.hall => self.phase = Phase::Hall,
+            Phase::Opening if self.frame >= self.timing.hall => self.phase = Phase::Screen,
             Phase::Opening => {}
-            Phase::Hall => {
-                if let Some(ease) = &mut self.ease {
-                    match ease.advance(&self.hall.cosine) {
-                        Some(at) => self.yomi = at,
-                        None => self.ease = None,
-                    }
-                }
-                if select && !self.redrawing() {
+            Phase::Screen => {
+                self.ease_yomi();
+                if self.redrawing() {
+                    self.read_pad(pad);
+                } else if presses.select {
                     self.phase = Phase::Closing(self.frame);
+                } else if presses.confirm {
+                    self.take_door();
+                } else if let Some(door) = presses.cancel.then(|| self.screen.hall_door()).flatten()
+                {
+                    self.go(door, None);
                 } else {
                     self.read_pad(pad);
                 }
             }
-            Phase::Closing(since) => return self.frame - since >= self.timing.done,
+            Phase::Door(door) => return self.door_frame(door),
+            Phase::Closing(since) => {
+                return (self.frame - since >= self.timing.done).then_some(Event::Closed);
+            }
         }
-        false
+        None
+    }
+
+    /// A on a door: the window closes on it (`$85:CD43`).
+    fn take_door(&mut self) {
+        let Some((to, cursor)) = self.screen.door(self.hotspot) else {
+            return;
+        };
+        // The door's place: the hall's are its hotspots 6..8, a room's
+        // its positions 0..2.
+        let place = if self.screen == Screen::Hall {
+            self.hotspot - 6
+        } else {
+            self.hotspot
+        };
+        self.ease = None;
+        self.moved = None;
+        self.phase = Phase::Door(Door {
+            since: self.frame,
+            from: self.screen,
+            place,
+            to,
+            cursor,
+        });
+    }
+
+    /// A frame of a door: the new screen loads in the dark, Yomi is placed,
+    /// the label shows; then the pad again.
+    fn door_frame(&mut self, door: Door) -> Option<Event> {
+        let after = self.frame - door.since;
+        let load = self.doors.dark.0 + LOAD;
+        if after == load {
+            self.screen = door.to;
+            self.hotspot = door.cursor;
+            self.yomi = self
+                .hall
+                .hotspots(door.to)
+                .get(usize::from(door.cursor))
+                .map_or(self.yomi, |hotspot| hotspot.at);
+        }
+        if after >= self.label_frame(door) {
+            self.phase = Phase::Screen;
+        }
+        (after == load && door.to != Screen::Hall).then_some(Event::Sort(door.to))
+    }
+
+    /// The frame a door's label shows, from its press.
+    const fn label_frame(&self, door: Door) -> u32 {
+        if matches!(door.to, Screen::Hall) {
+            self.doors.hall_label
+        } else {
+            self.doors.label
+        }
+    }
+
+    /// Yomi's ease, a frame.
+    fn ease_yomi(&mut self) {
+        if let Some(ease) = &mut self.ease {
+            match ease.advance(&self.hall.cosine) {
+                Some(at) => self.yomi = at,
+                None => self.ease = None,
+            }
+        }
     }
 
     /// Whether the label is being redrawn after a move: the pad is not read.
@@ -307,19 +528,24 @@ impl Menu {
         };
         let Some(next) = self
             .hall
-            .hotspots
+            .hotspots(self.screen)
             .get(usize::from(self.hotspot))
             .and_then(|hotspot| hotspot.next[side])
         else {
             return;
         };
+        self.go(next, Some((direction, held)));
+    }
+
+    /// Yomi to `next` (`$85:CC08`), the label redrawn.
+    fn go(&mut self, next: u8, held: Option<(Direction, u16)>) {
         self.moved = Some(Move {
             at: self.frame,
             from: self.hotspot,
-            held: Some((direction, held)),
+            held,
         });
         self.hotspot = next;
-        if let Some(hotspot) = self.hall.hotspots.get(usize::from(next)) {
+        if let Some(hotspot) = self.hall.hotspots(self.screen).get(usize::from(next)) {
             self.ease = Some(Ease::new(self.yomi, hotspot.at));
         }
     }
@@ -337,11 +563,12 @@ impl Menu {
                     View::Blank
                 }
             }
-            Phase::Hall => View::Hall(self.page()),
+            Phase::Screen => View::Screen(self.page()),
+            Phase::Door(door) => self.door_view(door),
             Phase::Closing(since) => {
                 let after = self.frame - since;
                 if after < CLOSE_BLANK {
-                    View::Hall(self.page())
+                    View::Screen(self.page())
                 } else if after < self.timing.back {
                     View::Blank
                 } else {
@@ -351,7 +578,35 @@ impl Menu {
         }
     }
 
+    /// A door: the window closing on the old screen, the dark, the window
+    /// opening on the new one with Yomi from her frame, the label after.
+    fn door_view(&self, door: Door) -> View {
+        let after = self.frame - door.since;
+        let (first, last) = self.doors.dark;
+        if (first..=last).contains(&after) {
+            return View::Blank;
+        }
+        let page = self.page();
+        let (wipe, yomi) = if after < first {
+            let closing = after.saturating_sub(WIPE_START).min(WIPE);
+            ((Wipe::Closing(door.place), closing), page.yomi)
+        } else {
+            let shown = (after >= self.doors.yomi).then_some(page.yomi).flatten();
+            ((Wipe::Opening(door.place), after - self.doors.yomi), shown)
+        };
+        // The label goes at the press's second frame.
+        let label = (after < WIPE_START).then_some(page.label).flatten();
+        View::Screen(Page {
+            screen: if after < first { door.from } else { door.to },
+            yomi,
+            label,
+            wipe: Some(wipe),
+            ..page
+        })
+    }
+
     fn page(&self) -> Page {
+        let camera = self.screen.camera();
         // The old label to the first frame after a move, none to the third,
         // the new one from the fourth.
         let label = match self.moved.map(|moved| (self.frame - moved.at, moved.from)) {
@@ -360,10 +615,12 @@ impl Menu {
             _ => Some(self.hotspot),
         };
         Page {
+            screen: self.screen,
             hotspot: self.hotspot,
-            yomi: self.yomi,
+            yomi: Some((self.yomi.0 - camera.0, self.yomi.1 - camera.1)),
             label,
             flap: self.frame.saturating_sub(self.timing.hall) + FLAP_AT_HALL,
+            wipe: None,
         }
     }
 }

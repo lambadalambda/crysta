@@ -586,7 +586,7 @@ impl Session {
                 frame.pixels.fill(0);
                 (0, 0)
             }
-            Some(View::Hall(page)) => {
+            Some(View::Screen(page)) => {
                 self.draw_hall(frame, page);
                 (0, 0)
             }
@@ -595,6 +595,7 @@ impl Session {
 
     /// Yomi's box's hall, centred in a wide view.
     fn draw_hall(&mut self, frame: &mut Canvas, page: crysta_runtime::menu::Page) {
+        use crysta_runtime::menu::Screen;
         frame.pixels.fill(0);
         let image = self.image;
         let HallArt { hall, yomi, labels } = self.hall.get_or_insert_with(|| HallArt::new(image));
@@ -602,17 +603,20 @@ impl Session {
             return;
         };
         let left = (i32::try_from(frame.width).unwrap_or(256) - 256) / 2;
-        let camera = (-left, 0);
+        // The screen's part of the hall's map.
+        let (cx, cy) = page.screen.camera();
+        let camera = (i32::from(cx) - left, i32::from(cy));
         frame::draw_background(frame, hall, camera);
-        if let (Some(yomi), Ok(x), Ok(y)) =
-            (yomi, u16::try_from(page.yomi.0), u16::try_from(page.yomi.1))
-        {
+        let at = page.yomi.map(|(x, y)| (u16::try_from(x + cx), u16::try_from(y + cy)));
+        if let (Some(yomi), Some((Ok(x), Ok(y)))) = (yomi, at) {
             // Priority 3, over the hall's high tiles.
             let raster = yomi.frame_at(u64::from(page.flap));
             frame::draw_sprite_over(frame, hall, camera, raster, (x, y));
         }
-        // The hotspot's label, typed out at once (`$C8 00`).
-        if let Some(label) = page.label.and_then(|hotspot| labels.get(usize::from(hotspot))?.as_ref()) {
+        // The hotspot's label, typed out at once (`$C8 00`); the rooms'
+        // are not drawn yet.
+        let label = page.label.filter(|_| page.screen == Screen::Hall);
+        if let Some(label) = label.and_then(|hotspot| labels.get(usize::from(hotspot))?.as_ref()) {
             let origin = crate::window::content_origin(image, label.placement(), (0, false), frame.width);
             let shown = label.glyphs().len();
             let typed = label.typed(image, shown);
