@@ -879,6 +879,9 @@ impl Decoder<'_> {
                 }
                 0xce => self.indexed_call(at)?,
                 0xdd => self.memory_addition(at)?,
+                // `$C9 n` (`$85:996B`): the glyphs start `n` × 4 pixels into
+                // the line, as the box's labels centre themselves.
+                0xc9 => self.position[0] = u16::from(self.next()?) * 4,
                 // `$C3 xx yy`: to line `yy`, `xx` map bytes (4 pixels each) in.
                 0xc3 => {
                     let [column, line] = [self.next()?, self.next()?];

@@ -843,3 +843,27 @@ fn a_souls_text_heals_ark() {
     assert_eq!(heals.iter().sum::<u16>(), 50);
     assert_eq!(heals.last(), Some(&50));
 }
+
+#[test]
+fn the_box_halls_labels_decode() {
+    // `$92:B23F` (`docs/menu.md`): entry `$06A6` of `$92:B24E`, each
+    // `C9 n` (centred n×4 pixels in), the glyphs, `D4`.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let glyphs: Vec<usize> = (0..9u8)
+        .map(|hotspot| {
+            let pages = assets::text::HouseDialogue::decode_reading(
+                cartridge.image(),
+                0x92_B23F,
+                |address| (address == 0x06A6).then_some(hotspot),
+            )
+            .unwrap_or_else(|error| panic!("hotspot {hotspot}: {error:?}"));
+            assert_eq!(pages.len(), 1);
+            pages[0].glyphs().len()
+        })
+        .collect();
+    // せっていメモ, つよさの鏡, 地図, 宝石箱, 戦いの手引書, 旅の手引書,
+    // 武器のとびら, 道具のとびら, 防具のとびら.
+    assert_eq!(glyphs, [6, 5, 2, 3, 6, 5, 6, 6, 6]);
+}
