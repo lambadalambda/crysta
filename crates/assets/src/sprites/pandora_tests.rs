@@ -252,4 +252,6 @@ fn carry_selection_is_explicit_and_separate_from_physics() {
         (0x80_a255, 0x1C, 0x24)
     );
     assert!(dash.ark_hflip && dash.pot_hflip);
+    let throw = PandoraSprites::carry_pose(PandoraCarryMotion::DashThrowing, 1).unwrap();
+    assert_eq!((throw.ark_art, throw.ark_selector), (0x80_a261, 0x13));
 }

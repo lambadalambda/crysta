@@ -256,14 +256,17 @@ impl PandoraSprites {
         // 2's `$20`), the rope's lean (1's 6, 7; its walk and stand hold the spear,
         // [`Mode4Art::with_weapon`]), the Magirock and the chest's lifts
         // (3's `$18`..`$1A`, `$39`, `$3A`), the drop with a pot (3's `$1D`,
-        // `$20`), the burn (5's 4, 5) and the sleep (5's 7, 8).
+        // `$20`), the dash-throw (3's `$12`..`$14`), the burn (5's 4, 5) and
+        // the sleep (5's 7, 8).
         for (resource, selectors) in [
             (0, &[3, 4, 5, 0x13, 0x14, 0x15, 0x18, 0x1D][..]),
             (1, &[6, 7, 9, 10, 11][..]),
             (2, &[0x20][..]),
             (
                 3,
-                &[15, 16, 17, 0x18, 0x19, 0x1A, 0x1D, 0x20, 0x39, 0x3A][..],
+                &[
+                    0x12, 0x13, 0x14, 15, 16, 17, 0x18, 0x19, 0x1A, 0x1D, 0x20, 0x39, 0x3A,
+                ][..],
             ),
             (5, &[4, 5, 7, 8][..]),
         ] {
@@ -897,6 +900,8 @@ pub enum PandoraCarryMotion {
     JumpFalling,
     /// A dash with the pot in hand (`$84:B5A7`, `COP 83 1C 01`).
     Dashing,
+    /// A in that dash: the pot flies at once (`$84:B117`..`B1B3`).
+    DashThrowing,
 }
 /// Ark's run (`docs/input-admission.md`): the dash a double tap starts and
 /// the brake that ends it.
@@ -978,6 +983,8 @@ impl PandoraSprites {
             PandoraCarryMotion::JumpFalling => (0x80_a261, 0x1C + 3 * axis, 0x25 + axis),
             // Resource 1 `$1A`..`$1C`, the pot's `$22`..`$24` (native `c_*`).
             PandoraCarryMotion::Dashing => (0x80_a255, 0x1A + axis, 0x22 + axis),
+            // Resource 3 `$12`..`$14`; the pot is in flight (native `t_*`).
+            PandoraCarryMotion::DashThrowing => (0x80_a261, 0x12 + axis, 60),
         };
         let hflip = facing == 2 && motion != PandoraCarryMotion::Dropping;
         Some(PandoraCarryPose {
