@@ -183,3 +183,4 @@
 - [x] [Dash diagonally, and attack and jump from a dash](issues/dash-diagonals-attack-jump.md)
 - [x] [Trace the dash's open edges](issues/dash-edges.md)
 - [x] [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)
+- [x] [Spend the map loads' own frames](issues/map-load-frames.md)
