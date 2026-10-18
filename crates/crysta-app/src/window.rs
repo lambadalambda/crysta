@@ -48,10 +48,24 @@ pub fn draw_window(
     canvas: &mut Canvas,
     art: &WindowArt,
     page: &DialoguePage,
-    (indexed, shown): (&[u8], usize),
+    typed: (&[u8], usize),
     origin: (i32, i32),
     tick: u64,
 ) {
+    draw_window_lowered(canvas, art, page, typed, origin, (tick, 0));
+}
+
+/// As [`draw_window`] with BG3 `lowered` lines down from the field's
+/// scroll: the window and its shading go with it (Yomi's box, 1).
+pub fn draw_window_lowered(
+    canvas: &mut Canvas,
+    art: &WindowArt,
+    page: &DialoguePage,
+    (indexed, shown): (&[u8], usize),
+    origin: (i32, i32),
+    (tick, lowered): (u64, i32),
+) {
+    let origin = (origin.0, origin.1 + lowered);
     let (width, height) = (usize::from(page.width()), usize::from(page.height()));
     if width == 0 || height == 0 || indexed.len() < width * height {
         return;
@@ -62,11 +76,11 @@ pub fn draw_window(
         if palette == 1 && index == 1 {
             page.speaker()
         } else {
-            colour(art, palette, index, y)
+            colour(art, palette, index, y - lowered)
         }
     };
     if windowed {
-        draw_frame(canvas, art, origin, (width / 8, height / 8));
+        draw_frame(canvas, art, origin, (width / 8, height / 8), lowered);
     }
     let glyphs = &page.glyphs()[..shown.min(page.glyphs().len())];
     for row in 0..height {
@@ -111,12 +125,14 @@ const fn prompt_shows(index: u8, windowed: bool) -> bool {
     index != 0 && (windowed || index != 3)
 }
 
-/// The frame one tile outside `(columns, rows)` of content at `origin`.
+/// The frame one tile outside `(columns, rows)` of content at `origin`,
+/// its shading `lowered` lines down.
 fn draw_frame(
     canvas: &mut Canvas,
     art: &WindowArt,
     origin: (i32, i32),
     (columns, rows): (usize, usize),
+    lowered: i32,
 ) {
     let (columns, rows) = (signed(columns), signed(rows));
     for row in -1..=rows {
@@ -138,7 +154,7 @@ fn draw_frame(
                     origin.1 + row * 8 + signed(at / 8),
                 );
                 if index != 0 {
-                    canvas.set((x, y), rgb(colour(art, 0, index, y)));
+                    canvas.set((x, y), rgb(colour(art, 0, index, y - lowered)));
                 }
             }
         }

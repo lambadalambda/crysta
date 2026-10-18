@@ -96,3 +96,4 @@
 - [ ] [Open the box's hall with Select](issues/box-hall.md)
 - [ ] [Equip at the box's weapon and armor doors](issues/box-equip-doors.md)
 - [ ] [Use and equip at the box's item door](issues/box-item-door.md)
+- [ ] [Draw the HUD's item icon](issues/hud-item-icon.md)

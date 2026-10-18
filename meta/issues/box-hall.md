@@ -31,4 +31,6 @@ leaves. The field waits meanwhile (`$049A`).
   (`$85:A0F0`, anim `$1C`) and its return (`$85:A113`), the window's
   gradient, the pad at S+61, Yomi's ease after a closing press, and the
   repeat counted from the physical press when it falls in the redraw.
-- The host does not draw the hall yet.
+- The host draws the hall, Yomi, the label and the HUD, matching native
+  captures (`local/menu/*-hall.rgb`) on both ROMs except the wall lamps'
+  tile animation and the item icon ([icon](hud-item-icon.md)).

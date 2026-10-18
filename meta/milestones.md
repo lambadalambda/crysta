@@ -178,6 +178,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Open the box's hall with Select](issues/box-hall.md)
 - [Equip at the box's weapon and armor doors](issues/box-equip-doors.md)
 - [Use and equip at the box's item door](issues/box-item-door.md)
+- [Draw the HUD's item icon](issues/hud-item-icon.md)
 - [Boot as the native game does](issues/native-boot.md)
 - [Show the title screen](issues/title-screen.md)
 - [Enter a name and read the opening text](issues/name-entry-opening.md)

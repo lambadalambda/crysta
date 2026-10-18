@@ -56,9 +56,8 @@ pub struct Session {
     pub image: &'static [u8],
     /// Ark's ordinary frames.
     pub atlas: ArkAtlas,
-    /// Yomi's box's hall and Yomi, decoded once (`None` inside when they
-    /// could not be).
-    pub hall: Option<(Option<frame::Background>, Option<crysta_runtime::art::Animation>)>,
+    /// Yomi's box's hall, Yomi and the labels, decoded once.
+    pub hall: Option<HallArt>,
     /// Backgrounds by map, composed once.
     pub backgrounds: HashMap<u16, background::CachedBackground>,
     /// Frames into the current map's visit, for its animations.
@@ -597,15 +596,8 @@ impl Session {
     /// Yomi's box's hall, centred in a wide view.
     fn draw_hall(&mut self, frame: &mut Canvas, page: crysta_runtime::menu::Page) {
         frame.pixels.fill(0);
-        let (hall, yomi) = self.hall.get_or_insert_with(|| {
-            let hall = background::hall(self.image)
-                .inspect_err(|error| eprintln!("the box's hall unavailable: {error}"))
-                .ok();
-            let yomi = crysta_runtime::art::yomi_animation(self.image)
-                .inspect_err(|error| eprintln!("Yomi's art unavailable: {error}"))
-                .ok();
-            (hall, yomi)
-        });
+        let image = self.image;
+        let HallArt { hall, yomi, labels } = self.hall.get_or_insert_with(|| HallArt::new(image));
         let Some(hall) = hall else {
             return;
         };
@@ -618,6 +610,15 @@ impl Session {
             // Priority 3, over the hall's high tiles.
             let raster = yomi.frame_at(u64::from(page.flap));
             frame::draw_sprite_over(frame, hall, camera, raster, (x, y));
+        }
+        // The hotspot's label, typed out at once (`$C8 00`).
+        if let Some(label) = page.label.and_then(|hotspot| labels.get(usize::from(hotspot))?.as_ref()) {
+            let origin = crate::window::content_origin(image, label.placement(), (0, false), frame.width);
+            let shown = label.glyphs().len();
+            let typed = label.typed(image, shown);
+            // The box does not scroll BG3 the line the field does.
+            let at = (self.tick, 1);
+            crate::window::draw_window_lowered(frame, &self.window_art, label, (&typed, shown), origin, at);
         }
         // The box's HUD (layout 1).
         if let Some(art) = self.shop_art.art(self.image) {
@@ -858,6 +859,38 @@ pub enum SpriteKey {
     /// The helper art's list: an explosion, a dropped gem, a wisp; mirror
     /// and vertical flip.
     Overlay(u32, u8, bool, bool),
+}
+
+/// Yomi's box's art (`docs/menu.md`): the hall, Yomi and each hotspot's
+/// label; `None` where it could not be decoded.
+pub struct HallArt {
+    hall: Option<frame::Background>,
+    yomi: Option<crysta_runtime::art::Animation>,
+    labels: Vec<Option<assets::text::DialoguePage>>,
+}
+
+impl HallArt {
+    fn new(image: &[u8]) -> Self {
+        let hall = background::hall(image)
+            .inspect_err(|error| eprintln!("the box's hall unavailable: {error}"))
+            .ok();
+        let yomi = crysta_runtime::art::yomi_animation(image)
+            .inspect_err(|error| eprintln!("Yomi's art unavailable: {error}"))
+            .ok();
+        // `$92:B23F` (European `$92:B4DE`): entry `$06A6` of the table.
+        let source = assets::layout::per_revision(image, 0x92_B23F, 0x92_B4DE);
+        let labels = (0..9u8)
+            .map(|hotspot| {
+                assets::text::HouseDialogue::decode_reading(image, source, |address| {
+                    (address == 0x06A6).then_some(hotspot)
+                })
+                .inspect_err(|error| eprintln!("the box's label {hotspot} unavailable: {error:?}"))
+                .ok()?
+                .pop()
+            })
+            .collect();
+        Self { hall, yomi, labels }
+    }
 }
 
 /// What the HUDs show of the world.

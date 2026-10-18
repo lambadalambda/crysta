@@ -46,14 +46,14 @@ fn the_hall_and_yomi_match_native_frames_on_both_roms() {
         let native = local(&format!("menu/{prefix}-hall.rgb"))
             .expect("with the ROM, its captures in `local/menu`");
         let canvas = hall(&rom);
-        // The label's window is not drawn yet, nor the wall lamps' tile
-        // animation (cells (2,2), (14,2), (1,4), (15,4)).
+        // The wall lamps' tile animation is not drawn yet (cells (2,2),
+        // (14,2), (1,4), (15,4)).
         let lamp = |x: usize, y: usize| {
             [(2, 2), (14, 2), (1, 4), (15, 4)].contains(&(x / 16, (y + 8) / 16))
         };
         // The item's icon (OBJ, (160,8)) is not drawn yet either.
         let item = |x: usize, y: usize| (160..176).contains(&x) && (8..24).contains(&y);
-        let keep = |x: usize, y: usize| y < 176 && !lamp(x, y) && !item(x, y);
+        let keep = |x: usize, y: usize| !lamp(x, y) && !item(x, y);
         let unlike = unlike_where(&canvas, &native, offset, keep);
         assert_eq!(unlike, 0, "{prefix}");
     }
