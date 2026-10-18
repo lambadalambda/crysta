@@ -70,8 +70,9 @@ const LOAD: u32 = 6;
 const FADE_START: u32 = 20;
 /// The hall stays this long after the closing press, then goes black.
 const CLOSE_BLANK: u32 = 11;
-/// Yomi's flapping as the hall shows: one native capture per ROM pins it.
-const FLAP_AT_HALL: u32 = 4;
+/// Yomi's flapping as the hall shows, and as a door spawns her again
+/// (P+99): native captures of the hall and the weapon room pin it.
+const FLAP_AT_SPAWN: u32 = 4;
 /// The hotspot the box opens on: the item door.
 pub const ITEM_DOOR: u8 = 7;
 /// Frames after a move in which the label is redrawn and the pad is not
@@ -112,6 +113,53 @@ impl Screen {
             Self::Hall => None,
             Self::Weapon => Some(0x20..0x30),
             Self::Armor => Some(0x30..0x40),
+        }
+    }
+
+    /// Where slot `k`'s icon shows (`$85:CE9E`): the layer-2 cell (column,
+    /// row) of metatile `$1E0 + k`, on the hall's map.
+    #[must_use]
+    pub fn icon_cell(self, slot: usize) -> Option<(u8, u8)> {
+        const WEAPON: [(u8, u8); 16] = [
+            (7, 23),
+            (9, 23),
+            (7, 25),
+            (9, 25),
+            (4, 22),
+            (6, 22),
+            (10, 22),
+            (12, 22),
+            (3, 23),
+            (13, 23),
+            (3, 25),
+            (13, 25),
+            (4, 26),
+            (6, 26),
+            (10, 26),
+            (12, 26),
+        ];
+        const ARMOR: [(u8, u8); 16] = [
+            (22, 7),
+            (26, 7),
+            (22, 9),
+            (26, 9),
+            (20, 6),
+            (23, 6),
+            (25, 6),
+            (28, 6),
+            (19, 7),
+            (29, 7),
+            (19, 9),
+            (29, 9),
+            (20, 10),
+            (23, 10),
+            (25, 10),
+            (28, 10),
+        ];
+        match self {
+            Self::Hall => None,
+            Self::Weapon => WEAPON.get(slot).copied(),
+            Self::Armor => ARMOR.get(slot).copied(),
         }
     }
 
@@ -451,6 +499,9 @@ pub struct Menu<'a> {
     dialogue: Dialogue,
     /// After a window closed, the label and the pad wait for this frame.
     label_at: u32,
+    /// Yomi's flapping starts here: she is spawned as the hall loads, and
+    /// again through a door.
+    spawned: u32,
 }
 
 /// The last move: its frame, the hotspot it left, its direction and how
@@ -489,6 +540,7 @@ impl<'a> Menu<'a> {
             task: None,
             dialogue: Dialogue::default(),
             label_at: 0,
+            spawned: 0,
         })
     }
 
@@ -680,6 +732,9 @@ impl<'a> Menu<'a> {
         let load = self.doors.dark.0 + LOAD;
         // A move under way goes on to the load.
         self.ease_yomi();
+        if after == self.doors.yomi {
+            self.spawned = self.frame - FLAP_AT_SPAWN;
+        }
         if after == load {
             self.ease = None;
             self.screen = door.to;
@@ -856,7 +911,11 @@ impl<'a> Menu<'a> {
             hotspot: self.hotspot,
             yomi: (self.yomi.0 - camera.0, self.yomi.1 - camera.1),
             label,
-            flap: self.frame.saturating_sub(self.timing.hall) + FLAP_AT_HALL,
+            flap: if self.spawned == 0 {
+                self.frame.saturating_sub(self.timing.hall) + FLAP_AT_SPAWN
+            } else {
+                self.frame - self.spawned
+            },
             wipe: None,
         }
     }
