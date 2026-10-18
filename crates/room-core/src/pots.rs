@@ -164,6 +164,9 @@ enum Arc {
     Thrown,
     /// A in a carry dash (`$84:B117`..`B1B3`): at 6 a frame.
     Dashed,
+    /// Dropped on an exit (`$84:C5CB`, stream `$6A`): it falls in place
+    /// and stays, unbroken, until the room goes.
+    Dropped,
     /// Thrown in the air, `base` above the ground (`$0999` at the A).
     Aloft {
         base: i8,
@@ -176,13 +179,14 @@ impl Arc {
             Self::Thrown => &HEIGHTS,
             Self::Aloft { .. } => &JUMP_HEIGHTS,
             Self::Dashed => &DASH_HEIGHTS,
+            Self::Dropped => &DROP_HEIGHTS,
         }
     }
 
     /// The height at a sample from 1.
     fn height(self, sample: u8) -> i16 {
         let base = match self {
-            Self::Thrown | Self::Dashed => 0,
+            Self::Thrown | Self::Dashed | Self::Dropped => 0,
             Self::Aloft { base } => i16::from(base),
         };
         let at = usize::from(sample.max(1) - 1);
@@ -193,6 +197,7 @@ impl Arc {
     const fn speed(self) -> u16 {
         match self {
             Self::Dashed => DASH_SPEED,
+            Self::Dropped => 0,
             _ => SPEED,
         }
     }
@@ -200,7 +205,9 @@ impl Arc {
     /// Whether a sample is the flight's last: at or below the ground, or
     /// the stream's end.
     fn last(self, sample: u8) -> bool {
-        usize::from(sample) >= self.heights().len() || (sample > 0 && self.height(sample) >= 0)
+        self != Self::Dropped
+            && (usize::from(sample) >= self.heights().len()
+                || (sample > 0 && self.height(sample) >= 0))
     }
 }
 /// Frames of the lift presentation, of the throw until the release, and of
@@ -210,6 +217,11 @@ const LIFT: u8 = 23;
 const DASH_RECOVERY: u8 = 17;
 /// A dash-throw's speed and heights (stream `$2D`, `$7F:65D2`).
 const DASH_SPEED: u16 = 6;
+/// The exit drop's samples, its last held.
+#[allow(clippy::cast_possible_truncation)] // 15 samples.
+const DROP_LEN: u8 = DROP_HEIGHTS.len() as u8;
+/// The exit drop's heights (native fixture `exit-while-carrying`), then 0.
+const DROP_HEIGHTS: [i8; 15] = [-29, -26, -22, -18, -13, -8, -3, 2, 7, 12, 17, 22, 27, 32, 0];
 const DASH_HEIGHTS: [i8; 20] = [
     -33, -34, -35, -35, -35, -35, -35, -34, -33, -32, -30, -28, -26, -23, -20, -17, -13, -9, -5, 0,
 ];
@@ -265,6 +277,8 @@ pub struct PotState {
     counted: bool,
     /// The throw under way is a dash-throw.
     dashed: bool,
+    /// Dropped on an exit: the pot leaves the hands next frame.
+    dropping: bool,
 }
 
 impl Admission<'_> {
@@ -380,6 +394,7 @@ impl PotState {
             flight: None,
             counted: false,
             dashed: false,
+            dropping: false,
         })
     }
     /// Player position; only the collision solver can change it after construction.
@@ -387,14 +402,30 @@ impl PotState {
     pub const fn position(&self) -> (u16, u16) {
         self.walking.position()
     }
-    /// Drops the pot Ark carries (`$84:C5CB`), as an exit does: it goes,
-    /// unbroken, and its cell stays lifted. Returns whether he held one.
+    /// Puts the pot Ark carries away (`$84:C5CB`), as the rope does: it
+    /// goes at once, unbroken, and its cell stays lifted. Returns whether he
+    /// held one.
     pub fn drop_held(&mut self) -> bool {
         if self.phase != Phase::Held {
             return false;
         }
         (self.phase, self.object, self.queued) = (Phase::Empty, 0, None);
         true
+    }
+    /// Drops the pot Ark carries as an exit takes him (`$84:C5CB`): it
+    /// leaves his hands the next frame and falls where he was. Returns
+    /// whether he held one.
+    pub fn drop_on_exit(&mut self) -> bool {
+        if self.phase != Phase::Held {
+            return false;
+        }
+        (self.phase, self.queued, self.dropping) = (Phase::Empty, None, true);
+        true
+    }
+    /// Whether a pot dropped on an exit is still in Ark's hands, for a frame.
+    #[must_use]
+    pub const fn drop_pending(&self) -> bool {
+        self.dropping
     }
     /// Lets the pot Ark carries fly as he falls (`$84:9F5B`, `$84:C649`):
     /// from 16 pixels toward his facing, on the throw's stream. Returns
@@ -586,6 +617,13 @@ impl PotState {
             sound: None,
         };
         next.fly(a, ground, &mut out);
+        if core::mem::take(&mut next.dropping) {
+            // A pixel left, where it falls (`$84:C6D3`).
+            let (x, y) = next.position();
+            out.held_changed = Some(None);
+            out.sound = Some(Sound::Release);
+            next.launch((x.saturating_sub(1), y), ground, Arc::Dropped);
+        }
         let (x, y) = self.position();
         match (self.queued, self.phase) {
             (Some(object @ 1..), _) => {
@@ -808,6 +846,11 @@ impl PotState {
         let Some(mut flight) = self.flight else {
             return;
         };
+        if flight.arc == Arc::Dropped {
+            flight.sample = (flight.sample + 1).min(DROP_LEN);
+            self.flight = Some(flight);
+            return;
+        }
         let speed = flight.arc.speed();
         let step = match flight.facing {
             Direction::Down => Some((flight.x, flight.y + speed)),
@@ -876,11 +919,12 @@ impl PotState {
                 Arc::Thrown => 0,
                 // Bit 3 on the ground's arc: the dash-throw's.
                 Arc::Dashed => 8,
+                Arc::Dropped => 16,
                 // Bit 2: in the air; bits 3-7 the base's height up.
                 Arc::Aloft { base } => 4 | base.unsigned_abs().min(31) << 3,
             };
         }
-        b[39] = u8::from(self.counted) | u8::from(self.dashed) << 1;
+        b[39] = u8::from(self.counted) | u8::from(self.dashed) << 1 | u8::from(self.dropping) << 2;
         b
     }
     /// Decode structural invariants against immutable source data. This does not
@@ -890,7 +934,7 @@ impl PotState {
     /// Rejects noncanonical, truncated, stale-source or impossible phase encodings.
     pub fn decode_snapshot(a: &Admission<'_>, b: &[u8]) -> Result<Self, Error> {
         a.validate()?;
-        if b.len() != SNAPSHOT_SIZE || &b[..4] != b"POT1" || b[39] > 3 {
+        if b.len() != SNAPSHOT_SIZE || &b[..4] != b"POT1" || b[39] > 7 {
             return Err(Error::Snapshot);
         }
         let facing = |byte: u8| match byte {
@@ -923,12 +967,15 @@ impl PotState {
             flight,
             counted: b[39] & 1 == 1,
             dashed: b[39] & 2 != 0,
+            dropping: b[39] & 4 != 0,
         };
         let object_valid = state.object > 0
             && usize::from(state.object) <= a.objects.len()
             && consumed & (1 << (state.object - 1)) != 0;
         let valid = match phase {
-            Phase::Empty => state.age == 0 && (state.object == 0 || state.flight.is_some()),
+            Phase::Empty => {
+                state.age == 0 && (state.object == 0 || state.flight.is_some() || state.dropping)
+            }
             Phase::Lifting => object_valid && state.age < LIFT && state.flight.is_none(),
             Phase::Held => {
                 object_valid
@@ -970,18 +1017,35 @@ impl PotState {
             (Phase::Throwing, None) => !released || state.object == 0,
             _ => true,
         };
-        let counted_valid = !state.counted || phase == Phase::Throwing || state.flight.is_some();
-        let dashed_valid = !state.dashed || phase == Phase::Throwing;
         if !valid
             || !flight_valid
             || !queued_valid
             || !flight_age
-            || !counted_valid
-            || !dashed_valid
+            || !state.flags_valid(object_valid)
         {
             return Err(Error::Snapshot);
         }
         Ok(state)
+    }
+}
+
+impl PotState {
+    /// Whether the throw's flags fit the phase: the door's count, a
+    /// dash-throw, a pending exit drop and its fall.
+    fn flags_valid(&self, object_valid: bool) -> bool {
+        let phase = self.phase;
+        let counted = !self.counted || phase == Phase::Throwing || self.flight.is_some();
+        let dashed = !self.dashed || phase == Phase::Throwing;
+        let dropping = !self.dropping
+            || (phase == Phase::Empty
+                && object_valid
+                && self.flight.is_none()
+                && self.queued.is_none());
+        // A drop never stops on a tile nor strikes the door.
+        let drop = self.flight.is_none_or(|flight| {
+            flight.arc != Arc::Dropped || (!flight.stopped && flight.door == DoorContact::Clear)
+        });
+        counted && dashed && dropping && drop
     }
 }
 
@@ -1009,6 +1073,7 @@ fn decode_flight(
             match b[5] >> 3 {
                 0 => Arc::Thrown,
                 1 => Arc::Dashed,
+                2 => Arc::Dropped,
                 _ => return Err(Error::Snapshot),
             }
         } else {

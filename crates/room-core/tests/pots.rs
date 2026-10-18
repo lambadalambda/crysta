@@ -675,3 +675,44 @@ fn a_in_a_carry_dash_throws_at_six_a_frame_through_a_snapshot() {
     assert_eq!(s.phase(), Phase::Empty);
     assert_eq!(s.position().0, x, "Ark stood through it");
 }
+
+#[test]
+fn a_pot_dropped_on_an_exit_falls_in_place_and_stays_through_a_snapshot() {
+    // The fixture `exit-while-carrying` (`$84:C5CB`, stream `$6A`): the
+    // pot leaves Ark's hands the frame after the exit, at x - 1, and falls
+    // without a break.
+    use room_core::pots::Sound;
+    let r = room();
+    let a = admission(&r);
+    let mut s = state(&r, 104, 352, Direction::Left);
+    lift(&mut s, &r);
+    frames(&mut s, &r, Some(Direction::Down), 12);
+    frames(&mut s, &r, None, 20);
+    let at = s.position();
+    assert!(s.drop_on_exit());
+    assert_eq!(s.phase(), Phase::Empty);
+    assert_eq!(s.flight(), None, "still in hand");
+    let pending = PotState::decode_snapshot(&a, &s.encode_snapshot()).unwrap();
+    assert_eq!(pending.encode_snapshot(), s.encode_snapshot());
+    let heights = [
+        -29, -26, -22, -18, -13, -8, -3, 2, 7, 12, 17, 22, 27, 32, 0, 0, 0,
+    ];
+    let mut restored = None;
+    for (n, &height) in heights.iter().enumerate() {
+        let out = s.step(&a, Input::default()).unwrap();
+        assert_eq!(out.sound, (n == 0).then_some(Sound::Release), "{n}");
+        let flight = s.flight().unwrap();
+        assert_eq!(
+            (flight.x, flight.y, s.flight_height()),
+            (at.0 - 1, at.1, Some(height)),
+            "{n}"
+        );
+        if let Some(restored) = &mut restored {
+            let again: &mut PotState = restored;
+            assert_eq!(again.step(&a, Input::default()).unwrap(), out);
+        }
+        if n == 5 {
+            restored = Some(PotState::decode_snapshot(&a, &s.encode_snapshot()).unwrap());
+        }
+    }
+}
