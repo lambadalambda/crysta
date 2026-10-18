@@ -205,6 +205,20 @@ impl World<'_> {
         true
     }
 
+    /// Whether the dash takes this frame's A from talking, doors, lifts and
+    /// thrusts: in it, on its setup frame (`e_a_setup2`), or on the double
+    /// tap's own frame, where the dash wins (`e_a_setup`).
+    pub(super) fn dash_takes_a(&self, direction: Option<Direction>) -> bool {
+        let tap = room_core::PadInput {
+            direction,
+            cross: direction.and(self.cross),
+        };
+        matches!(
+            self.run,
+            Some(room_core::run::Run::Dash { .. } | room_core::run::Run::Tap { .. })
+        ) || (self.run.is_none() && !self.holds_pot() && self.walking.double_taps(tap))
+    }
+
     /// A in a held dash attacks from the next frame, if the dash is still
     /// held: the loop reads the frame before (`$84:9078`, `$84:9549`). B
     /// first.
@@ -213,7 +227,10 @@ impl World<'_> {
         if self.dash_attack_armed && free && held(self.run) {
             self.dash_attack();
         }
-        self.dash_attack_armed = presses.confirm && !presses.cancel && free && held(self.run);
+        // A on the setup frame counts too (native `e_a_setup2`).
+        let setup = matches!(self.run, Some(room_core::run::Run::Tap { .. }));
+        self.dash_attack_armed =
+            presses.confirm && !presses.cancel && free && (setup || held(self.run));
     }
 
     /// Starts the dash attack: A in a dash with a weapon equipped.

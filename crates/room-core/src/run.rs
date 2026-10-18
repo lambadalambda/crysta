@@ -7,8 +7,9 @@
 //! runs 3, 2, 2 pixels a frame for as long as the direction is held.
 //! Released, it runs on for 8 frames of grace; the same direction again
 //! resumes it, the opposite one brakes the frame after, and another one
-//! turns it: the old dash runs one frame more, then the new one starts at
-//! 3. The brake slides 15 pixels over 16 frames (sound `$0D`), and a
+//! turns it the next frame: it faces and brakes the new way, but moves on
+//! the old way until the new one is held, which starts it at 3. The brake
+//! slides 15 pixels over 16 frames (sound `$0D`), and a
 //! direction from its fifth frame walks off. A wall ends the dash: a walk
 //! if the direction is held, else a stand.
 //!
@@ -44,15 +45,19 @@ pub enum Run {
     },
     /// Dashing; `grace` counts down once the direction is released.
     Dash {
-        /// The way it runs.
+        /// The way it faces, is held and brakes.
         direction: Direction,
+        /// The way its stream moves: the old one after a turn until the new
+        /// way's stream starts (native `e_turn_off`, `e_turn_back`).
+        way: Direction,
         /// The diagonal's other direction, 1 pixel a frame.
         cross: Option<Direction>,
         /// Where in the 3, 2, 2 stream the next stride is, 0..=2.
         frame: u8,
         /// Frames left to run once released.
         grace: u8,
-        /// A turn: the dash that starts after this frame's stride.
+        /// A turn that takes effect the next frame, or a restart in its own
+        /// way.
         turn: Option<(Direction, Option<Direction>)>,
     },
     /// The dash after a dash-throw (`$84:9051`): it stands; held, it
@@ -98,12 +103,14 @@ impl Run {
         match self {
             Self::Dash {
                 direction,
+                way,
                 cross,
                 frame,
                 grace,
                 ..
             } => Self::Dash {
                 direction,
+                way,
                 cross,
                 frame,
                 grace,
@@ -226,20 +233,7 @@ fn step_in(
         Some(Run::Tap { direction, cross }) => {
             (Some(dash(direction, cross, 0, GRACE)), direction, None, 0)
         }
-        Some(
-            now @ Run::Dash {
-                direction,
-                cross,
-                frame,
-                ..
-            },
-        ) => {
-            let next = dash_next(mode, now, held, held_cross);
-            match next {
-                Some(Run::Brake { .. }) => (next, direction, None, BRAKE[0]),
-                _ => (next, direction, cross, DASH[usize::from(frame)]),
-            }
-        }
+        Some(now @ Run::Dash { .. }) => dash_frame(mode, now, held, held_cross),
         Some(Run::Rest { direction, grace }) => match held {
             Some(held) if held == direction => (
                 Some(dash(direction, None, 1, GRACE)),
@@ -311,58 +305,96 @@ fn step_in(
     })
 }
 
-/// The run after a frame of `now`, a dash, with `held` and `held_cross`
-/// on the pad.
-fn dash_next(
+/// A frame of `now`, a dash, with `held` and `held_cross` on the pad: the
+/// run after it, and this frame's move (the way, the cross, the pixels).
+type DashFrame = (Option<Run>, Direction, Option<Direction>, i16);
+
+fn dash_frame(
     mode: Mode,
     now: Run,
     held: Option<Direction>,
     held_cross: Option<Direction>,
-) -> Option<Run> {
+) -> DashFrame {
     let Run::Dash {
         direction,
+        way,
         cross,
         frame,
         grace,
         turn,
     } = now
     else {
-        return Some(now);
+        return (Some(now), Direction::Down, None, 0);
     };
     let carry = mode == Mode::Carry;
     let following = (frame + 1) % 3;
+    // Not traced: with a pot, a turn and the opposite press compare with
+    // the facing, not the way it moves.
+    // The stream runs on; a cross moves only along its own way.
+    let crossing = cross.filter(|_| way == direction);
+    let keep = |next: Option<Run>| (next, way, crossing, DASH[usize::from(frame)]);
+    let with = |direction, way, cross, frame, grace| Run::Dash {
+        direction,
+        way,
+        cross,
+        frame,
+        grace,
+        turn: None,
+    };
     // A new cross starts the stream over the next frame.
     let on = |new: Option<Direction>, grace| {
         let frame = if new == cross { following } else { 0 };
-        Some(dash(direction, new, frame, grace))
+        Some(with(direction, way, new, frame, grace))
     };
     match (turn, held) {
-        // A restart in its own way keeps the grace.
-        (Some((turn, cross)), _) => {
-            let grace = if turn == direction { grace } else { GRACE };
-            Some(dash(turn, cross, 0, grace))
+        // A restart in its own way (a dash jump's end): this frame's
+        // stride, then 3.
+        (Some((turn, new)), _) if turn == direction => {
+            keep(Some(with(direction, way, new, 0, grace)))
         }
-        // Released, a carry dash runs this frame, then ends.
-        _ if carry && grace == 0 => None,
-        (None, Some(held)) if held == direction => on(held_cross, GRACE),
-        // Out of grace, or the frame after an opposite press.
-        _ if grace == 0 => Some(brake(direction, 0)),
-        (None, Some(held)) if held == direction.opposite() => {
-            if carry {
-                Some(dash(held, None, 0, GRACE))
+        // A turn takes effect: the new facing; the stream runs on, or
+        // starts over at 3 if it already moves that way.
+        (Some((turn, new)), _) => {
+            let grace = if held.is_some() {
+                GRACE
             } else {
-                on(cross, 0)
+                grace.saturating_sub(1)
+            };
+            if turn == way {
+                (Some(with(turn, way, new, 1, grace)), way, new, DASH[0])
+            } else {
+                keep(Some(with(turn, way, new, following, grace)))
             }
         }
-        // The old dash runs one frame more before the turn.
-        (None, Some(held)) => Some(Run::Dash {
+        // Released, a carry dash runs this frame, then ends.
+        _ if carry && grace == 0 => keep(None),
+        // Held after a turn, the new way's stream starts at 3.
+        (None, Some(held)) if held == direction && way != direction => (
+            Some(with(direction, direction, held_cross, 1, GRACE)),
             direction,
+            held_cross,
+            DASH[0],
+        ),
+        (None, Some(held)) if held == direction => keep(on(held_cross, GRACE)),
+        // Out of grace, or the frame after an opposite press.
+        _ if grace == 0 => (Some(brake(direction, 0)), direction, None, BRAKE[0]),
+        (None, Some(held)) if held == direction.opposite() => {
+            if carry {
+                keep(Some(dash(held, None, 0, GRACE)))
+            } else {
+                keep(on(cross, 0))
+            }
+        }
+        // The turn takes effect the next frame.
+        (None, Some(held)) => keep(Some(Run::Dash {
+            direction,
+            way,
             cross,
             frame: following,
             grace,
             turn: Some((held, held_cross)),
-        }),
-        (None, None) => on(cross, if carry { 0 } else { grace - 1 }),
+        })),
+        (None, None) => keep(on(cross, if carry { 0 } else { grace - 1 })),
     }
 }
 
@@ -412,6 +444,7 @@ fn resolve(
 const fn dash(direction: Direction, cross: Option<Direction>, frame: u8, grace: u8) -> Run {
     Run::Dash {
         direction,
+        way: direction,
         cross,
         frame,
         grace,

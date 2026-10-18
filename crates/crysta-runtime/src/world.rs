@@ -1520,7 +1520,7 @@ impl<'a> World<'a> {
             self.cross = None;
         }
         // A dash takes no A (`$0980 = $0010`); its bump does.
-        let dashing = matches!(self.run, Some(room_core::run::Run::Dash { .. }));
+        let dashing = self.dash_takes_a(direction);
         let lift = presses.confirm && !locked && !busy && !dashing && !self.globals.dialogue.busy();
         self.arm_dash_attack(presses, !locked && !busy);
         // B with a pot: the pot's frame runs on, the jump from the next.

@@ -390,7 +390,8 @@ impl World<'_> {
     }
 
     /// The dash runs on through the jump as if its way were held: the pad
-    /// does not steer.
+    /// does not steer. After a turn its facing counts as held, which starts
+    /// the new way's stream (not traced).
     fn dash_on(&mut self) {
         let Some(Run::Dash {
             direction, cross, ..

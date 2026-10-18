@@ -2538,6 +2538,27 @@ fn ark_dashes_diagonally_as_natively() {
 }
 
 #[test]
+fn a_turn_moves_on_the_old_way_until_the_new_is_held() {
+    // Native JP traces `e_turn_back` and `e_turn_off` (2026-10-18) on
+    // `$101`: Right for one frame in an up dash, then Up again or nothing.
+    use Direction::{Right, Up};
+    replay_moves(&[
+        (
+            "e_turn_back",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (10, Some(Up), None), (1, Some(Right), None), (15, Some(Up), None), (20, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 4:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 2:0,0 1:0,-1",
+        ),
+        (
+            "e_turn_off",
+            (100, 600),
+            &[(1, Some(Up), None), (2, None, None), (10, Some(Up), None), (1, Some(Right), None), (30, None, None)],
+            "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 1:0,-2 2:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0 10:0,0",
+        ),
+    ], (0, Presses::default()));
+}
+
+#[test]
 fn a_diagonal_dash_attacks_straight_and_jumps_on_diagonally() {
     // Native JP traces `q_attack_ur` and `q_jump_ur` on `$101`, the spear
     // equipped: A at 15 drops the cross for the attack and its slide, then
@@ -2569,6 +2590,34 @@ fn a_diagonal_dash_attacks_straight_and_jumps_on_diagonally() {
         plan,
         "5:0,0 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 1:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 1:1,-3 2:1,-2 2:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2",
     )], (15, jump));
+}
+
+#[test]
+fn a_on_the_setup_frame_attacks_and_on_the_tap_does_not() {
+    // Native JP traces `e_a_setup2` and `e_a_setup` on `$101`, the spear
+    // equipped: A on the dash's setup frame attacks from the next; A on the
+    // double tap's own frame does nothing.
+    use Direction::Up;
+    let plan: &Plan = &[
+        (1, Some(Up), None),
+        (2, None, None),
+        (21, Some(Up), None),
+        (16, None, None),
+    ];
+    let a = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    replay_moves(
+        &[(
+            "e_a_setup2",
+            (100, 600),
+            plan,
+            "5:0,0 18:0,-3 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 10:0,0",
+        )],
+        (4, a),
+    );
+    replay_moves(&[("e_a_setup", (100, 600), plan, "5:0,0 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 2:0,-2 1:0,-3 4:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2 1:0,-1 1:0,-2")], (3, a));
 }
 
 #[test]

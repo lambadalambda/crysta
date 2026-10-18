@@ -257,6 +257,20 @@ impl WalkingState {
     pub const fn delayed_direction(&self) -> Option<Direction> {
         self.delayed
     }
+    /// Whether `input` is a double tap, which [`Self::step`] refuses as
+    /// the trigger of a dash.
+    #[must_use]
+    pub fn double_taps(&self, input: PadInput) -> bool {
+        let (lead, _) = self.lead(input);
+        lead != self.delayed && self.taps_again(lead)
+    }
+
+    /// Whether `lead` presses the direction last pressed again inside the
+    /// onset window.
+    fn taps_again(&self, lead: Option<Direction>) -> bool {
+        lead.is_some() && self.last_activation == lead && self.onset_remaining > 1
+    }
+
     /// The lead and the cross of `input` ([`PadInput::lead`]) for this
     /// walk: the walk going on, else, in the window a double tap dashes in,
     /// the direction last pressed (a tap then a diagonal dashes the tap's
@@ -319,7 +333,7 @@ impl WalkingState {
         next.onset_remaining = self.onset_remaining.saturating_sub(1);
         if let Some(direction) = lead {
             if lead != self.delayed {
-                if self.last_activation == Some(direction) && next.onset_remaining != 0 {
+                if self.taps_again(lead) {
                     return Err(Unqualified::AcceleratedTrigger(direction));
                 }
                 next.last_activation = Some(direction);
