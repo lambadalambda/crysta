@@ -499,9 +499,9 @@ fn pots_lifted_and_thrown_with_the_native_presses_break_the_blue_door() {
 fn ark_lifts_carries_and_throws_in_the_carry_poses() {
     use PandoraCarryMotion::{Lifting, Standing, Throwing, Walking};
     // The MISS segment frame by frame: 23 lift frames (`Lifting` ticks
-    // 0..22), held Down and Right walks with stands between, Up, then the
-    // 32-frame throw. A walk's first frame keeps the old facing, as the
-    // component's (`room_core::pots`).
+    // 0..22), held Down and Right walks with stands between, Up's one-frame
+    // tap, then the 32-frame throw. The walk's pose follows the step under
+    // way (native traces `c_*`).
     let Some(cartridge) = owned_rom() else {
         return;
     };
@@ -540,13 +540,11 @@ fn ark_lifts_carries_and_throws_in_the_carry_poses() {
         [
             (Lifting, 2),
             (Standing, 2),
-            (Walking, 2),
             (Walking, 0),
             (Standing, 0),
-            (Walking, 0),
             (Walking, 3),
             (Standing, 3),
-            (Walking, 3),
+            (Walking, 1),
             (Standing, 1),
             (Throwing, 1)
         ],
@@ -722,7 +720,13 @@ fn ark_dashes_with_a_pot_as_natively() {
             // Its list `$1C` from the setup frame to the last held one.
             let dashing = Some(PandoraCarryMotion::Dashing);
             assert!(poses[4..13].iter().all(|&pose| pose == dashing));
-            assert_ne!(poses[3], dashing);
+            // The walk's pose follows the step under way: a frame after
+            // the press, and a frame after the release.
+            let (stand, walk) = (
+                Some(PandoraCarryMotion::Standing),
+                Some(PandoraCarryMotion::Walking),
+            );
+            assert_eq!(poses[..4], [stand, walk, stand, stand]);
             assert_ne!(poses[13], dashing);
         }
     }

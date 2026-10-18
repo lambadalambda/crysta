@@ -183,9 +183,9 @@ impl World<'_> {
             Phase::Lifting => PandoraCarryMotion::Lifting,
             Phase::Throwing if state.dash_throwing() => PandoraCarryMotion::DashThrowing,
             Phase::Throwing => PandoraCarryMotion::Throwing,
-            // The queued step, not the walker's retained direction: Ark
-            // stands the frame the pad is released.
-            Phase::Held if state.walking().delayed_direction().is_some() => {
+            // The step under way: a frame after the press, and a frame
+            // after the release (native traces `c_*`).
+            Phase::Held if state.walking().active_direction().is_some() => {
                 PandoraCarryMotion::Walking
             }
             Phase::Held => PandoraCarryMotion::Standing,
