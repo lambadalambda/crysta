@@ -856,6 +856,8 @@ pub struct Actor {
     helper_art: Option<u32>,
     /// A soul a marked enemy left (`$85:E2BA`): it stands in Ark's way.
     soul: bool,
+    /// The sound its death plays, for the world.
+    death_sound: Option<foe::Sound>,
     /// A sleep `COP 46` or a native store leaves for the next yield
     /// (`E+$0E`).
     sleep: u16,
@@ -1024,6 +1026,7 @@ impl Actor {
             overlay: None,
             helper_art: None,
             soul: false,
+            death_sound: None,
             sleep: 0,
             unseen: false,
             walked: false,

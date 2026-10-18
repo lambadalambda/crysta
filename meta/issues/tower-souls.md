@@ -31,7 +31,7 @@ Marked enemies: `$102`, `$103`, `$108`, `$109`, `$118`, `$12E`.
   shares the push's pad mask (a push's `Give` would free Ark early).
 - [x] The soul stands in Ark's way (its cell; natively Ark stops 2 pixels
   sooner, at y 402 below `$102`'s soul).
-- [ ] Sound `$37` with the burst.
+- [x] Sound `$37` with the burst (and the explosion's `$0C`).
 
 ## Acceptance Criteria
 

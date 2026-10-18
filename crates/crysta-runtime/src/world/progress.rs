@@ -27,6 +27,7 @@ impl World<'_> {
         }
         let mut exp = 0;
         for actor in &mut self.actors {
+            actor.play_death_sound(&mut self.globals.audio);
             if std::mem::take(&mut actor.died) {
                 exp += actor
                     .foe

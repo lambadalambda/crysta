@@ -19,6 +19,29 @@ const EXPLODING: u8 = 0x16;
 const BURSTING: u8 = 0x17;
 const BURST: u16 = 40;
 const SOUL: u8 = 0x13;
+/// The death script's sounds: the explosion's (`COP 37 $0C`, `$85:E2E3`)
+/// and a soul's burst (`COP 36 $37`, `$85:E2B2`).
+const EXPLOSION_SOUND: u8 = 0x0C;
+const BURST_SOUND: u8 = 0x37;
+
+/// How an enemy goes: the death script's explosion, a soul's burst, or as a
+/// group's member (`$85:E353`), silently.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Ending {
+    Script,
+    Soul,
+    Group,
+}
+
+/// A sound effect on one of the ports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum Sound {
+    /// `COP 37`.
+    Port2(u8),
+    /// `COP 36`.
+    Port3(u8),
+}
+
 /// A dropped gem: shown, then free to take, then blinking (`$85:E3CF`).
 const GEM_SHOWN: u16 = 16;
 const GEM_BLINKS: u16 = 256;
@@ -290,9 +313,13 @@ impl Actor {
             if no_gem {
                 foe.profile.gems = 0;
             }
-            // A group's member goes by `$85:E353`, which leaves no soul.
-            let soul = !no_gem && self.carries_soul();
-            self.explode(&mut foe, image, soul);
+            // A group's member goes by `$85:E353`: no soul, no sound.
+            let ending = if no_gem {
+                Ending::Group
+            } else {
+                self.death_script()
+            };
+            self.explode(&mut foe, image, ending);
         }
         self.foe = Some(foe);
     }
@@ -320,7 +347,7 @@ impl Actor {
     fn perish(&mut self, foe: &mut Foe, image: &[u8]) {
         let callback = self.own_word(0x1012);
         if callback == 0 {
-            self.explode(foe, image, self.carries_soul());
+            self.explode(foe, image, self.death_script());
             return;
         }
         // `$85:E25B`: a counted death leaves `$0498` first.
@@ -330,11 +357,16 @@ impl Actor {
 
     /// The death script's start (`$85:E27B`): the explosion, or a soul's
     /// burst.
-    fn explode(&mut self, foe: &mut Foe, image: &[u8], soul: bool) {
-        let (frames, list) = if soul {
+    fn explode(&mut self, foe: &mut Foe, image: &[u8], ending: Ending) {
+        let (frames, list) = if ending == Ending::Soul {
             (BURST, BURSTING)
         } else {
             (EXPLOSION, EXPLODING)
+        };
+        self.death_sound = match ending {
+            Ending::Script => Some(Sound::Port2(EXPLOSION_SOUND)),
+            Ending::Soul => Some(Sound::Port3(BURST_SOUND)),
+            Ending::Group => None,
         };
         foe.exploding = Some(frames);
         self.died = true;
@@ -345,9 +377,23 @@ impl Actor {
         self.pose_age = 0;
     }
 
-    /// Whether its record gave it a soul's script (`7F:1018`, `$85:E2A6`).
-    fn carries_soul(&self) -> bool {
-        self.own_word(0x1018) != 0
+    /// The death script's way (`$85:E27B`): a soul's burst when its record
+    /// gave it a soul's script (`7F:1018`, `$85:E2A6`), else the explosion.
+    fn death_script(&self) -> Ending {
+        if self.own_word(0x1018) == 0 {
+            Ending::Script
+        } else {
+            Ending::Soul
+        }
+    }
+
+    /// Plays the sound its death started, once.
+    pub(crate) fn play_death_sound(&mut self, audio: &mut crate::audio::Audio) {
+        match self.death_sound.take() {
+            Some(Sound::Port2(id)) => audio.sound_port2(id),
+            Some(Sound::Port3(id)) => audio.sound_port3(id),
+            None => {}
+        }
     }
 
     /// The burst's end (`$85:E2BA`): the soul, in the helper art, talked to

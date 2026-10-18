@@ -1,5 +1,6 @@
 //! Spear combat in the towers (`docs/combat.md`), on both ROMs.
 
+use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, World};
 use rom::{Revision, Rom};
@@ -126,11 +127,19 @@ fn a_thrust_kills_a_blob() {
         };
         let mut lives = Vec::new();
         let mut seen = Vec::new();
+        world.take_cues();
+        let mut sounds = Vec::new();
         for _ in 0..80 {
             world.update(None, Presses::NONE).unwrap();
             lives.push(world.foe_life(record));
             seen.push(overlay(&world).map(|(list, _)| list));
+            sounds.extend(world.take_cues().into_iter().filter_map(|cue| match cue {
+                Cue::Sound(latch) => Some(latch & 0xFF),
+                Cue::Track { .. } => None,
+            }));
         }
+        // The death script's `COP 37 $0C` (`$85:E2E3`): port 2.
+        assert!(sounds.contains(&0x0C), "{:?} {sounds:x?}", rom.revision());
         let hit = lives
             .iter()
             .position(|&life| life == Some(0))
@@ -461,6 +470,7 @@ fn a_marked_blob_leaves_a_soul() {
             world.update(None, Presses::NONE).unwrap();
         }
         assert!(world.kill_foe(record), "{:?}", rom.revision());
+        world.take_cues();
         let overlay = |world: &World<'_>| {
             world
                 .residents()
@@ -474,6 +484,12 @@ fn a_marked_blob_leaves_a_soul() {
                 overlay(&world)
             })
             .collect();
+        // `COP 36 $37` (`$85:E2B2`): port 3.
+        let burst_sound = world
+            .take_cues()
+            .iter()
+            .any(|&cue| matches!(cue, Cue::Sound(latch) if latch >> 8 == 0x37));
+        assert!(burst_sound, "{:?}", rom.revision());
         let burst = seen.iter().filter(|&&list| list == Some(0x17)).count();
         assert_eq!(burst, 40, "{:?} {seen:?}", rom.revision());
         assert_eq!(seen.last(), Some(&Some(0x13)), "{:?}", rom.revision());
