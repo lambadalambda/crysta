@@ -26,6 +26,8 @@ pub struct Presses {
     pub right: bool,
     /// L alone, which asks the shop for an item's description.
     pub describe: bool,
+    /// Select, which opens Yomi's box.
+    pub select: bool,
 }
 
 impl Presses {
@@ -38,6 +40,7 @@ impl Presses {
         left: false,
         right: false,
         describe: false,
+        select: false,
     };
 }
 

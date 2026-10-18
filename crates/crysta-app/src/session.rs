@@ -164,6 +164,7 @@ impl Session {
             confirm: buttons.confirm,
             cancel: buttons.cancel,
             describe: buttons.describe,
+            select: false,
             up: newly(Direction::Up),
             down: newly(Direction::Down),
             left: newly(Direction::Left),

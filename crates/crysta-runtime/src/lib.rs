@@ -23,6 +23,7 @@ pub mod colours;
 pub mod combat;
 pub mod display;
 pub mod inventory;
+pub mod menu;
 pub mod plane;
 pub mod random;
 pub mod records;

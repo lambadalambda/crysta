@@ -167,6 +167,8 @@ pub struct World<'a> {
     shop: Option<Shop>,
     /// The desk's Records screen, while it runs ([`crate::records`]).
     records: Option<Records>,
+    /// Yomi's box, while it runs ([`crate::menu`]).
+    menu: Option<crate::menu::Menu>,
     /// Dark frames left of the last load ([`transition::dark_frames`]).
     dark: u16,
     /// Frames since the arrival's fade began, which times the area title.
@@ -425,6 +427,7 @@ impl<'a> World<'a> {
             counters: Vec::new(),
             shop: None,
             records: None,
+            menu: None,
             dark: 0,
             arrived: 0,
             dawn: 15,
@@ -1433,7 +1436,12 @@ impl<'a> World<'a> {
         input: impl Into<PadInput>,
         presses: Presses,
     ) -> Result<(Step, Option<Step>), WorldError> {
-        let (direction, cross) = room_core::run::lead(&self.walking, self.run, input.into());
+        let input = input.into();
+        if self.menu_frame([input.direction, input.cross], presses) {
+            self.globals.audio.end_frame();
+            return Ok((Step::Stayed, None));
+        }
+        let (direction, cross) = room_core::run::lead(&self.walking, self.run, input);
         self.cross = cross;
         self.animate = true;
         self.ran = false;
@@ -1645,11 +1653,49 @@ impl<'a> World<'a> {
             matches!(step, Step::Entered { .. }) || matches!(opened, Some(Step::Entered { .. }));
         if !entered && !self.in_transition() {
             self.touch();
+            if presses.select && free && !locked && opened.is_none() && !self.in_transition() {
+                self.open_menu();
+            }
         }
         self.hurt_ark();
         self.level_up();
         self.apply_patches()?;
         Ok((step, opened))
+    }
+
+    /// Select opens Yomi's box (`$85:A179`) off the world map once the
+    /// frozen return is past (flag `$FE`); before, it does nothing. The
+    /// gate's `($7A)` test is not modelled: Ark free and the pad unlocked
+    /// stand for it.
+    fn open_menu(&mut self) {
+        const FROZEN_RETURN: usize = 0xFE;
+        let past = self
+            .globals
+            .events
+            .get(FROZEN_RETURN / 8)
+            .is_some_and(|byte| byte & (1 << (FROZEN_RETURN % 8)) != 0);
+        if !past || self.plane.is_some() || self.thrust.is_some() {
+            return;
+        }
+        self.menu = crate::menu::Menu::open(self.image);
+    }
+
+    /// A frame of the box, if it runs: the field waits (`$049A`) until it
+    /// closes. Returns whether it ran.
+    fn menu_frame(&mut self, pad: [Option<Direction>; 2], presses: Presses) -> bool {
+        let Some(menu) = &mut self.menu else {
+            return false;
+        };
+        if menu.step(pad, presses.select) {
+            self.menu = None;
+        }
+        true
+    }
+
+    /// Yomi's box as the host draws it, while it runs.
+    #[must_use]
+    pub fn menu(&self) -> Option<crate::menu::View> {
+        self.menu.as_ref().map(crate::menu::Menu::view)
     }
 
     /// The music and sound effect requests made since the last call.
@@ -2919,6 +2965,7 @@ mod tests {
             counters: Vec::new(),
             shop: None,
             records: None,
+            menu: None,
             dark: 0,
             arrived: 0,
             dawn: 15,

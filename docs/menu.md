@@ -131,7 +131,8 @@ press frame); a new direction is taken from P+4 even while Yomi still moves
   (127 … −127). Step 20 when |dx|+|dy| to the midpoint is under 24, else 9.
   In the hall only 3 ↔ 0 is fast (7 frames); all other moves take 15.
 - 136 → 72: 135 132 129 124 118 111 104 98 91 85 80 76 73 73 72 (the last
-  two frames: phase `$80` gives 73, then the exact target).
+  two 73s are phases 117 and 126; the exact target comes in place of
+  phase `$80`).
 - Sprite: anim set `COP D8 $AB:DE71`, anim 3, attributes `$3D00`. 4 to 6
   OBJ of 8×8, palette 7, priority 3: wings `$1AC/$1AD/$1BC`, head
   `$1A8/$1A9/$1B9`, body `$1B8`, each a left/right mirrored pair. The flap

@@ -23,3 +23,12 @@ leaves. The field waits meanwhile (`$049A`).
 - Native traces (JP and EU) of opening, moving across the hotspots and
   closing match frame by frame: the hotspot, Yomi's place, the label.
 - Before `$FE`, Select does nothing.
+
+## Notes
+
+- Runtime: `crysta_runtime::menu` steps the hall; the world opens it on
+  Select and waits while it runs. Not modelled yet: Ark's put-away pose
+  (`$85:A0F0`, anim `$1C`) and its return (`$85:A113`), the window's
+  gradient, the pad at S+61, Yomi's ease after a closing press, and the
+  repeat counted from the physical press when it falls in the redraw.
+- The host does not draw the hall yet.
