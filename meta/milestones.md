@@ -209,6 +209,7 @@ route needs acquisition/frozen return but no equipment selection or combat.
 - [Draw colour addition](issues/colour-addition.md)
 - [Draw tower 1's sky backdrop](issues/tower-one-backdrop.md)
 - [Fix the walkthrough's findings](issues/walkthrough-findings.md)
+- [Free the souls the towers' marked enemies hold](issues/tower-souls.md)
 - [Enter towers 2 to 5](issues/towers-two-to-five.md)
 - [Complete the first tower and Chapter 1](issues/complete-chapter-one.md)
 

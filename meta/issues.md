@@ -93,3 +93,4 @@
 - [ ] [Draw the towers' second layer](issues/tower-second-layer.md)
 - [ ] [Draw colour addition](issues/colour-addition.md)
 - [ ] [Fix the walkthrough's findings](issues/walkthrough-findings.md)
+- [ ] [Free the souls the towers' marked enemies hold](issues/tower-souls.md)

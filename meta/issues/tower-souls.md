@@ -1,0 +1,28 @@
+# Free the souls the towers' marked enemies hold
+
+## Summary
+
+An enemy whose record sets `7F:1018` (`$80:F56F`) does not explode when it
+dies. The death script (`$85:E2AC`) plays sound `$37` and the helper art's
+burst (list `$17`, 40 frames), then leaves a soul: a blue ball (list `$13`)
+that can be talked to (`+$06` = `$0200`), and wakes it (bit 13) at its
+`7F:1018` script (`$102`: `$90:90B0`, a text callback, then the loop
+`$90:FB36`). The runtime explodes these enemies and rolls a gem. Native
+trace (JP, `$102`, 2026-10-18): death 60497, burst 60514-60553, soul from
+60554, its script from 60555.
+
+Marked enemies: `$102`, `$103`, `$108`, `$109`, `$118`, `$12E`.
+
+## Dependencies
+
+- [Fix the walkthrough's findings](walkthrough-findings.md)
+
+## Requirements
+
+- Play the burst and leave the soul instead of the explosion and the gem.
+- Run the soul's script; talking to it shows its text.
+
+## Acceptance Criteria
+
+- On `$102`, killing the marked blob shows the burst for 40 frames, then
+  the soul, on both ROMs; no gem drops; talking to the soul opens its text.
