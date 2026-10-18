@@ -629,13 +629,16 @@ impl Body {
 
     fn mode4(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, ArtError> {
         let art = Mode4Art::from_rom(image, descriptor, selector)?;
-        let animate = |hflip| {
-            animate(
-                art.list().frames(),
-                (art.graphics(), art.palette(), art.palette_base()),
-                hflip,
-            )
+        // A piece in a palette another actor loads (the header list of
+        // `$111`'s darts, palette 3, the Guardners'): shown in the room's
+        // colours ([`Self::shown`]); here in its own row's.
+        let (palette, base) = (art.palette(), art.palette_base());
+        let colour = |index: u8| {
+            own_colour(palette, base, index)
+                .or_else(|| own_colour(palette, base, base | index & 15))
+                .map(|colour| (colour, index))
         };
+        let animate = |hflip| animate_by(art.list().frames(), art.graphics(), hflip, &colour);
         Ok(Self {
             art: BodyArt::Mode4(descriptor, selector, [animate(false)?, animate(true)?]),
         })

@@ -482,9 +482,8 @@ impl Mode4Art {
     ///
     /// # Errors
     /// Refuses another mode, palette or graphics form than the qualified
-    /// one (palette flags `$40` or 0, one or two palettes, the sheet's tiles to
-    /// the same OBJ tiles, `d15 == d16`, a packet pointer), and a list
-    /// outside the qualified shapes.
+    /// one (palette flags `$40` or 0, one or two palettes, a packet
+    /// pointer), and a list outside the qualified shapes.
     pub fn from_rom(image: &[u8], descriptor: usize, selector: u8) -> Result<Self, SpriteError> {
         let mut loader = Loader::new(image);
         // Byte 3's bits 4-6 `$20`: no second packet (`$80:FB5A`), so the
@@ -498,9 +497,10 @@ impl Mode4Art {
             d = loader.read(descriptor, 21)?.to_vec();
         }
         // `d15` is the sheet's offset in 64-byte units and `d16` the OBJ
-        // tiles' in 32 words, both two tiles: the frames name OBJ tiles, the
-        // sheet's moved by `2 * (d16 - d15)` (the doors `$82:F5B2`, `$10
-        // $10`; tower 2's statues `$82:F4BE`, `$00 $60`).
+        // tiles' in 32 words, both two tiles: the packet's frames move by
+        // `2 * (d16 - d15)` as the sheet does (`$80:FE8F`), so they name
+        // sheet tiles (tower 2's statues `$82:F4BE`, `$00 $60`; `$111`'s
+        // darts `$82:F4FD`, `$10 $00`).
         if d[3] & 0x8F != 4
             || ![0x00, 0x40].contains(&d[8])
             || ![2, 4].contains(&d[13])
@@ -523,17 +523,7 @@ impl Mode4Art {
         });
         let palette_base = 128 + 8 * d[14];
         let graphics_packet = loader.packet(cpu(&d[18..21]))?;
-        let sheet = decode_tiles_4bpp(&graphics_packet.bytes)?;
-        let moved = 2 * (i32::from(d[16]) - i32::from(d[15]));
-        let graphics: Arc<[Tile4bpp]> = match usize::try_from(moved) {
-            Ok(blank) => std::iter::repeat_n(Tile4bpp::decode(&[0; 32])?, blank)
-                .chain(sheet)
-                .collect(),
-            Err(_) => sheet
-                .into_iter()
-                .skip(usize::try_from(-moved).unwrap_or(0))
-                .collect(),
-        };
+        let graphics: Arc<[Tile4bpp]> = decode_tiles_4bpp(&graphics_packet.bytes)?.into();
         let packet = loader.packet(cpu(&d[..3]))?;
         // Flag `$40`: the source OBJ palette is `d12 / 2`; else the first
         // frame's first component's (`$80:FBE4`, the hooded guardians).

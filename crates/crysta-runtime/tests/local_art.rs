@@ -805,3 +805,56 @@ fn the_shows_balls_draw_in_the_troupes_art() {
     }
     assert_eq!(balls, 8, "the formation");
 }
+
+#[test]
+fn the_mode4_figures_draw_at_their_relocated_tiles() {
+    // A mode-4 sheet goes to OBJ tiles `2 * d16` on from sheet tile
+    // `2 * d15`, and the packet's frames move by the same: they name sheet
+    // tiles. Tower 2's statues (`$82:F4BE`, `$00 $60`) and `$111`'s wall
+    // darts (`$82:F4FD`, `$10 $00`) both drew blank.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    for (map, at, events) in [
+        (0x0108, (184, 260), new_game()),
+        (0x0111, (176, 464), {
+            let mut events = new_game();
+            events[0x103 / 8] |= 1 << (0x103 % 8);
+            events
+        }),
+    ] {
+        let mut world = World::enter_with_events(image, map, at.0, at.1, events).unwrap();
+        for _ in 0..60 {
+            world
+                .update(None, crysta_runtime::scene::Presses::NONE)
+                .unwrap();
+        }
+        let art = residents_art(
+            image,
+            map,
+            world.residents(),
+            EventFlags::Bitmap(world.spawn_events()),
+            EventFlags::Bitmap(world.events()),
+        );
+        let mut figures = 0;
+        for (resident, body) in world.residents().iter().zip(&art) {
+            if !matches!(resident.descriptor, Some(0x2F4BE | 0x2F4FD)) {
+                continue;
+            }
+            let shown = body
+                .as_ref()
+                .unwrap()
+                .shown(
+                    image,
+                    (resident.selector, resident.hflip),
+                    resident.palette,
+                    world.obj_colours(),
+                )
+                .unwrap();
+            assert!(shown.frames.iter().any(Raster::is_visible), "{map:#x}");
+            figures += 1;
+        }
+        assert!(figures >= 2, "{map:#x}");
+    }
+}
