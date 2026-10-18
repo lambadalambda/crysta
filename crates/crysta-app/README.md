@@ -17,6 +17,7 @@ reference-producer pins.
   a choice.
 - X/Backspace or gamepad East (SNES B): cancel a choice.
 - Up/Down move a choice's cursor.
+- Tab or gamepad Select: open and close Yomi's box (after the frozen return).
 - **M:** pause/resume music (not gameplay).
 - **− / +** (also numpad): change volume by 10%, clamped to 0–100%. Starts at50%.
 - Escape: quit and stop audio.

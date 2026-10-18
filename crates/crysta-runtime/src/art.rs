@@ -732,6 +732,14 @@ pub fn overlay_animation(
     list_animation(&PandoraArt::object(image, base, selector)?, selector, hflip)
 }
 
+/// Yomi in the box's hall (`docs/menu.md`): her flapping list.
+///
+/// # Errors
+/// As [`overlay_animation`].
+pub fn yomi_animation(image: &[u8]) -> Result<Animation, ArtError> {
+    list_animation(&PandoraArt::yomi(image)?, 3, false)
+}
+
 /// A Pandora art's list as rasters.
 fn list_animation(art: &PandoraArt, selector: u8, hflip: bool) -> Result<Animation, ArtError> {
     let list = art

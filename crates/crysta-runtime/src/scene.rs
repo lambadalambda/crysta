@@ -9,7 +9,7 @@
 use assets::text::{Acknowledgement, DialogueChoice, DialoguePage};
 
 /// Buttons pressed this frame, as edges.
-#[allow(clippy::struct_excessive_bools)] // four independent buttons, not a state
+#[allow(clippy::struct_excessive_bools)] // independent buttons, not a state
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Presses {
     /// A or L: acknowledges a page, confirms a choice.

@@ -23,6 +23,7 @@ use std::collections::HashMap;
 pub const START: (u16, u16, u16) = (0x000F, 304, 112);
 
 /// The buttons pressed this frame, besides the pad's directions.
+#[allow(clippy::struct_excessive_bools)] // independent buttons, not a state
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Buttons {
     /// A: talk, confirm, lift.
@@ -31,6 +32,8 @@ pub struct Buttons {
     pub cancel: bool,
     /// L: the shop's item description.
     pub describe: bool,
+    /// Select: Yomi's box.
+    pub select: bool,
 }
 
 /// What a resident whose art was refused is drawn as: a block, so that
@@ -53,6 +56,9 @@ pub struct Session {
     pub image: &'static [u8],
     /// Ark's ordinary frames.
     pub atlas: ArkAtlas,
+    /// Yomi's box's hall and Yomi, decoded once (`None` inside when they
+    /// could not be).
+    pub hall: Option<(Option<frame::Background>, Option<crysta_runtime::art::Animation>)>,
     /// Backgrounds by map, composed once.
     pub backgrounds: HashMap<u16, background::CachedBackground>,
     /// Frames into the current map's visit, for its animations.
@@ -119,6 +125,7 @@ impl Session {
             world: new_game(image),
             image,
             atlas: ArkAtlas::from_rom(image).expect("the player's frames"),
+            hall: None,
             backgrounds: HashMap::new(),
             background_clock: background::VisitClock::new(START.0),
             art: None,
@@ -153,6 +160,7 @@ impl Session {
                 confirm,
                 cancel,
                 describe: false,
+                select: false,
             },
         );
     }
@@ -164,7 +172,7 @@ impl Session {
             confirm: buttons.confirm,
             cancel: buttons.cancel,
             describe: buttons.describe,
-            select: false,
+            select: buttons.select,
             up: newly(Direction::Up),
             down: newly(Direction::Down),
             left: newly(Direction::Left),
@@ -564,7 +572,67 @@ impl Session {
         ))
     }
 
-    /// Composes the view: background, depth-sorted sprites, then dialogue.
+    /// Composes the view: the field, or Yomi's box while it runs. Returns
+    /// the field's camera.
+    pub fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
+        use crysta_runtime::menu::View;
+        match self.world.menu() {
+            None => self.compose_field(cartridge, frame),
+            Some(View::Field(brightness)) => {
+                let camera = self.compose_field(cartridge, frame);
+                frame::dim(frame, brightness);
+                camera
+            }
+            Some(View::Blank) => {
+                frame.pixels.fill(0);
+                (0, 0)
+            }
+            Some(View::Hall(page)) => {
+                self.draw_hall(frame, page);
+                (0, 0)
+            }
+        }
+    }
+
+    /// Yomi's box's hall, centred in a wide view.
+    fn draw_hall(&mut self, frame: &mut Canvas, page: crysta_runtime::menu::Page) {
+        frame.pixels.fill(0);
+        let (hall, yomi) = self.hall.get_or_insert_with(|| {
+            let hall = background::hall(self.image)
+                .inspect_err(|error| eprintln!("the box's hall unavailable: {error}"))
+                .ok();
+            let yomi = crysta_runtime::art::yomi_animation(self.image)
+                .inspect_err(|error| eprintln!("Yomi's art unavailable: {error}"))
+                .ok();
+            (hall, yomi)
+        });
+        let Some(hall) = hall else {
+            return;
+        };
+        let left = (i32::try_from(frame.width).unwrap_or(256) - 256) / 2;
+        let camera = (-left, 0);
+        frame::draw_background(frame, hall, camera);
+        if let (Some(yomi), Ok(x), Ok(y)) =
+            (yomi, u16::try_from(page.yomi.0), u16::try_from(page.yomi.1))
+        {
+            // Priority 3, over the hall's high tiles.
+            let raster = yomi.frame_at(u64::from(page.flap));
+            frame::draw_sprite_over(frame, hall, camera, raster, (x, y));
+        }
+        // The box's HUD (layout 1).
+        if let Some(art) = self.shop_art.art(self.image) {
+            let cells = crate::hud::menu_cells(hud_shown(&self.world));
+            crate::hud::draw_cells(frame, art, &cells);
+        }
+        // Only the screen's 256 columns: the layer runs on to its right.
+        for row in 0..frame::VIEW_HEIGHT {
+            for column in (0..left).chain(left + 256..i32::try_from(frame.width).unwrap_or(0)) {
+                frame.set((column, i32::try_from(row).unwrap_or(0)), 0);
+            }
+        }
+    }
+
+    /// The field: background, depth-sorted sprites, then dialogue.
     ///
     /// Depth is world Y as `+$06`'s depth bits move it
     /// (`Resident::draw_depth`), ties broken by spawn order with later
@@ -573,7 +641,7 @@ impl Session {
     /// count includes residents that draw nothing, which keeps the relative
     /// order and only inflates the player's rank. Whatever lies outside the
     /// map's region is blanked before the dialogue goes on top.
-    pub fn compose(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
+    fn compose_field(&mut self, cartridge: &rom::Rom, frame: &mut Canvas) -> (i32, i32) {
         if self.compose_records(frame) {
             return (0, 0);
         }
@@ -731,13 +799,7 @@ impl Session {
         {
             if let Some(art) = self.shop_art.art(self.image) {
                 crate::hud::draw_digits(frame, art, camera, world.digits());
-                let stats = world.stats();
-                let shown = crate::hud::Shown {
-                    level: stats.level,
-                    life: (stats.life, stats.max_life),
-                    gems: world.money(),
-                };
-                crate::hud::draw(frame, art, shown);
+                crate::hud::draw(frame, art, hud_shown(world));
             }
         }
         // An item held over Ark's head (`COP 60`).
@@ -796,6 +858,16 @@ pub enum SpriteKey {
     /// The helper art's list: an explosion, a dropped gem, a wisp; mirror
     /// and vertical flip.
     Overlay(u32, u8, bool, bool),
+}
+
+/// What the HUDs show of the world.
+fn hud_shown(world: &World<'_>) -> crate::hud::Shown {
+    let stats = world.stats();
+    crate::hud::Shown {
+        level: stats.level,
+        life: (stats.life, stats.max_life),
+        gems: world.money(),
+    }
 }
 
 /// Ark at his place, or above it over the high tiles while a landing drops

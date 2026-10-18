@@ -190,6 +190,14 @@ pub fn load(cartridge: &rom::Rom, map: u16, events: &[u8]) -> Result<CachedBackg
     })
 }
 
+/// Yomi's box's hall (`docs/menu.md`): the tour's tiles and colors with its
+/// own metatiles and layer; the screen is its top-left 256×224.
+pub fn hall(image: &[u8]) -> Result<crate::frame::Background, String> {
+    let scene =
+        assets::maps::visual::pandora::box_hall(image).map_err(|error| error.to_string())?;
+    Ok(render(&scene)?.0)
+}
+
 /// The whole first layer, as the inspector's static export draws it, and
 /// each pixel's palette index. The same loop as `map_inspector`'s export,
 /// whose source is hash-pinned by a qualification fixture; it also covers the

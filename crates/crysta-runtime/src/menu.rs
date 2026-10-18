@@ -31,6 +31,8 @@ const EUROPE: Timing = Timing {
 const FADE_START: u32 = 20;
 /// The hall stays this long after the closing press, then goes black.
 const CLOSE_BLANK: u32 = 11;
+/// Yomi's flapping as the hall shows: one native capture per ROM pins it.
+const FLAP_AT_HALL: u32 = 4;
 /// The hotspot the box opens on: the item door.
 pub const ITEM_DOOR: u8 = 7;
 /// Frames after a move in which the label is redrawn and the pad is not
@@ -168,6 +170,9 @@ pub struct Page {
     pub yomi: (i16, i16),
     /// The hotspot whose label shows; none while it is redrawn.
     pub label: Option<u8>,
+    /// Yomi's flapping: frames since she was spawned while the hall
+    /// loaded.
+    pub flap: u32,
 }
 
 /// Where the box stands.
@@ -358,6 +363,7 @@ impl Menu {
             hotspot: self.hotspot,
             yomi: self.yomi,
             label,
+            flap: self.frame.saturating_sub(self.timing.hall) + FLAP_AT_HALL,
         }
     }
 }

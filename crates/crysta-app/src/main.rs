@@ -296,6 +296,8 @@ struct App {
     /// B: cancels a choice. Edge-triggered like the confirm button.
     cancel: input::Interaction,
     describe: input::Interaction,
+    /// Select: opens Yomi's box.
+    select: input::Interaction,
     started: std::time::Instant,
     clock: clock::Clock,
     suspended: bool,
@@ -343,6 +345,7 @@ impl App {
             interaction: input::Interaction::default(),
             cancel: input::Interaction::default(),
             describe: input::Interaction::default(),
+            select: input::Interaction::default(),
             started: std::time::Instant::now(),
             clock: clock::Clock::with_period(std::time::Duration::ZERO, period),
             suspended: false,
@@ -491,6 +494,7 @@ impl ApplicationHandler for App {
         self.interaction = input::Interaction::default();
         self.cancel = input::Interaction::default();
         self.describe = input::Interaction::default();
+        self.select = input::Interaction::default();
         self.keys.clear();
         self.held = None;
         self.music_controls.set_focused(false);
@@ -556,6 +560,10 @@ impl ApplicationHandler for App {
                         self.describe.keyboard(pressed);
                         None
                     }
+                    PhysicalKey::Code(KeyCode::Tab) => {
+                        self.select.keyboard(pressed);
+                        None
+                    }
                     _ => None,
                 };
                 if let Some(direction) = direction {
@@ -619,7 +627,7 @@ impl ApplicationHandler for App {
 
 impl App {
     fn poll_pad(&mut self) {
-        let (mut interact, mut cancel, mut describe) = (false, false, false);
+        let (mut interact, mut cancel, mut describe, mut select) = (false, false, false, false);
         let (mut direction, mut cross) = input::held_axes(&self.keys);
         if let Some(pads) = &mut self.pads {
             while pads.next_event().is_some() {}
@@ -652,6 +660,7 @@ impl App {
                 interact |= pad.is_pressed(Button::South);
                 cancel |= pad.is_pressed(Button::East);
                 describe |= pad.is_pressed(Button::LeftTrigger);
+                select |= pad.is_pressed(Button::Select);
             }
         }
         self.held = direction;
@@ -661,6 +670,7 @@ impl App {
         self.interaction.gamepad(interact);
         self.cancel.gamepad(cancel);
         self.describe.gamepad(describe);
+        self.select.gamepad(select);
     }
 
     fn advance(&mut self) {
@@ -668,6 +678,7 @@ impl App {
         let interact = self.interaction.take();
         let cancel = self.cancel.take();
         let describe = self.describe.take();
+        let select = self.select.take();
         let cross = self.held_cross;
         let session = self.session();
         if session.fault.is_some() {
@@ -681,6 +692,7 @@ impl App {
                 confirm: interact,
                 cancel,
                 describe,
+                select,
             },
         );
         let urgent = session.fault.is_some() || matches!(session.last_step, Some(Step::Refused(_)));

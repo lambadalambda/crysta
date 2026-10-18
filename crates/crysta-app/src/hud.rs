@@ -41,54 +41,94 @@ fn digit(cells: &mut Vec<Cell>, (column, row): (u8, u8), value: u8) {
     cells.push((column, row + 1, ShopArt::BOTTOM + value, BOTTOMS));
 }
 
-/// The HUD's cells for `shown`.
+/// Where a HUD layout puts things, in BG3 cells.
+struct Layout {
+    /// The labels' row and their columns and tiles.
+    labels: (u8, &'static [(u8, u8)]),
+    /// The digits' row (tops; bottoms below).
+    digits: u8,
+    /// The level's last column, and the life's: the slash follows it, then
+    /// the most life.
+    level: u8,
+    life: u8,
+    /// The gem icon's and the gems' row.
+    gems: u8,
+    /// The side frame on columns 0 and 31.
+    frame: bool,
+}
+
+/// The towers' HUD (`docs/combat.md` §7): "LEVEL", the box edge, "ITEM",
+/// "LIFE" on row 1, the gems at the bottom, a frame at the sides.
+const FIELD: Layout = Layout {
+    labels: (
+        1,
+        &[(4, 0x3D), (5, 0x3E), (6, 0x2E), (7, 0x0C), (8, 0x0D), (24, 0x02), (25, 0x03)],
+    ),
+    digits: 2,
+    level: 5,
+    life: 24,
+    gems: 25,
+    frame: true,
+};
+
+/// The box's HUD (layout 1, `docs/menu.md`): all on rows 1 and 2.
+const MENU: Layout = Layout {
+    labels: (
+        2,
+        &[(1, 0x3D), (2, 0x3E), (3, 0x2E), (7, 0x02), (8, 0x03), (18, 0x0C), (19, 0x0D)],
+    ),
+    digits: 1,
+    level: 5,
+    life: 11,
+    gems: 1,
+    frame: false,
+};
+
+/// The field HUD's cells for `shown`.
 #[must_use]
 pub fn cells(shown: Shown) -> Vec<Cell> {
+    layout_cells(&FIELD, shown)
+}
+
+/// The box HUD's cells for `shown`.
+#[must_use]
+pub fn menu_cells(shown: Shown) -> Vec<Cell> {
+    layout_cells(&MENU, shown)
+}
+
+fn layout_cells(layout: &Layout, shown: Shown) -> Vec<Cell> {
     let mut cells = Vec::new();
-    for row in 0..ROWS {
-        cells.push((0, row, 0x20, LABELS));
-        cells.push((31, row, 0x20, LABELS));
+    if layout.frame {
+        for row in 0..ROWS {
+            cells.push((0, row, 0x20, LABELS));
+            cells.push((31, row, 0x20, LABELS));
+        }
     }
-    // "LEVEL", the box edge, "ITEM"; "LIFE".
-    for (column, tile) in [
-        (4, 0x3D),
-        (5, 0x3E),
-        (6, 0x2E),
-        (7, 0x0C),
-        (8, 0x0D),
-        (24, 0x02),
-        (25, 0x03),
-    ] {
-        cells.push((column, 1, tile, LABELS));
+    let (row, labels) = layout.labels;
+    for &(column, tile) in labels {
+        cells.push((column, row, tile, LABELS));
     }
     // Right-aligned level and life, a slash, the most life left-aligned.
+    let row = layout.digits;
     let right = |cells: &mut Vec<Cell>, value: u32, last: u8| {
         let shown = digits(value);
         for (index, &value) in shown.iter().enumerate() {
             let column = last + 1 + u8::try_from(index).unwrap_or(0)
                 - u8::try_from(shown.len()).unwrap_or(0);
-            digit(cells, (column, 2), value);
+            digit(cells, (column, row), value);
         }
     };
-    right(&mut cells, u32::from(shown.level), 5);
-    right(&mut cells, u32::from(shown.life.0), 24);
-    cells.push((25, 2, 0x2F, TOPS));
-    cells.push((25, 3, 0x3F, BOTTOMS));
+    right(&mut cells, u32::from(shown.level), layout.level);
+    right(&mut cells, u32::from(shown.life.0), layout.life);
+    cells.push((layout.life + 1, row, 0x2F, TOPS));
+    cells.push((layout.life + 1, row + 1, 0x3F, BOTTOMS));
     for (index, value) in digits(u32::from(shown.life.1)).into_iter().enumerate() {
-        digit(
-            &mut cells,
-            (26 + u8::try_from(index).unwrap_or(0), 2),
-            value,
-        );
+        digit(&mut cells, (layout.life + 2 + u8::try_from(index).unwrap_or(0), row), value);
     }
     // The gem icon, then the gems: up to three end at column 28.
-    for (column, row, tile) in [
-        (24, 25, 0x40),
-        (25, 25, 0x41),
-        (24, 26, 0x50),
-        (25, 26, 0x51),
-    ] {
-        cells.push((column, row, tile, TOPS));
+    let row = layout.gems;
+    for (column, below, tile) in [(24, 0, 0x40), (25, 0, 0x41), (24, 1, 0x50), (25, 1, 0x51)] {
+        cells.push((column, row + below, tile, TOPS));
     }
     let gems = digits(shown.gems.min(99_999));
     let start = if gems.len() <= 3 {
@@ -97,19 +137,21 @@ pub fn cells(shown: Shown) -> Vec<Cell> {
         26
     };
     for (index, value) in gems.into_iter().enumerate() {
-        digit(
-            &mut cells,
-            (start + u8::try_from(index).unwrap_or(0), 25),
-            value,
-        );
+        digit(&mut cells, (start + u8::try_from(index).unwrap_or(0), row), value);
     }
     cells
 }
 
-/// Draws the cells on the classic view's columns, centred in a wide one.
+/// Draws the field's HUD on the classic view's columns, centred in a wide
+/// one.
 pub fn draw(canvas: &mut Canvas, art: &ShopArt, shown: Shown) {
+    draw_cells(canvas, art, &cells(shown));
+}
+
+/// Draws `cells` on the classic view's columns, centred in a wide one.
+pub fn draw_cells(canvas: &mut Canvas, art: &ShopArt, cells: &[Cell]) {
     let left = (signed(canvas.width) - signed(CLASSIC_WIDTH)) / 2;
-    for (column, row, tile, palette) in cells(shown) {
+    for &(column, row, tile, palette) in cells {
         let Some(pixels) = art.panel.get(usize::from(tile)) else {
             continue;
         };
