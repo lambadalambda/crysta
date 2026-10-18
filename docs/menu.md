@@ -13,7 +13,7 @@ Yomi as the cursor on nine hotspots. A on a hotspot opens its screen:
 | Hotspot | Screen |
 |---|---|
 | item door | 8×3 grid of the 27 shared slots, a row of fixed slots; A asks Use / Equip (`$0648`, the field's X uses it); L shows the description |
-| weapon, armor doors | 12 pedestals each; A equips (`$064A`, `$064C`) |
+| weapon, armor doors | 16 pedestals each (12 shared slots, 4 fixed); A equips (`$064A`, `$064C`); see [the rooms](#the-weapon-and-armor-rooms) |
 | mirror | status: attack, defense (+bonus), luck, Prime Blue, EXP, next |
 | memo | options: keys (`$0634–063E`), cursor memory (`$06B4` bit 14), sound, window colour, text speed, gauge |
 | jewel box | magic (a separate screen) |
@@ -206,3 +206,226 @@ jump through `$85:ACDC` [`$85:AD74`]:
 - The window gradient's source (HDMA or colour math) was not traced.
 - `$85:D1EE`'s role was not traced. The words `$06A8/AA/AC` are set by the
   door handlers (guess: the room each door leads to).
+
+## The weapon and armor rooms
+
+Captured with `palnative` as the hall, with weapons and armor poked into
+the slots. P is the first frame with the button held; P+k is the k-th frame
+after it. Addresses are Japanese, European in brackets; bank `$85` is
++`$98` in European up to `$85:CC65`, and the door handlers are
+`CC81 → CD18`, `CCC3 → CD5A`, `CD04 → CD9B`.
+
+The hall's map is 512×512 (32×32 cells of 16 px) and holds all four
+screens: hall at camera (0,0), armor room (256,0), weapon room (0,256),
+item room (256,256). The rooms use the hall's tiles, metatiles and layers
+(stage `$0A`); only the camera, the sort and the pedestal icons differ.
+
+| | Weapon room | Armor room |
+|---|---|---|
+| `$06BC` (screen) | 4 | 3 |
+| Cursor | `$06AA` | `$06AC` |
+| Room loop | `$85:B19B` [`B233`] | `$85:B049` [`B0E1`] |
+| Stage (A from `$85:A40B`) | `$85:A6DB` [`A773`] | `$85:A641` [`A6D9`] |
+| Slots, pedestals 4..19 | `$7F:8040..805F` | `$7F:8060..807F` |
+| Power table | `$8D:BC92` + (id & `$3F`)×4 | `$8D:BD12` + (id − `$A0`)×4 |
+| Equipped | `$064A`, bonus `$0659` | `$064C`, bonus `$065B` |
+| Nav table | `$92:BFC5` [`$92:C173`] | `$92:BED5` [`$92:C083`] |
+
+### Positions
+
+`$92:BCA3[$06BC]` as in the hall (12 bytes: x, y, Up, Down, Left, Right);
+x, y are map pixels (Yomi's entity x/y); screen = map − camera. Same
+values in both ROMs. The table gives screen positions; the two rooms have
+the same graph and screen positions (weapon map y = screen y + 256, armor
+map x = screen x + 256):
+
+| # | x, y | Up | Down | Left | Right | What |
+|---|---|---|---|---|---|---|
+| 0 | 72, 56 | – | 8 | – | 1 | left door |
+| 1 | 136, 56 | – | 3 | 0 | 2 | middle door |
+| 2 | 200, 56 | – | 11 | 1 | – | right door |
+| 3 | 132, 88 | 1 | 9 | 9 | 10 | ホールホル (the trash hole) |
+| 4 | 116, 122 | 9 | 6 | 12 | 5 | slot 0 (fixed) |
+| 5 | 148, 122 | 10 | 7 | 4 | 13 | slot 1 (fixed) |
+| 6 | 116, 154 | 4 | 17 | 14 | 7 | slot 2 (fixed) |
+| 7 | 148, 154 | 5 | 18 | 6 | 15 | slot 3 (fixed) |
+| 8 | 68, 106 | 0 | 12 | – | 9 | slot 4 |
+| 9 | 100, 106 | 3 | 4 | 8 | 10 | slot 5 |
+| 10 | 164, 106 | 3 | 5 | 9 | 11 | slot 6 |
+| 11 | 196, 106 | 2 | 13 | 10 | – | slot 7 |
+| 12 | 52, 122 | 8 | 14 | – | 4 | slot 8 |
+| 13 | 212, 122 | 11 | 15 | 5 | – | slot 9 |
+| 14 | 52, 154 | 12 | 16 | – | 6 | slot 10 |
+| 15 | 212, 154 | 13 | 19 | 7 | – | slot 11 |
+| 16 | 68, 170 | 14 | – | – | 17 | slot 12 |
+| 17 | 100, 170 | 6 | – | 16 | 18 | slot 13 |
+| 18 | 164, 170 | 7 | – | 17 | 19 | slot 14 |
+| 19 | 196, 170 | 15 | – | 18 | – | slot 15 |
+
+Position p ≥ 4 is slot p − 4: `$7F:8040 + 2(p−4)` (weapon), `$7F:8060 +
+2(p−4)` (armor). Slots 0..3 are the fixed items (`$9C..$9F`, `$BC..$BF`),
+4..15 the 12 shared slots. `$85:C6B1` [`C749`] (weapon), `$85:C695`
+[`C72D`] (armor) set `$0DD0` = item, `$0DD2` = count. The pad, the
+repeat timing, Yomi's ease (`$85:CC08`) and the label redraw (P+2 empty,
+P+4 new label) are the hall's (`$85:CB2A`).
+
+Doors: weapon 0 → hall (hotspot 6), 1 → armor room position 1, 2 → item
+room position 2; armor 0 → item room position 0, 1 → weapon room
+position 1, 2 → hall (hotspot 8). From the hall the weapon room starts at
+0, the armor room at 2 (`$85:CD04`, `$85:CC81` write the cursor).
+
+### Entering: the sort
+
+The stage sorts the 16 slots before drawing (`$85:A6FD..A74C`, armor
+`A663..A6B6`): the power of each slot (0 when empty) into `$7F:80A0`, then
+a bubble sort, descending, swapping only when the next is strictly
+greater (stable). So empty slots go last, and the saved order changes. With
+`$81` (3), `$82` (6), `$80`×2 (4) the slots become `82 01 80 02 81 01`.
+Both ROMs.
+
+### Transition
+
+`$85:CD04` (or another door handler): set the target cursor, `$7F:201A` =
+target screen, `$7F:201C` = door 0/1/2 (centres `$85:C954`: (72,52),
+(136,52), (200,52)), spawn the door task, then `$85:CD43`. From the hall,
+A first runs `COP 37 23` and the label close (above). JP:
+
+| Frame | What |
+|---|---|
+| P+2 | label closed; sound (`COP 37 1A`); door half open (metatiles `$F3/$F2`, `$85:C9C8`) |
+| P+3 | door open (`$F5/$F4`) |
+| P+2..P+66 | the window closes on the door (below); angle `$7E:46E8` low byte +4 a frame (JP has one lag frame at P+8; EU ends at P+65) |
+| P+40 | door half closed, Yomi's priority 2 (behind the door) |
+| P+45 | door closed (`$F1/$F0`) |
+| P+62..P+114 | black (LUM 0); EU P+61..P+108 |
+| P+67 | `$7E:46E6` = 0, P+68 `$06BC` = target, loads (Ark → `$85:A246`) |
+| P+99 | Yomi at the target position, priority 3, script `$85:C616`; the window opens (EU P+93) |
+| P+165 | window done (`$46E6` = 0), P+167 `$7E:5DC4` = `$FF00` (EU P+157, P+159) |
+| P+169, P+171 | empty label window, then the label (EU P+161, P+163) |
+
+Back to the hall (weapon door 0): the same steps; the hall label comes at
+P+162 (JP). Room to room (armor 1 → weapon 1): label at P+171 (JP).
+
+The window is a rotating quadrilateral, visible inside, black outside
+(polygon list `$7E:46E6` = 4 vertices at `$7E:46EE`, 6 bytes each;
+`$8D:AFE0`). Close (`$85:C725`): centre = door centre + camera; four child
+tasks ease the vertex offsets with the half-cosine ease (`$87:CDBD`,
+`$87:CE36`, phase +2 a frame, 64 frames) from (−256,−226), (−256,226),
+(256,226), (256,−226) (`$85:C95A`) to (±1,±1); the angle goes 0 → `$100`.
+Open (`$85:C7F3`): the same offsets backwards, the angle 0 → −`$100`, and
+the centre eases from the door to (128,112) with phase +1 a frame (so it
+is half way when the window is done).
+
+### Pedestals
+
+`$85:CE9E` [`CF36`] (each stage): fills `$7E:3F00..3FFF` (metatiles
+`$1E0..$1FF`) with tiles `$180..$1FF`, then for slot k with an item ORs
+`$2000 | $B1:DA31[item] << 10` (priority 1, palette) into the four words of
+metatile `$1E0+k`, and DMAs the icon to VRAM `$1800 + $40k`: the shop
+icon (`$A8:8000` chain, `$A2:8000` tiles, `assets::shop_display::item_icon`),
+two rows of 64 bytes. An empty slot gets item 0's tiles. Palette n is BG
+palette n, colours 8..15 = `$AF:E43B + 32n` (the hall's overrides; the
+stage also loads `$AF:E4DB` → colours `$58..$5F`).
+
+Layer 2 cells (col,row) of metatile `$1E0+k`:
+
+| k | 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| weapon | 7,23 | 9,23 | 7,25 | 9,25 | 4,22 | 6,22 | 10,22 | 12,22 | 3,23 | 13,23 | 3,25 | 13,25 | 4,26 | 6,26 | 10,26 | 12,26 |
+| armor | 22,7 | 26,7 | 22,9 | 26,9 | 20,6 | 23,6 | 25,6 | 28,6 | 19,7 | 29,7 | 19,9 | 29,9 | 20,10 | 23,10 | 25,10 | 28,10 |
+
+When a throw empties a slot, `$85:C97A` [`CA12`] queues a fixed-source DMA
+(`$A2:8000`, `$80` bytes) to the slot's VRAM, so the icon goes.
+
+### Sprites over the pedestals
+
+Task `$85:D00B` [`D0A3`] (entity `$1580` in the captures), each frame:
+
+- On a pedestal (p ≥ 4) with an item that is not the equipped one: the
+  power difference new − equipped (equipped 0 when none). Arrow tile `$5C`
+  (V-flipped when negative) at (x+13, y + b − 2), b = (`$42` & 15) >> 2
+  (gain), or y − b + 2 (loss); the digits (`$40` + digit) at y − 8, one
+  digit at x+13, two at x+10 and x+17. Palette 0, priority 3.
+- On the equipped item's pedestal: tile `$1BF`, palette 7, priority 3, at
+  (x+8, y−8) (`$85:E6FE`).
+
+### Labels and texts
+
+| Text | JP | EU |
+|---|---|---|
+| Pedestal: name (`$92:8179`[`81A4`] entry `$0DD0`), count if > 1 | `$92:B47C` | `$92:B6FD` |
+| Door/hole labels (table: 0 中央, 1 防具/武器, 2 道具/中央, 3 ホールホル) | weapon `$92:B66F`, armor `$92:B619` | `$92:B889`, `$92:B856` |
+| L on a pedestal: power line, description (`$92:8E3A` [`8EA4`]) | `$92:B5B1` | |
+| L on 0..3 | `$92:B68B`, `$92:B635` | |
+| A on an empty pedestal: 何もないぜ！ | `$92:B6C5` | `$92:B8BC` |
+| Equip? (装備する / 装備しない) | `$92:AB47` | `$92:ADE5` |
+| 装備したぜ！ | `$92:AB84` | `$92:AE22` |
+| Unequip? (はずす / そのまま) | `$92:AB1D` | `$92:ADC5` |
+| Unequipped | `$92:AB6D` | `$92:AE04` |
+| 何を すてるんだい？ (on 0..3 / with the name) | `$92:ABB8` / `$92:AB98` | `$92:AE57` / `$92:AE39` |
+| 本当に すてていいのかい？ (はい / いいえ) | `$92:ABCD` | `$92:AE6C` |
+| じゃあ すてるぜっ！ | `$92:ABF3` | |
+| Can't throw (flag) | `$92:AC07` | `$92:AEB0` |
+| アーク！ 戦いを やめる気かいっ！ (last one, waits for a button) | `$92:AC4C` | `$92:AF08` |
+
+The label window is the hall's. The question windows are `C2 02 17 1C 04`
+(cols 2..29, rows 23..26), 2 frames a glyph; L grows the window as the
+hall's.
+
+### Input
+
+Room loop (`$0454`): A, B or Select first, then L (description while
+held, then the label again), then the pad.
+
+- B: cursor to the hall door (weapon 0, armor 2), Yomi moves there.
+- Select: `COP CB 01 $85:A333`, the menu closes (not measured).
+- A on 0..2: the door (`$85:CC49` [`CCE1`], armor `$85:CC65`).
+- A on 3: throw mode (below).
+- A on a pedestal: `COP 00 $85:AE8E` [`AF26`], then `$85:F4BD` [`F555`]
+  (stats), then the loop again.
+
+`$85:AE8E`: empty → 何もないぜ！ (P+3, gone at P+21, label P+22). A weapon
+(`$80..$9F`) or armor (`$A0..`): if it is the equipped one, the unequip
+question, else the equip question; `COP 1A 0A` (cursor on the first
+answer; table [B, first, second]: B and the second answer close the
+window). First answer: equip writes `$064A`/`$064C` = item, unequip
+writes 0, then the answer text, a 30-frame wait, close.
+
+| Frame (JP, A on the first answer) | Equip | Unequip |
+|---|---|---|
+| P+1 | `$064A` = item | `$064A` = 0 |
+| P+3..P+13 | 装備したぜ！ typed | |
+| P+46 | window closed; `$0659` = power (3 for `$81`) | |
+| P+48, P+50 | empty label window, label | |
+| P+52 | | `$0659` = 0 |
+
+The question itself: P+2 window, glyphs from P+3, complete at P+19, the
+cursor blinks every 16 frames. `$0662` stayed 3 in the capture. Armor:
+same with `$064C`, `$065B` (cloth `$A0`: 3). EU: the same flow (equip
+`$82`: `$064A` = `$82`, `$0659` = 6); its question appears at P+2, glyphs
+from P+3, and the equip answer is longer (window closed at P+68, label at
+P+72).
+
+Throw mode (`$85:B220` [`B2B8`], armor `$85:B0CE`): 何を すてるんだい？ at
+P+3 (instant); pedestals show the name on line 2 (何もない when empty).
+The pad moves Yomi as before; B → back to the room loop (Yomi stays); A:
+
+- empty pedestal or 0..3: `COP 36 1B` only;
+- the byte before the item's description in `$92:8E3A` non-zero
+  (`$85:CE50`; e.g. `$9C`): `COP 36 1B`, `$92:AC07`;
+- fewer than 2 non-empty slots of 16 (`$85:CE82`, armor `CE66`): the last
+  one text, waits for a button;
+- else the question; はい: じゃあ すてるぜっ！, `$8D:96A0` takes one
+  (`$09C7` = item), the icon goes when the count reaches 0, and if the
+  equipped item has none left (`$8D:9628`) `$064A`/`$064C` = 0 and the
+  stats again. Window cleared P+31, throw-mode text P+32.
+
+### Open
+
+- The polygon rasteriser (bank `$89`, `$7E:46E8` users) and the window
+  registers were not traced; only the vertex and angle values above.
+- The door metatiles `$F0..$F5` go through `$8D:8C63` (the cell from
+  x, y); their art was not checked.
+- `$7F:0702` = 0, `$7F:071C` = `$FFFF` (both stages) were not traced.
+- Select in a room, the European exit timings, the item room, and the
+  meaning of `COP 1A 0A` beyond the jump table were not measured.
