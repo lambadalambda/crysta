@@ -417,11 +417,18 @@ pub trait Page {
     fn shown(&self, _typed: u16) -> usize {
         usize::MAX
     }
+    /// Life the page adds once typed out.
+    fn heal(&self) -> u16 {
+        0
+    }
 }
 
 impl Page for DialoguePage {
     fn acknowledgement(&self) -> Acknowledgement {
         DialoguePage::acknowledgement(self)
+    }
+    fn heal(&self) -> u16 {
+        DialoguePage::heal(self)
     }
     fn duration(&self) -> u16 {
         DialoguePage::duration(self)
@@ -453,6 +460,8 @@ pub struct Dialogue<P = DialoguePage> {
     choice: Option<(DialogueChoice, u8)>,
     /// Frames the page on screen has been typing.
     typed: u16,
+    /// Life typed-out pages added, until the world takes it.
+    healed: u16,
 }
 
 impl<P> Default for Dialogue<P> {
@@ -462,6 +471,7 @@ impl<P> Default for Dialogue<P> {
             retained: None,
             choice: None,
             typed: 0,
+            healed: 0,
         }
     }
 }
@@ -513,9 +523,18 @@ impl<P: Page> Dialogue<P> {
             }
             return None;
         }
-        let blip = page.blip(self.typed);
+        let (blip, heal) = (page.blip(self.typed), page.heal());
+        let done = self.typed + 1 == page.duration();
         self.typed += 1;
+        if done {
+            self.healed = self.healed.saturating_add(heal);
+        }
         blip
+    }
+
+    /// The life typed-out pages added since last asked (`$DD`).
+    pub fn take_heal(&mut self) -> u16 {
+        std::mem::take(&mut self.healed)
     }
 
     /// The page on screen.

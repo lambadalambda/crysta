@@ -440,3 +440,63 @@ fn the_cadet_casts_spells_that_hurt_ark() {
         assert!(world.frozen_scripts().is_empty(), "{:?}", rom.revision());
     }
 }
+
+#[test]
+fn a_marked_blob_leaves_a_soul() {
+    // `meta/issues/tower-souls.md`: `$102`'s blob at (520,384) carries
+    // `7F:1018`; it bursts (helper list `$17`, 40 frames) and leaves a soul
+    // (list `$13`) instead of exploding; no gem. Talking to it opens its text.
+    for rom in roms() {
+        let mut events = fresh_game_flags();
+        events[0x101 / 8] |= 1 << (0x101 % 8);
+        let mut world = World::enter_with_events(rom.image(), 0x0102, 520, 448, events).unwrap();
+        let record = world
+            .residents()
+            .iter()
+            .find(|resident| resident.position == (520, 384))
+            .expect("the marked blob")
+            .record;
+        // Hidden until Ark is 48 to 96 pixels away (`$97:B9A2`, `COP D6`).
+        for _ in 0..60 {
+            world.update(None, Presses::NONE).unwrap();
+        }
+        assert!(world.kill_foe(record), "{:?}", rom.revision());
+        let overlay = |world: &World<'_>| {
+            world
+                .residents()
+                .iter()
+                .find(|resident| resident.record == record)
+                .and_then(|resident| resident.overlay.map(|(_, list)| list))
+        };
+        let seen: Vec<_> = (0..60)
+            .map(|_| {
+                world.update(None, Presses::NONE).unwrap();
+                overlay(&world)
+            })
+            .collect();
+        let burst = seen.iter().filter(|&&list| list == Some(0x17)).count();
+        assert_eq!(burst, 40, "{:?} {seen:?}", rom.revision());
+        assert_eq!(seen.last(), Some(&Some(0x13)), "{:?}", rom.revision());
+        assert!(!seen.contains(&Some(0x16)) && !seen.contains(&Some(0x0B)));
+        assert_eq!(world.frozen_scripts(), []);
+        let at = world
+            .residents()
+            .iter()
+            .find(|resident| resident.record == record)
+            .unwrap()
+            .position;
+        world.place(at.0, at.1 + 16);
+        world.face(Direction::Up);
+        world.set_life(1);
+        world.update(None, A).unwrap();
+        assert!(world.dialogue().is_some(), "{:?}", rom.revision());
+        // Its text ends with `$DD $04CE 50`: fifty points, a point a frame.
+        for _ in 0..600 {
+            let reading = world.dialogue().is_some() && !world.typing();
+            world
+                .update(None, if reading { A } else { Presses::NONE })
+                .unwrap();
+        }
+        assert_eq!(world.life(), (28, 28), "{:?}", rom.revision());
+    }
+}

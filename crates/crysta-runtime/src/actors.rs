@@ -2131,14 +2131,7 @@ impl Actor {
                     self.state = State::Frozen;
                     return false;
                 };
-                if let Some(ticks) = cadence::packet_ticks(image, pointer) {
-                    self.pose_ticks = Some(ticks);
-                }
-                // An enemy's or a bullet's boxes follow its art.
-                if self.foe.is_some() || self.boxes.is_some() || self.spawned {
-                    self.boxes = cadence::packet_boxes(image, pointer).map(std::rc::Rc::new);
-                }
-                let art = u32::from_le_bytes([pointer[0], pointer[1], pointer[2], 0]);
+                let art = self.load_packet(image, pointer);
                 let helper = foe::helper(image);
                 self.helper_art = (self.spawned && art == helper).then_some(helper);
                 self.pc = operands + 3;
@@ -3291,6 +3284,26 @@ impl Actor {
     }
 
     /// `+$04` bits set and cleared, as far as they are modelled.
+    /// A new art packet's timing and, for an enemy's or a bullet's art,
+    /// its boxes (`$80:B4DF`); returns the packet's CPU address.
+    fn load_packet(&mut self, image: &[u8], pointer: &[u8]) -> u32 {
+        if let Some(ticks) = cadence::packet_ticks(image, pointer) {
+            self.pose_ticks = Some(ticks);
+        }
+        if self.foe.is_some() || self.boxes.is_some() || self.spawned {
+            self.boxes = cadence::packet_boxes(image, pointer).map(std::rc::Rc::new);
+        }
+        u32::from_le_bytes([pointer[0], pointer[1], pointer[2], 0])
+    }
+
+    /// Sends the script to `bank | target` at once, as a wake does.
+    fn jump_to(&mut self, bank: usize, target: u16) {
+        self.pc = bank | usize::from(target);
+        self.state = State::Running;
+        (self.subroutine, self.continuation, self.call) = (None, None, None);
+        self.paused = None;
+    }
+
     fn write_04(&mut self, set: u16, cleared: u16) {
         self.hidden = (self.hidden || set & 0x8000 != 0) && cleared & 0x8000 == 0;
         self.touchable = (self.touchable || set & 0x0200 != 0) && cleared & 0x0200 == 0;

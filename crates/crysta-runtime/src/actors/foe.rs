@@ -14,6 +14,11 @@ const IMMUNE: u16 = 50;
 const EXPLOSION: u16 = 26;
 /// The explosion's and the gem's lists of the helper art.
 const EXPLODING: u8 = 0x16;
+/// A soul's carrier (`7F:1018` set) bursts instead (`$85:E2B2`: list `$17`,
+/// 40 frames), then leaves the soul (list `$13`).
+const BURSTING: u8 = 0x17;
+const BURST: u16 = 40;
+const SOUL: u8 = 0x13;
 /// A dropped gem: shown, then free to take, then blinking (`$85:E3CF`).
 const GEM_SHOWN: u16 = 16;
 const GEM_BLINKS: u16 = 256;
@@ -217,6 +222,12 @@ impl Actor {
             if left <= 1 {
                 foe.exploding = None;
                 foe.dead = true;
+                if self.overlay.is_some_and(|(_, list)| list == BURSTING) {
+                    // No longer an enemy: the foe is dropped, the soul's
+                    // script runs.
+                    self.free_soul(image);
+                    return true;
+                }
                 self.drop_gem(&mut foe, image, random);
             } else {
                 foe.exploding = Some(left - 1);
@@ -279,7 +290,9 @@ impl Actor {
             if no_gem {
                 foe.profile.gems = 0;
             }
-            self.explode(&mut foe, image);
+            // A group's member goes by `$85:E353`, which leaves no soul.
+            let soul = !no_gem && self.carries_soul();
+            self.explode(&mut foe, image, soul);
         }
         self.foe = Some(foe);
     }
@@ -307,26 +320,50 @@ impl Actor {
     fn perish(&mut self, foe: &mut Foe, image: &[u8]) {
         let callback = self.own_word(0x1012);
         if callback == 0 {
-            self.explode(foe, image);
+            self.explode(foe, image, self.carries_soul());
             return;
         }
         // `$85:E25B`: a counted death leaves `$0498` first.
         foe.counted = false;
-        let bank = usize::from(self.own_word(0x1014) & 0x3F) << 16;
-        self.pc = bank | usize::from(callback);
-        self.state = super::State::Running;
-        (self.subroutine, self.continuation, self.call) = (None, None, None);
+        self.jump_to(usize::from(self.own_word(0x1014) & 0x3F) << 16, callback);
     }
 
-    /// The death script's start (`$85:E27B`): the explosion.
-    fn explode(&mut self, foe: &mut Foe, image: &[u8]) {
-        foe.exploding = Some(EXPLOSION);
+    /// The death script's start (`$85:E27B`): the explosion, or a soul's
+    /// burst.
+    fn explode(&mut self, foe: &mut Foe, image: &[u8], soul: bool) {
+        let (frames, list) = if soul {
+            (BURST, BURSTING)
+        } else {
+            (EXPLOSION, EXPLODING)
+        };
+        foe.exploding = Some(frames);
         self.died = true;
         self.root_died |= self.root;
         self.motion = None;
         self.stream = None;
-        self.overlay = Some((helper(image), EXPLODING));
+        self.overlay = Some((helper(image), list));
         self.pose_age = 0;
+    }
+
+    /// Whether its record gave it a soul's script (`7F:1018`, `$85:E2A6`).
+    fn carries_soul(&self) -> bool {
+        self.own_word(0x1018) != 0
+    }
+
+    /// The burst's end (`$85:E2BA`): the soul, in the helper art, talked to
+    /// from any side, wakes at its script (bit 13, `7F:1018`, bank
+    /// `7F:101A`).
+    fn free_soul(&mut self, image: &[u8]) {
+        let helper = helper(image);
+        self.load_packet(image, &helper.to_le_bytes()[..3]);
+        (self.overlay, self.helper_art) = (None, Some(helper));
+        (self.selector, self.pose_age) = (SOUL, 0);
+        (self.hidden, self.touchable, self.guard) = (false, false, (0, 0));
+        self.interaction = super::INTERACT_ANY_SIDE;
+        self.jump_to(
+            usize::from(self.own_word(0x101A) & 0x3F) << 16,
+            self.own_word(0x1018),
+        );
     }
 
     /// The drop roll after the explosion (`$85:E2E9`): a gem, or gone.

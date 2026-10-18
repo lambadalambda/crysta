@@ -1471,6 +1471,8 @@ impl<'a> World<'a> {
         if let Some(blip) = self.globals.dialogue.tick() {
             self.globals.audio.sound_port3(blip);
         }
+        let healed = self.globals.dialogue.take_heal();
+        self.pending_life = self.pending_life.saturating_add(healed);
         if let Some(step) = self.transition_frame()? {
             self.apply_patches()?;
             return Ok((step, None));
