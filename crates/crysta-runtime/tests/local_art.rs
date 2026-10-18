@@ -858,3 +858,35 @@ fn the_mode4_figures_draw_at_their_relocated_tiles() {
         assert!(figures >= 2, "{map:#x}");
     }
 }
+
+#[test]
+fn mus_rocks_draw() {
+    // `$12A`'s six rocks (`$82:ECA9`) have a frame record of facing 8.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let image = cartridge.image();
+    let mut events = new_game();
+    for flag in 0x101..=0x109usize {
+        events[flag / 8] |= 1 << (flag % 8);
+    }
+    let present = residents(image, 0x012A, EventFlags::Bitmap(&events)).unwrap();
+    let art = residents_art(
+        image,
+        0x012A,
+        &present,
+        EventFlags::Bitmap(&events),
+        EventFlags::Bitmap(&events),
+    );
+    let rocks = present
+        .iter()
+        .zip(&art)
+        .filter(|(resident, _)| resident.descriptor == Some(0x2ECA9))
+        .map(|(_, body)| {
+            body.as_ref()
+                .map(|_| ())
+                .map_err(|error| format!("{error:?}"))
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(rocks, vec![Ok(()); 6]);
+}

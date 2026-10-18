@@ -1105,7 +1105,9 @@ fn decode_record(bytes: &[u8], r: &[u8], spec: ListSpec) -> Result<HouseFrame, S
         hflip,
         ..
     } = spec;
-    if ![0, 1, 3].contains(&r[1]) {
+    // Facing 8: Mu's rocks (`$82:ECA9`); the byte goes to the actor's
+    // facing, not the drawing.
+    if ![0, 1, 3, 8].contains(&r[1]) {
         return Err(SpriteError::Invalid("unsupported house frame record"));
     }
     let anchor = usize::from(word(r, 2));
