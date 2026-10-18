@@ -93,7 +93,6 @@
 - [ ] [Draw the towers' second layer](issues/tower-second-layer.md)
 - [ ] [Draw colour addition](issues/colour-addition.md)
 - [ ] [Fix the walkthrough's findings](issues/walkthrough-findings.md)
-- [ ] [Free the souls the towers' marked enemies hold](issues/tower-souls.md)
 - [ ] [Open the box's hall with Select](issues/box-hall.md)
 - [ ] [Equip at the box's weapon and armor doors](issues/box-equip-doors.md)
 - [ ] [Use and equip at the box's item door](issues/box-item-door.md)

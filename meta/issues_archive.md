@@ -184,3 +184,4 @@
 - [x] [Trace the dash's open edges](issues/dash-edges.md)
 - [x] [Throw pots while dashing or jumping, and show their fall and fragments](issues/pot-extras.md)
 - [x] [Spend the map loads' own frames](issues/map-load-frames.md)
+- [x] [Free the souls the towers' marked enemies hold](issues/tower-souls.md)

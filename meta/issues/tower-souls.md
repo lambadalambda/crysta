@@ -37,3 +37,7 @@ Marked enemies: `$102`, `$103`, `$108`, `$109`, `$118`, `$12E`.
 
 - On `$102`, killing the marked blob shows the burst for 40 frames, then
   the soul, on both ROMs; no gem drops; talking to the soul opens its text.
+
+## Notes
+
+- `$12E`'s soul did not spawn under the flags tried; it is not tested.
