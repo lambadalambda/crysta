@@ -616,13 +616,13 @@ impl Session {
         // The hotspot's label, typed out at once (`$C8 00`); the rooms'
         // are not drawn yet.
         let label = page.label.filter(|_| page.screen == Screen::Hall);
+        let art = (image, &self.window_art);
         if let Some(label) = label.and_then(|hotspot| labels.get(usize::from(hotspot))?.as_ref()) {
-            let origin = crate::window::content_origin(image, label.placement(), (0, false), frame.width);
-            let shown = label.glyphs().len();
-            let typed = label.typed(image, shown);
-            // The box does not scroll BG3 the line the field does.
-            let at = (self.tick, 1);
-            crate::window::draw_window_lowered(frame, &self.window_art, label, (&typed, shown), origin, at);
+            draw_box_window(frame, art, (label, label.glyphs().len(), None), self.tick);
+        }
+        // A pedestal's question or answer.
+        if let Some(view) = self.world.menu_dialogue() {
+            draw_box_window(frame, art, (view.page, view.glyphs, view.cursor), self.tick);
         }
         // The box's HUD (layout 1).
         if let Some(art) = self.shop_art.art(self.image) {
@@ -863,6 +863,23 @@ pub enum SpriteKey {
     /// The helper art's list: an explosion, a dropped gem, a wisp; mirror
     /// and vertical flip.
     Overlay(u32, u8, bool, bool),
+}
+
+/// A text window of Yomi's box: `shown` glyphs of `page` and its choice
+/// cursor, a line lower than the field's (the box does not scroll BG3).
+fn draw_box_window(
+    frame: &mut Canvas,
+    (image, art): (&[u8], &WindowArt),
+    (page, shown, cursor): (&assets::text::DialoguePage, usize, Option<[u16; 2]>),
+    tick: u64,
+) {
+    const LOWERED: i32 = 1;
+    let origin = crate::window::content_origin(image, page.placement(), (0, false), frame.width);
+    let typed = page.typed(image, shown);
+    crate::window::draw_window_lowered(frame, art, page, (&typed, shown), origin, (tick, LOWERED));
+    if let Some(cursor) = cursor {
+        crate::window::draw_cursor(frame, art, (origin.0, origin.1 + LOWERED), cursor);
+    }
 }
 
 /// Yomi's box's art (`docs/menu.md`): the hall, Yomi and each hotspot's
