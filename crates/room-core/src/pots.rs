@@ -94,6 +94,9 @@ pub struct Output {
     pub control: u16,
     /// Component throw recovery, not proof that parent story input is enabled.
     pub control_restored: bool,
+    /// The recovery of a dash-throw: Ark's control returns to the dash
+    /// ([`crate::run::Run::after_throw`]).
+    pub dash_resumes: bool,
     /// The pot broke this frame, at its last ground point.
     pub broke: Option<Flight>,
     /// The sound the pot makes this frame, besides the lift's.
@@ -159,6 +162,8 @@ const JUMP_HEIGHTS: [i8; 24] = [
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Arc {
     Thrown,
+    /// A in a carry dash (`$84:B117`..`B1B3`): at 6 a frame.
+    Dashed,
     /// Thrown in the air, `base` above the ground (`$0999` at the A).
     Aloft {
         base: i8,
@@ -170,17 +175,26 @@ impl Arc {
         match self {
             Self::Thrown => &HEIGHTS,
             Self::Aloft { .. } => &JUMP_HEIGHTS,
+            Self::Dashed => &DASH_HEIGHTS,
         }
     }
 
     /// The height at a sample from 1.
     fn height(self, sample: u8) -> i16 {
         let base = match self {
-            Self::Thrown => 0,
+            Self::Thrown | Self::Dashed => 0,
             Self::Aloft { base } => i16::from(base),
         };
         let at = usize::from(sample.max(1) - 1);
         base + self.heights().get(at).map_or(0, |&h| i16::from(h))
+    }
+
+    /// Pixels a frame.
+    const fn speed(self) -> u16 {
+        match self {
+            Self::Dashed => DASH_SPEED,
+            _ => SPEED,
+        }
     }
 
     /// Whether a sample is the flight's last: at or below the ground, or
@@ -192,6 +206,13 @@ impl Arc {
 /// Frames of the lift presentation, of the throw until the release, and of
 /// the throw until Ark's control returns (`$84:BE9D`, `$84:B558`).
 const LIFT: u8 = 23;
+/// Frames of a dash-throw until Ark's control returns (native `t_*`).
+const DASH_RECOVERY: u8 = 17;
+/// A dash-throw's speed and heights (stream `$2D`, `$7F:65D2`).
+const DASH_SPEED: u16 = 6;
+const DASH_HEIGHTS: [i8; 20] = [
+    -33, -34, -35, -35, -35, -35, -35, -34, -33, -32, -30, -28, -26, -23, -20, -17, -13, -9, -5, 0,
+];
 const RELEASE: u8 = 18;
 const RECOVERY: u8 = 32;
 /// A flight's speed and the launch point's distance from Ark.
@@ -242,6 +263,8 @@ pub struct PotState {
     flight: Option<Flying>,
     /// The cellar door counted this throw's pot; until the throw ends.
     counted: bool,
+    /// The throw under way is a dash-throw.
+    dashed: bool,
 }
 
 impl Admission<'_> {
@@ -356,6 +379,7 @@ impl PotState {
             queued: None,
             flight: None,
             counted: false,
+            dashed: false,
         })
     }
     /// Player position; only the collision solver can change it after construction.
@@ -394,6 +418,11 @@ impl PotState {
     #[must_use]
     pub const fn phase(&self) -> Phase {
         self.phase
+    }
+    /// Whether the throw under way is a dash-throw.
+    #[must_use]
+    pub const fn dash_throwing(&self) -> bool {
+        self.dashed
     }
     /// Elapsed lift/throw presentation ticks; zero in Empty/Held.
     #[must_use]
@@ -552,6 +581,7 @@ impl PotState {
             door_hit: false,
             control: 0,
             control_restored: false,
+            dash_resumes: false,
             broke: None,
             sound: None,
         };
@@ -572,6 +602,16 @@ impl PotState {
                 next.phase = Phase::Throwing;
                 next.age = 0;
                 next.walking = WalkingState::new(x, y);
+                // A in a carry dash: the pot flies at once, from 16 ahead.
+                if run
+                    .as_ref()
+                    .is_some_and(|run| matches!(**run, Some(Run::Dash { .. })))
+                {
+                    next.dashed = true;
+                    out.held_changed = Some(None);
+                    out.sound = Some(Sound::Release);
+                    next.launch(next.ahead(), ground, Arc::Dashed);
+                }
             }
             (None, Phase::Lifting) => {
                 next.age += 1;
@@ -590,24 +630,7 @@ impl PotState {
                     )?);
                 }
             }
-            (None, Phase::Throwing) => {
-                next.age += 1;
-                if next.age == RELEASE {
-                    next.release(ground, &mut out);
-                }
-                if next.age == RECOVERY {
-                    next.phase = Phase::Empty;
-                    next.age = 0;
-                    out.control_restored = true;
-                    // Control returns this frame: a direction held through
-                    // the throw is walking already, and moves from the next.
-                    if let Some(direction) = input.direction {
-                        next.walking = WalkingState::walking(x, y, direction, 0);
-                        next.facing = direction;
-                        out.control = 0xa0;
-                    }
-                }
-            }
+            (None, Phase::Throwing) => next.throw_frame(ground, input.direction, &mut out),
             (None, Phase::Empty | Phase::Held) => {
                 let collision = a.collision(self.consumed)?;
                 let (movement, way) = next.walk(&collision, input.direction, run)?;
@@ -666,6 +689,36 @@ impl PotState {
         Ok((movement, self.walking.active_direction()))
     }
 
+    /// A frame of the throw under way: the release and Ark's recovery, or
+    /// a dash-throw's recovery.
+    fn throw_frame(&mut self, ground: &Room, direction: Option<Direction>, out: &mut Output) {
+        self.age += 1;
+        if self.dashed {
+            if self.age == DASH_RECOVERY {
+                (self.phase, self.age, self.dashed) = (Phase::Empty, 0, false);
+                out.control_restored = true;
+                out.dash_resumes = true;
+            }
+            return;
+        }
+        let (x, y) = self.position();
+        if self.age == RELEASE {
+            self.release(ground, out);
+        }
+        if self.age == RECOVERY {
+            self.phase = Phase::Empty;
+            self.age = 0;
+            out.control_restored = true;
+            // Control returns this frame: a direction held through the
+            // throw is walking already, and moves from the next.
+            if let Some(direction) = direction {
+                self.walking = WalkingState::walking(x, y, direction, 0);
+                self.facing = direction;
+                out.control = 0xa0;
+            }
+        }
+    }
+
     /// The release (`$84:C721`): the pot leaves Ark's hands at the launch
     /// point, (x, y+10) Down, (x, y−8) Up, (x∓10, y) sideways, and takes
     /// its first step.
@@ -697,16 +750,20 @@ impl PotState {
         if self.phase != Phase::Held {
             return false;
         }
+        (self.phase, self.queued) = (Phase::Empty, None);
+        self.launch(self.ahead(), ground, arc);
+        true
+    }
+
+    /// 16 pixels toward the facing.
+    fn ahead(&self) -> (u16, u16) {
         let (x, y) = self.position();
-        let at = match self.facing {
+        match self.facing {
             Direction::Down => (x, y + DROP_LAUNCH),
             Direction::Up => (x, y.saturating_sub(DROP_LAUNCH)),
             Direction::Left => (x.saturating_sub(DROP_LAUNCH), y),
             Direction::Right => (x + DROP_LAUNCH, y),
-        };
-        (self.phase, self.queued) = (Phase::Empty, None);
-        self.launch(at, ground, arc);
-        true
+        }
     }
 
     /// The flight's start at `(x, y)` and its first step.
@@ -751,11 +808,12 @@ impl PotState {
         let Some(mut flight) = self.flight else {
             return;
         };
+        let speed = flight.arc.speed();
         let step = match flight.facing {
-            Direction::Down => Some((flight.x, flight.y + SPEED)),
-            Direction::Up => flight.y.checked_sub(SPEED).map(|y| (flight.x, y)),
-            Direction::Left => flight.x.checked_sub(SPEED).map(|x| (x, flight.y)),
-            Direction::Right => Some((flight.x + SPEED, flight.y)),
+            Direction::Down => Some((flight.x, flight.y + speed)),
+            Direction::Up => flight.y.checked_sub(speed).map(|y| (flight.x, y)),
+            Direction::Left => flight.x.checked_sub(speed).map(|x| (x, flight.y)),
+            Direction::Right => Some((flight.x + speed, flight.y)),
         };
         flight.sample += 1;
         // The map's edge stops it where it is.
@@ -814,12 +872,15 @@ impl PotState {
             b[34..36].copy_from_slice(&flight.x.to_le_bytes());
             b[36..38].copy_from_slice(&flight.y.to_le_bytes());
             b[38] = flight.facing as u8;
-            if let Arc::Aloft { base } = flight.arc {
+            b[38] |= match flight.arc {
+                Arc::Thrown => 0,
+                // Bit 3 on the ground's arc: the dash-throw's.
+                Arc::Dashed => 8,
                 // Bit 2: in the air; bits 3-7 the base's height up.
-                b[38] |= 4 | base.unsigned_abs().min(31) << 3;
-            }
+                Arc::Aloft { base } => 4 | base.unsigned_abs().min(31) << 3,
+            };
         }
-        b[39] = u8::from(self.counted);
+        b[39] = u8::from(self.counted) | u8::from(self.dashed) << 1;
         b
     }
     /// Decode structural invariants against immutable source data. This does not
@@ -829,7 +890,7 @@ impl PotState {
     /// Rejects noncanonical, truncated, stale-source or impossible phase encodings.
     pub fn decode_snapshot(a: &Admission<'_>, b: &[u8]) -> Result<Self, Error> {
         a.validate()?;
-        if b.len() != SNAPSHOT_SIZE || &b[..4] != b"POT1" || b[39] > 1 {
+        if b.len() != SNAPSHOT_SIZE || &b[..4] != b"POT1" || b[39] > 3 {
             return Err(Error::Snapshot);
         }
         let facing = |byte: u8| match byte {
@@ -860,7 +921,8 @@ impl PotState {
             object: b[31],
             queued: b[32].checked_sub(1),
             flight,
-            counted: b[39] == 1,
+            counted: b[39] & 1 == 1,
+            dashed: b[39] & 2 != 0,
         };
         let object_valid = state.object > 0
             && usize::from(state.object) <= a.objects.len()
@@ -873,6 +935,9 @@ impl PotState {
                     && state.age == 0
                     && state.flight.is_none()
                     && state.walking.phase() <= 2
+            }
+            Phase::Throwing if state.dashed => {
+                state.age < DASH_RECOVERY && (object_valid || state.object == 0)
             }
             // After the break, the recovery goes on without a pot.
             Phase::Throwing => {
@@ -898,12 +963,22 @@ impl PotState {
         // it is in Ark's hands.
         let released = phase == Phase::Throwing && state.age >= RELEASE;
         let flight_age = match (phase, state.flight) {
+            _ if state.dashed => state.flight.map_or(state.object == 0, |flight| {
+                flight.arc == Arc::Dashed && flight.sample == state.age + 1
+            }),
             (Phase::Throwing, Some(flight)) => released && flight.sample == state.age - RELEASE + 1,
             (Phase::Throwing, None) => !released || state.object == 0,
             _ => true,
         };
         let counted_valid = !state.counted || phase == Phase::Throwing || state.flight.is_some();
-        if !valid || !flight_valid || !queued_valid || !flight_age || !counted_valid {
+        let dashed_valid = !state.dashed || phase == Phase::Throwing;
+        if !valid
+            || !flight_valid
+            || !queued_valid
+            || !flight_age
+            || !counted_valid
+            || !dashed_valid
+        {
             return Err(Error::Snapshot);
         }
         Ok(state)
@@ -931,10 +1006,11 @@ fn decode_flight(
             _ => return Err(Error::Snapshot),
         };
         let arc = if b[5] & 4 == 0 {
-            if b[5] >> 2 != 0 {
-                return Err(Error::Snapshot);
+            match b[5] >> 3 {
+                0 => Arc::Thrown,
+                1 => Arc::Dashed,
+                _ => return Err(Error::Snapshot),
             }
-            Arc::Thrown
         } else {
             Arc::Aloft {
                 base: -i8::try_from(b[5] >> 3).map_err(|_| Error::Snapshot)?,

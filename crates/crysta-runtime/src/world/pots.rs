@@ -181,6 +181,7 @@ impl World<'_> {
             Phase::Empty => return None,
             Phase::Held if dashing => PandoraCarryMotion::Dashing,
             Phase::Lifting => PandoraCarryMotion::Lifting,
+            Phase::Throwing if state.dash_throwing() => PandoraCarryMotion::DashThrowing,
             Phase::Throwing => PandoraCarryMotion::Throwing,
             // The queued step, not the walker's retained direction: Ark
             // stands the frame the pad is released.
@@ -238,6 +239,16 @@ impl World<'_> {
         direction: Option<Direction>,
         lift: bool,
     ) -> Result<Option<Step>, WorldError> {
+        // After a dash-throw the dash runs while the pot flies on.
+        let flying = self
+            .pots
+            .as_ref()
+            .and_then(|pots| pots.state)
+            .is_some_and(|state| state.phase() == Phase::Empty && state.flight().is_some());
+        if flying && self.run.is_some() {
+            self.fly_pot()?;
+            return Ok(None);
+        }
         let Some(mut pots) = self.pots.take() else {
             return Ok(None);
         };
@@ -342,6 +353,11 @@ impl World<'_> {
             self.animation.advance(self.walking.active_direction());
         }
         sounds(&mut self.globals.audio, &output);
+        if output.dash_resumes {
+            // This frame stands in the dash's pose; it runs from the next.
+            self.run = Some(Run::after_throw(self.facing));
+            self.ran = true;
+        }
         if let Some(object) = output.consumed_cell {
             let width = self.base.width;
             self.globals.patches.push((

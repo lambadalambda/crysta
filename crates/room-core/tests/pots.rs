@@ -634,3 +634,44 @@ fn a_throw_in_the_air_flies_from_the_jumps_height() {
     assert!(broke.is_some());
     assert!(!s.throw_in_air(-26, &r));
 }
+
+#[test]
+fn a_in_a_carry_dash_throws_at_six_a_frame_through_a_snapshot() {
+    // Native `t_held`: the pot flies from 16 ahead at 6 a frame at once;
+    // Ark's control returns to the dash 17 frames on.
+    use room_core::pots::Sound;
+    use room_core::run::Run;
+    let r = room();
+    let a = admission(&r);
+    let mut s = state(&r, 104, 352, Direction::Left);
+    lift(&mut s, &r);
+    frames(&mut s, &r, Some(Direction::Down), 12);
+    frames(&mut s, &r, None, 20);
+    let mut run = None;
+    let right = Some(Direction::Right);
+    let step = |s: &mut PotState, run: &mut Option<Run>, direction, action| {
+        s.step_over_running(&a, &r, Input { direction, action }, run)
+            .unwrap()
+    };
+    for direction in [right, None, None, right, right, right, right] {
+        step(&mut s, &mut run, direction, false);
+    }
+    assert!(matches!(run, Some(Run::Dash { .. })));
+    step(&mut s, &mut run, right, true);
+    let x = s.position().0;
+    let out = step(&mut s, &mut run, right, false);
+    assert_eq!(out.sound, Some(Sound::Release));
+    assert_eq!(out.flight.unwrap().x, x + 22);
+    assert_eq!((s.phase(), run), (Phase::Throwing, None));
+    let mut restored = PotState::decode_snapshot(&a, &s.encode_snapshot()).unwrap();
+    for n in 1..17 {
+        let out = step(&mut s, &mut run, right, false);
+        assert_eq!(out.flight.unwrap().x, x + 22 + 6 * n);
+        assert!(!out.control_restored && !out.dash_resumes);
+        assert_eq!(step(&mut restored, &mut None, right, false), out);
+    }
+    let out = step(&mut s, &mut run, right, false);
+    assert!(out.control_restored && out.dash_resumes);
+    assert_eq!(s.phase(), Phase::Empty);
+    assert_eq!(s.position().0, x, "Ark stood through it");
+}

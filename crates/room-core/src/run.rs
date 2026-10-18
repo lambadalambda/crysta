@@ -55,6 +55,14 @@ pub enum Run {
         /// A turn: the dash that starts after this frame's stride.
         turn: Option<(Direction, Option<Direction>)>,
     },
+    /// The dash after a dash-throw (`$84:9051`): it stands; held, it
+    /// runs at once from 3, else it brakes when `grace` is out.
+    Rest {
+        /// The way it will run.
+        direction: Direction,
+        /// Frames left to stand.
+        grace: u8,
+    },
     /// Braking.
     Brake {
         /// The way it slides.
@@ -70,6 +78,16 @@ impl Run {
     #[must_use]
     pub const fn held(self) -> bool {
         matches!(self, Self::Dash { grace: GRACE, .. })
+    }
+
+    /// The dash Ark's control returns to after a dash-throw, from the frame
+    /// after its still one (native traces `t_*`).
+    #[must_use]
+    pub const fn after_throw(direction: Direction) -> Self {
+        Self::Rest {
+            direction,
+            grace: GRACE - 1,
+        }
     }
 
     /// A dash that runs this frame's stride, then starts its stream over
@@ -127,7 +145,9 @@ pub fn lead(
     input: PadInput,
 ) -> (Option<Direction>, Option<Direction>) {
     match run {
-        Some(Run::Dash { direction, .. }) => input.lead(Some(direction)),
+        Some(Run::Dash { direction, .. } | Run::Rest { direction, .. }) => {
+            input.lead(Some(direction))
+        }
         _ => walking.lead(input),
     }
 }
@@ -220,6 +240,24 @@ fn step_in(
                 _ => (next, direction, cross, DASH[usize::from(frame)]),
             }
         }
+        Some(Run::Rest { direction, grace }) => match held {
+            Some(held) if held == direction => (
+                Some(dash(direction, None, 1, GRACE)),
+                direction,
+                None,
+                DASH[0],
+            ),
+            _ if grace == 0 => (Some(brake(direction, 0)), direction, None, BRAKE[0]),
+            _ => (
+                Some(Run::Rest {
+                    direction,
+                    grace: grace - 1,
+                }),
+                direction,
+                None,
+                0,
+            ),
+        },
         Some(Run::Brake { direction, frame }) => {
             let slide = BRAKE.get(usize::from(frame) + 1).copied();
             let next = slide.map(|_| brake(direction, frame + 1));
@@ -549,5 +587,24 @@ mod tests {
         let (moves, state) = carry(&room, &inputs);
         assert_eq!(moves.last(), Some(&0));
         assert!(matches!(state, Some(Run::Dash { grace: GRACE, .. })));
+    }
+
+    #[test]
+    fn after_a_dash_throw_the_dash_waits_for_its_way() {
+        // Native `t_held`/`t_free`: held, it runs at once from 3; else it
+        // stands out the grace, then brakes.
+        let held = |inputs: &[Option<Direction>]| {
+            let mut walking = WalkingState::new(256, 256);
+            let mut state = Some(Run::after_throw(Direction::Right));
+            let mut moves = Vec::new();
+            for &direction in inputs {
+                let step =
+                    step(&mut walking, &mut state, &floor(), FrameInput { direction }).unwrap();
+                moves.push(step.output.dx);
+            }
+            moves
+        };
+        assert_eq!(held(&[R; 4]), [3, 2, 2, 3]);
+        assert_eq!(held(&[None; 9]), [0, 0, 0, 0, 0, 0, 0, 2, 2]);
     }
 }

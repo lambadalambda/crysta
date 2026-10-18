@@ -504,6 +504,7 @@ impl Session {
                 carry.motion,
                 PandoraCarryMotion::Lifting
                     | PandoraCarryMotion::Throwing
+                    | PandoraCarryMotion::DashThrowing
                     | PandoraCarryMotion::JumpRising
                     | PandoraCarryMotion::JumpFalling
             );

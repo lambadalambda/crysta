@@ -1,6 +1,6 @@
 //! The Crysta story slice, played through the world with real presses and
 //! compared against the native input-only route.
-use assets::sprites::PandoraCarryMotion;
+use assets::sprites::{PandoraCarryMotion, PandoraRunMotion};
 use crysta_runtime::audio::Cue;
 use crysta_runtime::scene::Presses;
 use crysta_runtime::world::{fresh_game_flags, Tint, World};
@@ -557,6 +557,46 @@ fn ark_lifts_carries_and_throws_in_the_carry_poses() {
     assert!(world.carry().is_none());
 }
 
+/// The native traces' start on `$0C`: the pot left of (104, 352) lifted,
+/// Ark poked to (296, `y`), 20 frames on.
+fn carrying_at(image: &[u8], y: u16) -> World<'_> {
+    let mut events = crysta_runtime::world::new_game_flags();
+    for set in [0x26, 0x27, 0x28, 0x2E] {
+        events[set / 8] |= 1 << (set % 8);
+    }
+    let mut world = World::enter_with_events(image, 0x000C, 184, 400, events).unwrap();
+    world.update(None, Presses::default()).unwrap();
+    world.place(104, 352);
+    world.face(Direction::Left);
+    let lift = Presses {
+        confirm: true,
+        ..Presses::default()
+    };
+    world.update(None, lift).unwrap();
+    for _ in 0..40 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    world.place(296, y);
+    for _ in 0..20 {
+        world.update(None, Presses::default()).unwrap();
+    }
+    assert!(world.carry().is_some(), "carrying");
+    world
+}
+
+/// A native run-length string of moves (`count:dx,dy`), frame by frame.
+fn native_moves(native: &str) -> Vec<(i32, i32)> {
+    native
+        .split(' ')
+        .flat_map(|run| {
+            let (count, delta) = run.split_once(':').unwrap();
+            let (dx, dy) = delta.split_once(',').unwrap();
+            let delta = (dx.parse().unwrap(), dy.parse().unwrap());
+            std::iter::repeat_n(delta, count.parse().unwrap())
+        })
+        .collect()
+}
+
 /// A carry dash case: its name, the poked y, the pad's plan and the native
 /// moves.
 type CarryDash = (
@@ -659,38 +699,9 @@ fn ark_dashes_with_a_pot_as_natively() {
     let Some(cartridge) = owned_rom() else {
         return;
     };
-    let mut events = crysta_runtime::world::new_game_flags();
-    for set in [0x26, 0x27, 0x28, 0x2E] {
-        events[set / 8] |= 1 << (set % 8);
-    }
     for (name, y, plan, native) in carry_dashes() {
-        let expected: Vec<(i32, i32)> = native
-            .split(' ')
-            .flat_map(|run| {
-                let (count, delta) = run.split_once(':').unwrap();
-                let (dx, dy) = delta.split_once(',').unwrap();
-                let delta = (dx.parse().unwrap(), dy.parse().unwrap());
-                std::iter::repeat_n(delta, count.parse().unwrap())
-            })
-            .collect();
-        let mut world =
-            World::enter_with_events(cartridge.image(), 0x000C, 184, 400, events.clone()).unwrap();
-        world.update(None, Presses::default()).unwrap();
-        world.place(104, 352);
-        world.face(Direction::Left);
-        let lift = Presses {
-            confirm: true,
-            ..Presses::default()
-        };
-        world.update(None, lift).unwrap();
-        for _ in 0..40 {
-            world.update(None, Presses::default()).unwrap();
-        }
-        world.place(296, y);
-        for _ in 0..20 {
-            world.update(None, Presses::default()).unwrap();
-        }
-        assert!(world.carry().is_some(), "{name}: carrying");
+        let expected = native_moves(native);
+        let mut world = carrying_at(cartridge.image(), y);
         let mut moves = Vec::new();
         let mut poses = Vec::new();
         for &(frames, direction) in plan {
@@ -718,29 +729,82 @@ fn ark_dashes_with_a_pot_as_natively() {
 }
 
 #[test]
+fn a_in_a_carry_dash_is_the_dash_throw() {
+    // Native JP traces `t_held` and `t_free` (2026-10-18, the job's
+    // `tmp/throws/`): A at 9 from the first tap; at 10 the pot leaves from
+    // 16 ahead at 6 a frame on the stream `$2D` (`$12`), and breaks at 30
+    // (`$13`); Ark's resource 3 `$14` for 17 frames, then the dash still at
+    // 27: held, it runs from 28, else it brakes at 35.
+    let Some(cartridge) = owned_rom() else {
+        return;
+    };
+    let right = Some(Direction::Right);
+    let heights = [
+        -33, -34, -35, -35, -35, -35, -35, -34, -33, -32, -30, -28, -26, -23, -20, -17, -13, -9,
+        -5, 0,
+    ];
+    for (name, after, native) in [
+        (
+            "t_held",
+            right,
+            "5:0,0 1:3,0 2:2,0 1:3,0 1:2,0 18:0,0 1:3,0 2:2,0 1:3,0 2:2,0 1:3,0 2:2,0",
+        ),
+        (
+            "t_free",
+            None,
+            "5:0,0 1:3,0 2:2,0 1:3,0 1:2,0 25:0,0 2:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 1:2,0 1:1,0 2:0,0 1:1,0",
+        ),
+    ] {
+        let expected = native_moves(native);
+        let mut world = carrying_at(cartridge.image(), 368);
+        world.take_cues();
+        let mut pad = vec![right, None, None];
+        pad.extend([right; 7]);
+        pad.resize(expected.len(), after);
+        let (mut moves, mut flights, mut motions, mut sounds) = (vec![], vec![], vec![], vec![]);
+        for (frame, direction) in pad.into_iter().enumerate() {
+            let press = Presses {
+                confirm: frame == 9,
+                ..Presses::default()
+            };
+            let before = world.position();
+            world.update(direction, press).unwrap();
+            let after = world.position();
+            moves.push((
+                i32::from(after.0) - i32::from(before.0),
+                i32::from(after.1) - i32::from(before.1),
+            ));
+            flights.push(world.pot().and_then(|pot| pot.flight));
+            motions.push((world.carry().map(|carry| carry.motion), world.run_pose().map(|pose| pose.0)));
+            for cue in world.take_cues() {
+                if let Cue::Sound(sound @ (0x1200 | 0x1300)) = cue {
+                    sounds.push((frame, sound));
+                }
+            }
+        }
+        assert_eq!(moves, expected, "{name}");
+        let flight: Vec<_> = (0..20)
+            .map(|n| Some((330 + 6 * n, 368, heights[usize::from(n)])))
+            .collect();
+        assert_eq!(flights[10..30], flight, "{name}");
+        assert_eq!(flights[30], None, "{name}: broken");
+        // The break sounds at the landing sample (natively here a frame
+        // later, the jitter `room_core::pots::Sound::Break` records).
+        assert_eq!(sounds, [(10, 0x1200), (29, 0x1300)], "{name}");
+        let throwing = (Some(PandoraCarryMotion::DashThrowing), None);
+        assert!(motions[10..27].iter().all(|&m| m == throwing), "{name}: {motions:?}");
+        assert_eq!(motions[27], (None, Some(PandoraRunMotion::Dashing)), "{name}");
+    }
+}
+
+#[test]
 fn a_jump_ends_a_carry_dash() {
     // The landing gives the carry's control again (`$84:AC02`): no dash
     // runs on from before the jump.
     let Some(cartridge) = owned_rom() else {
         return;
     };
-    let mut events = crysta_runtime::world::new_game_flags();
-    for set in [0x26, 0x27, 0x28, 0x2E] {
-        events[set / 8] |= 1 << (set % 8);
-    }
-    let mut world = World::enter_with_events(cartridge.image(), 0x000C, 184, 400, events).unwrap();
-    world.update(None, Presses::default()).unwrap();
-    world.place(104, 352);
-    world.face(Direction::Left);
-    let a = Presses {
-        confirm: true,
-        ..Presses::default()
-    };
-    world.update(None, a).unwrap();
-    for _ in 0..40 {
-        world.update(None, Presses::default()).unwrap();
-    }
-    world.place(296, 368);
+    let mut world = carrying_at(cartridge.image(), 368);
     let right = Some(Direction::Right);
     for direction in [right, None, None, right, right, right, right] {
         world.update(direction, Presses::default()).unwrap();

@@ -485,7 +485,9 @@ impl<'a> World<'a> {
     #[must_use]
     pub fn run_pose(&self) -> Option<(PandoraRunMotion, u8, u16)> {
         let (motion, direction) = match self.run {
-            Some(Run::Dash { direction, .. }) => (PandoraRunMotion::Dashing, direction),
+            Some(Run::Dash { direction, .. } | Run::Rest { direction, .. }) => {
+                (PandoraRunMotion::Dashing, direction)
+            }
             Some(Run::Brake { direction, .. }) => (PandoraRunMotion::Braking, direction),
             Some(Run::Tap { .. }) | None => return self.scripted_run_pose(),
         };
@@ -526,7 +528,7 @@ impl<'a> World<'a> {
     /// starts, brakes or turns (`before` is the run of the frame before).
     fn track_run(&mut self, before: Option<Run>) {
         match self.run {
-            Some(Run::Dash { direction, .. }) => {
+            Some(Run::Dash { direction, .. } | Run::Rest { direction, .. }) => {
                 self.facing = direction;
                 let same =
                     matches!(before, Some(Run::Dash { direction: was, .. }) if was == direction);
