@@ -25,6 +25,8 @@ pub mod buttons {
     pub const CANCEL: u32 = 32;
     /// L: the shop's item description.
     pub const DESCRIBE: u32 = 64;
+    /// Select: opens Yomi's box.
+    pub const SELECT: u32 = 128;
 }
 
 /// One game from one ROM.
@@ -94,6 +96,7 @@ impl Game {
                 confirm: pressed & buttons::CONFIRM != 0,
                 cancel: pressed & buttons::CANCEL != 0,
                 describe: pressed & buttons::DESCRIBE != 0,
+                select: pressed & buttons::SELECT != 0,
             },
         );
         let cues = self.session.take_cues();

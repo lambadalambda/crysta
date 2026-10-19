@@ -3,15 +3,15 @@ import init, { WebGame } from './crysta_web.js';
 
 const RATE = 32000;
 const AHEAD = 0.1; // Seconds of sound queued.
-const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32, DESCRIBE: 64 };
+const BUTTONS = { UP: 1, DOWN: 2, LEFT: 4, RIGHT: 8, CONFIRM: 16, CANCEL: 32, DESCRIBE: 64, SELECT: 128 };
 const DIRECTIONS = 15;
-const ACTIONS = BUTTONS.CONFIRM | BUTTONS.CANCEL | BUTTONS.DESCRIBE;
+const ACTIONS = BUTTONS.CONFIRM | BUTTONS.CANCEL | BUTTONS.DESCRIBE | BUTTONS.SELECT;
 const KEYS = {
   ArrowUp: 'UP', KeyW: 'UP', ArrowDown: 'DOWN', KeyS: 'DOWN',
   ArrowLeft: 'LEFT', KeyA: 'LEFT', ArrowRight: 'RIGHT', KeyD: 'RIGHT',
   KeyX: 'CONFIRM', Enter: 'CONFIRM', Space: 'CONFIRM',
   KeyZ: 'CANCEL', Backspace: 'CANCEL',
-  KeyQ: 'DESCRIBE',
+  KeyQ: 'DESCRIBE', Tab: 'SELECT',
 };
 
 const status = document.getElementById('status');
@@ -103,6 +103,7 @@ function pad() {
     if (button(0)) bits |= BUTTONS.CONFIRM;
     if (button(1)) bits |= BUTTONS.CANCEL;
     if (button(4)) bits |= BUTTONS.DESCRIBE;
+    if (button(8)) bits |= BUTTONS.SELECT;
   }
   return bits;
 }

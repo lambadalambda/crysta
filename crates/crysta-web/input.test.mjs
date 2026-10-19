@@ -64,6 +64,20 @@ async function page(stored = new Map(), full = false) {
 }
 
 const CONFIRM = 16;
+const SELECT = 128;
+
+test('Tab and the gamepad Select button open the box', async () => {
+  const p = await page();
+  p.raf(0);
+  p.key('keydown', 'Tab');
+  p.raf(20);
+  assert.deepEqual(p.last(), { held: SELECT, pressed: SELECT });
+  p.key('keyup', 'Tab');
+  p.raf(40);
+  p.pad.buttons[8].pressed = true;
+  p.raf(60);
+  assert.deepEqual(p.last(), { held: SELECT, pressed: SELECT });
+});
 
 test('X held and sampled gamepad A each generate separate edges, including a sub-frame re-press', async () => {
   const p = await page();
